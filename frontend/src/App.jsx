@@ -6,12 +6,12 @@ import Map from "./pages/Map"
 export default function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/map" element={<Map />} />
-        </Routes>
-      </Layout>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="map" element={<Map />} />
+        </Route>
+      </Routes>
     </BrowserRouter>
   )
 }
