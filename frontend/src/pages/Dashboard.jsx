@@ -1,9 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useOutletContext } from "react-router-dom";
 import { Container, Card, Table, Badge, Button, Dropdown } from "react-bootstrap"
-import LotInfo from "../components/LotInfo"
-import { mockLots } from "../lib/data"
 
 const customStyles = `
   .brand-gray { 
@@ -40,20 +38,9 @@ const customStyles = `
   }
 `
 
-export default function Dashboard({ filters, onSelectLot }) {
-  const [lotsData, setLotsData] = useState(mockLots)
-  const [showLotInfo, setShowLotInfo] = useState(false)
-  const [selectedLotId, setSelectedLotId] = useState(null)
-
-  // Filter lots based on current filters
-  const filteredLots = lotsData.filter((lot) => {
-    if (filters?.search && !lot.id.toLowerCase().includes(filters.search.toLowerCase())) return false
-    if (filters?.owner?.length > 0 && !filters.owner.includes(lot.owner)) return false
-    if (filters?.location?.length > 0 && !filters.location.includes(lot.location || "")) return false
-    if (filters?.status?.length > 0 && !filters.status.includes(lot.status)) return false
-    if (filters?.subStatus?.length > 0 && !filters.subStatus.includes(lot.subStatus)) return false
-    return true
-  })
+export default function Dashboard() {
+  // Recibe todo desde Layout con este "gancho"
+  const { lots, handleStatusChange, handleDeleteLot, handleViewDetail } = useOutletContext();
 
   const getStatusDotClass = (status) => {
     switch (status) {
@@ -83,22 +70,6 @@ export default function Dashboard({ filters, onSelectLot }) {
     }
   }
 
-  const handleStatusChange = (lotId, newStatus) => {
-    setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)))
-  }
-
-  const handleViewDetail = (lotId) => {
-    setSelectedLotId(lotId)
-    setShowLotInfo(true)
-  }
-
-  const handleDeleteLot = (lotId) => {
-    if (window.confirm("¿Está seguro de eliminar este lote?")) {
-      setLotsData((prev) => prev.filter((lot) => lot.id !== lotId))
-      alert("Lote eliminado")
-    }
-  }
-
   return (
     <>
       <style>{customStyles}</style>
@@ -118,7 +89,7 @@ export default function Dashboard({ filters, onSelectLot }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredLots.map((lot) => (
+                {lots.map((lot) => (
                   <tr key={lot.id} className="table-row-hover">
                     <td className="p-3">
                       <div className={`status-dot ${getStatusDotClass(lot.status)}`}></div>
@@ -212,7 +183,7 @@ export default function Dashboard({ filters, onSelectLot }) {
                 ))}
               </tbody>
             </Table>
-            {filteredLots.length === 0 && (
+            {lots.length === 0 && (
               <div className="text-center py-5">
                 <i className="bi bi-info-circle text-muted" style={{ fontSize: "2rem" }}></i>
                 <p className="text-muted mt-3 mb-0">No se encontraron lotes que coincidan con los filtros aplicados.</p>
@@ -220,8 +191,6 @@ export default function Dashboard({ filters, onSelectLot }) {
             )}
           </Card.Body>
         </Card>
-
-        <LotInfo show={showLotInfo} onHide={() => setShowLotInfo(false)} selectedLotId={selectedLotId} />
       </Container>
     </>
   )

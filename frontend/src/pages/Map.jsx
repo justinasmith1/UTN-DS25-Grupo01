@@ -1,8 +1,8 @@
-"use client"
-
 import { useState } from "react"
 import { Container } from "react-bootstrap"
 import { mockLots } from "../lib/data"
+import SidePanel from "../components/SidePanel"  
+import LotInfo from "../components/LotInfo"
 
 const customStyles = `
   .map-container { 
@@ -49,18 +49,33 @@ const customStyles = `
   }
 `
 
-export default function Map({ onParcelClick }) {
-  const [hoveredParcel, setHoveredParcel] = useState(null)
+export default function Map() {
+  const [selectedLotId, setSelectedLotId] = useState(null)
+  const [showPanel,   setShowPanel]   = useState(false)
 
-  const handleParcelClick = (lotId) => {
-    if (onParcelClick) {
-      onParcelClick(lotId)
-    }
+  const [showInfo,    setShowInfo]    = useState(false)
+
+  const handleParcelClick = (id) => {
+    setSelectedLotId(id)
+    setShowPanel(true)
+  }
+  const handleClosePanel = () => {
+    setShowPanel(false)
+  }
+
+  const handleViewDetail = (id) => {
+    setSelectedLotId(id)
+    setShowPanel(false)  
+    setShowInfo(true)    
+  }
+  const handleCloseInfo = () => {
+    setShowInfo(false)
   }
 
   return (
     <>
       <style>{customStyles}</style>
+
       <Container fluid className="py-4">
         <div className="map-container">
           <img
@@ -70,24 +85,36 @@ export default function Map({ onParcelClick }) {
             style={{ objectFit: "contain" }}
           />
 
-          {/* Clickable Parcels */}
           {mockLots.slice(0, 4).map((lot, index) => (
             <div
               key={lot.id}
               className="parcel-overlay"
               style={{
-                top: `${25 + index * 15}%`,
-                left: `${30 + index * 10}%`,
+                top:    `${25 + index * 15}%`,
+                left:   `${30 + index * 10}%`,
               }}
-              onMouseEnter={() => setHoveredParcel(lot.id)}
-              onMouseLeave={() => setHoveredParcel(null)}
               onClick={() => handleParcelClick(lot.id)}
+              onMouseEnter={() => setHoveredParcel(lot.id)}
+              onMouseLeave={() => {() => setHoveredParcel(null)}}
             >
               <div className="parcel-label">{lot.id}</div>
             </div>
           ))}
         </div>
       </Container>
+
+      <SidePanel
+        show={showPanel}
+        onHide={handleClosePanel}
+        selectedLotId={selectedLotId}
+        onViewDetail={handleViewDetail} 
+      />
+
+      <LotInfo
+        show={showInfo}
+        onHide={handleCloseInfo}
+        selectedLotId={selectedLotId}
+      />
     </>
   )
 }
