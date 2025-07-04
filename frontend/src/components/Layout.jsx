@@ -1,8 +1,12 @@
+// src/components/Layout.jsx
 "use client"
 
+// Importa estado, el placeholder de ruta y datos simulados
 import { useState } from "react"
 import { Outlet } from "react-router-dom"
 import { mockLots, mockUser } from "../lib/data"
+
+// Importa los componentes principales que se muestran en todas las páginas
 import Header from "./Header"
 import Botones from "./Botones"
 import FilterBar from "./FilterBar"
@@ -11,7 +15,7 @@ import LotInfo from "./LotInfo"
 
 
 export default function Layout() {
-  // Estado centralizado
+  // Estado global de lotes y filtros
   const [lotsData, setLotsData] = useState(mockLots);
   const [filters, setFilters] = useState({
     search: "",
@@ -20,11 +24,12 @@ export default function Layout() {
     status: [],
     subStatus: [],
   });
+  // Control de visibilidad de los modales
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState(null);
   const [showLotInfo, setShowLotInfo] = useState(false);
 
-  // Lógica de filtrado
+  // Logica de filtrado segun los criterios seleccionados
   const filteredLots = lotsData.filter((lot) => {
     if (filters.search && !lot.id.toLowerCase().includes(filters.search.toLowerCase())) return false;
     if (filters.owner.length > 0 && !filters.owner.includes(lot.owner)) return false;
@@ -34,7 +39,7 @@ export default function Layout() {
     return true;
   });
 
-  // Funciones para manejar los datos
+  // Funciones para manejar los datos y modificar, eliminar, etc
   const handleStatusChange = (lotId, newStatus) => {
     setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
   };

@@ -1,4 +1,5 @@
-"use client"
+// src/components/FilterBar.jsx
+"use client" //Activa el modo cliente para hooks y eventos
 import { Container, Row, Col, Button, FormControl, InputGroup, Dropdown, Badge } from "react-bootstrap"
 
 const customStyles = `
@@ -39,6 +40,7 @@ const customStyles = `
 `
 
 export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApplyPromotion, onClearFilters }) {
+  // Opciones disponibles para cada categoria de filtro, en un futuro se tienen que ir a buscar a la BD
   const filterOptions = {
     owner: ["CCLF", "Juan Pérez", "Ana Gómez", "Carlos López"],
     location: ["Sector Norte", "Sector Sur", "Sector Este", "Sector Oeste"],
@@ -46,6 +48,7 @@ export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApp
     subStatus: ["En Venta", "Reservado", "Alquilado", "En Construccion", "Construido", "No Construido"],
   }
 
+  //Alterna un valor dentro de la categoria: lo agrega o lo quita
   const toggleFilter = (category, value) => {
     if (category === "search") return
 
@@ -60,6 +63,7 @@ export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApp
     })
   }
 
+  // Comprueba si existe al menos un filtro activo
   const hasActiveFilters =
     filters.search ||
     (filters.owner && filters.owner.length > 0) ||

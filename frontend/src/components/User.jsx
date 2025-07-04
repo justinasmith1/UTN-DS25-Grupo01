@@ -1,3 +1,5 @@
+// src/components/User.jsx
+// Muestra un modal con pestañas para perfil y actividad
 import { Modal, Tabs, Tab, Row, Col, Card, Badge } from "react-bootstrap"
 
 const customStyles = `
@@ -21,7 +23,7 @@ const customStyles = `
 `
 
 export default function User({ show, onHide, user }) {
-  if (!user) return null
+  if (!user) return null // No renderiza basicamente si no hay usuario
 
   return (
     <>

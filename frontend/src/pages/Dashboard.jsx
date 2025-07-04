@@ -1,4 +1,5 @@
-"use client"
+// src/pages/Dashboard.jsx
+"use client" // permite hooks en entornos que lo requieran
 
 import { useOutletContext } from "react-router-dom";
 import { Container, Card, Table, Badge, Button, Dropdown } from "react-bootstrap"
@@ -39,8 +40,10 @@ const customStyles = `
 
 export default function Dashboard() {
   // Recibe todo desde Layout con este "gancho"
+  // Obtiene lista de lotes y funciones de acción
   const { lots, handleStatusChange, handleDeleteLot, handleViewDetail } = useOutletContext();
 
+  // Asigna clase de color al punto según el estado del lote
   const getStatusDotClass = (status) => {
     switch (status) {
       case "Disponible":
@@ -54,6 +57,7 @@ export default function Dashboard() {
     }
   }
 
+  // Devuelve la variante de Badge según el sub-estado del lote
 const getSubStatusVariant = (subStatus) => {
   switch (subStatus) {
     case "En Venta":

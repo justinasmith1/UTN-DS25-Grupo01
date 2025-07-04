@@ -1,3 +1,4 @@
+// src/components/SidePanel.jsx
 "use client"
 
 import { useState } from "react"
@@ -40,26 +41,26 @@ const customStyles = `
 `
 
 export default function SidePanel({ show, onHide, selectedLotId, onViewDetail }) {
+  // Indice de imagen actual en el carrusel
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
 
+  // Busca el lote seleccionado en los datos
   const currentLot = mockLots.find((lot) => lot.id === selectedLotId)
 
   if (!currentLot) return null
 
   const images = currentLot.images || []
 
+  // Acciones de ejemplo: editar, reservar, ver cuenta
   const handleEdit = () => {
     alert(`Editar lote ${currentLot.id}`)
   }
-
   const handleReserve = () => {
     alert(`Reservar lote ${currentLot.id}`)
   }
-
   const handleViewAccount = () => {
     alert(`Ver cuenta para lote ${currentLot.id}`)
   }
-
   const handleViewDetail = () => {
     onViewDetail(currentLot.id)
     onHide()
