@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
 import { mockLots } from "../lib/data"
+/*Falta invocar LotInfo para poder ver el detalle completo desde el SidePanel */
 
 const customStyles = `
   .brand-pale-green { 
