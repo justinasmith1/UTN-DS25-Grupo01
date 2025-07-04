@@ -42,8 +42,8 @@ export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApp
   const filterOptions = {
     owner: ["CCLF", "Juan Pérez", "Ana Gómez", "Carlos López"],
     location: ["Sector Norte", "Sector Sur", "Sector Este", "Sector Oeste"],
-    status: ["Disponible", "Vendido", "Reservado", "En Construccion"],
-    subStatus: ["Disponible", "Reservado", "Vendido", "En promoción"],
+    status: ["Disponible", "Vendido", "No Disponible"],
+    subStatus: ["En Venta", "Reservado", "Alquilado", "En Construccion", "Construido", "No Construido"],
   }
 
   const toggleFilter = (category, value) => {
@@ -84,16 +84,27 @@ export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApp
             </Col>
             <Col md={6}>
               <InputGroup>
-                <InputGroup.Text className="bg-white border-end-0">
+                <span className="input-group-text bg-white border-end-0" style={{ borderRight: "none" }}>
                   <i className="bi bi-search text-muted"></i>
-                </InputGroup.Text>
-                <FormControl
+                </span>
+                <input
+                  type="text"
+                  className="form-control border-start-0"
+                  style={{
+                    borderLeft: "none",
+                    boxShadow: "none",
+                    borderTopRightRadius: "8px",
+                    borderBottomRightRadius: "8px",
+                    borderTopLeftRadius: "0",
+                    borderBottomLeftRadius: "0"
+                  }}
                   placeholder="ID de Lote..."
                   value={filters.search || ""}
                   onChange={(e) => onFiltersChange({ ...filters, search: e.target.value })}
-                  className="filter-input border-start-0"
                 />
               </InputGroup>
+
+              
             </Col>
             <Col md={3}>
               <Button className="brand-dark-green filter-btn" onClick={onApplyPromotion}>

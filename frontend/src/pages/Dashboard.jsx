@@ -25,9 +25,8 @@ const customStyles = `
     margin-right: 8px;
   }
   .status-dot-disponible { background-color: #28a745; }
-  .status-dot-vendido { background-color: #dc3545; }
-  .status-dot-reservado { background-color: #ffc107; }
-  .status-dot-construccion { background-color: #007bff; }
+  .status-dot-nodisponible { background-color: #dc3545; }
+  .status-dot-vendido { background-color: #007bff; }
   .action-btn {
     border-radius: 8px !important;
     transition: all 0.15s ease;
@@ -48,27 +47,32 @@ export default function Dashboard() {
         return "status-dot-disponible"
       case "Vendido":
         return "status-dot-vendido"
-      case "Reservado":
-        return "status-dot-reservado"
-      case "En Construccion":
-        return "status-dot-construccion"
+      case "No Disponible":
+        return "status-dot-nodisponible"
       default:
         return "bg-secondary"
     }
   }
 
-  const getSubStatusVariant = (subStatus) => {
-    switch (subStatus) {
-      case "En promoción":
-        return "warning"
-      case "Reservado":
-        return "warning"
-      case "Vendido":
-        return "danger"
-      default:
-        return "success"
-    }
+const getSubStatusVariant = (subStatus) => {
+  switch (subStatus) {
+    case "En Venta":
+      return "success"
+    case "Reservado":
+      return "warning"
+    case "Alquilado":
+      return "info"
+    case "En Construccion":
+      return "secondary"
+    case "Construido":
+      return "dark"
+    case "No Construido":
+      return "light"
+    default:
+      return "primary"
   }
+}
+
 
   return (
     <>
@@ -110,7 +114,7 @@ export default function Dashboard() {
                           {lot.status}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ borderRadius: "12px" }}>
-                          {["Disponible", "Vendido", "Reservado", "En Construccion"].map((status) => (
+                          {["Disponible", "Vendido", "No Disponible"].map((status) => (
                             <Dropdown.Item
                               key={status}
                               onClick={() => handleStatusChange(lot.id, status)}
@@ -130,6 +134,7 @@ export default function Dashboard() {
                       >
                         {lot.subStatus}
                       </Badge>
+      
                     </td>
                     <td className="p-3">
                       <Badge
