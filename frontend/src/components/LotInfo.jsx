@@ -95,6 +95,7 @@ export default function LotInfo({ show, onHide, selectedLotId }) {
   const dataFields = [
     { key: "id", label: "ID", value: editedLot.id, editable: false },
     { key: "status", label: "Estado", value: editedLot.status, editable: true },
+    { key: "subStatus", label: "SubEstado", value: editedLot.subStatus, editable: true },
     { key: "owner", label: "Propietario", value: editedLot.owner, editable: true },
     { key: "surface", label: "Superficie", value: editedLot.surface || "N/A", editable: true },
     { key: "price", label: "Precio", value: editedLot.price || "N/A", editable: true },

@@ -38,6 +38,9 @@ export default function Layout() {
   const handleStatusChange = (lotId, newStatus) => {
     setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
   };
+  const handleSubStatusChange = (lotId, newSubStatus) => {
+      setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, subStatus: newSubStatus } : lot)));
+    };
   const handleDeleteLot = (lotId) => {
     if (window.confirm("¿Está seguro de eliminar este lote?")) {
       setLotsData((prev) => prev.filter((lot) => lot.id !== lotId));
