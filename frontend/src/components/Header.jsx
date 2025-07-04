@@ -1,4 +1,5 @@
-"use client"
+// src/components/Header.jsx
+"use client" // Lo mismo que en el resto de archivos
 import { Navbar, Nav, Container, Button } from "react-bootstrap"
 import { useNavigate, useLocation } from "react-router-dom"
 
@@ -21,8 +22,8 @@ const customStyles = `
 `
 
 export default function Header({ onUserClick, user }) {
-  const navigate = useNavigate()
-  const location = useLocation()
+  const navigate = useNavigate() // Esto para cambiar de ruta
+  const location = useLocation() // Esto para conocer la ruta actual
 
   return (
     <>

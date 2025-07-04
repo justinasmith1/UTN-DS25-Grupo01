@@ -1,3 +1,4 @@
+// src/pages/Map.jsx
 import { useState } from "react"
 import { Container } from "react-bootstrap"
 import { mockLots } from "../lib/data"
@@ -50,24 +51,28 @@ const customStyles = `
 `
 
 export default function Map() {
+  // Estado local: lote seleccionado, visibilidad del panel y modal, parcela en hover
   const [selectedLotId, setSelectedLotId] = useState(null)
   const [showPanel,   setShowPanel]   = useState(false)
 
   const [showInfo,    setShowInfo]    = useState(false)
 
+  // Abre panel lateral al hacer clic
   const handleParcelClick = (id) => {
     setSelectedLotId(id)
     setShowPanel(true)
   }
+  // Cierra el panel
   const handleClosePanel = () => {
     setShowPanel(false)
   }
-
+  // Pasa a vista detallada
   const handleViewDetail = (id) => {
     setSelectedLotId(id)
     setShowPanel(false)  
     setShowInfo(true)    
   }
+  //Cierra la vista de informacion
   const handleCloseInfo = () => {
     setShowInfo(false)
   }
@@ -102,7 +107,8 @@ export default function Map() {
           ))}
         </div>
       </Container>
-
+      
+      {/* Panel lateral con opciones y detalles */}
       <SidePanel
         show={showPanel}
         onHide={handleClosePanel}
@@ -110,6 +116,7 @@ export default function Map() {
         onViewDetail={handleViewDetail} 
       />
 
+      {/* Modal de información extendida */}
       <LotInfo
         show={showInfo}
         onHide={handleCloseInfo}

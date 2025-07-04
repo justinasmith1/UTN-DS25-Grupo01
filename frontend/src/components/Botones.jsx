@@ -1,3 +1,4 @@
+// src/components/Botones.jsx
 import { Container, Row, Col, Button } from "react-bootstrap"
 
 const customStyles = `
@@ -25,6 +26,7 @@ const customStyles = `
 `
 
 export default function Botones() {
+  // Lista de las categorias que se van a mostrar como botones
   const categories = ["Ventas", "Inmobiliarias", "Personas", "Reportes"]
 
   return (
