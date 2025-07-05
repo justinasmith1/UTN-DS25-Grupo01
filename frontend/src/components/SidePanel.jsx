@@ -3,7 +3,6 @@
 
 import { useState } from "react"
 import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
-import { mockLots } from "../lib/data"
 /*Falta invocar LotInfo para poder ver el detalle completo desde el SidePanel */
 
 const customStyles = `
@@ -40,21 +39,16 @@ const customStyles = `
   }
 `
 
-export default function SidePanel({ show, onHide, selectedLotId, onViewDetail }) {
+export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, lots, abrirModalEditar }) {
   // Indice de imagen actual en el carrusel
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
-
   // Busca el lote seleccionado en los datos
-  const currentLot = mockLots.find((lot) => lot.id === selectedLotId)
-
+  const currentLot = lots.find((lot) => lot.id === selectedLotId)
   if (!currentLot) return null
 
   const images = currentLot.images || []
 
   // Acciones de ejemplo: editar, reservar, ver cuenta
-  const handleEdit = () => {
-    alert(`Editar lote ${currentLot.id}`)
-  }
   const handleReserve = () => {
     alert(`Reservar lote ${currentLot.id}`)
   }
@@ -179,7 +173,7 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail })
                 </Button>
               </Col>
               <Col xs={6}>
-                <Button className="brand-dark-green w-100 action-btn" onClick={handleEdit}>
+                <Button className="brand-dark-green w-100 action-btn" onClick={() => abrirModalEditar(currentLot)}>
                   Editar
                 </Button>
               </Col>
