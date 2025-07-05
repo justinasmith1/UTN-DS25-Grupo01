@@ -2,8 +2,8 @@
 import { useState } from "react"
 import { Container } from "react-bootstrap"
 import { mockLots } from "../lib/data"
-import SidePanel from "../components/SidePanel"  
-import LotInfo from "../components/LotInfo"
+import { useOutletContext } from "react-router-dom"
+
 
 const customStyles = `
   .map-container { 
@@ -54,8 +54,8 @@ export default function Map() {
   // Estado local: lote seleccionado, visibilidad del panel y modal, parcela en hover
   const [selectedLotId, setSelectedLotId] = useState(null)
   const [showPanel,   setShowPanel]   = useState(false)
-
   const [showInfo,    setShowInfo]    = useState(false)
+  const { openSidePanel, handleViewDetail, abrirModalEditar } = useOutletContext()
 
   // Abre panel lateral al hacer clic
   const handleParcelClick = (id) => {
@@ -66,12 +66,7 @@ export default function Map() {
   const handleClosePanel = () => {
     setShowPanel(false)
   }
-  // Pasa a vista detallada
-  const handleViewDetail = (id) => {
-    setSelectedLotId(id)
-    setShowPanel(false)  
-    setShowInfo(true)    
-  }
+
   //Cierra la vista de informacion
   const handleCloseInfo = () => {
     setShowInfo(false)
@@ -98,30 +93,20 @@ export default function Map() {
                 top:    `${25 + index * 15}%`,
                 left:   `${30 + index * 10}%`,
               }}
-              onClick={() => handleParcelClick(lot.id)}
+              onClick={() => openSidePanel(lot.id)}
+              onDoubleClick={() => abrirModalEditar(lot)}
               onMouseEnter={() => setHoveredParcel(lot.id)}
-              onMouseLeave={() => {() => setHoveredParcel(null)}}
+              onMouseLeave={() => setHoveredParcel(null)}
+              onContextMenu={e => {                         // clic derecho abre detalle
+                e.preventDefault()
+                handleViewDetail(lot.id)
+              }}
             >
               <div className="parcel-label">{lot.id}</div>
             </div>
           ))}
         </div>
       </Container>
-      
-      {/* Panel lateral con opciones y detalles */}
-      <SidePanel
-        show={showPanel}
-        onHide={handleClosePanel}
-        selectedLotId={selectedLotId}
-        onViewDetail={handleViewDetail} 
-      />
-
-      {/* Modal de información extendida */}
-      <LotInfo
-        show={showInfo}
-        onHide={handleCloseInfo}
-        selectedLotId={selectedLotId}
-      />
     </>
   )
 }
