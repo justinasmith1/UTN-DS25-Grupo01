@@ -1,8 +1,5 @@
-// src/components/LotInfo.jsx
-"use client"
-
 import React, { useState } from "react"
-import { Modal, Container, Row, Col, Card, Button, FormControl } from "react-bootstrap"
+import { Modal, Container, Row, Col, Card, Button, FormControl, Carousel } from "react-bootstrap"
 import { useOutletContext } from "react-router-dom"
 
 const customStyles = `
@@ -24,6 +21,8 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
   // leemos lots y la función para editar
   const lot = lots.find(l => l.id === selectedLotId)
   if (!lot) return null
+
+  const images = lot.images || []
 
   return (
     <>
@@ -57,25 +56,43 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
                 </table>
               </Col>
               <Col lg={6}>
-                {lot.image && (
+              <div className="mb-4">
+                {images.length > 1 ? (
+                  <Carousel className="detail-card overflow-hidden">
+                    {images.map((img, i) => (
+                      <Carousel.Item key={i}>
+                        <img
+                          className="d-block w-100 detail-card"
+                          src={img}
+                          alt={`Lote ${lot.id} imagen ${i + 1}`}
+                          style={{ height: "300px", objectFit: "cover" }}
+                        />
+                      </Carousel.Item>
+                    ))}
+                  </Carousel>
+                ) : images[0] ? (
+                  // Si sólo hay una imagen
                   <img
-                    src={lot.image}
+                    src={images[0]}
                     alt={`Lote ${lot.id}`}
                     className="img-fluid detail-card mb-4"
-                    style={{ objectFit:"cover", width:"100%", height:"300px" }}
+                    style={{ width: "100%", height: "300px", objectFit: "cover" }}
                   />
-                )}
-                {lot.description?.length > 0 && (
-                  <Card className="p-3 detail-card">
-                    <Card.Title className="mb-3">Descripción</Card.Title>
-                    <ul className="mb-0">
-                      {lot.description.map((pt,i) => (
-                        <li key={i}>{pt}</li>
-                      ))}
-                    </ul>
-                  </Card>
-                )}
-              </Col>
+                ) : null}
+              </div>
+                </Col>
+                <div className="mb-4">
+                  {lot.descriptionPoints && lot.descriptionPoints.length > 0 && (
+                    <Card className="p-3 detail-card">
+                      <Card.Title className="mb-3">Descripción</Card.Title>
+                      <ul className="mb-0">
+                        {lot.descriptionPoints.map((pt, i) => (
+                          <li key={i}>{pt}</li>
+                        ))}
+                      </ul>
+                    </Card>
+                  )}
+                </div>
             </Row>
           </Container>
         </Modal.Body>
