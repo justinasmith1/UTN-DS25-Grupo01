@@ -1,6 +1,3 @@
-// src/components/ModalGestionLote.jsx
-"use client"
-
 import { useState, useEffect } from "react"
 import { Modal, Button, Form } from "react-bootstrap"
 
@@ -59,7 +56,9 @@ export default function ModalGestionLote({
     status: "Disponible",
     subStatus: "En Venta",
     owner: "",
-    location: ""
+    location: "",
+    price: "",
+    area: ""
   })
 
   // controla la visibilidad del confirm interno
@@ -77,7 +76,9 @@ export default function ModalGestionLote({
         status: "Disponible", //Estos proque es medio raro que lo creemos y no este disponible, igual todo esto con BD
         subStatus: "En Venta",
         owner: "",
-        location: ""
+        location: "",
+        price: "",
+        surface: ""
       })
     }
   }, [show, esEdicion, datosIniciales])
@@ -174,6 +175,25 @@ export default function ModalGestionLote({
               value={formData.location}
               onChange={handleChange}
               placeholder="Ej. Sector Norte"
+            />
+          </Form.Group>
+          
+          <Form.Group className="mb-3">
+            <Form.Label>Superficie</Form.Label>
+            <Form.Control
+              name="surface"
+              value={formData.surface}
+              onChange={handleChange}
+              placeholder="Ej. 500 m²"
+            />
+          </Form.Group>
+          <Form.Group className="mb-3">
+            <Form.Label>Precio</Form.Label>
+            <Form.Control
+              name="price"
+              value={formData.price}
+              onChange={handleChange}
+              placeholder="Ej. $40.000"
             />
           </Form.Group>
         </Form>
