@@ -12,6 +12,8 @@ import Botones from "./Botones"
 import FilterBar from "./FilterBar"
 import User from "./User"
 import LotInfo from "./LotInfo"
+import ModalGestionLote from "./ModalGestionLote"
+import SidePanel from "./SidePanel"
 
 
 export default function Layout() {
@@ -25,9 +27,23 @@ export default function Layout() {
     subStatus: [],
   });
   // Control de visibilidad de los modales
+
+  //Estados modales y seleccion
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedLotId, setSelectedLotId] = useState(null);
+
+  //Para LotInfo
   const [showLotInfo, setShowLotInfo] = useState(false);
+
+  //Para SidePanel
+  const [showPanel, setShowPanel] = useState(false)
+
+  //Modal para crear/editar
+  const [modalLote, setModalLote] = useState({
+    show: false,
+    modo: "crear",      // "crear" o "editar"
+    datosIniciales: null
+   })
 
   // Logica de filtrado segun los criterios seleccionados
   const filteredLots = lotsData.filter((lot) => {
@@ -43,30 +59,62 @@ export default function Layout() {
   const handleStatusChange = (lotId, newStatus) => {
     setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
   };
+
   const handleSubStatusChange = (lotId, newSubStatus) => {
       setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, subStatus: newSubStatus } : lot)));
     };
-  const handleDeleteLot = (lotId) => {
-    if (window.confirm("¿Está seguro de eliminar este lote?")) {
-      setLotsData((prev) => prev.filter((lot) => lot.id !== lotId));
-      alert("Lote eliminado");
-    }
-  };
-   const handleViewDetail = (lotId) => {
+  
+  const handleViewDetail = (lotId) => {
     setSelectedLotId(lotId);
+    setShowPanel(false)
     setShowLotInfo(true);
   };
+  
   const handleClearFilters = () => {
     setFilters({ search: "", owner: [], location: [], status: [], subStatus: [] });
-  };
-  const handleAddRecord = () => {
-    alert("Acción Añadir Nuevo Registro");
   };
 
   const handleApplyPromotion = () => {
     alert("Acción Aplicar Promoción");
   };
 
+  // — Handlers de SidePanel —
+  const handleOpenPanel  = lotId => {
+    setSelectedLotId(lotId)
+    setShowPanel(true)
+  }
+  const handleClosePanel = () => setShowPanel(false)
+
+
+  // Abre el modal para crear un lote
+  const abrirModalCrear = () => {
+    setModalLote({ show: true, modo: "crear", datosIniciales: null })
+  }
+
+  // Abre el modal para editar un lote existente
+  const abrirModalEditar = (lote) => {
+    setModalLote({ show: true, modo: "editar", datosIniciales: lote })
+   }
+
+  // Guarda o actualiza un lote según el modo
+  const guardarLote = (lote) => {
+    if (modalLote.modo === "editar") {
+      setLotsData(prev =>
+        prev.map(l => (l.id === lote.id ? { ...l, ...lote } : l))
+      )
+    } else {
+      setLotsData(prev => [...prev, lote])
+    }
+  }
+
+  // Elimina lote desde el modal
+  const eliminarLote = (id) => {
+    setLotsData(prev => prev.filter(l => l.id !== id))
+   }
+
+  const abrirModalEliminar = (lote) => {
+    setModalLote({ show: true, modo: "borrar", datosIniciales: lote })
+   }
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-white">
@@ -75,20 +123,55 @@ export default function Layout() {
       <FilterBar
         filters={filters}
         onFiltersChange={setFilters}
-        onAddRecord={handleAddRecord}
+        onAddRecord={abrirModalCrear}
         onApplyPromotion={handleApplyPromotion}
         onClearFilters={handleClearFilters}
       />
       
       <Outlet context={{ 
         lots: filteredLots, 
-        handleStatusChange, 
-        handleDeleteLot,
-        handleViewDetail 
+        handleStatusChange,
+        handleSubStatusChange,
+        handleViewDetail,
+        abrirModalEditar,
+        abrirModalEliminar,
+        openSidePanel: handleOpenPanel
       }} />
 
-      <User show={showUserModal} onHide={() => setShowUserModal(false)} user={mockUser} />
-      <LotInfo show={showLotInfo} onHide={() => setShowLotInfo(false)} selectedLotId={selectedLotId} />
+      <SidePanel
+        show={showPanel}
+        onHide={handleClosePanel}
+        selectedLotId={selectedLotId}
+        onViewDetail={handleViewDetail}
+        lots={filteredLots}                     
+        abrirModalEditar={abrirModalEditar}
+        abrirModalEliminar={abrirModalEliminar}     
+      />
+
+      <User 
+        show={showUserModal} 
+        onHide={() => setShowUserModal(false)} 
+        user={mockUser} 
+      />
+
+      <LotInfo 
+        show={showLotInfo} 
+        onHide={() => setShowLotInfo(false)} 
+        selectedLotId={selectedLotId} 
+        lots={filteredLots} 
+        abrirModalEditar={abrirModalEditar}
+        abrirModalEliminar={abrirModalEliminar}
+        />
+
+      {/* Modal unico para crear, editar y eliminar */}
+      <ModalGestionLote
+        show={modalLote.show}
+        modo={modalLote.modo}
+        datosIniciales={modalLote.datosIniciales}
+        onHide={() => setModalLote(prev => ({ ...prev, show: false }))}
+        onSave={guardarLote}
+        onDelete={eliminarLote}
+       /> 
     </div>
   )
 }

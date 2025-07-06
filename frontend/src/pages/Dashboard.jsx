@@ -5,43 +5,23 @@ import { useOutletContext } from "react-router-dom";
 import { Container, Card, Table, Badge, Button, Dropdown } from "react-bootstrap"
 
 const customStyles = `
-  .brand-gray { 
-    background-color: #f0f0f0 !important; 
-  }
-  .text-brand-dark-green { 
-    color: #0b3d23 !important; 
-  }
-  .border-brand-dark-green { 
-    border-color: #0b3d23 !important; 
-  }
-  .table-row-hover:hover { 
-    background-color: rgba(230, 239, 233, 0.5) !important; 
-    transition: all 0.15s ease;
-  }
-  .status-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 8px;
-  }
+  .brand-gray { background-color: #f0f0f0 !important; }
+  .text-brand-dark-green { color: #0b3d23 !important; }
+  .border-brand-dark-green { border-color: #0b3d23 !important; }
+  .table-row-hover:hover { background-color: rgba(230, 239, 233, 0.5) !important; transition: all 0.15s ease;}
+  .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
   .status-dot-disponible { background-color: #28a745; }
   .status-dot-nodisponible { background-color: #dc3545; }
   .status-dot-vendido { background-color: #007bff; }
-  .action-btn {
-    border-radius: 8px !important;
-    transition: all 0.15s ease;
-  }
-  .action-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  }
+  .action-btn { border-radius: 8px !important; transition: all 0.15s ease; }
+  .action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
 `
 
 export default function Dashboard() {
   // Recibe todo desde Layout con este "gancho"
   // Obtiene lista de lotes y funciones de acción
-  const { lots, handleStatusChange, handleDeleteLot, handleViewDetail } = useOutletContext();
+  const { lots, handleStatusChange, handleViewDetail, abrirModalEditar, abrirModalEliminar } = useOutletContext();
+
 
   // Asigna clase de color al punto según el estado del lote
   const getStatusDotClass = (status) => {
@@ -174,7 +154,7 @@ const getSubStatusVariant = (subStatus) => {
                           variant="outline-warning"
                           size="sm"
                           className="action-btn"
-                          onClick={() => alert(`Editar ${lot.id}`)}
+                          onClick={() => abrirModalEditar(lot)}
                         >
                           <i className="bi bi-pencil"></i>
                         </Button>
@@ -182,7 +162,7 @@ const getSubStatusVariant = (subStatus) => {
                           variant="outline-danger"
                           size="sm"
                           className="action-btn"
-                          onClick={() => handleDeleteLot(lot.id)}
+                          onClick={() => abrirModalEliminar(lot)}
                         >
                           <i className="bi bi-trash"></i>
                         </Button>
