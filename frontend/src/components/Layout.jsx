@@ -1,12 +1,11 @@
-// src/components/Layout.jsx
-"use client"
+"use client" //No se para que es esto
 
-// Importa estado, el placeholder de ruta y datos simulados
+// Importa estado, el placeholder de ruta y datos simulados de un js
 import { useState } from "react"
 import { Outlet } from "react-router-dom"
 import { mockLots, mockUser } from "../lib/data"
 
-// Importa los componentes principales que se muestran en todas las páginas
+// Importa los componentes principales comunes a todas las páginas
 import Header from "./Header"
 import Botones from "./Botones"
 import FilterBar from "./FilterBar"
@@ -28,8 +27,10 @@ export default function Layout() {
   });
   // Control de visibilidad de los modales
 
-  //Estados modales y seleccion
+  //Para mostrar el componente User
   const [showUserModal, setShowUserModal] = useState(false);
+
+  //Guarda un lote seleccionado
   const [selectedLotId, setSelectedLotId] = useState(null);
 
   //Para LotInfo
@@ -54,26 +55,20 @@ export default function Layout() {
     if (filters.subStatus.length > 0 && !filters.subStatus.includes(lot.subStatus)) return false;
     return true;
   });
-
-  // Funciones para manejar los datos y modificar, eliminar, etc
-  const handleStatusChange = (lotId, newStatus) => {
-    setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
-  };
-
-  const handleSubStatusChange = (lotId, newSubStatus) => {
-      setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, subStatus: newSubStatus } : lot)));
-    };
   
+  //Manejador para ver el detalle completo de un lote
   const handleViewDetail = (lotId) => {
     setSelectedLotId(lotId);
     setShowPanel(false)
     setShowLotInfo(true);
   };
   
+  //Funcion para limpiar filtros 
   const handleClearFilters = () => {
     setFilters({ search: "", owner: [], location: [], status: [], subStatus: [] });
   };
 
+  //Funcion para aplicar promocion -> Modularizar en otro componente
   const handleApplyPromotion = () => {
     alert("Acción Aplicar Promoción");
   };
@@ -83,8 +78,17 @@ export default function Layout() {
     setSelectedLotId(lotId)
     setShowPanel(true)
   }
+
   const handleClosePanel = () => setShowPanel(false)
 
+  // Funciones para cambiar los estados de los lotes
+  const handleStatusChange = (lotId, newStatus) => {
+    setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
+  };
+
+  const handleSubStatusChange = (lotId, newSubStatus) => {
+      setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, subStatus: newSubStatus } : lot)));
+    };
 
   // Abre el modal para crear un lote
   const abrirModalCrear = () => {
