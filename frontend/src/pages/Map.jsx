@@ -93,14 +93,9 @@ export default function Map() {
                 top:    `${25 + index * 15}%`,
                 left:   `${30 + index * 10}%`,
               }}
-              onClick={() => openSidePanel(lot.id)}
-              onDoubleClick={() => abrirModalEditar(lot)}
-              onMouseEnter={() => setHoveredParcel(lot.id)}
+              onClick={() => openSidePanel(lot.id)}  
+              onMouseEnter={() => setHoveredParcel(lot.id)} 
               onMouseLeave={() => setHoveredParcel(null)}
-              onContextMenu={e => {                         // clic derecho abre detalle
-                e.preventDefault()
-                handleViewDetail(lot.id)
-              }}
             >
               <div className="parcel-label">{lot.id}</div>
             </div>
