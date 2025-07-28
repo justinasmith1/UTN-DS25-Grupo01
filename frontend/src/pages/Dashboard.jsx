@@ -13,6 +13,8 @@ const customStyles = `
   .status-dot-disponible { background-color: #28a745; }
   .status-dot-nodisponible { background-color: #dc3545; }
   .status-dot-vendido { background-color: #007bff; }
+  .status-dot-reservado { background-color: #Ffff00; }
+  .status-dot-alquilado { background-color: #Ff8000; }
   .action-btn { border-radius: 8px !important; transition: all 0.15s ease; }
   .action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
 `
@@ -32,6 +34,10 @@ export default function Dashboard() {
         return "status-dot-vendido"
       case "No Disponible":
         return "status-dot-nodisponible"
+      case "Reservado":
+        return "status-dot-reservado"
+      case "Alquilado":
+        return "status-dot-alquilado"
       default:
         return "bg-secondary"
     }
@@ -40,18 +46,12 @@ export default function Dashboard() {
   // Devuelve la variante de Badge según el sub-estado del lote
 const getSubStatusVariant = (subStatus) => {
   switch (subStatus) {
-    case "En Venta":
-      return "success"
-    case "Reservado":
-      return "warning"
-    case "Alquilado":
-      return "info"
     case "En Construccion":
-      return "secondary"
+      return "warning"
     case "Construido":
-      return "dark"
+      return "success"
     case "No Construido":
-      return "light"
+      return "danger"
     default:
       return "primary"
   }
@@ -70,7 +70,7 @@ const getSubStatusVariant = (subStatus) => {
                   <th width="50" className="p-3"></th>
                   <th className="p-3">ID</th>
                   <th className="p-3">Estado</th>
-                  <th className="p-3">Sub-Estado</th>
+                  <th className="p-3">Estado-Plano</th>
                   <th className="p-3">Propietario</th>
                   <th className="p-3">Ubicación</th>
                   <th className="p-3">Acciones</th>
@@ -98,7 +98,7 @@ const getSubStatusVariant = (subStatus) => {
                           {lot.status}
                         </Dropdown.Toggle>
                         <Dropdown.Menu style={{ borderRadius: "12px" }}>
-                          {["Disponible", "Vendido", "No Disponible"].map((status) => (
+                          {["Disponible", "Vendido", "No Disponible", "Reservado", "Alquilado"].map((status) => (
                             <Dropdown.Item
                               key={status}
                               onClick={() => handleStatusChange(lot.id, status)}
@@ -123,7 +123,7 @@ const getSubStatusVariant = (subStatus) => {
                     <td className="p-3">
                       <Badge
                         variant="outline-success"
-                        className="border-brand-dark-green text-brand-dark-green px-3 py-2"
+                        className="border-brand-dark-green px-3 py-2"
                         style={{ borderRadius: "12px" }}
                       >
                         {lot.owner}
