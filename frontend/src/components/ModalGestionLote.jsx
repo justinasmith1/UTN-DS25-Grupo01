@@ -54,11 +54,11 @@ export default function ModalGestionLote({
   const [formData, setFormData] = useState({
     id: "",
     status: "Disponible",
-    subStatus: "En Venta",
+    subStatus: "Construido",
     owner: "",
     location: "",
     price: "",
-    area: ""
+    surface: ""
   })
 
   // controla la visibilidad del confirm interno
@@ -74,7 +74,7 @@ export default function ModalGestionLote({
       setFormData({
         id: "",
         status: "Disponible", //Estos proque es medio raro que lo creemos y no este disponible, igual todo esto con BD
-        subStatus: "En Venta",
+        subStatus: "Construido",
         owner: "",
         location: "",
         price: "",
@@ -139,6 +139,8 @@ export default function ModalGestionLote({
               <option>Disponible</option>
               <option>Vendido</option>
               <option>No Disponible</option>
+              <option>Alquilado</option>
+              <option>Reservado</option>
             </Form.Select>
           </Form.Group>
 
@@ -149,12 +151,10 @@ export default function ModalGestionLote({
               value={formData.subStatus}
               onChange={handleChange}
             >
-              <option>En Venta</option>
-              <option>Reservado</option>
-              <option>Alquilado</option>
               <option>En Construccion</option>
               <option>Construido</option>
               <option>No Construido</option>
+ 4
             </Form.Select>
           </Form.Group>
 

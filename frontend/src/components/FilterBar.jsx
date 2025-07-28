@@ -44,8 +44,8 @@ export default function FilterBar({ filters, onFiltersChange, onAddRecord, onApp
   const filterOptions = {
     owner: ["CCLF", "Juan Pérez", "Ana Gómez", "Carlos López"],
     location: ["Sector Norte", "Sector Sur", "Sector Este", "Sector Oeste"],
-    status: ["Disponible", "Vendido", "No Disponible"],
-    subStatus: ["En Venta", "Reservado", "Alquilado", "En Construccion", "Construido", "No Construido"],
+    status: ["Disponible", "Vendido", "No Disponible","Reservado", "Alquilado"],
+    subStatus: ["En Construccion", "Construido", "No Construido"],
   }
 
   //Alterna un valor dentro de la categoria: lo agrega o lo quita

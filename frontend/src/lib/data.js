@@ -2,7 +2,7 @@ export const mockLots = [
   {
     id: "L001",
     status: "Disponible",
-    subStatus: "En promoción",
+    subStatus: "En Construccion",
     plan: "Plano General",
     owner: "CCLF",
     surface: "500 m²",
@@ -30,7 +30,7 @@ export const mockLots = [
   {
     id: "L003",
     status: "No Disponible",
-    subStatus: "Reservado",
+    subStatus: "Construido",
     plan: "Plano Sector A",
     owner: "Ana Gómez",
     surface: "550 m²",
@@ -42,7 +42,7 @@ export const mockLots = [
   {
     id: "L004",
     status: "No Disponible",
-    subStatus: "Reservado",
+    subStatus: "No Construido",
     plan: "Plano Sector B",
     owner: "Carlos López",
     surface: "700 m²",
@@ -54,7 +54,7 @@ export const mockLots = [
   {
     id: "L005",
     status: "Disponible",
-    subStatus: "En Venta",
+    subStatus: "Construido",
     plan: "Plano General",
     owner: "CCLF",
     surface: "520 m²",
