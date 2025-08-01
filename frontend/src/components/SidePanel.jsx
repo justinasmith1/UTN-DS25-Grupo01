@@ -34,6 +34,10 @@ const customStyles = `
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
     transform: translateY(-1px);
   }
+  .no-wrap {
+    white-space: nowrap !important;
+  }
+
 `
 
 export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, lots, abrirModalEditar }) {
@@ -49,9 +53,9 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
   const handleReserve = () => {
     alert(`Reservar lote ${currentLot.id}`)
   }
-  const handleViewAccount = () => {
+  /*const handleViewAccount = () => {
     alert(`Ver cuenta para lote ${currentLot.id}`)
-  }
+  }*/
   const handleViewDetail = () => {
     onViewDetail(currentLot.id)
     onHide()
@@ -176,13 +180,15 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
               </Col>
             </Row>
             <Row>
+              {/*
               <Col xs={6}>
                 <Button variant="outline-secondary" className="w-100 action-btn" onClick={handleViewAccount}>
                   Ver cuenta
                 </Button>
               </Col>
+              */}
               <Col xs={6}>
-                <Button variant="link" className="text-brand-dark-green w-100" onClick={handleViewDetail}>
+                <Button variant="link" className="text-brand-dark-green w-100 no-wrap" onClick={handleViewDetail}>
                   Ver detalle completo
                 </Button>
               </Col>
