@@ -1,0 +1,22 @@
+# MockUps - Figma
+
+Este enlace lleva al diseño interactivo en Figma con los MockUps del sistema:
+👉 [Ver Figma](https://www.figma.com/design/w0PfNGG0JinUgsN9wODi4P/Club-de-campo-LF?node-id=167-777&t=PI6DQz8K58iDIrIH-1)
+
+Contiene los siguientes MockUs:
+- MK del Mapa
+- MK del SidePanel
+- MK del Dashboard
+    - Incluye las vistas de los distintos roles
+- MK de las Acciones del Dashboard
+    - Incluye el funcionamiento de cada boton perteneciente al Dashboard
+- MK del modulo de las Inmobiliarias
+- MK del modulo de las Ventas
+- MK del modulo las Reservas
+
+No incluidos pero que se van a realizar en un futuro:
+
+- MK de Personas
+- MK de Reportes
+- MK de la Cuenta
+- MK de Inicio de Sesion
