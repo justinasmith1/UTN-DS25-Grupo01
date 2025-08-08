@@ -1,5 +1,7 @@
 // interfacesCCLF.d.ts
 
+import e from "express";
+
 // --- TIPOS BÁSICOS ---
 // Estos tipos definen los valores permitidos para ciertas propiedades,
 // lo que ayuda a prevenir errores de tipeo.
@@ -46,7 +48,7 @@ export interface LoteVenta extends Lote {
 
 export interface Venta {
     idVenta: number;
-    lote: LoteVenta;
+    idLote: number
     comprador: Persona;
     fechaVenta: string;
     montoTotal: number;
@@ -148,6 +150,40 @@ export interface PostVentaRequest {
     montoTotal: number;
     idComprador: number; // Es mejor enviar solo el ID
     fechaVenta: string;
+}
+
+export interface PostVentaResponse {
+    venta: Venta | null;
+    message: string;
+}
+
+export interface GetVentaRequest {
+    idVenta: number;
+}
+
+export interface GetVentaResponse {
+    venta: Venta | null;
+    message?: string;
+}
+
+export interface PutVentaRequest {
+    idVenta: number;
+    idLote?: number;
+    montoTotal?: number;
+    idComprador?: number; // Es mejor enviar solo el ID
+    fechaVenta?: string;
+}
+
+export interface PutVentaResponse {
+    message: string;
+}
+
+export interface DeleteVentaRequest {
+    idVenta: number;
+}
+
+export interface DeleteVentaResponse {
+    message: string;
 }
 
 // Reservas
