@@ -4,7 +4,7 @@ import { Lote, LoteVenta, GetLotesResponse, GetLoteResponse, PostLoteRequest, Po
 , DeleteLoteRequest, DeleteLoteResponse } from '../types/interfacesCCLF';
 import * as loteService from '../services/lote.service';
 
-export const obtenerTodos = async (req: Request, res: Response<GetLotesResponse>, next: NextFunction) => {
+export const obtenerTodosLotes = async (req: Request, res: Response<GetLotesResponse>, next: NextFunction) => {
   try {
     const data = await loteService.getLotes();
     res.status(200).json({
@@ -16,7 +16,7 @@ export const obtenerTodos = async (req: Request, res: Response<GetLotesResponse>
   }
 };
 
-export const obtenerPorId = async (req: Request, res: Response<GetLoteResponse>, next: NextFunction) => {
+export const obtenerPorIdLote = async (req: Request, res: Response<GetLoteResponse>, next: NextFunction) => {
   try {
     const id = req.params.id ? parseInt(String(req.params.id)) : 0;
     const data = await loteService.getLotesById(id);
@@ -30,7 +30,7 @@ export const obtenerPorId = async (req: Request, res: Response<GetLoteResponse>,
   }
 };
 
-export const crear = async (req: Request<{}, PostLoteResponse, PostLoteRequest>, res: Response<PostLoteResponse>, next: NextFunction) => {
+export const crearLote = async (req: Request<{}, PostLoteResponse, PostLoteRequest>, res: Response<PostLoteResponse>, next: NextFunction) => {
   try {
     // Validar datos de entrada
     const { fraccion, numero, estado, subestado, propietario, precio, ubicacion } = req.body;
@@ -47,7 +47,7 @@ export const crear = async (req: Request<{}, PostLoteResponse, PostLoteRequest>,
 
 };
 
-export const actualizar = async (req: Request<PutLoteRequest, PutLoteResponse>, res: Response<PutLoteResponse>, next: NextFunction) => {
+export const actualizarLote = async (req: Request<PutLoteRequest, PutLoteResponse>, res: Response<PutLoteResponse>, next: NextFunction) => {
   try {
     const id = req.params.id ? parseInt(String(req.params.id)) : 0;
     const data = await loteService.updateLote(id, req.body);
@@ -61,7 +61,7 @@ export const actualizar = async (req: Request<PutLoteRequest, PutLoteResponse>, 
   }
 };
 
-export const eliminar = async (req: Request<DeleteLoteRequest>, res: Response<DeleteLoteResponse>, next: NextFunction) => {
+export const eliminarLote = async (req: Request<DeleteLoteRequest>, res: Response<DeleteLoteResponse>, next: NextFunction) => {
   try {
     const id = req.params.idLote ? parseInt(String(req.params.idLote)) : 0;
     const success = await loteService.deleteLote(id);
