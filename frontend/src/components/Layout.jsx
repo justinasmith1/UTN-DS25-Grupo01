@@ -1,4 +1,5 @@
-"use client" //No se para que es esto
+// src/components/Layout.jsx
+"use client" //le indica a React que este componente es interactivo
 
 // Importa estado, el placeholder de ruta y datos simulados de un js
 import { useState } from "react"
