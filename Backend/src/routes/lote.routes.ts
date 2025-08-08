@@ -9,4 +9,4 @@ router.post('/', controller.crear);
 router.put('/:id', controller.actualizar);
 router.delete('/:id', controller.eliminar);
 
-export default router;
+export const lotesRoutes = router;
