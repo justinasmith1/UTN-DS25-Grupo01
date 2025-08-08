@@ -88,6 +88,12 @@ export interface Reserva {
 // Lotes
 export interface GetLotesResponse {
     lotes: LoteVenta[];
+    total: number;
+}
+
+export interface GetLoteResponse {
+    lote: LoteVenta | null;
+    message?: string;
 }
 
 export interface PostLoteRequest {
@@ -102,7 +108,15 @@ export interface PostLoteRequest {
     descripcion?: string;
 }
 
+export interface PostLoteResponse {
+    lote: LoteVenta | null;
+    message: string;
+}
+
 export interface PutLoteRequest {
+    id: number;
+    fraccion?: number;
+    numero?: number;
     estado?: EstadoLote;
     subestado?: SubestadoLote;
     propietario?: Persona;
@@ -111,9 +125,22 @@ export interface PutLoteRequest {
     descripcion?: string;
 }
 
+export interface PutLoteResponse {
+    message: string;
+}
+
+export interface DeleteLoteRequest {
+    idLote: number;
+}
+
+export interface DeleteLoteResponse {
+    message: string;
+}
+
 // Ventas
 export interface GetVentasResponse {
     ventas: Venta[];
+    total: number;
 }
 
 export interface PostVentaRequest {
@@ -126,6 +153,7 @@ export interface PostVentaRequest {
 // Reservas
 export interface GetReservasResponse {
     reservas: Reserva[];
+    total: number;
 }
 
 export interface PostReservaRequest {
