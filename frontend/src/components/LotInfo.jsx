@@ -1,3 +1,4 @@
+// src/components/LotInfo.jsx
 import React, { useState } from "react"
 import { Modal, Container, Row, Col, Card, Button, FormControl, Carousel } from "react-bootstrap"
 import { useOutletContext } from "react-router-dom"

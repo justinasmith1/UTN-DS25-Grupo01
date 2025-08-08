@@ -1,3 +1,4 @@
+// src/components/ModalGestionLote.jsx
 import { useState, useEffect } from "react"
 import { Modal, Button, Form } from "react-bootstrap"
 
