@@ -252,6 +252,60 @@ export interface DeleteReservaResponse {
 }
 //------------------------------------------------//
 
+//Inmobiliarias
+//-----------------------------------------//
+export interface GetInmobiliariasResponse {
+  inmobiliarias: Inmobiliaria[];
+  total: number;
+}
+
+//Request para crear una inmobiliaria
+export interface PostInmobiliariaRequest{ 
+  nombre: string; //Nombre de la inmobiliaria
+  telefono?: string; //Telefono de contacto (opcional)
+  email?: string; //Email de contacto (opcional)
+}
+
+// Response para crear una nueva inmobiliaria
+export interface PostInmobiliariaResponse {
+  inmobiliaria: Inmobiliaria | null;  // La inmobiliaria creada o null si falla
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para obtener una inmobiliaria por ID
+export interface GetInmobiliariaRequest {
+  idInmobiliaria: number;
+}
+
+// Response para obtener una inmobiliaria por ID
+export interface GetInmobiliariaResponse {
+  inmobiliaria: Inmobiliaria | null;  // La reserva encontrada o null
+  message?: string;         // Mensaje opcional
+}
+
+// Request para actualizar una inmobiliaria
+export interface PutInmobiliariaRequest {
+  idInmobiliaria: number; //ID de la inmobilairia a crear
+  nombre: string; //Nombre de la inmobiliaria
+  telefono?: string; //Telefono de contacto (opcional)
+  email?: string; //Email de contacto (opcional)
+}
+
+// Response para actualizar una inmobiliaria
+export interface PutInmobiliariaResponse {
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para eliminar una inmobiliaria
+export interface DeleteInmobiliariaRequest {
+  idReserva: number;
+}
+
+// Response para eliminar una inmobiliaria
+export interface DeleteInmobiliariaResponse {
+  message: string;
+}
+//-----------------------------------------------------//
 
 
 //Usuarios
