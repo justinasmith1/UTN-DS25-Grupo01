@@ -11,6 +11,7 @@ export type Calle = "Reinamora" | "Maca" | "Zorzal" | "Cauquén" | "Alondra" | "
 export type EstadoLote = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type Ubicacion = "Norte" | "Sur" | "Este" | "Oeste";
+export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico;";
 
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
@@ -24,6 +25,7 @@ export interface Persona {
     telefono?: number;
     email?: string;
 }
+
 
 export interface Lote {
     idLote: number;
@@ -198,4 +200,55 @@ export interface PostReservaRequest {
     fechaReserva: string;
     seña?: number;
     idInmobiliaria?: number;
+}
+
+//Usuarios
+export interface Usuario {
+    idUsuario: number;
+    username: string;
+    password: string;
+    rol: Rol;
+}
+
+export interface GetUsuariosResponse {
+    usuarios: Usuario[];
+    total: number;
+}
+
+export interface PostUsuarioRequest {
+    username: string;
+    password: string;
+    rol: Rol;
+}
+
+export interface PostUsuarioResponse {
+    usuario: Usuario | null;
+    message: string;
+}
+
+export interface GetUsuarioRequest {
+    username: string;
+}
+
+export interface GetUsuarioResponse {
+    usuario: Usuario | null;
+    message?: string;
+}
+
+export interface PutUsuarioRequest {
+    username?: string;
+    password?: string;
+    rol?: Rol;
+}
+
+export interface PutUsuarioResponse {
+    message: string;
+}
+
+export interface DeleteUsuarioRequest {
+    username: string;
+}
+
+export interface DeleteUsuarioResponse {
+    message: string;
 }
