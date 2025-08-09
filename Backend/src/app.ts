@@ -5,6 +5,7 @@ import { logRequest } from './middlewares/logger.middleware';
 import { handleError } from './middlewares/error.middleware';
 import cors from 'cors';
 import { usuarioRoutes } from './routes/usuario.routes';
+import { reservaRoutes } from './routes/reserva.routes';
 
 const app = express();
 const PORT = 3000;
@@ -21,7 +22,8 @@ app.use(logRequest);
 app.use(handleError);
 
 app.use('/api/lotes', lotesRoutes);
-app.use("/api/usuarios", usuarioRoutes)
+app.use("/api/usuarios", usuarioRoutes);
+app.use("/api/reservas", reservaRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

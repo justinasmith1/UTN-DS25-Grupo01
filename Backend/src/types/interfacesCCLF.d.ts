@@ -90,6 +90,7 @@ export interface Reserva {
 // Definen la forma de los datos que se envían y reciben en cada endpoint.
 
 // Lotes
+//----------------------------------------//
 export interface GetLotesResponse {
     lotes: LoteVenta[];
     total: number;
@@ -140,8 +141,10 @@ export interface DeleteLoteRequest {
 export interface DeleteLoteResponse {
     message: string;
 }
+//----------------------------------------//
 
 // Ventas
+//----------------------------------------//
 export interface GetVentasResponse {
     ventas: Venta[];
     total: number;
@@ -187,22 +190,72 @@ export interface DeleteVentaRequest {
 export interface DeleteVentaResponse {
     message: string;
 }
+//----------------------------------------//
+
 
 // Reservas
+//------------------------------------------------//
 export interface GetReservasResponse {
-    reservas: Reserva[];
-    total: number;
+  reservas: Reserva[];
+  total: number;
 }
 
+// Request para crear una nueva reserva
 export interface PostReservaRequest {
-    idLote: number;
-    idCliente: number; // Es mejor enviar solo el ID
-    fechaReserva: string;
-    seña?: number;
-    idInmobiliaria?: number;
+  idLote: number;           // ID del lote a reservar
+  idCliente: number;        // ID del cliente que hace la reserva
+  fechaReserva: string;     // Fecha de la reserva (ISO string)
+  seña?: number;            // Monto de la seña (opcional)
+  idInmobiliaria?: number;  // ID de la inmobiliaria (opcional)
 }
+
+// Response para crear una nueva reserva
+export interface PostReservaResponse {
+  reserva: Reserva | null;  // La reserva creada o null si falla
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para obtener una reserva por ID
+export interface GetReservaRequest {
+  idReserva: number;
+}
+
+// Response para obtener una reserva por ID
+export interface GetReservaResponse {
+  reserva: Reserva | null;  // La reserva encontrada o null
+  message?: string;         // Mensaje opcional
+}
+
+// Request para actualizar una reserva
+export interface PutReservaRequest {
+  idReserva: number;        // ID de la reserva a actualizar
+  idLote?: number;          // ID de lote (opcional)
+  idCliente?: number;       // ID de cliente (opcional)
+  fechaReserva?: string;    // Fecha de reserva (opcional)
+  seña?: number;            // Seña (opcional)
+  idInmobiliaria?: number;  // ID inmobiliaria (opcional)
+}
+
+// Response para actualizar una reserva
+export interface PutReservaResponse {
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para eliminar una reserva
+export interface DeleteReservaRequest {
+  idReserva: number;
+}
+
+// Response para eliminar una reserva
+export interface DeleteReservaResponse {
+  message: string;
+}
+//------------------------------------------------//
+
+
 
 //Usuarios
+//----------------------------------------//
 export interface Usuario {
     idUsuario: number;
     username: string;
@@ -252,3 +305,4 @@ export interface DeleteUsuarioRequest {
 export interface DeleteUsuarioResponse {
     message: string;
 }
+//----------------------------------------//
