@@ -11,6 +11,7 @@ export type Calle = "Reinamora" | "Maca" | "Zorzal" | "Cauquén" | "Alondra" | "
 export type EstadoLote = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type Ubicacion = "Norte" | "Sur" | "Este" | "Oeste";
+export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico;";
 
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
@@ -24,6 +25,7 @@ export interface Persona {
     telefono?: number;
     email?: string;
 }
+
 
 export interface Lote {
     idLote: number;
@@ -88,6 +90,7 @@ export interface Reserva {
 // Definen la forma de los datos que se envían y reciben en cada endpoint.
 
 // Lotes
+//----------------------------------------//
 export interface GetLotesResponse {
     lotes: LoteVenta[];
     total: number;
@@ -138,8 +141,10 @@ export interface DeleteLoteRequest {
 export interface DeleteLoteResponse {
     message: string;
 }
+//----------------------------------------//
 
 // Ventas
+//----------------------------------------//
 export interface GetVentasResponse {
     ventas: Venta[];
     total: number;
@@ -185,17 +190,173 @@ export interface DeleteVentaRequest {
 export interface DeleteVentaResponse {
     message: string;
 }
+//----------------------------------------//
+
 
 // Reservas
+//------------------------------------------------//
 export interface GetReservasResponse {
-    reservas: Reserva[];
+  reservas: Reserva[];
+  total: number;
+}
+
+// Request para crear una nueva reserva
+export interface PostReservaRequest {
+  idLote: number;           // ID del lote a reservar
+  idCliente: number;        // ID del cliente que hace la reserva
+  fechaReserva: string;     // Fecha de la reserva (ISO string)
+  seña?: number;            // Monto de la seña (opcional)
+  idInmobiliaria?: number;  // ID de la inmobiliaria (opcional)
+}
+
+// Response para crear una nueva reserva
+export interface PostReservaResponse {
+  reserva: Reserva | null;  // La reserva creada o null si falla
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para obtener una reserva por ID
+export interface GetReservaRequest {
+  idReserva: number;
+}
+
+// Response para obtener una reserva por ID
+export interface GetReservaResponse {
+  reserva: Reserva | null;  // La reserva encontrada o null
+  message?: string;         // Mensaje opcional
+}
+
+// Request para actualizar una reserva
+export interface PutReservaRequest {
+  idReserva: number;        // ID de la reserva a actualizar
+  idLote?: number;          // ID de lote (opcional)
+  idCliente?: number;       // ID de cliente (opcional)
+  fechaReserva?: string;    // Fecha de reserva (opcional)
+  seña?: number;            // Seña (opcional)
+  idInmobiliaria?: number;  // ID inmobiliaria (opcional)
+}
+
+// Response para actualizar una reserva
+export interface PutReservaResponse {
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para eliminar una reserva
+export interface DeleteReservaRequest {
+  idReserva: number;
+}
+
+// Response para eliminar una reserva
+export interface DeleteReservaResponse {
+  message: string;
+}
+//------------------------------------------------//
+
+//Inmobiliarias
+//-----------------------------------------//
+export interface GetInmobiliariasResponse {
+  inmobiliarias: Inmobiliaria[];
+  total: number;
+}
+
+//Request para crear una inmobiliaria
+export interface PostInmobiliariaRequest{ 
+  nombre: string; //Nombre de la inmobiliaria
+  telefono?: string; //Telefono de contacto (opcional)
+  email?: string; //Email de contacto (opcional)
+}
+
+// Response para crear una nueva inmobiliaria
+export interface PostInmobiliariaResponse {
+  inmobiliaria: Inmobiliaria | null;  // La inmobiliaria creada o null si falla
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para obtener una inmobiliaria por ID
+export interface GetInmobiliariaRequest {
+  idInmobiliaria: number;
+}
+
+// Response para obtener una inmobiliaria por ID
+export interface GetInmobiliariaResponse {
+  inmobiliaria: Inmobiliaria | null;  // La reserva encontrada o null
+  message?: string;         // Mensaje opcional
+}
+
+// Request para actualizar una inmobiliaria
+export interface PutInmobiliariaRequest {
+  idInmobiliaria: number; //ID de la inmobilairia a crear
+  nombre: string; //Nombre de la inmobiliaria
+  telefono?: string; //Telefono de contacto (opcional)
+  email?: string; //Email de contacto (opcional)
+}
+
+// Response para actualizar una inmobiliaria
+export interface PutInmobiliariaResponse {
+  message: string;          // Mensaje de confirmacion o error
+}
+
+// Request para eliminar una inmobiliaria
+export interface DeleteInmobiliariaRequest {
+  idReserva: number;
+}
+
+// Response para eliminar una inmobiliaria
+export interface DeleteInmobiliariaResponse {
+  message: string;
+}
+//-----------------------------------------------------//
+
+
+//Usuarios
+//----------------------------------------//
+export interface Usuario {
+    idUsuario: number;
+    username: string;
+    password: string;
+    rol: Rol;
+}
+
+export interface GetUsuariosResponse {
+    usuarios: Usuario[];
     total: number;
 }
 
-export interface PostReservaRequest {
-    idLote: number;
-    idCliente: number; // Es mejor enviar solo el ID
-    fechaReserva: string;
-    seña?: number;
-    idInmobiliaria?: number;
+export interface PostUsuarioRequest {
+    username: string;
+    password: string;
+    rol: Rol;
 }
+
+export interface PostUsuarioResponse {
+    usuario: Usuario | null;
+    message: string;
+}
+
+export interface GetUsuarioRequest {
+    username: string;
+}
+
+export interface GetUsuarioResponse {
+    usuario: Usuario | null;
+    message?: string;
+}
+
+export interface PutUsuarioRequest {
+    username?: string;
+    password?: string;
+    rol?: Rol;
+}
+
+export interface PutUsuarioResponse {
+    message: string;
+}
+
+export interface DeleteUsuarioRequest {
+    username: string;
+}
+
+export interface DeleteUsuarioResponse {
+    message: string;
+}
+//----------------------------------------//
