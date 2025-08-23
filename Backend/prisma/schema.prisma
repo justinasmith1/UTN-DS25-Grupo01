@@ -4,18 +4,19 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
 
 model User {
- id        Int      @id @default(autoincrement())
- email     String   @unique
- name      String
- password  String
- role      Role 
- createdAt DateTime @default(now())
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  name      String
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+  persona   Persona?
 }
 
 enum Role {
@@ -25,4 +26,14 @@ enum Role {
   TECNICO
 }
 
-
+model Persona {
+  id        Int       @id @default(autoincrement())
+  nombre    String
+  apellido  String
+  cuil      String
+  contacto  String?
+  userId    Int?      @unique
+  user      User?     @relation(fields: [userId], references: [id])
+  createdAt DateTime  @default(now())
+  updateAt  DateTime?
+}
