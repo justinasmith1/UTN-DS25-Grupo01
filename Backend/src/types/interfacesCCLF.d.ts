@@ -1,6 +1,7 @@
 // interfacesCCLF.d.ts
 
 import e from "express";
+import { EstadoVenta } from "../generated/prisma";
 
 // --- TIPOS BÁSICOS ---
 // Estos tipos definen los valores permitidos para ciertas propiedades,
@@ -12,7 +13,7 @@ export type EstadoLote = "Disponible" | "Reservado" | "Vendido" | "No Disponible
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type Ubicacion = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico;";
-
+export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
 // Estas interfaces son los "planos" que definen cómo deben ser los objetos en la aplicación.
@@ -151,11 +152,20 @@ export interface GetVentasResponse {
 }
 
 export interface PostVentaRequest {
-    idLote: number;
-    montoTotal: number;
-    idComprador: number; // Es mejor enviar solo el ID
-    fechaVenta: string;
-}
+    id: number;
+    loteId: number;
+    lote: Lote;
+    fechaVenta: DateTime;
+    monto: number;
+    estado: EstadoVenta;
+    plazoEscritura?: DateTime;
+    tipoPago: string;
+    compradorId: number;  
+    fechaVenta: DateTime;
+    vendedorId: number;
+    createdAt?: DateTime;
+    updateAt?: DateTime;
+} 
 
 export interface PostVentaResponse {
     venta: Venta | null;
@@ -172,11 +182,16 @@ export interface GetVentaResponse {
 }
 
 export interface PutVentaRequest {
-    idVenta: number;
-    idLote?: number;
-    montoTotal?: number;
-    idComprador?: number; // Es mejor enviar solo el ID
-    fechaVenta?: string;
+    id: number;
+    loteId?: number;
+    monto?: number;
+    compradorId?: number; // Es mejor enviar solo el ID
+    fechaVenta?: DateTime
+    estado?: EstadoVenta;
+    plazoEscritura?: DateTime;
+    tipoPago?: string;
+    vendedorId?: number;
+    updateAt: DateTime;
 }
 
 export interface PutVentaResponse {
