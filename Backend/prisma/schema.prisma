@@ -9,6 +9,21 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ===================
+// Enums del dominio
+// ===================
+
+enum Role {
+  ADMIN
+  INMOBILIARIA
+  GESTOR
+  TECNICO
+}
+
+// ===================
+// Modelos de dominio
+// ===================
+
 model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -17,13 +32,6 @@ model User {
   role      Role
   createdAt DateTime @default(now())
   persona   Persona?
-}
-
-enum Role {
-  ADMIN
-  INMOBILIARIA
-  GESTOR
-  TECNICO
 }
 
 model Persona {
@@ -36,4 +44,20 @@ model Persona {
   user      User?     @relation(fields: [userId], references: [id])
   createdAt DateTime  @default(now())
   updateAt  DateTime?
+}
+
+model Reserva {
+  id             Int      @id @default(autoincrement())
+  fechaReserva   DateTime
+  loteId         Int
+  clienteId      Int
+  inmobiliariaId Int?
+  sena           Decimal? @db.Decimal(12, 2) // “seña” opcional, pero al parecer asi es mejor
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // Esto evita duplicados logicos de la misma reserva pero habria que ver si hace falta o no
+  @@unique([clienteId, loteId, fechaReserva], name: "uq_reserva_cliente_lote_fecha")
+  @@index([loteId], name: "idx_reserva_lote")
+  @@index([clienteId], name: "idx_reserva_cliente")
 }

@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express from 'express';
 import { lotesRoutes } from './routes/lote.routes';
 
@@ -7,7 +8,7 @@ import cors from 'cors';
 import { usuarioRoutes } from './routes/usuario.routes';
 import { reservaRoutes } from './routes/reserva.routes';
 import {inmobRoutes} from './routes/inmobiliaria.routes';
-import {ventaRoutes} from "./routes/ventas.routes"
+import {ventaRoutes} from "./routes/ventas.routes";
 
 const app = express();
 const PORT = 3000;
