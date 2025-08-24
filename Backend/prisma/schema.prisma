@@ -172,3 +172,13 @@ model Venta {
   createdAt      DateTime    @default(now())
   updateAt       DateTime?
 }
+
+model Inmobiliaria {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  razonSocial String
+  comxventa Decimal?  @db.Decimal(5, 2)
+  contacto  String?
+  createdAt DateTime @default(now())
+  updateAt  DateTime?
+}
