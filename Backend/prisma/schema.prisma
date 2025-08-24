@@ -61,3 +61,90 @@ model Reserva {
   @@index([loteId], name: "idx_reserva_lote")
   @@index([clienteId], name: "idx_reserva_cliente")
 }
+
+// LOTES
+enum EstadoLote {
+  ALQUILADO
+  DISPONIBLE
+  EN_PROMOCION
+  NO_DISPONIBLE
+  RESERVADO
+  VENDIDO
+}
+
+enum SubestadoLote {
+  CONSTRUIDO
+  NO_CONSTRUIDO
+  EN_CONSTRUCCION
+}
+
+enum NombreCalle {
+  REINAMORA
+  MACA
+  ZORZAL
+  CAUQUEN
+  ALONDRA
+  JACANA
+  TACUARITO
+  JILGUERO
+  GOLONDRINA
+  CALANDRIA
+  AGUILAMORA
+  LORCA
+  MILANO
+}
+
+enum TipoLote {
+  LOTE_VENTA
+  ESPACIO_COMUN
+}
+
+model Lote {
+  id Int @id @default(autoincrement())
+  tipo TipoLote 
+  descripcion String?
+  estado EstadoLote @default(DISPONIBLE)
+  subestado SubestadoLote @default(NO_CONSTRUIDO)
+  fondo Decimal? @db.Decimal(8,2)
+  frente Decimal? @db.Decimal(8,2)
+  numPartido Int @default(62)
+  superficie Decimal? @db.Decimal(10,2)
+
+  alquiler Boolean?
+  deuda Boolean?
+  precio Decimal? @db.Decimal(12,2)
+  nombreEspacioComun String?
+  capacidad Int?
+
+  ubicacion Ubicacion?
+
+  fraccionId Int?
+  fraccion Fraccion? @relation(fields: [fraccionId], references: [id])
+
+  propietarioId Int?
+  propietario Persona?  @relation(fields: [propietarioId], references: [id])
+
+  //inmobiliaria Int?
+  //inmobiliaria Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
+
+  reservas Reserva []
+  //ventas Venta[]
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime?
+}
+
+model Ubicacion {
+  id Int @id @default(autoincrement())
+  loteId Int @unique
+  lote Lote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+
+  calle NombreCalle
+  numero Int
+}
+
+model Fraccion {
+  id Int @id @default(autoincrement())
+  numero Int @unique
+  lotes Lote[]
+}
