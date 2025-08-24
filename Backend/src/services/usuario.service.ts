@@ -1,73 +1,73 @@
-import { Usuario, GetUsuariosResponse, GetUsuarioRequest, GetUsuarioResponse, PostUsuarioRequest, PostUsuarioResponse, PutUsuarioRequest, PutUsuarioResponse
-, DeleteUsuarioRequest, DeleteUsuarioResponse, Rol} from '../types/interfacesCCLF'; 
+import prisma from '../config/prisma';
+import type { User as PrismaUser } from "../generated/prisma";
+import type { Usuario, Rol, GetUsuariosResponse, GetUsuarioRequest, GetUsuarioResponse, PostUsuarioRequest, PostUsuarioResponse, PutUsuarioRequest, PutUsuarioResponse, DeleteUsuarioRequest, DeleteUsuarioResponse } from '../types/interfacesCCLF';
+import type { $Enums} from "../generated/prisma"
 
-let usuarios: Usuario[] = [
-    {
-        idUsuario: 1,
-        username: "MarianoPerez",
-        password: "admin123",
-        rol: "Administrador" as Rol
-    },
-    {
-        idUsuario: 2,
-        username: "JulioGomez",
-        password: "gestor123",
-        rol: "Gestor" as Rol
-    },
-    {
-        idUsuario: 3,
-        username: "AndinolfiInmobiliaria",
-        password: "inmo123",
-        rol: "Inmobiliaria" as Rol
-    },
-    {
-        idUsuario: 4,
-        username: "MirandaSuarez",
-        password: "tecnico123",
-        rol: "Tecnico;" as Rol
-    }
-];
 
-export async function getAllUsuarios(): Promise<GetUsuariosResponse> {
-    return { usuarios, total: usuarios.length };
+// mapeo de PrsimaUser a Usuariio
+const toUsuario = (u: PrismaUser): Usuario => ({
+    idUsuario: u.id,
+    username: u.username,
+    password: u.password,     
+    rol: u.role as unknown as Rol,
+});
+
+// obtener todos los usuaruarios
+export async function getAllUsers(): Promise<GetUsuariosResponse> {
+    const usuarios = await prisma.user.findMany({
+        orderBy: { id: 'asc' },
+    });
+    return { usuarios: usuarios.map(toUsuario), total: usuarios.length };
 }
 
-export async function getUsuarioByUsername(request: GetUsuarioRequest): Promise<GetUsuarioResponse> {
-    const usuario = usuarios.find(u => u.username === request.username) || null;
-    if (!usuario) {
-        return { usuario: null, message: 'Usuario no encontrado' };
-    }
-    return { usuario };
+//  obtener usuario por username
+export async function getUserByUsername(request: GetUsuarioRequest): Promise<GetUsuarioResponse> {
+    const user = await prisma.user.findUnique({ where: { username: request.username } });
+    return user ? { usuario: toUsuario(user) } : { usuario: null, message: 'Usuario no encontrado' };
 }
 
-export async function createUsuario(data: PostUsuarioRequest): Promise<PostUsuarioResponse> {
-    if (usuarios.some(u => u.username === data.username)) {
-        return { usuario: null, message: 'El username ya existe' };
+// crear ususario
+export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioResponse> {
+    try {
+        const created = await prisma.user.create({
+            data: {
+                username: req.username,
+                password: req.password,
+                role: req.rol as unknown as $Enums.Role,
+            },
+        });
+        return { usuario: toUsuario(created), message: 'Usuario creado con éxito' };
+    } catch (e: any) {
+        if (e.code === 'P2002') return { usuario: null, message: 'El username ya existe' };
+        throw e;
     }
-
-    const nuevoUsuario: Usuario = {
-        idUsuario: usuarios.length ? Math.max(...usuarios.map(u => u.idUsuario)) + 1 : 1,
-        ...data
-    };
-
-    usuarios.push(nuevoUsuario);
-    return { usuario: nuevoUsuario, message: 'Usuario creado exitosamente' };
 }
 
-export async function updateUsuario(username: string, data: PutUsuarioRequest): Promise<PutUsuarioResponse> {
-    const index = usuarios.findIndex(u => u.username === username);
-    if (index === -1) {
-        return { message: 'Usuario no encontrado' };
+// actualizar usuario
+export async function updateUser( usernameActual: string, req: PutUsuarioRequest ): Promise<PutUsuarioResponse> {
+    try {
+        await prisma.user.update({
+            where: { username: usernameActual },
+            data: {
+                username: req.username,
+                password: req.password,
+                role: req.rol as unknown as $Enums.Role,
+            },
+        });
+        return { message: 'Usuario actualizado con éxito' };
+    } catch (e: any) {
+        if (e.code === 'P2025') return { message: 'Usuario no encontrado' };
+        throw e;
     }
-    usuarios[index] = { ...usuarios[index], ...data };
-    return { message: 'Usuario actualizado exitosamente' };
 }
 
-export async function deleteUsuario(username: string): Promise<DeleteUsuarioResponse> {
-    const index = usuarios.findIndex(u => u.username === username);
-    if (index === -1) {
-        return { message: 'Usuario no encontrado' };
+// eliminar usuario
+export async function deleteUser( req: DeleteUsuarioRequest ): Promise<DeleteUsuarioResponse> {
+    try {
+        await prisma.user.delete({ where: { username: req.username } });
+        return { message: 'Usuario eliminado con éxito' };
+    } catch (e: any) {
+        if (e.code === 'P2025') return { message: 'Usuario no encontrado' };
+        throw e;
     }
-    usuarios.splice(index, 1);
-    return { message: 'Usuario eliminado exitosamente' };
 }

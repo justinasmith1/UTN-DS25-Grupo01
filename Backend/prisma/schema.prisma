@@ -14,7 +14,7 @@ datasource db {
 // ===================
 
 enum Role {
-  ADMIN
+  ADMINISTRADOR
   INMOBILIARIA
   GESTOR
   TECNICO
@@ -26,8 +26,7 @@ enum Role {
 
 model User {
   id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String
+  username     String   @unique
   password  String
   role      Role
   createdAt DateTime @default(now())
