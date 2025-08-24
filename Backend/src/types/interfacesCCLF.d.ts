@@ -73,8 +73,9 @@ export interface CambioEstado {
 export interface Inmobiliaria {
     idInmobiliaria: number;
     nombre: string;
-    telefono?: string;
-    email?: string;
+    razonSocial?: string;
+    comxventa?: number;
+    contacto?: string;
 }
 
 export interface Reserva {
@@ -277,8 +278,9 @@ export interface GetInmobiliariasResponse {
 //Request para crear una inmobiliaria
 export interface PostInmobiliariaRequest{ 
   nombre: string; //Nombre de la inmobiliaria
-  telefono?: string; //Telefono de contacto (opcional)
-  email?: string; //Email de contacto (opcional)
+  razonsocial?: string; //Razon social (opcional)
+  comxventa?: number; //Comision por venta (opcional)
+  contacto?: string; //Telefono de contacto (opcional)
 }
 
 // Response para crear una nueva inmobiliaria
@@ -300,10 +302,9 @@ export interface GetInmobiliariaResponse {
 
 // Request para actualizar una inmobiliaria
 export interface PutInmobiliariaRequest {
-  idInmobiliaria: number; //ID de la inmobilairia a crear
+  idInmobiliaria: number; //ID de la inmobilairia a modificar
   nombre: string; //Nombre de la inmobiliaria
-  telefono?: string; //Telefono de contacto (opcional)
-  email?: string; //Email de contacto (opcional)
+  contacto?: string; //Telefono de contacto (opcional)
 }
 
 // Response para actualizar una inmobiliaria
