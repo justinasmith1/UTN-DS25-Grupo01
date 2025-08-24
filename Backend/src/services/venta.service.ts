@@ -1,57 +1,95 @@
-import { Venta, GetVentasResponse, GetVentaRequest, GetVentaResponse, PostVentaRequest, PostVentaResponse, PutVentaRequest, PutVentaResponse
+import prisma from '../config/prisma';
+import { Venta } from '../generated/prisma';
+import { GetVentasResponse, GetVentaRequest, GetVentaResponse, PostVentaRequest, PostVentaResponse, PutVentaRequest, PutVentaResponse
 , DeleteVentaRequest, DeleteVentaResponse, Persona } from '../types/interfacesCCLF'; 
 
-let ventas: Venta[] = [
-    {
-        idVenta: 1,
-        idLote: 2,
-        montoTotal: 65000,
-        comprador: { idPersona: 101, nombre: "Juan Pérez" } as Persona,
-        fechaVenta: "2023-10-15"
-    },
-    {
-        idVenta: 2,
-        idLote: 3,
-        montoTotal: 58000,
-        comprador: { idPersona: 102, nombre: "Ana Gómez" } as Persona,
-        fechaVenta: "2023-11-20"
-    }
-];
-
-export async function getAllVentas(): Promise<GetVentasResponse> {
-    return { ventas, total: ventas.length };
+export async function getAllVentas(): Promise<Venta[]> {
+    const ventas = await prisma.venta.findMany({
+        include: { comprador: true }, // Incluir datos del comprador
+        orderBy: { id: 'asc' }, // Ordenar por idVenta de forma ascendente
+    });
+    return ventas;
 }
 
-export async function getVentaById(idVenta: number): Promise<GetVentaResponse> {
-    const venta = ventas.find(v => v.idVenta === idVenta) || null;
+export async function getVentaById(id: number): Promise<Venta> {
+    const venta = await prisma.venta.findUnique({
+        where: { id },
+        include: { comprador: true }, // Incluir datos del comprador
+    });
+
     if (!venta) {
-        return { venta: null, message: 'Venta no encontrada' };
+        const error = new  Error('Venta no encontrada');
+        (error as any).statusCode = 404;
+        throw error;
     }
-    return { venta };
+
+    return venta;
+
 }
 
-export async function createVenta(data: PostVentaRequest): Promise<PostVentaResponse> {
-    const nuevoId = Math.max(...ventas.map(v => v.idVenta)) + 1;
-    const nuevaVenta: Venta = { idVenta: nuevoId, ...data, comprador: { idPersona: data.idComprador } as Persona }; // Asignar solo el ID del comprador, se tendria que buscar el nombre asoaciado una vez que tens personas.
-    ventas.push(nuevaVenta);
-    return { venta: nuevaVenta, message: 'Venta creada exitosamente' };
+export async function createVenta(data: PostVentaRequest): Promise<Venta> {
+    if (data.monto <= 0) {
+        const error = new Error('El monto debe ser un número positivo');
+        (error as any).statusCode = 400;
+        throw error;
+    }
+    // Excluir 'lote' y 'comprador' del objeto data si no son parte de VentaCreateInput
+    const { lote, ...ventaData } = data;
+    const newVenta = await prisma.venta.create({
+        data: {
+            ...ventaData,
+        },
+        include: { comprador: true }, // Incluir datos del comprador
+    });
+    return newVenta;
 }
 
-export async function updateVenta(idVenta: number, data: PutVentaRequest): Promise<PutVentaResponse> {
-    const index = ventas.findIndex(v => v.idVenta === idVenta);
-    if (index === -1) {
-        return { message: 'Venta no encontrada' };
+export async function updateVenta(id: number, updateData: PutVentaRequest): Promise<Venta> {
+    if (updateData.monto !== undefined && updateData.monto <= 0) {
+        const error = new Error('El monto total debe ser un número positivo');
+        (error as any).statusCode = 400;
+        throw error;
     }
-    ventas[index] = { ...ventas[index], ...data };
-    return { message: 'Venta actualizada exitosamente' };
+    try{
+        const updatedVenta = await prisma.venta.update({
+        where: { id },
+        data: {
+            ...(updateData.compradorId !== undefined ? { compradorId: updateData.compradorId } : {}),
+            ...(updateData.loteId !== undefined ? { loteId: updateData.loteId } : {}),
+            ...(updateData.monto !== undefined ? { monto: updateData.monto } : {}),
+            ...(updateData.fechaVenta !== undefined ? { fechaVenta: new Date(updateData.fechaVenta) } : {}),
+            ...(updateData.estado !== undefined ? { estado: updateData.estado } : {}),
+            ...(updateData.plazoEscritura !== undefined ? { plazoEscritura: new Date(updateData.plazoEscritura) } : {}),
+            ...(updateData.tipoPago !== undefined ? { tipoPago: updateData.tipoPago } : {}),
+            ...(updateData.vendedorId !== undefined ? { vendedorId: updateData.vendedorId } : {}),
+            updateAt: new Date(), // Actualizar la fecha de modificación
+        },
+        include: { comprador: true }, // Incluir datos del comprador
+        });
+        return updatedVenta;
+    } catch (e: any) {
+        if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
+            const error = new Error('Venta no encontrada');
+            (error as any).statusCode = 404;
+            throw error;
+        }
+        throw e; // Re-lanzar otros errores
+    }
 }
 
-export async function deleteVenta(idVenta: number): Promise<DeleteVentaResponse> {
-    const index = ventas.findIndex(v => v.idVenta === idVenta);
-    if (index === -1) {
-        return { message: 'Venta no encontrada' };
+export async function deleteVenta(id: number): Promise<DeleteVentaResponse> {
+    try {
+        await prisma.venta.delete({
+            where: { id },
+        });
+        return { message: 'Venta eliminada correctamente' };
+    } catch (e: any) {
+        if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
+            const error = new Error('Venta no encontrada');
+            (error as any).statusCode = 404;
+            throw error;
+        }
+        throw e; // Re-lanzar otros errores
     }
-    ventas.splice(index, 1);
-    return { message: 'Venta eliminada exitosamente' };
 }
 
