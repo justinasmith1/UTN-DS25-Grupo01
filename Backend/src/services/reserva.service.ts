@@ -1,149 +1,131 @@
-import { 
-    Reserva,
-    GetReservasResponse,
-    GetReservaRequest,
-    GetReservaResponse,
-    PostReservaRequest,
-    PostReservaResponse,
-    PutReservaRequest,
-    PutReservaResponse,
-    DeleteReservaResponse,
-    EstadoLote,
-    SubestadoLote,
-    Ubicacion,
-    Persona,
-    Inmobiliaria,
-    LoteVenta
-} from '../types/interfacesCCLF';
+// src/services/reserva.service.ts
+import prisma from '../config/prisma'
+import type { Reserva as PrismaReserva } from '../generated/prisma'
+import type {
+  // DTOs y Requests del proyecto
+  Reserva as ReservaDTO,
+  LoteVenta, Persona, Inmobiliaria,
+  GetReservasResponse, GetReservaRequest, GetReservaResponse,
+  PostReservaRequest, PostReservaResponse,
+  PutReservaRequest, PutReservaResponse,
+  DeleteReservaRequest, DeleteReservaResponse
+} from '../types/interfacesCCLF'
 
-// ==============================
-// Datos en memoria (mock)
-// ==============================
-// Estos comentarios aplican tambien para el resto de los services
-// Por ahora las reservas estan almacenadas en un array en memoria, ya que todavia no usamos una BD.
-// Los datos se cargan manualmente para pruebas y desarrollo.
-let reservas: Reserva[] = [
-    {
-        idReserva: 1,
-        lote: { idLote: 1 } as LoteVenta , // Simplificado
-        cliente: { nombre: "Juan Pérez" } as Persona, // Tambien simplificado
-        fechaReserva: "2025-08-10",
-        seña: 50000,
-        inmobiliaria: { nombre: "Inmobiliaria Andina" } as Inmobiliaria
-    },
-    {
-        idReserva: 2,
-        lote: { idLote: 2 } as LoteVenta, 
-        cliente: { nombre: "María Gómez" } as Persona,
-        fechaReserva: "2025-08-11",
-        seña: 60000,
-        inmobiliaria: { nombre: "Inmobiliaria Río" } as Inmobiliaria // Revisar cuando este implementado el modulo inmobiliarias
-    },
-    {
-        idReserva: 3,
-        lote: { idLote: 3 } as LoteVenta,
-        cliente: { nombre: "Elver Galan" } as Persona,
-        fechaReserva: "2025-08-11",
-        seña: 50000,
-        inmobiliaria: { nombre: "Inmobiliaria Río" } as Inmobiliaria
-    },
-    {
-        idReserva: 4,
-        lote: { idLote: 9 } as LoteVenta,
-        cliente: { nombre: "Javo Enciso Gifted" } as Persona,
-        fechaReserva: "2025-08-12",
-        seña: 50000,
-        inmobiliaria: { nombre: "Inmobiliaria Andina" } as Inmobiliaria
-    },
-    {
-        idReserva: 5,
-        lote: { idLote: 7 } as LoteVenta,
-        cliente: { nombre: "Juan Wanso Tarrio" } as Persona,
-        fechaReserva: "2025-08-22",
-        seña: 40000,
-        inmobiliaria: { nombre: "Inmobiliaria Río" } as Inmobiliaria
-    }
-];
+// Helpers (los puse para que los veamos como una opción a usar para el resto,
+// son validación básica y fecha consistente, nada muy raro, sino los saco)
+const toDate = (v: string | Date) => {
+  const d = v instanceof Date ? v : new Date(v)
+  if (isNaN(d.getTime())) {
+    const e = new Error('fechaReserva inválida (usar YYYY-MM-DD)')
+    ;(e as any).statusCode = 400
+    throw e
+  }
+  return d
+}
+
+// -- Mapeo de PrismaReserva -> Reserva (DTO del proyecto), la hice parecida a la que uso jus asi ya quedan todos con la misma linea
+const toReserva = (r: PrismaReserva): ReservaDTO => ({
+  idReserva: r.id,
+  fechaReserva: r.fechaReserva.toISOString().slice(0, 10),
+  seña: r.sena != null ? Number(r.sena) : undefined,
+  // hoy devolvemos sólo IDs (como hace usuarios con su DTO); si mañana quieren nombres,
+  // se puede agregar include y enriquecer el DTO.
+  lote: { idLote: r.loteId } as LoteVenta,
+  cliente: { idPersona: r.clienteId } as Persona,
+  inmobiliaria: r.inmobiliariaId != null
+    ? ({ idInmobiliaria: r.inmobiliariaId } as Inmobiliaria)
+    : undefined,
+})
 
 // ==============================
 // Obtener todas las reservas
+// Retorna el listado completo junto con el total.
 // ==============================
-// Retorna el listado completo de reservas junto con el total.
-// Esto nos va a ser util para mostrar en listados o paneles administrativos (mostrar el dashboard).
 export async function getAllReservas(): Promise<GetReservasResponse> {
-    return { reservas, total: reservas.length };
+  const filas = await prisma.reserva.findMany({
+    orderBy: { fechaReserva: 'desc' },
+    // sin include: mantenemos tipos simples como en las filminas
+  })
+  return { reservas: filas.map(toReserva), total: filas.length }
 }
 
 // ==============================
 // Obtener una reserva por ID
+// Si no existe, devuelve mensaje de error.
 // ==============================
-// Busca dentro del array la reserva cuyo ID coincida con el solicitado.
-// Si no existe, devuelve un mensaje de error.
-export async function getReservaById(request: GetReservaRequest): Promise<GetReservaResponse> {
-    const reserva = reservas.find(r => r.idReserva === request.idReserva) || null;
-    if (!reserva) {
-        return { reserva: null, message: 'Reserva no encontrada' };
-    }
-    return { reserva };
+export async function getReservaById(req: GetReservaRequest): Promise<GetReservaResponse> {
+  const r = await prisma.reserva.findUnique({ where: { id: req.idReserva } })
+  return r ? { reserva: toReserva(r) } : { reserva: null, message: 'Reserva no encontrada' }
 }
 
 // ==============================
 // Crear nueva reserva
+// Valida obligatorios y evita seña negativa.
 // ==============================
-// Agrega una nueva reserva al array en memoria.
-// Se hace una validacion para evitar duplicados de lote + cliente en la misma fecha.
-// Los datos del cliente, lote e inmobiliaria se simplifican para esta etapa de desarrollo.
 export async function createReserva(data: PostReservaRequest): Promise<PostReservaResponse> {
-    // Validacion para evitar duplicados
-    if (reservas.some(r =>
-        r.lote.idLote === data.idLote &&
-        r.cliente.idPersona === data.idCliente &&
-        r.fechaReserva === data.fechaReserva
-    )) {
-        return { reserva: null, message: 'Ya existe una reserva para este cliente y lote en esa fecha' };
-    }
+  if (!data?.idLote || !data?.idCliente || !data?.fechaReserva) {
+    return { reserva: null, message: 'idLote, idCliente y fechaReserva son obligatorios' }
+  }
+  if (data.seña != null && data.seña < 0) {
+    return { reserva: null, message: 'La seña no puede ser negativa' }
+  }
 
-    // Creacion del objeto Reserva simplificado
-    const nuevaReserva: Reserva = {
-        idReserva: reservas.length ? Math.max(...reservas.map(r => r.idReserva)) + 1 : 1,
-        lote: { idLote: data.idLote, nombre: `Lote ${data.idLote}` } as any,
-        cliente: { idPersona: data.idCliente, nombre: `Cliente ${data.idCliente}` } as any,
-        fechaReserva: data.fechaReserva,
-        seña: data.seña,
-        inmobiliaria: data.idInmobiliaria
-            ? { idInmobiliaria: data.idInmobiliaria, nombre: `Inmobiliaria ${data.idInmobiliaria}` } as any
-            : undefined
-    };
-
-    // Guardar en el array
-    reservas.push(nuevaReserva);
-    return { reserva: nuevaReserva, message: 'Reserva creada exitosamente' };
+  try {
+    const created = await prisma.reserva.create({
+      data: {
+        fechaReserva: toDate(data.fechaReserva),
+        // usamos relaciones reales por consistencia con el schema actual
+        loteId: data.idLote,
+        clienteId: data.idCliente,
+        inmobiliariaId: data.idInmobiliaria ?? null,
+        sena: data.seña ?? null,
+      },
+    })
+    return { reserva: toReserva(created), message: 'Reserva creada con éxito' }
+  } catch (e: any) {
+    if (e.code === 'P2002') return { reserva: null, message: 'Ya existe una reserva para ese cliente, lote y fecha' }
+    throw e
+  }
 }
 
 // ==============================
 // Actualizar reserva existente
+// Aplica sólo los campos enviados. Permite dejar inmobiliaria vacía.
 // ==============================
-// Busca la reserva por ID y, si existe, reemplaza sus datos con los nuevos recibidos.
-// Devuelve mensaje segun resultado.
 export async function updateReserva(idReserva: number, data: PutReservaRequest): Promise<PutReservaResponse> {
-    const index = reservas.findIndex(r => r.idReserva === idReserva);
-    if (index === -1) {
-        return { message: 'Reserva no encontrada' };
-    }
-    reservas[index] = { ...reservas[index], ...data };
-    return { message: 'Reserva actualizada exitosamente' };
+  if (data.seña != null && data.seña < 0) {
+    return { message: 'La seña no puede ser negativa' }
+  }
+
+  try {
+    const updated = await prisma.reserva.update({
+      where: { id: idReserva },
+      data: {
+        ...(data.fechaReserva !== undefined ? { fechaReserva: toDate(data.fechaReserva) } : {}),
+        ...(typeof data.idLote === 'number' ? { loteId: data.idLote } : {}),
+        ...(typeof data.idCliente === 'number' ? { clienteId: data.idCliente } : {}),
+        ...(data.idInmobiliaria !== undefined ? { inmobiliariaId: data.idInmobiliaria } : {}),
+        ...(data.seña !== undefined ? { sena: data.seña } : {}),
+      },
+    })
+    return { message: 'Reserva actualizada con éxito' }
+  } catch (e: any) {
+    if (e.code === 'P2025') return { message: 'Reserva no encontrada' }
+    if (e.code === 'P2002') return { message: 'Ya existe una reserva para ese cliente, lote y fecha' }
+    throw e
+  }
 }
 
 // ==============================
 // Eliminar reserva
+// Devuelve mensaje según resultado.
 // ==============================
-// Elimina del array la reserva que coincida con el ID especificado.
-// Devuelve mensaje segun exito o error.
-export async function deleteReserva(idReserva: number): Promise<DeleteReservaResponse> {
-    const index = reservas.findIndex(r => r.idReserva === idReserva);
-    if (index === -1) {
-        return { message: 'Reserva no encontrada' };
-    }
-    reservas.splice(index, 1);
-    return { message: 'Reserva eliminada exitosamente' };
+export async function deleteReserva(req: DeleteReservaRequest): Promise<DeleteReservaResponse> {
+  try {
+    await prisma.reserva.delete({ where: { id: req.idReserva } })
+    return { message: 'Reserva eliminada con éxito' }
+  } catch (e: any) {
+    if (e.code === 'P2025') return { message: 'Reserva no encontrada' }
+    throw e
+  }
 }
