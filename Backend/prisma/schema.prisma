@@ -75,6 +75,7 @@ model User {
   role      Role
   createdAt DateTime @default(now())
   persona   Persona?
+  inmobiliaria Inmobiliaria?
 }
 
 // Persona
@@ -178,6 +179,7 @@ model Venta {
   vendedorId     Int         @default(0)
   createdAt      DateTime    @default(now())
   updateAt       DateTime?
+  Inmobiliaria  Inmobiliaria[]
 }
 
 // Inmobiliaria
@@ -190,4 +192,10 @@ model Inmobiliaria {
   createdAt   DateTime  @default(now())
   updateAt    DateTime?
   Reserva     Reserva[]
+
+  ventaId Int @unique
+  venta  Venta @relation(fields: [ventaId], references: [id])
+
+  userId    Int?      @unique
+  user      User?     @relation(fields: [userId], references: [id])
 }
