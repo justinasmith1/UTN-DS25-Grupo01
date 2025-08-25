@@ -18,6 +18,13 @@ export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
 // Estas interfaces son los "planos" que definen cómo deben ser los objetos en la aplicación.
 
+export interface Usuario {
+    idUsuario: number;
+    username: string;
+    password: string;
+    rol: Rol;
+}
+
 export interface Persona {
     idPersona: number;
     nombre: string;
@@ -76,6 +83,9 @@ export interface Inmobiliaria {
     razonSocial?: string;
     comxventa?: number;
     contacto?: string;
+    reservas?: Reserva[];
+    venta?: Venta;
+    user?: Usuario;
 }
 
 export interface Reserva {
@@ -278,9 +288,12 @@ export interface GetInmobiliariasResponse {
 //Request para crear una inmobiliaria
 export interface PostInmobiliariaRequest{ 
   nombre: string; //Nombre de la inmobiliaria
-  razonsocial?: string; //Razon social (opcional)
+  razonSocial: string; //Razon social (opcional)
   comxventa?: number; //Comision por venta (opcional)
   contacto?: string; //Telefono de contacto (opcional)
+  reservas?: Reserva[]; //Reservas asociadas (opcional)
+  ventaId?: number; //Ventas asociadas (opcional)
+  userId?: number; //Usuario asociado (opcional)
 }
 
 // Response para crear una nueva inmobiliaria
@@ -326,12 +339,6 @@ export interface DeleteInmobiliariaResponse {
 
 //Usuarios
 //----------------------------------------//
-export interface Usuario {
-    idUsuario: number;
-    username: string;
-    password: string;
-    rol: Rol;
-}
 
 export interface GetUsuariosResponse {
     usuarios: Usuario[];
