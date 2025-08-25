@@ -193,8 +193,8 @@ model Inmobiliaria {
   updateAt    DateTime?
   Reserva     Reserva[]
 
-  ventaId Int @unique
-  venta  Venta @relation(fields: [ventaId], references: [id])
+  ventaId Int? 
+  venta  Venta? @relation(fields: [ventaId], references: [id])
 
   userId    Int?      @unique
   user      User?     @relation(fields: [userId], references: [id])

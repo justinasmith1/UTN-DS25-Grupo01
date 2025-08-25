@@ -11,6 +11,7 @@ import{
 } from '../types/interfacesCCLF';
 import { Inmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
+import { Prisma } from '../generated/prisma';
 
 //Dejo esto para luego no buscar otra vez los datos reales de las inmobiliarias
 let inmobiliarias: Inmobiliaria[] = [
@@ -86,10 +87,13 @@ export async function createInmobiliaria(data: PostInmobiliariaRequest): Promise
     const newInmobiliaria = await prisma.inmobiliaria.create({
         data: {
             nombre: data.nombre,
-            razonSocial: data.razonsocial ?? 'Sin definir',
+            razonSocial: data.razonSocial,
             // Asignar undefined a los campos opcionales si no se proporcionan
             contacto: data.contacto ?? undefined,
-            comxventa: data.comxventa ?? undefined,
+            comxventa: data.comxventa != null ? new Prisma.Decimal(data.comxventa) : undefined,
+            // Relacionando por FK directa 
+            venta:  data.ventaId != null ? { connect: { id: data.ventaId } } : undefined,
+            user:   data.userId  != null ? { connect: { id: data.userId  } } : undefined,
             createdAt: new Date(),
             updateAt: undefined,
         }
