@@ -191,10 +191,8 @@ model Inmobiliaria {
   contacto    String?
   createdAt   DateTime  @default(now())
   updateAt    DateTime?
-  Reserva     Reserva[]
-
-  ventaId Int? 
-  venta  Venta? @relation(fields: [ventaId], references: [id])
+  reservas     Reserva[]
+  ventas      Venta[]
 
   userId    Int?      @unique
   user      User?     @relation(fields: [userId], references: [id])
