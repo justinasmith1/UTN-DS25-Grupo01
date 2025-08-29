@@ -10,6 +10,7 @@ const toUsuario = (u: PrismaUser): Usuario => ({
     username: u.username,
     password: u.password,     
     rol: u.role as unknown as Rol,
+    email: u.email,
 });
 
 // obtener todos los usuaruarios
@@ -34,6 +35,7 @@ export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioR
                 username: req.username,
                 password: req.password,
                 role: req.rol as unknown as $Enums.Role,
+                email: req.email,
             },
         });
         return { usuario: toUsuario(created), message: 'Usuario creado con éxito' };
@@ -52,6 +54,7 @@ export async function updateUser( usernameActual: string, req: PutUsuarioRequest
                 username: req.username,
                 password: req.password,
                 role: req.rol as unknown as $Enums.Role,
+                email: req.email,
             },
         });
         return { message: 'Usuario actualizado con éxito' };

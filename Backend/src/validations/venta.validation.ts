@@ -4,7 +4,7 @@ export const createVentaSchema = z.object({
     loteId: z.number().int('El ID del lote debe ser un número entero').positive('El ID del lote debe ser un número positivo'),
     fechaVenta: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Fecha de venta inválida' }),
     monto: z.number().min(0, 'El monto no puede ser negativo'),
-    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO']).optional(),
+    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO']),
     plazoEscritura: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Fecha de plazo de escritura inválida' }).optional(),
     tipoPago: z.string().min(1, 'Se requiere un tipo de pago').trim(),
     compradorId: z.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo'),

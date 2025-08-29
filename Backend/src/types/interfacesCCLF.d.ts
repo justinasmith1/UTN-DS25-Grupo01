@@ -23,6 +23,7 @@ export interface Usuario {
     username: string;
     password: string;
     rol: Rol;
+    email: string;
 }
 
 export interface Persona {
@@ -356,6 +357,7 @@ export interface PostUsuarioRequest {
     username: string;
     password: string;
     rol: Rol;
+    email: string;
 }
 
 export interface PostUsuarioResponse {
@@ -376,6 +378,7 @@ export interface PutUsuarioRequest {
     username?: string;
     password?: string;
     rol?: Rol;
+    email?: string;
 }
 
 export interface PutUsuarioResponse {
