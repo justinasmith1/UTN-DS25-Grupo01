@@ -9,10 +9,11 @@ import { EstadoVenta } from "../generated/prisma";
 
 export type Identificador = "DNI" | "CUIT" | "CUIL" | "Pasaporte";
 export type Calle = "Reinamora" | "Maca" | "Zorzal" | "Cauquén" | "Alondra" | "Jacana" | "Tacuarito" | "Jilguero" | "Golondrina" | "Calandria" | "Aguilamora" | "Lorca" | "Milano";
-export type EstadoLote = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
+export type EstadoLoteOpc = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
-export type Ubicacion = "Norte" | "Sur" | "Este" | "Oeste";
-export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico;";
+export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
+export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico";
+export type TipoLote = "Lote Venta" | "Espacio Comun";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
@@ -39,8 +40,6 @@ export interface Lote {
     idLote: number;
     fraccion: number;
     readonly numPartido: 62;
-    numero?: number;
-    calle?: Calle[];
     frente?: number;
     fondo?: number;
     superficie?: number; 
@@ -49,12 +48,27 @@ export interface Lote {
     descripcion?: string;
 }
 
+
+
 export interface LoteVenta extends Lote {
     deuda?: boolean;
     precio: number;
     propietario: Persona;
     ubicacion: Ubicacion;
 }
+
+export interface Ubicacion {
+    id: number;
+    calle: Calle;
+    numero: number;
+}
+
+export interface Fraccion {
+    idFraccion: number;
+    numero: number;
+    lotes: Lote[];
+}
+
 
 export interface Venta {
     id: number;
@@ -121,15 +135,23 @@ export interface GetLoteResponse {
 }
 
 export interface PostLoteRequest {
-    fraccion: number;
-    numero: number;
-    estado: EstadoLote;
+    id: number;
+    fraccion: Fraccion;
+    frente: number;
+    fondo: number;
+    tipo: TipoLote;
+    estado: EstadoLoteOpc;
     subestado: SubestadoLote;
     propietario: Persona;
     precio: number;
-    ubicacion: Ubicacion;
+    ubicacion?: Ubicacion;
     superficie?: number;
     descripcion?: string;
+    capacidad?: number;
+    nombre?: string;
+    alquiler?: boolean;
+    deuda?: boolean
+    nombreEspacioComun?: string;
 }
 
 export interface PostLoteResponse {
@@ -139,14 +161,19 @@ export interface PostLoteResponse {
 
 export interface PutLoteRequest {
     id: number;
-    fraccion?: number;
-    numero?: number;
+    fraccion?: Fraccion;
+    frente?: number;
+    fondo?: number;
+    tipo?: TipoLote;
     estado?: EstadoLote;
     subestado?: SubestadoLote;
     propietario?: Persona;
     precio?: number;
     ubicacion?: Ubicacion;
+    superficie?: number;
     descripcion?: string;
+    capacidad?: number;
+    nombre?: string;
 }
 
 export interface PutLoteResponse {
