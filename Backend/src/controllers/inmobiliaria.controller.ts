@@ -1,11 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import {
-    getAllInmobiliarias,
-    getInmobiliariaById,
-    createInmobiliaria,
-    updateInmobiliaria,
-    deleteInmobiliaria
-} from '../services/inmobiliaria.service';
+import * as inmobiliariaService from '../services/inmobiliaria.service';
 import {
     GetInmobiliariaRequest,
     PostInmobiliariaRequest,
@@ -18,8 +12,8 @@ import {
 export async function getAllInmobiliariasController(req: Request, res: Response, next: NextFunction) {
     try {
         // Llamo al servicio para obtener todas las Inmobiliarias
-        const result = await getAllInmobiliarias();
-        res.json(result);
+        const result = await inmobiliariaService.getAllInmobiliarias();
+        res.json({success: true,data:result});
     } catch (error) {
         next(error); // Paso el error al middleware de manejo
     }
@@ -30,16 +24,15 @@ export async function getAllInmobiliariasController(req: Request, res: Response,
 // ==============================
 export async function getInmobiliariaByIdController(req: Request, res: Response, next: NextFunction) {
     try {
-        // Construyo el request tipado a partir de los parametros
-        const request: GetInmobiliariaRequest = { idInmobiliaria: Number(req.params.id) };
-        const result = await getInmobiliariaById(request);
+        const id = parseInt(req.params.id, 10);
+        const result = await inmobiliariaService.getInmobiliariaById(id);
 
         // Si no encuentra la Inmobiliaria, devuelvo 404
-        if (!result.inmobiliaria) {
+        if (!result) {
             res.status(404).json(result);
             return;
         }
-        res.json(result);
+        res.json({success: true,data:result});
     } catch (error) {
         next(error);
     }
@@ -52,14 +45,14 @@ export async function createInmobiliariaController(req: Request, res: Response, 
     try {
         // Creo el objeto tipado a partir del body
         const data: PostInmobiliariaRequest = req.body;
-        const result = await createInmobiliaria(data);
+        const result = await inmobiliariaService.createInmobiliaria(data);
 
         // Si no se crea por validacion, devuelvo 400
-        if (!result.inmobiliaria) {
+        if (!result) {
             res.status(400).json(result);
             return;
         }
-        res.status(201).json(result);
+        res.status(201).json({success: true,message: "Inmobiliaria creada exitosamente",data:result});
     } catch (error) {
         next(error);
     }
@@ -71,16 +64,16 @@ export async function createInmobiliariaController(req: Request, res: Response, 
 export async function updateInmobiliariaController(req: Request, res: Response, next: NextFunction) {
     try {
         // Construyo el request con ID por parametro y datos del body
-        const idInmobiliaria = Number(req.params.id);
+        const idInmobiliaria = parseInt(req.params.id, 10);
         const data: PutInmobiliariaRequest = req.body;
-        const result = await updateInmobiliaria(idInmobiliaria, data);
+        const result = await inmobiliariaService.updateInmobiliaria(idInmobiliaria, data);
 
         // Si no existe la Inmobiliaria, devuelvo 404
         if (result.message === 'Inmobiliaria no encontrada') {
             res.status(404).json(result);
             return;
         }
-        res.json(result);
+        res.json({success: true,message: "Inmobiliaria actualizada exitosamente",data:result});
     } catch (error) {
         next(error);
     }
@@ -93,14 +86,14 @@ export async function deleteInmobiliariaController(req: Request, res: Response, 
     try {
         // Construyo el request con el ID de la Inmobiliaria
         const idInmobiliaria = Number(req.params.id);
-        const result = await deleteInmobiliaria(idInmobiliaria);
+        const result = await inmobiliariaService.deleteInmobiliaria(idInmobiliaria);
 
         // Si no existe la Inmobiliaria, devuelvo 404
         if (result.message === 'Inmobiliaria no encontrada') {
             res.status(404).json(result);
             return;
         }
-        res.json(result);
+        res.json({success: true,message: "Inmobiliaria eliminada exitosamente",data:result});
     } catch (error) {
         next(error);
     }

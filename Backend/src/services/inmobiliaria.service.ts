@@ -1,51 +1,16 @@
 import{
-    GetInmobiliariasResponse,
-    GetInmobiliariaRequest,
-    GetInmobiliariaResponse,
     PutInmobiliariaRequest,
-    PutInmobiliariaResponse,
     PostInmobiliariaRequest,
-    PostInmobiliariaResponse,
-    DeleteInmobiliariaRequest,
-    DeleteInmobiliariaResponse
+    DeleteInmobiliariaResponse,
+    PutInmobiliariaResponse
 } from '../types/interfacesCCLF';
 import { Inmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
-
-//Dejo esto para luego no buscar otra vez los datos reales de las inmobiliarias
-let inmobiliarias: Inmobiliaria[] = [
-    {
-        idInmobiliaria: 1,
-        nombre: "Andinolfi Inmobiliaria",
-        telefono: "2227-546076",
-        email: "camilo@andinolfi.com"
-    },
-    {
-        idInmobiliaria: 2,
-        nombre: "NS Inmobiliaria",
-        telefono: "+54 9 2227 50-4344",
-        email: "contacto@nsInmobiliaria.com.ar"
-    },
-    {
-        idInmobiliaria: 3,
-        nombre: "Andrea Gianfelice Inmobiliaria",
-        telefono: "(02227) 432429",
-        email: "info@agianfeliceprop.com"
-    },
-    {
-        idInmobiliaria: 4,
-        nombre: "Azcarate Propiedades",
-        telefono: "02227 15555332",
-        email: "Azcaratepropiedades.com.ar"
-    }
-]
-
 // ==============================
 // Obtener todas las Inmobiliarias
 // ==============================
 // Retorna el listado completo de Inmobiliarias junto con el total.
-// Esto nos va a ser util para mostrar en listados o paneles administrativos (mostrar el dashboard).
 export async function getAllInmobiliarias(): Promise<Inmobiliaria[]> {
     const inmobiliarias = await prisma.inmobiliaria.findMany({
         orderBy: { id: 'asc' }, 
@@ -56,7 +21,7 @@ export async function getAllInmobiliarias(): Promise<Inmobiliaria[]> {
 // ==============================
 // Obtener una Inmobiliaria por ID
 // ==============================
-// Busca dentro de la BSD la Inmobiliaria cuyo ID coincida con el solicitado.
+// Busca dentro de la BD la Inmobiliaria cuyo ID coincida con el solicitado.
 // Si no existe, devuelve un mensaje de error.
 export async function getInmobiliariaById(id: number): Promise<Inmobiliaria> {
     const inmobiliaria = await prisma.inmobiliaria.findUnique({
@@ -69,6 +34,7 @@ export async function getInmobiliariaById(id: number): Promise<Inmobiliaria> {
 
     return inmobiliaria;
 }
+
 
 // ==============================
 // Crear nueva Inmobiliaria
@@ -92,7 +58,6 @@ export async function createInmobiliaria(data: PostInmobiliariaRequest): Promise
             contacto: data.contacto ?? undefined,
             comxventa: data.comxventa != null ? new Prisma.Decimal(data.comxventa) : undefined,
             // Relacionando por FK directa 
-            venta:  data.ventaId != null ? { connect: { id: data.ventaId } } : undefined,
             user:   data.userId  != null ? { connect: { id: data.userId  } } : undefined,
             createdAt: new Date(),
             updateAt: undefined,
@@ -105,11 +70,11 @@ export async function createInmobiliaria(data: PostInmobiliariaRequest): Promise
 // ==============================
 // Busca la Inmobiliaria por ID y, si existe, reemplaza sus datos con los nuevos recibidos.
 // Devuelve mensaje segun resultado.
-export async function updateInmobiliaria(id: number, updateData: PutInmobiliariaRequest): Promise<Inmobiliaria> {
+export async function updateInmobiliaria(id: number, updateData: PutInmobiliariaRequest): Promise<PutInmobiliariaResponse> {
     const inmobiliaria = await prisma.inmobiliaria.findFirst({
     where: { nombre: updateData.nombre }});
     if (inmobiliaria) {
-        const error = new Error('Ya existe una inmobiliaria con ese nombre');
+        const error = new Error('Advertencia: Ya existe una inmobiliaria con ese nombre');
         (error as any).statusCode = 400;
         throw error;
     }
@@ -122,7 +87,7 @@ export async function updateInmobiliaria(id: number, updateData: PutInmobiliaria
             updateAt: new Date(), // Actualizar la fecha de modificación
         },
         });
-        return updatedInmobiliaria;
+        return ({message:"Inmobiliaria actualizada exitosamente"});
     } catch (e: any) {
         if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
             const error = new Error('Inmobiliaria no encontrada');
