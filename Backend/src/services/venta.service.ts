@@ -1,7 +1,6 @@
 import prisma from '../config/prisma';
 import { Venta } from '../generated/prisma';
-import { GetVentasResponse, GetVentaRequest, GetVentaResponse, PostVentaRequest, PostVentaResponse, PutVentaRequest, PutVentaResponse
-, DeleteVentaRequest, DeleteVentaResponse, Persona } from '../types/interfacesCCLF'; 
+import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
 
 export async function getAllVentas(): Promise<Venta[]> {
     const ventas = await prisma.venta.findMany({
@@ -28,43 +27,80 @@ export async function getVentaById(id: number): Promise<Venta> {
 }
 
 export async function createVenta(data: PostVentaRequest): Promise<Venta> {
-    if (data.monto <= 0) {
-        const error = new Error('El monto debe ser un número positivo');
-        (error as any).statusCode = 400;
+    const loteExists = await prisma.lote.findUnique({
+        where: { id: data.loteId },
+    });
+    if (!loteExists) {
+        const error = new Error('Lote no encontrado');
+        (error as any).statusCode = 404;
         throw error;
     }
-    // Excluir 'lote' y 'comprador' del objeto data si no son parte de VentaCreateInput
-    const { lote, ...ventaData } = data;
+
+    const compradorExists = await prisma.persona.findUnique({
+        where: { id: data.compradorId },
+    });
+    if (!compradorExists) {
+        const error = new Error('Comprador no encontrado');
+        (error as any).statusCode = 404;
+        throw error;
+    }
+
     const newVenta = await prisma.venta.create({
         data: {
-            ...ventaData,
+            loteId: data.loteId,
+            fechaVenta: new Date(data.fechaVenta),
+            monto: data.monto,
+            estado: data.estado || 'INICIADA',
+            plazoEscritura: data.plazoEscritura ? new Date(data.plazoEscritura) : null,
+            tipoPago: data.tipoPago,
+            compradorId: data.compradorId,
+            inmobiliariaId: data.inmobiliariaId || null,
+            createdAt: new Date(),
         },
         include: { comprador: true }, // Incluir datos del comprador
     });
-    return newVenta;
+    return newVenta;   
 }
 
 export async function updateVenta(id: number, updateData: PutVentaRequest): Promise<Venta> {
-    if (updateData.monto !== undefined && updateData.monto <= 0) {
-        const error = new Error('El monto total debe ser un número positivo');
-        (error as any).statusCode = 400;
-        throw error;
+    if (updateData.loteId) {
+        const loteExists = await prisma.lote.findUnique({
+            where: { id: updateData.loteId },
+        });
+        if (!loteExists) {
+            const error = new Error('Lote no encontrado');
+            (error as any).statusCode = 404;
+            throw error;
+        }
     }
+
+    if (updateData.compradorId) {
+        const compradorExists = await prisma.persona.findUnique({
+            where: { id: updateData.compradorId },
+        });
+        if (!compradorExists) {
+            const error = new Error('Comprador no encontrado');
+            (error as any).statusCode = 404;
+            throw error;
+        }
+    }
+
+    if (updateData.inmobiliariaId) {
+        const inmobiliariaExists = await prisma.inmobiliaria.findUnique({
+            where: { id: updateData.inmobiliariaId },
+        });
+        if (!inmobiliariaExists) {
+            const error = new Error('Inmobiliaria no encontrada');
+            (error as any).statusCode = 404;
+            throw error;
+        }
+    }
+
     try{
         const updatedVenta = await prisma.venta.update({
-        where: { id },
-        data: {
-            ...(updateData.compradorId !== undefined ? { compradorId: updateData.compradorId } : {}),
-            ...(updateData.loteId !== undefined ? { loteId: updateData.loteId } : {}),
-            ...(updateData.monto !== undefined ? { monto: updateData.monto } : {}),
-            ...(updateData.fechaVenta !== undefined ? { fechaVenta: new Date(updateData.fechaVenta) } : {}),
-            ...(updateData.estado !== undefined ? { estado: updateData.estado } : {}),
-            ...(updateData.plazoEscritura !== undefined ? { plazoEscritura: new Date(updateData.plazoEscritura) } : {}),
-            ...(updateData.tipoPago !== undefined ? { tipoPago: updateData.tipoPago } : {}),
-            ...(updateData.vendedorId !== undefined ? { vendedorId: updateData.vendedorId } : {}),
-            updateAt: new Date(), // Actualizar la fecha de modificación
-        },
-        include: { comprador: true }, // Incluir datos del comprador
+            where: { id }, 
+            data: updateData,
+            include: { comprador: true }, // Incluir datos del comprador
         });
         return updatedVenta;
     } catch (e: any) {
