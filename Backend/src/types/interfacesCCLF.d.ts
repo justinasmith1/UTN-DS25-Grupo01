@@ -57,11 +57,18 @@ export interface LoteVenta extends Lote {
 }
 
 export interface Venta {
-    idVenta: number;
-    idLote: number
-    comprador: Persona;
+    id: number;
+    loteId: number;
     fechaVenta: string;
-    montoTotal: number;
+    monto: number;
+    estado: EstadoVenta;
+    plazoEscritura?: DateTime;
+    tipoPago: string;
+    compradorId: number;
+    fechaVenta: DateTime;
+    inmobiliariaId?: number;
+    createdAt?: DateTime;
+    updateAt?: DateTime;
 }
 
 export interface EspacioComun extends Lote {
@@ -173,7 +180,7 @@ export interface PostVentaRequest {
     tipoPago: string;
     compradorId: number;  
     fechaVenta: DateTime;
-    vendedorId: number;
+    inmobiliariaId?: number;
     createdAt?: DateTime;
     updateAt?: DateTime;
 } 
@@ -201,7 +208,7 @@ export interface PutVentaRequest {
     estado?: EstadoVenta;
     plazoEscritura?: DateTime;
     tipoPago?: string;
-    vendedorId?: number;
+    inmobiliariaId?: number;
     updateAt: DateTime;
 }
 

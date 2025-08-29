@@ -69,12 +69,12 @@ enum EstadoVenta {
 
 // Usuario
 model User {
-  id        Int      @id @default(autoincrement())
-  username  String   @unique
-  password  String
-  role      Role
-  createdAt DateTime @default(now())
-  persona   Persona?
+  id           Int           @id @default(autoincrement())
+  username     String        @unique
+  password     String
+  role         Role
+  createdAt    DateTime      @default(now())
+  persona      Persona?
   inmobiliaria Inmobiliaria?
 }
 
@@ -166,20 +166,20 @@ model Fraccion {
 
 // VENTAS
 model Venta {
-  id             Int         @id @default(autoincrement())
+  id             Int           @id @default(autoincrement())
   loteId         Int
-  lote           Lote        @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  lote           Lote          @relation(fields: [loteId], references: [id], onDelete: Restrict)
   fechaVenta     DateTime
-  monto          Decimal     @db.Decimal(12, 2)
-  estado         EstadoVenta @default(INICIADA)
+  monto          Decimal       @db.Decimal(12, 2)
+  estado         EstadoVenta   @default(INICIADA)
   plazoEscritura DateTime?
   tipoPago       String
   compradorId    Int
-  comprador      Persona     @relation(fields: [compradorId], references: [id], onDelete: Cascade)
-  vendedorId     Int         @default(0)
-  createdAt      DateTime    @default(now())
+  comprador      Persona       @relation(fields: [compradorId], references: [id], onDelete: Restrict)
+  inmobiliariaId Int?
+  inmobiliaria   Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
   updateAt       DateTime?
-  Inmobiliaria  Inmobiliaria[]
 }
 
 // Inmobiliaria
@@ -191,9 +191,9 @@ model Inmobiliaria {
   contacto    String?
   createdAt   DateTime  @default(now())
   updateAt    DateTime?
-  reservas     Reserva[]
+  reservas    Reserva[]
   ventas      Venta[]
 
-  userId    Int?      @unique
-  user      User?     @relation(fields: [userId], references: [id])
+  userId Int?  @unique
+  user   User? @relation(fields: [userId], references: [id])
 }
