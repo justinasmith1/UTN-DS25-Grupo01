@@ -25,7 +25,7 @@ enum TipoLote {
   ESPACIO_COMUN
 }
 
-enum EstadoLote {
+enum EstadoLote {     
   ALQUILADO
   DISPONIBLE
   EN_PROMOCION
@@ -152,8 +152,8 @@ model Lote {
 
 model Ubicacion {
   id     Int  @id @default(autoincrement())
-  loteId Int  @unique
-  lote   Lote @relation(fields: [loteId], references: [id], onDelete: Cascade)
+  loteId Int?  @unique
+  lote   Lote? @relation(fields: [loteId], references: [id])
 
   calle  NombreCalle
   numero Int
