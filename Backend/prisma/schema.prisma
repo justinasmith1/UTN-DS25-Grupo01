@@ -73,6 +73,7 @@ model User {
   username     String        @unique
   password     String
   role         Role
+  email        String         @unique
   createdAt    DateTime      @default(now())
   persona      Persona?
   inmobiliaria Inmobiliaria?
