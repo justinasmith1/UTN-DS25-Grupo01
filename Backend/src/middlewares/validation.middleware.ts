@@ -1,24 +1,55 @@
-import { ZodError, ZodType } from 'zod';
-import { Request, Response, NextFunction } from 'express'; 
+// src/middlewares/validation.middleware.ts
+import { ZodError, ZodTypeAny } from 'zod';
+import { Request, Response, NextFunction } from 'express';
 
-export const validate = (schema: ZodType) => { 
-    return async (req: Request, res: Response, next: NextFunction) => { 
-        try {
-            const validatedData = await schema.parseAsync(req.body);
-            req.body = validatedData;
-            next();
-        } catch (error) {
-            if (error instanceof ZodError) {
-                return res.status(400).json({
-                    success: false,
-                    message: "Datos invalidos",
-                    errors: error.issues.map(err => ({
-                        field: err.path.join('.'),
-                        message: err.message
-                    })),
-                });
-            }
-        return next(error);
-        }
+function sendZodError(res: Response, e: ZodError) {
+  return res.status(400).json({
+    success: false,
+    message: 'Datos inválidos',
+    errors: e.issues.map(i => ({ field: i.path.join('.'), message: i.message })),
+  });
+}
+
+// Lo que hace esto es validar el cuerpo de la query, separe el sendZodError en otra funcion
+// xq es mas limpio y reutilizable por si dsp queremos validar otros tipos de datos pero
+// seguir mandando el mismo formato de error
+export const validate = (schema: ZodTypeAny) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      req.body = await schema.parseAsync(req.body);
+      next();
+    } catch (e) {
+      if (e instanceof ZodError) return sendZodError(res, e);
+      next(e);
     }
-    };
+  };
+};
+
+// Lo que hace esto es validar los parametros de la ruta
+export const validateParams = (schema: ZodTypeAny, remap?: Record<string, string>) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = remap
+        ? Object.fromEntries(Object.entries(remap).map(([dst, src]) => [dst, (req.params as any)[src]]))
+        : req.params;
+      await schema.parseAsync(data);
+      next();
+    } catch (e) {
+      if (e instanceof ZodError) return sendZodError(res, e);
+      next(e);
+    }
+  };
+};
+
+//Lo que hace esto es validar los query params
+export const validateQuery = (schema: ZodTypeAny) => {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      req.query = await schema.parseAsync(req.query) as any; // saneo tipos
+      next();
+    } catch (e) {
+      if (e instanceof ZodError) return sendZodError(res, e);
+      next(e);
+    }
+  };
+};
