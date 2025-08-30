@@ -41,7 +41,7 @@ const toReserva = (r: PrismaReserva): ReservaDTO => ({
 // Obtener todas las reservas
 // Retorna el listado completo junto con el total.
 // ==============================
-export async function getAllReservas(): Promise<GetReservasResponse> {
+export async function getAllReservas(p0: any): Promise<GetReservasResponse> {
   const filas = await prisma.reserva.findMany({
     orderBy: { fechaReserva: 'desc' },
     // sin include: mantenemos tipos simples como en las filminas
@@ -74,7 +74,6 @@ export async function createReserva(data: PostReservaRequest): Promise<PostReser
     const created = await prisma.reserva.create({
       data: {
         fechaReserva: toDate(data.fechaReserva),
-        // usamos relaciones reales por consistencia con el schema actual
         loteId: data.idLote,
         clienteId: data.idCliente,
         inmobiliariaId: data.idInmobiliaria ?? null,
