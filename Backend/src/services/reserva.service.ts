@@ -1,130 +1,116 @@
 // src/services/reserva.service.ts
-import prisma from '../config/prisma'
-import type { Reserva as PrismaReserva } from '../generated/prisma'
-import type {
-  // DTOs y Requests del proyecto
-  Reserva as ReservaDTO,
-  LoteVenta, Persona, Inmobiliaria,
-  GetReservasResponse, GetReservaRequest, GetReservaResponse,
-  PostReservaRequest, PostReservaResponse,
-  PutReservaRequest, PutReservaResponse,
-  DeleteReservaRequest, DeleteReservaResponse
-} from '../types/interfacesCCLF'
+import prisma from '../config/prisma'; // ⚠️ si en tu config exportás { prisma }, cambiá este import
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
-// Helpers (los puse para que los veamos como una opción a usar para el resto,
-// son validación básica y fecha consistente, nada muy raro, sino los saco)
-const toDate = (v: string | Date) => {
-  const d = v instanceof Date ? v : new Date(v)
-  if (isNaN(d.getTime())) {
-    const e = new Error('fechaReserva inválida (usar YYYY-MM-DD)')
-    ;(e as any).statusCode = 400
-    throw e
+// Esto es un mapper de errores de Prisma a errores HTTP para no tenes que hacerlo en cada funcion
+// -------------------------------------
+function mapPrismaError(e: unknown) {
+  if (e instanceof PrismaClientKnownRequestError) {
+    if (e.code === 'P2002') { // unique compuesta (clienteId + loteId + fechaReserva)
+      const err: any = new Error('Ya existe una reserva para ese cliente, lote y fecha');
+      err.status = 409; return err;
+    }
+    if (e.code === 'P2003') { // FK inválida
+      const err: any = new Error('Alguna referencia (cliente/lote/inmobiliaria) no existe');
+      err.status = 409; return err;
+    }
+    if (e.code === 'P2025') { // not found
+      const err: any = new Error('La reserva no existe');
+      err.status = 404; return err;
+    }
   }
-  return d
+  return e;
 }
-
-// -- Mapeo de PrismaReserva -> Reserva (DTO del proyecto), la hice parecida a la que uso jus asi ya quedan todos con la misma linea
-const toReserva = (r: PrismaReserva): ReservaDTO => ({
-  idReserva: r.id,
-  fechaReserva: r.fechaReserva.toISOString().slice(0, 10),
-  seña: r.sena != null ? Number(r.sena) : undefined,
-  // hoy devolvemos sólo IDs (como hace usuarios con su DTO); si mañana quieren nombres,
-  // se puede agregar include y enriquecer el DTO.
-  lote: { idLote: r.loteId } as LoteVenta,
-  cliente: { idPersona: r.clienteId } as Persona,
-  inmobiliaria: r.inmobiliariaId != null
-    ? ({ idInmobiliaria: r.inmobiliariaId } as Inmobiliaria)
-    : undefined,
-})
 
 // ==============================
 // Obtener todas las reservas
-// Retorna el listado completo junto con el total.
+// Retorna el listado junto con el total.
 // ==============================
-export async function getAllReservas(p0: any): Promise<GetReservasResponse> {
-  const filas = await prisma.reserva.findMany({
+export async function getAllReservas(): Promise<{ reservas: any[]; total: number }> {
+  const reservas = await prisma.reserva.findMany({
     orderBy: { fechaReserva: 'desc' },
     // sin include: mantenemos tipos simples como en las filminas
-  })
-  return { reservas: filas.map(toReserva), total: filas.length }
+  });
+  return { reservas, total: reservas.length };
 }
 
 // ==============================
 // Obtener una reserva por ID
-// Si no existe, devuelve mensaje de error.
 // ==============================
-export async function getReservaById(req: GetReservaRequest): Promise<GetReservaResponse> {
-  const r = await prisma.reserva.findUnique({ where: { id: req.idReserva } })
-  return r ? { reserva: toReserva(r) } : { reserva: null, message: 'Reserva no encontrada' }
+export async function getReservaById(id: number): Promise<any> {
+  const row = await prisma.reserva.findUnique({ where: { id } });
+  if (!row) {
+    const err: any = new Error('La reserva no existe');
+    err.status = 404;
+    throw err;
+  }
+  return row; // devolvemos el registro tal cual viene de Prisma
 }
 
 // ==============================
-// Crear nueva reserva
-// Valida obligatorios y evita seña negativa.
+// Crear reserva
 // ==============================
-export async function createReserva(data: PostReservaRequest): Promise<PostReservaResponse> {
-  if (!data?.idLote || !data?.idCliente || !data?.fechaReserva) {
-    return { reserva: null, message: 'idLote, idCliente y fechaReserva son obligatorios' }
-  }
-  if (data.seña != null && data.seña < 0) {
-    return { reserva: null, message: 'La seña no puede ser negativa' }
-  }
-
+export async function createReserva(body: {
+  fechaReserva: string;           // ISO (lo transformo a Date)
+  loteId: number;
+  clienteId: number;
+  inmobiliariaId?: number | null;
+  sena?: number;                  // Zod ya garantiza >= 0 si viene
+}): Promise<any> {
   try {
-    const created = await prisma.reserva.create({
+    const row = await prisma.reserva.create({
       data: {
-        fechaReserva: toDate(data.fechaReserva),
-        loteId: data.idLote,
-        clienteId: data.idCliente,
-        inmobiliariaId: data.idInmobiliaria ?? null,
-        sena: data.seña ?? null,
+        fechaReserva: new Date(body.fechaReserva), // ISO -> Date
+        loteId: body.loteId,
+        clienteId: body.clienteId,
+        inmobiliariaId: body.inmobiliariaId ?? null,
+        // Para Decimal no necesito new Decimal: Prisma acepta number|string
+        ...(body.sena !== undefined ? { sena: body.sena } : {}),
       },
-    })
-    return { reserva: toReserva(created), message: 'Reserva creada con éxito' }
-  } catch (e: any) {
-    if (e.code === 'P2002') return { reserva: null, message: 'Ya existe una reserva para ese cliente, lote y fecha' }
-    throw e
+    });
+    return row;
+  } catch (e) {
+    throw mapPrismaError(e);
   }
 }
 
 // ==============================
-// Actualizar reserva existente
-// Aplica sólo los campos enviados. Permite dejar inmobiliaria vacía.
+// Actualizar reserva (parcial)
 // ==============================
-export async function updateReserva(idReserva: number, data: PutReservaRequest): Promise<PutReservaResponse> {
-  if (data.seña != null && data.seña < 0) {
-    return { message: 'La seña no puede ser negativa' }
-  }
-
+export async function updateReserva(
+  id: number,
+  body: Partial<{
+    fechaReserva: string;
+    loteId: number;
+    clienteId: number;
+    inmobiliariaId: number | null;
+    sena: number;
+  }>
+): Promise<any> {
   try {
-    const updated = await prisma.reserva.update({
-      where: { id: idReserva },
+    const row = await prisma.reserva.update({
+      where: { id },
       data: {
-        ...(data.fechaReserva !== undefined ? { fechaReserva: toDate(data.fechaReserva) } : {}),
-        ...(typeof data.idLote === 'number' ? { loteId: data.idLote } : {}),
-        ...(typeof data.idCliente === 'number' ? { clienteId: data.idCliente } : {}),
-        ...(data.idInmobiliaria !== undefined ? { inmobiliariaId: data.idInmobiliaria } : {}),
-        ...(data.seña !== undefined ? { sena: data.seña } : {}),
+        ...(body.fechaReserva !== undefined ? { fechaReserva: new Date(body.fechaReserva) } : {}),
+        ...(body.loteId !== undefined ? { loteId: body.loteId } : {}),
+        ...(body.clienteId !== undefined ? { clienteId: body.clienteId } : {}),
+        ...(body.inmobiliariaId !== undefined ? { inmobiliariaId: body.inmobiliariaId } : {}),
+        ...(body.sena !== undefined ? { sena: body.sena } : {}),
       },
-    })
-    return { message: 'Reserva actualizada con éxito' }
-  } catch (e: any) {
-    if (e.code === 'P2025') return { message: 'Reserva no encontrada' }
-    if (e.code === 'P2002') return { message: 'Ya existe una reserva para ese cliente, lote y fecha' }
-    throw e
+    });
+    return row;
+  } catch (e) {
+    throw mapPrismaError(e);
   }
 }
 
 // ==============================
 // Eliminar reserva
-// Devuelve mensaje según resultado.
 // ==============================
-export async function deleteReserva(req: DeleteReservaRequest): Promise<DeleteReservaResponse> {
+export async function deleteReserva(id: number): Promise<void> {
   try {
-    await prisma.reserva.delete({ where: { id: req.idReserva } })
-    return { message: 'Reserva eliminada con éxito' }
-  } catch (e: any) {
-    if (e.code === 'P2025') return { message: 'Reserva no encontrada' }
-    throw e
+    await prisma.reserva.delete({ where: { id } });
+  } catch (e) {
+    throw mapPrismaError(e);
   }
 }
