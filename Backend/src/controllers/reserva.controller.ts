@@ -14,7 +14,7 @@ import {
 // La query ya viene validada por el middleware de Zod.
 export async function getAllReservasController(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = await getAllReservas(req.query as any);
+    const data = await getAllReservas();
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -28,7 +28,7 @@ export async function getAllReservasController(req: Request, res: Response, next
 export async function getReservaByIdController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number((req.params as any).id ?? (req.params as any).idReserva);
-    const data = await getReservaById({ idReserva: id });
+    const data = await getReservaById(id);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -68,7 +68,7 @@ export async function updateReservaController(req: Request, res: Response, next:
 export async function deleteReservaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number((req.params as any).id ?? (req.params as any).idReserva);
-    await deleteReserva({ idReserva: id });
+    await deleteReserva(id);
     res.json({ success: true, message: 'Reserva eliminada exitosamente' });
   } catch (error) {
     next(error);
