@@ -1,12 +1,23 @@
 import { Router } from 'express';
 import * as usuarioController from '../controllers/usuario.controller';
+import { validate } from '../middlewares/validation.middleware';
+import { createUsuarioSchema, updateUsuarioSchema, getUsuarioSchema, deleteUsuarioSchema, queryUsuarioSchema } from '../validations/usuario.validation';
 
 const router = Router();
 
-router.get('/', usuarioController.obtenerTodosUsuarios);
-router.get('/:username', usuarioController.obtenerUsuarioPorUsername);
-router.post('/', usuarioController.crearUsuario);
-router.put('/:username', usuarioController.actualizarUsuario);
-router.delete('/:username', usuarioController.eliminarUsuario);
+// GET /api/Usuarios
+router.get('/', validate(getUsuarioSchema), usuarioController.obtenerTodosUsuarios);
 
-export const usuarioRoutes = router;
+// GET /api/Usuarios/:id
+router.get('/:id',validate(queryUsuarioSchema), usuarioController.obtenerUsuarioPorUsername);
+
+// POST /api/Usuarios
+router.post('/', validate(createUsuarioSchema), usuarioController.crearUsuario);
+
+// PUT /api/Usuarios/:id
+router.put('/:id', validate(updateUsuarioSchema), usuarioController.actualizarUsuario);
+
+// DELETE /api/Usuarios/:id
+router.delete('/:id', validate(deleteUsuarioSchema), usuarioController.eliminarUsuario);
+
+export const UsuarioRoutes = router;
