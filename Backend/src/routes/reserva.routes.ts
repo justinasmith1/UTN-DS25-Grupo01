@@ -32,3 +32,5 @@ router.put('/:id',validateParams(getReservaParamsSchema, { idReserva: 'id' }), v
 
 // Eliminar una reserva
 router.delete('/:id',validateParams(getReservaParamsSchema, { idReserva: 'id' }),reservaController.deleteReservaController);
+
+export const reservaRoutes = router;

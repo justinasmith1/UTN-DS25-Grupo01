@@ -1,7 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
-import { lotesRoutes } from './routes/lote.routes';
-
+import { loteRoutes } from './routes/lote.routes';
 import { logRequest } from './middlewares/logger.middleware';
 import { handleError } from './middlewares/error.middleware';
 import cors from 'cors';
@@ -24,7 +23,7 @@ app.use(logRequest);
 // Error handling middleware
 app.use(handleError);
 
-app.use('/api/lotes', lotesRoutes);
+app.use('/api/lotes', loteRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/reservas", reservaRoutes);
 app.use("/api/inmobiliarias", inmobRoutes)
