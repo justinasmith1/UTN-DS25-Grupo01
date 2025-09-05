@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import * as loteController from '../controllers/lote.controller';
-import { validate } from '../middlewares/validation.middleware';
+import { validate, validateParams } from '../middlewares/validation.middleware';
 import { createLoteSchema, updateLoteSchema, getLoteSchema, deleteLoteSchema, queryLoteSchema } from '../validations/lote.validation';
 
 const router = Router();
 
 // GET /api/lotes
-router.get('/', validate(getLoteSchema), loteController.obtenerTodos);
+router.get('/', loteController.obtenerTodos);
 
 // GET /api/lotes/:id
-router.get('/:id', validate(queryLoteSchema), loteController.obtenerLotePorId);
+router.get('/:id', validateParams(getLoteSchema), loteController.obtenerLotePorId);
 
 // POST /api/lotes
 router.post('/', validate(createLoteSchema), loteController.crearLote);
@@ -18,6 +18,6 @@ router.post('/', validate(createLoteSchema), loteController.crearLote);
 router.put('/:id', validate(updateLoteSchema), loteController.actualizarLote);
 
 // DELETE /api/lotes/:id
-router.delete('/:id', validate(deleteLoteSchema), loteController.eliminarLote);
+router.delete('/:id', validateParams(deleteLoteSchema), loteController.eliminarLote);
 
 export const loteRoutes = router;
