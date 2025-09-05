@@ -20,4 +20,4 @@ router.put('/:id', validate(updateUsuarioSchema), usuarioController.actualizarUs
 // DELETE /api/Usuarios/:id
 router.delete('/:id', validate(deleteUsuarioSchema), usuarioController.eliminarUsuario);
 
-export const UsuarioRoutes = router;
+export const usuarioRoutes = router;
