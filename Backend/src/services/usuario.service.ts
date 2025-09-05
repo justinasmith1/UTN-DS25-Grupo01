@@ -2,6 +2,7 @@ import prisma from '../config/prisma';
 import type { User as PrismaUser } from "../generated/prisma";
 import type { Usuario, Rol, GetUsuariosResponse, GetUsuarioRequest, GetUsuarioResponse, PostUsuarioRequest, PostUsuarioResponse, PutUsuarioRequest, PutUsuarioResponse, DeleteUsuarioRequest, DeleteUsuarioResponse } from '../types/interfacesCCLF';
 import type { $Enums} from "../generated/prisma"
+import { userInfo } from 'os';
 
 
 // mapeo de PrsimaUser a Usuariio
@@ -21,11 +22,28 @@ export async function getAllUsers(): Promise<GetUsuariosResponse> {
     return { usuarios: usuarios.map(toUsuario), total: usuarios.length };
 }
 
-//  obtener usuario por username
-export async function getUserByUsername(request: GetUsuarioRequest): Promise<GetUsuarioResponse> {
-    const user = await prisma.user.findUnique({ where: { username: request.username } });
-    return user ? { usuario: toUsuario(user) } : { usuario: null, message: 'Usuario no encontrado' };
+//  obtener usuario por ID
+//export async function getUsuarioById(request: GetUsuarioRequest): Promise<GetUsuarioResponse> {
+  //  const user = await prisma.user.findUnique({ where: { id: request.idUsuario } });
+  //  return user ? { usuario: toUsuario(user) } : { usuario: null, message: 'Usuario no encontrado' };
+//}
+
+export async function getUsuarioById(id: number): Promise<Usuario> {
+    const usuario = await prisma.user.findUnique({
+        where: { id },
+    });
+
+    if (!usuario) {
+        const error = new  Error('Usuario no encontrado');
+        (error as any).statusCode = 404;
+        throw error;
+    }
+
+    return toUsuario(usuario);
+
 }
+
+    
 // crear ususario
 export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioResponse> {
     try {
@@ -45,10 +63,10 @@ export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioR
 }
 
 // actualizar usuario
-export async function updateUser( usernameActual: string, req: PutUsuarioRequest ): Promise<PutUsuarioResponse> {
+export async function updateUser( idActual: number, req: PutUsuarioRequest ): Promise<PutUsuarioResponse> {
     try {
         await prisma.user.update({
-            where: { username: usernameActual },
+            where: { id: idActual },
             data: {
                 username: req.username,
                 password: req.password,
@@ -66,7 +84,7 @@ export async function updateUser( usernameActual: string, req: PutUsuarioRequest
 // eliminar usuario
 export async function deleteUser( req: DeleteUsuarioRequest ): Promise<DeleteUsuarioResponse> {
     try {
-        await prisma.user.delete({ where: { username: req.username } });
+        await prisma.user.delete({ where: { id: req.idUsuario } });
         return { message: 'Usuario eliminado con éxito' };
     } catch (e: any) {
         if (e.code === 'P2025') return { message: 'Usuario no encontrado' };

@@ -393,7 +393,7 @@ export interface PostUsuarioResponse {
 }
 
 export interface GetUsuarioRequest {
-    username: string;
+    idUsuario: number;
 }
 
 export interface GetUsuarioResponse {
@@ -413,7 +413,7 @@ export interface PutUsuarioResponse {
 }
 
 export interface DeleteUsuarioRequest {
-    username: string;
+    idUsuario: number;
 }
 
 export interface DeleteUsuarioResponse {

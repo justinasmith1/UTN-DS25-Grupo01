@@ -13,11 +13,11 @@ export async function obtenerTodosUsuarios( req: Request, res: Response, next: N
     }
 }
 
-// Obtener usuario por username
-export async function obtenerUsuarioPorUsername( req: Request, res: Response, next: NextFunction) {
+// Obtener usuario por ID
+export async function obtenerUsuarioPorId( req: Request, res: Response, next: NextFunction) {
     try {
-        const username = req.params.username;
-        const result = await UsuarioService.getUserByUsername({ username });
+        const id = parseInt(req.params.id);
+        const result = await UsuarioService.getUsuarioById(id);
         res.json({success: true,data:result});
     } catch (error) {
         next(error);
@@ -33,23 +33,23 @@ export async function crearUsuario(req: Request, res: Response, next: NextFuncti
         next(error);
     }   
 }
-// Actualizar usuario por username
+// Actualizar usuario por ID
 export async function actualizarUsuario(req: Request, res: Response, next: NextFunction) {
     try {
-        const username = req.params.username;
-        const result = await UsuarioService.updateUser(username, req.body);
+        const id = parseInt(req.params.id);
+        const result = await UsuarioService.updateUser(id, req.body);
         res.json({success: true,message: "Usuario actualizado exitosamente",data:result});
     } catch (error) {
         next(error);
     }
 }
 
-// Eliminar usuario por username
+// Eliminar usuario por ID
 export async function eliminarUsuario(req: Request, res: Response, next: NextFunction) {
     console.log("Llega a controller")
     try {
-        const username: string = req.params.username;
-        const deleteRequest = { username: username }; 
+        const id = parseInt(req.params.id);
+        const deleteRequest = { idUsuario: id }; 
         const result = await UsuarioService.deleteUser(deleteRequest);
         res.json({success: true,message: "Usuario eliminado exitosamente",data:result});
     } catch (error) {
