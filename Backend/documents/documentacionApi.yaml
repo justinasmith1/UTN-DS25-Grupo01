@@ -1,0 +1,885 @@
+openapi: 3.0.3
+info:
+  title: API Club de Campo La Federala (CCLF)
+  description: API para gestionar lotes, ventas, inmobiliarias, usuarios y reservas.
+  version: 1.0.12
+servers:
+  - url: http://localhost:3000/api
+    description: Servidor local de desarrollo
+
+tags:
+  - name: lotes
+    description: Este endpoint maneja toda la información relacionada con los lotes.
+  - name: ventas
+    description: Este endpoint maneja toda la información relacionada con las ventas.
+  - name: inmobiliarias
+    description: Este endpoint maneja toda la información relacionada con las inmobiliarias.
+  - name: usuarios
+    description: Este endpoint maneja toda la información relacionada con los usuarios.
+  - name: reservas
+    description: Este endpoint maneja toda la información relacionada con las reservas.
+
+paths:
+  # ===================== L O T E S =====================
+  /lotes:
+    get:
+      tags: [lotes]
+      summary: Listar lotes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetLotesResponse' }
+    post:
+      tags: [lotes]
+      summary: Crear lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostLoteRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostLoteResponse' }
+
+  /lotes/{idLote}:
+    parameters:
+      - $ref: '#/components/parameters/IdLote'
+    get:
+      tags: [lotes]
+      summary: Obtener lote por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetLoteResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [lotes]
+      summary: Actualizar lote
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutLoteRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PutLoteResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [lotes]
+      summary: Eliminar lote
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteLoteResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===================== V E N T A S =====================
+  /ventas:
+    get:
+      tags: [ventas]
+      summary: Listar ventas
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetVentasResponse' }
+    post:
+      tags: [ventas]
+      summary: Crear venta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostVentaRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostVentaResponse' }
+
+  /ventas/{idVenta}:
+    parameters:
+      - $ref: '#/components/parameters/IdVenta'
+    get:
+      tags: [ventas]
+      summary: Obtener venta por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetVentaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [ventas]
+      summary: Actualizar venta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutVentaRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PutVentaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [ventas]
+      summary: Eliminar venta
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteVentaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ================= I N M O B I L I A R I A S =================
+  /inmobiliarias:
+    get:
+      tags: [inmobiliarias]
+      summary: Listar inmobiliarias
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetInmobiliariasResponse' }
+    post:
+      tags: [inmobiliarias]
+      summary: Crear inmobiliaria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostInmobiliariaRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostInmobiliariaResponse' }
+
+  /inmobiliarias/{idInmobiliaria}:
+    parameters:
+      - $ref: '#/components/parameters/IdInmobiliaria'
+    get:
+      tags: [inmobiliarias]
+      summary: Obtener inmobiliaria por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetInmobiliariaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [inmobiliarias]
+      summary: Actualizar inmobiliaria
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutInmobiliariaRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PutInmobiliariaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [inmobiliarias]
+      summary: Eliminar inmobiliaria
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteInmobiliariaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===================== U S U A R I O S =====================
+  /usuarios:
+    get:
+      tags: [usuarios]
+      summary: Listar usuarios
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetUsuariosResponse' }
+    post:
+      tags: [usuarios]
+      summary: Crear usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostUsuarioRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostUsuarioResponse' }
+
+  /usuarios/{username}:
+    parameters:
+      - $ref: '#/components/parameters/Username'
+    get:
+      tags: [usuarios]
+      summary: Obtener usuario por username
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetUsuarioResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [usuarios]
+      summary: Actualizar usuario
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutUsuarioRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PutUsuarioResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [usuarios]
+      summary: Eliminar usuario
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteUsuarioResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===================== R E S E R V A S =====================
+  /reservas:
+    get:
+      tags: [reservas]
+      summary: Listar reservas
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetReservasResponse' }
+    post:
+      tags: [reservas]
+      summary: Crear reserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PostReservaRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PostReservaResponse' }
+
+  /reservas/{idReserva}:
+    parameters:
+      - $ref: '#/components/parameters/IdReserva'
+    get:
+      tags: [reservas]
+      summary: Obtener reserva por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GetReservaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [reservas]
+      summary: Actualizar reserva
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PutReservaRequest' }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PutReservaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [reservas]
+      summary: Eliminar reserva
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/DeleteReservaResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+  parameters:
+    IdLote:
+      name: idLote
+      in: path
+      required: true
+      schema: { type: integer }
+    IdVenta:
+      name: idVenta
+      in: path
+      required: true
+      schema: { type: integer }
+    IdInmobiliaria:
+      name: idInmobiliaria
+      in: path
+      required: true
+      schema: { type: integer }
+    IdReserva:
+      name: idReserva
+      in: path
+      required: true
+      schema: { type: integer }
+    Username:
+      name: username
+      in: path
+      required: true
+      schema: { type: string }
+
+  responses:
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+
+  schemas:
+    # ====== Tipos base / enums ======
+    Identificador:
+      type: string
+      enum: [DNI, CUIT, CUIL, Pasaporte]
+    Calle:
+      type: string
+      enum: [Reinamora, Maca, Zorzal, Cauquén, Alondra, Jacana, Tacuarito, Jilguero, Golondrina, Calandria, Aguilamora, Lorca, Milano]
+    EstadoLote:
+      type: string
+      enum: [Disponible, Reservado, Vendido, No Disponible, Alquilado, En Promoción]
+    SubestadoLote:
+      type: string
+      enum: [En Construccion, No Construido, Construido]
+    UbicacionOpc:
+      type: string
+      enum: [Norte, Sur, Este, Oeste]
+    Rol:
+      type: string
+      enum: [Administrador, Inmobiliaria, Gestor, Tecnico]
+    TipoLote:
+      type: string
+      enum: [Lote Venta, Espacio Comun]
+    DateTime:
+      type: string
+      format: date-time
+      description: ISO 8601
+
+    EstadoVenta:
+      type: string
+      description: Enum proveniente de Prisma `EstadoVenta` 
+      enum:
+        - INICIADA
+        - CON_BOLETO
+        - ESCRITURA_PROGRAMADA
+        - ESCRITURADO
+      example: INICIADA
+
+    # ====== Entidades ======
+    Usuario:
+      type: object
+      required: [idUsuario, username, password, rol, email]
+      properties:
+        idUsuario: { type: integer }
+        username: { type: string }
+        password: { type: string }
+        rol: { $ref: '#/components/schemas/Rol' }
+        email: { type: string, format: email }
+
+    Persona:
+      type: object
+      required: [idPersona, nombre, apellido, identificador]
+      properties:
+        idPersona: { type: integer }
+        nombre: { type: string }
+        apellido: { type: string }
+        identificador: { $ref: '#/components/schemas/Identificador' }
+        telefono: { type: number }
+        email: { type: string, format: email }
+
+    Ubicacion:
+      type: object
+      required: [id, calle, numero]
+      properties:
+        id: { type: integer }
+        calle: { $ref: '#/components/schemas/Calle' }
+        numero: { type: integer }
+
+    Lote:
+      type: object
+      required: [idLote, fraccion, estado, subestado]
+      properties:
+        idLote: { type: integer }
+        fraccion: { type: integer, description: 'ID o número de fracción' }
+        numPartido:
+          type: integer
+          enum: [62]  # readonly 62
+        frente: { type: number }
+        fondo: { type: number }
+        superficie: { type: number }
+        estado: { $ref: '#/components/schemas/EstadoLote' }
+        subestado: { $ref: '#/components/schemas/SubestadoLote' }
+        descripcion: { type: string }
+
+    LoteVenta:
+      allOf:
+        - $ref: '#/components/schemas/Lote'
+        - type: object
+          required: [precio, propietario, ubicacion]
+          properties:
+            deuda: { type: boolean }
+            precio: { type: number }
+            propietario: { $ref: '#/components/schemas/Persona' }
+            ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+
+    EspacioComun:
+      allOf:
+        - $ref: '#/components/schemas/Lote'
+        - type: object
+          required: [capacidad, nombre]
+          properties:
+            capacidad: { type: integer }
+            nombre: { type: string }
+
+    Fraccion:
+      type: object
+      required: [idFraccion, numero]
+      properties:
+        idFraccion: { type: integer }
+        numero: { type: integer }
+        lotes:
+          type: array
+          items: { $ref: '#/components/schemas/Lote' }
+
+    CambioEstado:
+      type: object
+      required: [idCambio, lote, estadoAnterior, estadoNuevo, fechaCambio]
+      properties:
+        idCambio: { type: integer }
+        lote: { $ref: '#/components/schemas/Lote' }
+        estadoAnterior: { $ref: '#/components/schemas/EstadoLote' }
+        estadoNuevo: { $ref: '#/components/schemas/EstadoLote' }
+        fechaCambio: { type: string }
+
+    Venta:
+      type: object
+      required: [id, loteId, fechaVenta, monto, estado, tipoPago, compradorId]
+      properties:
+        id: { type: integer }
+        loteId: { type: integer }
+        fechaVenta: { $ref: '#/components/schemas/DateTime' }
+        monto: { type: number }
+        estado: { $ref: '#/components/schemas/EstadoVenta' }
+        plazoEscritura: { $ref: '#/components/schemas/DateTime' }
+        tipoPago: { type: string }
+        compradorId: { type: integer }
+        inmobiliariaId: { type: integer }
+        createdAt: { $ref: '#/components/schemas/DateTime' }
+        updateAt: { $ref: '#/components/schemas/DateTime' }
+
+    Inmobiliaria:
+      type: object
+      required: [idInmobiliaria, nombre]
+      properties:
+        idInmobiliaria: { type: integer }
+        nombre: { type: string }
+        razonSocial: { type: string }
+        comxventa: { type: number }
+        contacto: { type: string }
+        reservas:
+          type: array
+          items: { $ref: '#/components/schemas/Reserva' }
+        venta: { $ref: '#/components/schemas/Venta' }
+        user: { $ref: '#/components/schemas/Usuario' }
+
+    Reserva:
+      type: object
+      required: [idReserva, lote, cliente, fechaReserva]
+      properties:
+        idReserva: { type: integer }
+        lote: { $ref: '#/components/schemas/LoteVenta' }
+        cliente: { $ref: '#/components/schemas/Persona' }
+        fechaReserva: { type: string }
+        seña: { type: number }
+        inmobiliaria: { $ref: '#/components/schemas/Inmobiliaria' }
+
+    # ====== DTOs Lotes ======
+    GetLotesResponse:
+      type: object
+      required: [lotes, total]
+      properties:
+        lotes:
+          type: array
+          items: { $ref: '#/components/schemas/LoteVenta' }
+        total: { type: integer }
+
+    GetLoteResponse:
+      type: object
+      required: [lote]
+      properties:
+        lote:
+          oneOf:
+            - $ref: '#/components/schemas/LoteVenta'
+            - type: 'object'
+        message: { type: string }
+
+    PostLoteRequest:
+      type: object
+      required: [id, fraccion, frente, fondo, tipo, estado, subestado, propietario, precio]
+      properties:
+        id: { type: integer }
+        fraccion: { $ref: '#/components/schemas/Fraccion' }
+        frente: { type: number }
+        fondo: { type: number }
+        tipo: { $ref: '#/components/schemas/TipoLote' }
+        estado: { $ref: '#/components/schemas/EstadoLote' }
+        subestado: { $ref: '#/components/schemas/SubestadoLote' }
+        propietario: { $ref: '#/components/schemas/Persona' }
+        precio: { type: number }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        superficie: { type: number }
+        descripcion: { type: string }
+        capacidad: { type: number }
+        nombre: { type: string }
+        alquiler: { type: boolean }
+        deuda: { type: boolean }
+        nombreEspacioComun: { type: string }
+
+    PostLoteResponse:
+      type: object
+      required: [lote, message]
+      properties:
+        lote:
+          oneOf:
+            - $ref: '#/components/schemas/LoteVenta'
+            - type: 'object'
+        message: { type: string }
+
+    PutLoteRequest:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+        fraccion: { $ref: '#/components/schemas/Fraccion' }
+        frente: { type: number }
+        fondo: { type: number }
+        tipo: { $ref: '#/components/schemas/TipoLote' }
+        estado: { $ref: '#/components/schemas/EstadoLote' }
+        subestado: { $ref: '#/components/schemas/SubestadoLote' }
+        propietario: { $ref: '#/components/schemas/Persona' }
+        precio: { type: number }
+        ubicacion: { $ref: '#/components/schemas/Ubicacion' }
+        superficie: { type: number }
+        descripcion: { type: string }
+        capacidad: { type: number }
+        nombre: { type: string }
+
+    PutLoteResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    DeleteLoteResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    # ====== DTOs Ventas ======
+    GetVentasResponse:
+      type: object
+      required: [ventas, total]
+      properties:
+        ventas:
+          type: array
+          items: { $ref: '#/components/schemas/Venta' }
+        total: { type: integer }
+
+    PostVentaRequest:
+      allOf:
+        - $ref: '#/components/schemas/Venta'
+      description: Algunos campos pueden ser opcionales al crear una venta.
+      required: [loteId, fechaVenta, monto, estado, tipoPago, compradorId]
+
+
+    PostVentaResponse:
+      type: object
+      required: [venta, message]
+      properties:
+        venta:
+          oneOf:
+            - $ref: '#/components/schemas/Venta'
+            - type: 'object'
+        message: { type: string }
+
+    GetVentaResponse:
+      type: object
+      required: [venta]
+      properties:
+        venta:
+          oneOf:
+            - $ref: '#/components/schemas/Venta'
+            - type: 'object'
+        message: { type: string }
+
+    PutVentaRequest:
+      type: object
+      required: [id, updateAt]
+      properties:
+        id: { type: integer }
+        loteId: { type: integer }
+        monto: { type: number }
+        compradorId: { type: integer }
+        fechaVenta: { $ref: '#/components/schemas/DateTime' }
+        estado: { $ref: '#/components/schemas/EstadoVenta' }
+        plazoEscritura: { $ref: '#/components/schemas/DateTime' }
+        tipoPago: { type: string }
+        inmobiliariaId: { type: integer }
+        updateAt: { $ref: '#/components/schemas/DateTime' }
+
+    PutVentaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    DeleteVentaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    # ====== DTOs Reservas ======
+    GetReservasResponse:
+      type: object
+      required: [reservas, total]
+      properties:
+        reservas:
+          type: array
+          items: { $ref: '#/components/schemas/Reserva' }
+        total: { type: integer }
+
+    PostReservaRequest:
+      type: object
+      required: [idLote, idCliente, fechaReserva]
+      properties:
+        idLote: { type: integer }
+        idCliente: { type: integer }
+        fechaReserva: { type: string }
+        seña: { type: number }
+        idInmobiliaria: { type: integer }
+
+    PostReservaResponse:
+      type: object
+      required: [reserva, message]
+      properties:
+        reserva:
+          oneOf:
+            - $ref: '#/components/schemas/Reserva'
+            - type: 'object'
+        message: { type: string }
+
+    GetReservaResponse:
+      type: object
+      required: [reserva]
+      properties:
+        reserva:
+          oneOf:
+            - $ref: '#/components/schemas/Reserva'
+            - type: 'object'
+        message: { type: string }
+
+    PutReservaRequest:
+      type: object
+      required: [idReserva]
+      properties:
+        idReserva: { type: integer }
+        idLote: { type: integer }
+        idCliente: { type: integer }
+        fechaReserva: { type: string }
+        seña: { type: number }
+        idInmobiliaria: { type: integer }
+
+    PutReservaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    DeleteReservaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    # ====== DTOs Inmobiliarias ======
+    GetInmobiliariasResponse:
+      type: object
+      required: [inmobiliarias, total]
+      properties:
+        inmobiliarias:
+          type: array
+          items: { $ref: '#/components/schemas/Inmobiliaria' }
+        total: { type: integer }
+
+    PostInmobiliariaRequest:
+      type: object
+      required: [nombre]
+      properties:
+        nombre: { type: string }
+        razonSocial: { type: string }
+        comxventa: { type: number }
+        contacto: { type: string }
+        reservas:
+          type: array
+          items: { $ref: '#/components/schemas/Reserva' }
+        ventaId: { type: integer }
+        userId: { type: integer }
+
+    PostInmobiliariaResponse:
+      type: object
+      required: [inmobiliaria, message]
+      properties:
+        inmobiliaria:
+          oneOf:
+            - $ref: '#/components/schemas/Inmobiliaria'
+            - type: 'object'
+        message: { type: string }
+
+    GetInmobiliariaResponse:
+      type: object
+      required: [inmobiliaria]
+      properties:
+        inmobiliaria:
+          oneOf:
+            - $ref: '#/components/schemas/Inmobiliaria'
+            - type: 'object'
+        message: { type: string }
+
+    PutInmobiliariaRequest:
+      type: object
+      required: [idInmobiliaria, nombre]
+      properties:
+        idInmobiliaria: { type: integer }
+        nombre: { type: string }
+        contacto: { type: string }
+
+    PutInmobiliariaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    DeleteInmobiliariaResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    # ====== DTOs Usuarios ======
+    GetUsuariosResponse:
+      type: object
+      required: [usuarios, total]
+      properties:
+        usuarios:
+          type: array
+          items: { $ref: '#/components/schemas/Usuario' }
+        total: { type: integer }
+
+    PostUsuarioRequest:
+      type: object
+      required: [username, password, rol, email]
+      properties:
+        username: { type: string }
+        password: { type: string }
+        rol: { $ref: '#/components/schemas/Rol' }
+        email: { type: string, format: email }
+
+    PostUsuarioResponse:
+      type: object
+      required: [usuario, message]
+      properties:
+        usuario:
+          oneOf:
+            - $ref: '#/components/schemas/Usuario'
+            - type: 'object'
+        message: { type: string }
+
+    GetUsuarioResponse:
+      type: object
+      required: [usuario]
+      properties:
+        usuario:
+          oneOf:
+            - $ref: '#/components/schemas/Usuario'
+            - type: 'object'
+        message: { type: string }
+
+    PutUsuarioRequest:
+      type: object
+      properties:
+        username: { type: string }
+        password: { type: string }
+        rol: { $ref: '#/components/schemas/Rol' }
+        email: { type: string, format: email }
+
+    PutUsuarioResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+    DeleteUsuarioResponse:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+
+security: []
