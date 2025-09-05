@@ -10,7 +10,7 @@ export const createUsuarioSchema = z.object({
 export const updateUsuarioSchema = createUsuarioSchema.partial();
 
 export const getUsuarioSchema = z.object({
-    id: z.number().int('El ID del usuario debe ser un número entero').positive('El ID del usuario debe ser un número positivo'),
+    id: z.coerce.number().int('El ID del usuario debe ser un número entero').positive('El ID del usuario debe ser un número positivo'),
 });                     
 
 export const deleteUsuarioSchema = getUsuarioSchema;

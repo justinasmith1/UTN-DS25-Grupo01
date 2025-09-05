@@ -26,7 +26,6 @@ export async function getUserByUsername(request: GetUsuarioRequest): Promise<Get
     const user = await prisma.user.findUnique({ where: { username: request.username } });
     return user ? { usuario: toUsuario(user) } : { usuario: null, message: 'Usuario no encontrado' };
 }
-
 // crear ususario
 export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioResponse> {
     try {
@@ -74,3 +73,4 @@ export async function deleteUser( req: DeleteUsuarioRequest ): Promise<DeleteUsu
         throw e;
     }
 }
+
