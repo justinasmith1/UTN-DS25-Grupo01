@@ -22,8 +22,8 @@ export async function obtenerTodos(req: Request, res: Response, next: NextFuncti
 
 export async function obtenerVentaPorId(req: Request, res: Response, next: NextFunction) {
     try {
-        const idVenta = parseInt(req.params.idVenta);
-        const result = await ventaService.getVentaById(idVenta);
+        const id = parseInt(req.params.id);
+        const result = await ventaService.getVentaById(id);
         res.json({success: true,data:result});
     } catch (error) {
         next(error);

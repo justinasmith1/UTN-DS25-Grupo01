@@ -13,8 +13,9 @@ export const createVentaSchema = z.object({
 
 export const updateVentaSchema = createVentaSchema.partial();
 
+// z.coerce.number() convierte el string del param a number antes de validar.
 export const getVentaSchema = z.object({
-    id: z.number().int('El ID de la venta debe ser un número entero').positive('El ID de la venta debe ser un número positivo'),
+    id: z.coerce.number().int('El ID de la venta debe ser un número entero').positive('El ID de la venta debe ser un número positivo'),
 });
 
 export const deleteVentaSchema = getVentaSchema;
