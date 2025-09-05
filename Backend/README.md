@@ -11,6 +11,9 @@ Se implementa con **Node.js + TypeScript + Prisma ORM**, siguiendo una arquitect
 Carpeta utilizada para almacenar documentos de referencia relacionados al proyecto.
 - `MetodosDashboard.jpeg` / `MetodosSidePanel.jpeg`: capturas de interfaz y propuestas de diseño.
 - `RelevamientoAPIs-Backend.pdf`: documento de relevamiento de APIs.
+- `documentacionApi.yaml`: documento de endpoint de API.
+
+### `link a Documentacion API en Swagger`[ https://app.swaggerhub.com/apis/clubdecampolf/api-club-de-campo-la-federala-cclf/1.0.12 ]
 
 ---
 
