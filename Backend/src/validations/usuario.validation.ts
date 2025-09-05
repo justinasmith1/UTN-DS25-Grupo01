@@ -9,6 +9,10 @@ export const createUsuarioSchema = z.object({
 
 export const updateUsuarioSchema = createUsuarioSchema.partial();
 
+export const updateUsuarioWithParamsSchema = z.object({
+    id: z.coerce.number().int('El ID del usuario debe ser un número entero').positive('El ID del usuario debe ser un número positivo'),
+}).merge(updateUsuarioSchema);
+
 export const getUsuarioSchema = z.object({
     id: z.coerce.number().int('El ID del usuario debe ser un número entero').positive('El ID del usuario debe ser un número positivo'),
 });                     
