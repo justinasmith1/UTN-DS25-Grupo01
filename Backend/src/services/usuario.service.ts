@@ -2,10 +2,9 @@ import prisma from '../config/prisma';
 import type { User as PrismaUser } from "../generated/prisma";
 import type { Usuario, Rol, GetUsuariosResponse, GetUsuarioRequest, GetUsuarioResponse, PostUsuarioRequest, PostUsuarioResponse, PutUsuarioRequest, PutUsuarioResponse, DeleteUsuarioRequest, DeleteUsuarioResponse } from '../types/interfacesCCLF';
 import type { $Enums} from "../generated/prisma"
-import { userInfo } from 'os';
 
 
-// mapeo de PrsimaUser a Usuariio
+// mapeo de PrismaUser a Usuario
 const toUsuario = (u: PrismaUser): Usuario => ({
     idUsuario: u.id,
     username: u.username,
@@ -14,19 +13,13 @@ const toUsuario = (u: PrismaUser): Usuario => ({
     email: u.email,
 });
 
-// obtener todos los usuaruarios
+// obtener todos los usuarios
 export async function getAllUsers(): Promise<GetUsuariosResponse> {
     const usuarios = await prisma.user.findMany({
         orderBy: { id: 'asc' },
     });
     return { usuarios: usuarios.map(toUsuario), total: usuarios.length };
 }
-
-//  obtener usuario por ID
-//export async function getUsuarioById(request: GetUsuarioRequest): Promise<GetUsuarioResponse> {
-  //  const user = await prisma.user.findUnique({ where: { id: request.idUsuario } });
-  //  return user ? { usuario: toUsuario(user) } : { usuario: null, message: 'Usuario no encontrado' };
-//}
 
 export async function getUsuarioById(id: number): Promise<Usuario> {
     const usuario = await prisma.user.findUnique({
@@ -44,7 +37,7 @@ export async function getUsuarioById(id: number): Promise<Usuario> {
 }
 
     
-// crear ususario
+// crear usuario
 export async function createUser( req: PostUsuarioRequest): Promise<PostUsuarioResponse> {
     try {
         const created = await prisma.user.create({
