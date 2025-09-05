@@ -46,6 +46,7 @@ export async function actualizarUsuario(req: Request, res: Response, next: NextF
 
 // Eliminar usuario por username
 export async function eliminarUsuario(req: Request, res: Response, next: NextFunction) {
+    console.log("Llega a controller")
     try {
         const username: string = req.params.username;
         const deleteRequest = { username: username }; 
@@ -55,3 +56,4 @@ export async function eliminarUsuario(req: Request, res: Response, next: NextFun
         next(error);
     }
 }
+
