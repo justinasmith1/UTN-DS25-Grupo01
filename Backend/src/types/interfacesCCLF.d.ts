@@ -353,6 +353,11 @@ export interface PutInmobiliariaRequest {
   idInmobiliaria: number; //ID de la inmobilairia a modificar
   nombre: string; //Nombre de la inmobiliaria
   contacto?: string; //Telefono de contacto (opcional)
+  razonSocial?: string; //Razon social (opcional)
+  comxventa?: number; //Comision por venta (opcional) 
+  userId?: number; //Usuario asociado (opcional)
+  reservas?: Reserva[]; //Reservas asociadas (opcional)
+  ventaId?: number; //Ventas asociadas (opcional)
 }
 
 // Response para actualizar una inmobiliaria
@@ -362,7 +367,7 @@ export interface PutInmobiliariaResponse {
 
 // Request para eliminar una inmobiliaria
 export interface DeleteInmobiliariaRequest {
-  idReserva: number;
+  idInmobiliaria: number;
 }
 
 // Response para eliminar una inmobiliaria
