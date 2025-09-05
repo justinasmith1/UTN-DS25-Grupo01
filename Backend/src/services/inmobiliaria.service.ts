@@ -1,38 +1,47 @@
 import{
+    Inmobiliaria,
+    GetInmobiliariasResponse,
+    GetInmobiliariaRequest,
+    GetInmobiliariaResponse,
     PutInmobiliariaRequest,
+    PutInmobiliariaResponse,
     PostInmobiliariaRequest,
-    DeleteInmobiliariaResponse,
-    PutInmobiliariaResponse
+    PostInmobiliariaResponse,    
+    DeleteInmobiliariaRequest,
+    DeleteInmobiliariaResponse
 } from '../types/interfacesCCLF';
-import { Inmobiliaria } from '../generated/prisma';
+import { Inmobiliaria as PrismaInmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
+
+const toInmobiliaria = (i: PrismaInmobiliaria): Inmobiliaria => ({
+    idInmobiliaria: i.id,
+    nombre: i.nombre,
+    razonSocial: i.razonSocial,
+    contacto: i.contacto ?? undefined,
+    comxventa: i.comxventa ? parseFloat(i.comxventa.toString()) : undefined,
+});
+
 // ==============================
 // Obtener todas las Inmobiliarias
 // ==============================
 // Retorna el listado completo de Inmobiliarias junto con el total.
-export async function getAllInmobiliarias(): Promise<Inmobiliaria[]> {
-    const inmobiliarias = await prisma.inmobiliaria.findMany({
-        orderBy: { id: 'asc' }, 
-    });
-    return inmobiliarias;
+export async function getAllInmobiliarias(): Promise<GetInmobiliariasResponse> {
+  const [rows, total] = await Promise.all([
+    prisma.inmobiliaria.findMany({orderBy: { id: 'asc' } }),
+    prisma.inmobiliaria.count(),
+  ]);
+  return { inmobiliarias: rows.map(toInmobiliaria), total };
 }
-
 // ==============================
 // Obtener una Inmobiliaria por ID
 // ==============================
 // Busca dentro de la BD la Inmobiliaria cuyo ID coincida con el solicitado.
 // Si no existe, devuelve un mensaje de error.
-export async function getInmobiliariaById(id: number): Promise<Inmobiliaria> {
+export async function getInmobiliariaById(req: GetInmobiliariaRequest): Promise<GetInmobiliariaResponse> {
     const inmobiliaria = await prisma.inmobiliaria.findUnique({
-        where: { id }});
-    if (!inmobiliaria) {
-        const error = new  Error('Inmobiliaria no encontrada');
-        (error as any).statusCode = 404;
-        throw error;
-    }
-
-    return inmobiliaria;
+        where: { id: req.idInmobiliaria },});
+    return inmobiliaria ? { inmobiliaria: toInmobiliaria(inmobiliaria) } : { inmobiliaria: null, message: 'Inmobiliaria no encontrada' };
 }
 
 
@@ -41,9 +50,9 @@ export async function getInmobiliariaById(id: number): Promise<Inmobiliaria> {
 // ==============================
 // Agrega una nueva Inmobiliaria a la BD.
 // Se hace una validacion para evitar duplicados de lote + cliente en la misma fecha.
-export async function createInmobiliaria(data: PostInmobiliariaRequest): Promise<Inmobiliaria> {
+export async function createInmobiliaria(req: PostInmobiliariaRequest): Promise<PostInmobiliariaResponse> {
     const inmobiliaria = await prisma.inmobiliaria.findFirst({
-    where: { nombre: data.nombre }});
+    where: { nombre: req.nombre }});
     if (inmobiliaria) {
         const error = new Error('Advertencia: Ya existe una inmobiliaria con ese nombre');
         (error as any).statusCode = 400;
@@ -52,27 +61,27 @@ export async function createInmobiliaria(data: PostInmobiliariaRequest): Promise
 
     const newInmobiliaria = await prisma.inmobiliaria.create({
         data: {
-            nombre: data.nombre,
-            razonSocial: data.razonSocial,
+            nombre: req.nombre,
+            razonSocial: req.razonSocial,
             // Asignar undefined a los campos opcionales si no se proporcionan
-            contacto: data.contacto ?? undefined,
-            comxventa: data.comxventa != null ? new Prisma.Decimal(data.comxventa) : undefined,
+            contacto: req.contacto ?? undefined,
+            comxventa: req.comxventa != null ? new Prisma.Decimal(req.comxventa) : undefined,
             // Relacionando por FK directa 
-            user:   data.userId  != null ? { connect: { id: data.userId  } } : undefined,
+            user:   req.userId  != null ? { connect: { id: req.userId  } } : undefined,
             createdAt: new Date(),
             updateAt: undefined,
         }
     });
-    return newInmobiliaria
+    return { inmobiliaria: toInmobiliaria(newInmobiliaria), message: 'Inmobiliaria creada exitosamente' };
 }
 // ==============================
 // Actualizar Inmobiliaria existente
 // ==============================
 // Busca la Inmobiliaria por ID y, si existe, reemplaza sus datos con los nuevos recibidos.
 // Devuelve mensaje segun resultado.
-export async function updateInmobiliaria(id: number, updateData: PutInmobiliariaRequest): Promise<PutInmobiliariaResponse> {
+export async function updateInmobiliaria(idActual:number, updateData: PutInmobiliariaRequest): Promise<PutInmobiliariaResponse> {
     const inmobiliaria = await prisma.inmobiliaria.findFirst({
-    where: { nombre: updateData.nombre }});
+    where: { id: idActual }});
     if (inmobiliaria) {
         const error = new Error('Advertencia: Ya existe una inmobiliaria con ese nombre');
         (error as any).statusCode = 400;
@@ -80,7 +89,7 @@ export async function updateInmobiliaria(id: number, updateData: PutInmobiliaria
     }
     try{
         const updatedInmobiliaria = await prisma.inmobiliaria.update({
-        where: { id },
+        where: { id: updateData.idInmobiliaria },
         data: {
             ...(updateData.nombre !== undefined ? { nombre: updateData.nombre } : {}),
             ...(updateData.contacto !== undefined ? { contacto: updateData.contacto } : {}),
@@ -102,10 +111,10 @@ export async function updateInmobiliaria(id: number, updateData: PutInmobiliaria
 // ==============================
 // Elimina de la BD la Inmobiliaria que coincida con el ID especificado.
 // Devuelve mensaje segun exito o error.
-export async function deleteInmobiliaria(id: number): Promise<DeleteInmobiliariaResponse> {
+export async function deleteInmobiliaria(req: DeleteInmobiliariaRequest): Promise<DeleteInmobiliariaResponse> {
     try {
         await prisma.inmobiliaria.delete({
-            where: { id },
+            where: { id: req.idInmobiliaria },
         });
         return { message: 'Inmobiliaria eliminada correctamente' };
     } catch (e: any) {

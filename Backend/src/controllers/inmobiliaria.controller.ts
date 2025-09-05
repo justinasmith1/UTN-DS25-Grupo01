@@ -24,8 +24,8 @@ export async function getAllInmobiliariasController(req: Request, res: Response,
 // ==============================
 export async function getInmobiliariaByIdController(req: Request, res: Response, next: NextFunction) {
     try {
-        const id = parseInt(req.params.id, 10);
-        const result = await inmobiliariaService.getInmobiliariaById(id);
+        const idInmobiliaria = parseInt(req.params.id, 10);
+        const result = await inmobiliariaService.getInmobiliariaById({idInmobiliaria});  
 
         // Si no encuentra la Inmobiliaria, devuelvo 404
         if (!result) {
@@ -86,7 +86,7 @@ export async function deleteInmobiliariaController(req: Request, res: Response, 
     try {
         // Construyo el request con el ID de la Inmobiliaria
         const idInmobiliaria = Number(req.params.id);
-        const result = await inmobiliariaService.deleteInmobiliaria(idInmobiliaria);
+        const result = await inmobiliariaService.deleteInmobiliaria({idInmobiliaria});
 
         // Si no existe la Inmobiliaria, devuelvo 404
         if (result.message === 'Inmobiliaria no encontrada') {
