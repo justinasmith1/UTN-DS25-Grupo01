@@ -367,11 +367,11 @@ components:
       in: path
       required: true
       schema: { type: integer }
-    Username:
-      name: username
+    IdUsuario:
+      name: idUsuario
       in: path
       required: true
-      schema: { type: string }
+      schema: { type: integer }
 
   responses:
     NotFound:
