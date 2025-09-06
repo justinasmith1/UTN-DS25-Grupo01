@@ -9,6 +9,7 @@ export const createVentaSchema = z.object({
     tipoPago: z.string().min(1, 'Se requiere un tipo de pago').trim(),
     compradorId: z.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo'),
     inmobiliariaId: z.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo').optional(),
+    reservaId: z.number().int('El ID de la reserva debe ser un número entero').positive('El ID de la reserva debe ser un número positivo').optional().nullable(),
 });
 
 export const updateVentaSchema = createVentaSchema.partial();
