@@ -52,7 +52,7 @@ export const updateReservaSchema = createReservaSchema
   - GET detalle, PUT, DELETE usan el mismo parametros q es el idReserva.
 */
 export const getReservaParamsSchema = z.object({
-  idReserva: idInt,
+  id: idInt,
 });
 
 /*  Parametros para eliminar, usa el mismo que el de arriba del obtener */
