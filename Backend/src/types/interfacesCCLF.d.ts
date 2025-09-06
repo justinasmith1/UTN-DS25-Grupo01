@@ -350,8 +350,7 @@ export interface GetInmobiliariaResponse {
 
 // Request para actualizar una inmobiliaria
 export interface PutInmobiliariaRequest {
-  idInmobiliaria: number; //ID de la inmobilairia a modificar
-  nombre: string; //Nombre de la inmobiliaria
+  nombre?: string; //Nombre de la inmobiliaria
   contacto?: string; //Telefono de contacto (opcional)
   razonSocial?: string; //Razon social (opcional)
   comxventa?: number; //Comision por venta (opcional) 
