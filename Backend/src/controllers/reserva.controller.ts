@@ -27,7 +27,7 @@ export async function getAllReservasController(req: Request, res: Response, next
 // Los parametros ya vienen validados en la ruta (id entero positivo).
 export async function getReservaByIdController(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = Number((req.params as any).id ?? (req.params as any).idReserva);
+    const id = Number(req.params.id);
     const data = await getReservaById(id);
     res.json({ success: true, data });
   } catch (error) {
@@ -54,7 +54,7 @@ export async function createReservaController(req: Request, res: Response, next:
 // Body parcial validado.
 export async function updateReservaController(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = Number((req.params as any).id ?? (req.params as any).idReserva);
+    const id = Number(req.params.id);
     const data = await updateReserva(id, req.body);
     res.json({ success: true, message: 'Reserva actualizada exitosamente', data });
   } catch (error) {
@@ -67,7 +67,7 @@ export async function updateReservaController(req: Request, res: Response, next:
 // ==============================
 export async function deleteReservaController(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = Number((req.params as any).id ?? (req.params as any).idReserva);
+    const id = Number(req.params.id);
     await deleteReserva(id);
     res.json({ success: true, message: 'Reserva eliminada exitosamente' });
   } catch (error) {

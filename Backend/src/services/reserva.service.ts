@@ -1,5 +1,5 @@
 // src/services/reserva.service.ts
-import prisma from '../config/prisma'; // ⚠️ si en tu config exportás { prisma }, cambiá este import
+import prisma from '../config/prisma'; 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 // Esto es un mapper de errores de Prisma a errores HTTP para no tenes que hacerlo en cada funcion
