@@ -810,6 +810,13 @@ components:
         idInmobiliaria: { type: integer }
         nombre: { type: string }
         contacto: { type: string }
+        razonSocial: {type: string}
+        comxventa: {type: integer} 
+        userId: { type: integer }
+        reservas:
+          type: array
+          items: { $ref: '#/components/schemas/Reserva' }
+        ventaId: { type: integer } 
 
     PutInmobiliariaResponse:
       type: object
