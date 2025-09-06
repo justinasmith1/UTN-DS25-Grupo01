@@ -25,7 +25,7 @@ enum TipoLote {
   ESPACIO_COMUN
 }
 
-enum EstadoLote {     
+enum EstadoLote {
   ALQUILADO
   DISPONIBLE
   EN_PROMOCION
@@ -73,7 +73,7 @@ model User {
   username     String        @unique
   password     String
   role         Role
-  email        String         @unique 
+  email        String        @unique
   createdAt    DateTime      @default(now())
   persona      Persona?
   inmobiliaria Inmobiliaria?
@@ -110,6 +110,7 @@ model Reserva {
   lote         Lote          @relation(fields: [loteId], references: [id])
   cliente      Persona       @relation(fields: [clienteId], references: [id])
   inmobiliaria Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
+  Venta        Venta[]
 
   // Esto evita duplicados logicos de la misma reserva pero habria que ver si hace falta o no
   @@unique([clienteId, loteId, fechaReserva], name: "uq_reserva_cliente_lote_fecha")
@@ -151,7 +152,7 @@ model Lote {
 }
 
 model Ubicacion {
-  id     Int  @id @default(autoincrement())
+  id     Int   @id @default(autoincrement())
   loteId Int?  @unique
   lote   Lote? @relation(fields: [loteId], references: [id])
 
@@ -179,6 +180,8 @@ model Venta {
   comprador      Persona       @relation(fields: [compradorId], references: [id], onDelete: Restrict)
   inmobiliariaId Int?
   inmobiliaria   Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
+  reservaId      Int?
+  reserva        Reserva?      @relation(fields: [reservaId], references: [id], onDelete: SetNull)
   createdAt      DateTime      @default(now())
   updateAt       DateTime?
 }

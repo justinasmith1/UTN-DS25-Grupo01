@@ -1,4 +1,3 @@
-// Reemplazá el import viejo por este
 import { Prisma } from '@prisma/client';
 import type { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
