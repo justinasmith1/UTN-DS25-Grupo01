@@ -105,7 +105,7 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
       ...(updateData.contacto      !== undefined ? { contacto: updateData.contacto } : {}),
       ...(updateData.comxventa     !== undefined ? { comxventa: new Prisma.Decimal(updateData.comxventa) } : {}),
       ...(updateData.userId        !== undefined ? { userId: updateData.userId } : {}),
-      updateAt: new Date(), // (o updatedAt si así está en tu schema)
+      updateAt: new Date(), 
     },
   });
 
