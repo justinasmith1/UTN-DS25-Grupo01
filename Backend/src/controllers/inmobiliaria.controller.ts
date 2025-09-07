@@ -62,22 +62,16 @@ export async function createInmobiliariaController(req: Request, res: Response, 
 // Actualizar Inmobiliaria existente
 // ==============================
 export async function updateInmobiliariaController(req: Request, res: Response, next: NextFunction) {
-    try {
-        // Construyo el request con ID por parametro y datos del body
-        const idInmobiliaria = parseInt(req.params.id, 10);
-        const data: PutInmobiliariaRequest = req.body;
-        const result = await inmobiliariaService.updateInmobiliaria(idInmobiliaria, data);
-
-        // Si no existe la Inmobiliaria, devuelvo 404
-        if (result.message === 'Inmobiliaria no encontrada') {
-            res.status(404).json(result);
-            return;
-        }
-        res.json({success: true,message: "Inmobiliaria actualizada exitosamente",data:result});
-    } catch (error) {
-        next(error);
-    }
+  try {
+    const id = Number(req.params.id);
+    const data = req.body; // ya validado por zod
+    const result = await inmobiliariaService.updateInmobiliaria(id, data);
+    res.json({ success: true, message: 'Inmobiliaria actualizada exitosamente', data: result });
+  } catch (error) {
+    next(error);
+  }
 }
+
 
 // ==============================
 // Eliminar Inmobiliaria

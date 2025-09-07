@@ -79,32 +79,37 @@ export async function createInmobiliaria(req: PostInmobiliariaRequest): Promise<
 // ==============================
 // Busca la Inmobiliaria por ID y, si existe, reemplaza sus datos con los nuevos recibidos.
 // Devuelve mensaje segun resultado.
-export async function updateInmobiliaria(idActual:number, updateData: PutInmobiliariaRequest): Promise<PutInmobiliariaResponse> {
-    const inmobiliaria = await prisma.inmobiliaria.findFirst({
-    where: { id: idActual }});
-    if (inmobiliaria) {
-        const error = new Error('Advertencia: Ya existe una inmobiliaria con ese nombre');
-        (error as any).statusCode = 400;
-        throw error;
+export async function updateInmobiliaria(idActual: number, updateData: PutInmobiliariaRequest): Promise<PutInmobiliariaResponse> {
+  // 404 si no existe
+  const existing = await prisma.inmobiliaria.findUnique({ where: { id: idActual } });
+  if (!existing) {
+    const e = new Error('Inmobiliaria no encontrada'); (e as any).statusCode = 404; throw e;
+  }
+
+  // Duplicado por nombre (si viene nombre)
+  if (updateData.nombre) {
+    const dup = await prisma.inmobiliaria.findFirst({
+      where: { nombre: updateData.nombre, NOT: { id: idActual } },
+      select: { id: true },
+    });
+    if (dup) {
+      const e = new Error('El nombre ya existe'); (e as any).statusCode = 400; throw e;
     }
-    try{
-        const updatedInmobiliaria = await prisma.inmobiliaria.update({
-        where: { id: updateData.idInmobiliaria },
-        data: {
-            ...(updateData.nombre !== undefined ? { nombre: updateData.nombre } : {}),
-            ...(updateData.contacto !== undefined ? { contacto: updateData.contacto } : {}),
-            updateAt: new Date(), // Actualizar la fecha de modificación
-        },
-        });
-        return ({message:"Inmobiliaria actualizada exitosamente"});
-    } catch (e: any) {
-        if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
-            const error = new Error('Inmobiliaria no encontrada');
-            (error as any).statusCode = 404;
-            throw error;
-        }
-        throw e; // Re-lanzar otros errores
-    }
+  }
+
+  await prisma.inmobiliaria.update({
+    where: { id: idActual },
+    data: {
+      ...(updateData.nombre        !== undefined ? { nombre: updateData.nombre } : {}),
+      ...(updateData.razonSocial   !== undefined ? { razonSocial: updateData.razonSocial } : {}),
+      ...(updateData.contacto      !== undefined ? { contacto: updateData.contacto } : {}),
+      ...(updateData.comxventa     !== undefined ? { comxventa: new Prisma.Decimal(updateData.comxventa) } : {}),
+      ...(updateData.userId        !== undefined ? { userId: updateData.userId } : {}),
+      updateAt: new Date(), 
+    },
+  });
+
+  return { message: 'Inmobiliaria actualizada correctamente' };
 }
 // ==============================
 // Eliminar Inmobiliaria

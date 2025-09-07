@@ -8,11 +8,15 @@ export const createInmobiliariaSchema = z.object({
     userId: z.number().int('El ID del usuario debe ser un número entero').positive('El ID del usuario debe ser un número positivo').optional(),
 })
 
-export const updateInmobiliariaSchema = createInmobiliariaSchema.partial();
+// body del PUT: todos opcionales + al menos 1 campo
+export const updateInmobiliariaSchema = createInmobiliariaSchema
+  .partial()
+  .refine((d) => Object.keys(d).length > 0, { message: 'Debe enviar al menos un campo' });
 
-export const updateInmobiliariaWithParamsSchema = z.object({
-    idInmobiliaria: z.coerce.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo'),
-}).merge(updateInmobiliariaSchema);
+// params: /:id
+export const idParamSchema = z.object({
+  id: z.coerce.number().int().positive(),
+});
 
 export const getInmobiliariaSchema = z.object({
     id: z.coerce.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo'),
