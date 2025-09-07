@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as loteController from '../controllers/lote.controller';
 import { validate, validateParams } from '../middlewares/validation.middleware';
-import { createLoteSchema, updateLoteSchema, getLoteSchema, deleteLoteSchema, queryLoteSchema } from '../validations/lote.validation';
+import { createLoteSchema, updateLoteSchema, getLoteSchema, deleteLoteSchema } from '../validations/lote.validation';
 
 const router = Router();
 
