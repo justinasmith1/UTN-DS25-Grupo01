@@ -241,9 +241,9 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/PostUsuarioResponse' }
 
-  /usuarios/{username}:
+  /usuarios/{idUsuario}:
     parameters:
-      - $ref: '#/components/parameters/Username'
+      - $ref: '#/components/parameters/IdUsuario'
     get:
       tags: [usuarios]
       summary: Obtener usuario por username
