@@ -18,8 +18,8 @@ export async function obtenerTodos(req: Request, res: Response, next: NextFuncti
 
 export async function obtenerLotePorId(req: Request, res: Response, next: NextFunction) {
     try {
-        const idLote = parseInt(req.params.idLote);
-        const result = await loteService.getLotesById(idLote);
+        const id = parseInt(req.params.id);
+        const result = await loteService.getLotesById(id);
         res.json({success: true,data:result});
     } catch (error) {
         next(error);
@@ -43,8 +43,8 @@ export async function crearLote(req: Request, res: Response, next: NextFunction)
 
 export async function actualizarLote(req: Request, res: Response, next: NextFunction) {
     try {
-        const idLote = parseInt(String(req.params.idLote), 10);
-        const result = await loteService.updatedLote(idLote, req.body);
+        const id = parseInt(String(req.params.id), 10);
+        const result = await loteService.updatedLote(id, req.body);
         res.json({success: true,message: "Lote actualizado exitosamente",data:result});
     } catch (error) {
         next(error);
@@ -55,8 +55,8 @@ export async function actualizarLote(req: Request, res: Response, next: NextFunc
 
 export async function eliminarLote(req: Request, res: Response, next: NextFunction) {
     try {
-        const idLote = parseInt(req.params.idLote);
-        const result = await loteService.deleteLote(idLote);
+        const id = parseInt(req.params.id);
+        const result = await loteService.deleteLote(id);
         res.json({success: true,message: "Lote eliminado exitosamente",data:result});
     } catch (error) {
         next(error);
