@@ -51,8 +51,8 @@ export async function crearVenta(req: Request, res: Response, next: NextFunction
 
 export async function actualizarVenta(req: Request, res: Response, next: NextFunction) {
     try {
-        const idVenta = parseInt(String(req.params.idVenta), 10);
-        const result = await ventaService.updateVenta(idVenta, req.body);
+        const id = parseInt(req.params.id);
+        const result = await ventaService.updateVenta(id, req.body);
         res.json({success: true,message: "Venta actualizada exitosamente",data:result});
     } catch (error) {
         next(error);
@@ -65,7 +65,7 @@ export async function actualizarVenta(req: Request, res: Response, next: NextFun
 
 export async function eliminarVenta(req: Request, res: Response, next: NextFunction) {
     try {
-        const idVenta = parseInt(req.params.idVenta);
+        const idVenta = parseInt(req.params.id);
         const result = await ventaService.deleteVenta(idVenta);
         res.json({success: true,message: "Venta eliminada exitosamente",data:result});
     } catch (error) {
