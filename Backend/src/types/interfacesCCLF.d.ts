@@ -207,7 +207,6 @@ export interface PostVentaRequest {
     plazoEscritura?: DateTime;
     tipoPago: string;
     compradorId: number;  
-    fechaVenta: DateTime;
     inmobiliariaId?: number;
     createdAt?: DateTime;
     updateAt?: DateTime;
