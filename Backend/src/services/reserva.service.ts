@@ -47,6 +47,17 @@ export async function getReservaById(id: number): Promise<any> {
   return row; // devolvemos el registro tal cual viene de Prisma
 }
 
+
+export async function getReservaByImmobiliariaId(id: number): Promise<any> {
+  const row = await prisma.reserva.findMany({ where: { inmobiliariaId: id } });
+  if (!row) {
+    const err: any = new Error('Inmobialiaria no existe');
+    err.status = 404;
+    throw err;
+  }
+  return row; // devolvemos el registro tal cual viene de Prisma
+}
+
 // ==============================
 // Crear reserva
 // ==============================

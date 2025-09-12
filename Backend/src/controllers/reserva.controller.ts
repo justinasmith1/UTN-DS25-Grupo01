@@ -6,6 +6,7 @@ import {
   createReserva,
   updateReserva,
   deleteReserva,
+  getReservaByImmobiliariaId,
 } from '../services/reserva.service';
 
 // ==============================
@@ -35,6 +36,15 @@ export async function getReservaByIdController(req: Request, res: Response, next
   }
 }
 
+export async function getAllReservasByInmobiliariaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const data = await getReservaByImmobiliariaId(id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
 // ==============================
 // Crear nueva reserva
 // ==============================
