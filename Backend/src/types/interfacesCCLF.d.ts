@@ -12,7 +12,7 @@ export type Calle = "Reinamora" | "Maca" | "Zorzal" | "Cauquén" | "Alondra" | "
 export type EstadoLoteOpc = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
-export type Rol = "Administrador" | "Inmobiliaria" | "Gestor" | "Tecnico";
+export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
 export type TipoLote = "Lote Venta" | "Espacio Comun";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
@@ -378,6 +378,12 @@ export interface DeleteInmobiliariaResponse {
 //Usuarios
 //----------------------------------------//
 
+export interface UserData {
+    username: string;
+    email: string;
+    role: Rol;
+}
+
 export interface GetUsuariosResponse {
     usuarios: Usuario[];
     total: number;
@@ -391,7 +397,7 @@ export interface PostUsuarioRequest {
 }
 
 export interface PostUsuarioResponse {
-    usuario: Usuario | null;
+    usuario: UserData | null;
     message: string;
 }
 
@@ -412,6 +418,7 @@ export interface PutUsuarioRequest {
 }
 
 export interface PutUsuarioResponse {
+    user: UserData;
     message: string;
 }
 
