@@ -1,30 +1,56 @@
-// src/routes/reserva.routes.ts
 import { Router } from 'express';
 import * as reservaController from '../controllers/reserva.controller';
-import { validate, validateParams } from '../middlewares/validation.middleware';
-import * as v from '../validations/reserva.validation';
+import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
+import { authenticate, authorize } from '../middlewares/auth.middleware';
+import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema } from '../validations/reserva.validation';
 
-// Creo una instancia del router de Express
 const router = Router();
 
+// GET /api/Reservas
+router.get(
+    '/', 
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR',),
+    reservaController.getAllReservasController);
 
-// ==============================
-// Definicion de rutas para reservas
-// ==============================
+// GET /api/Reservas/:id
+router.get(
+    '/:id',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(getReservaParamsSchema),
+    reservaController.getReservaByIdController);
 
-// Obtener todas las reservas
-router.get('/', reservaController.getAllReservasController);
+// GET /api/Reservas/inmobiliaria/:idInmobiliaria
+router.get(
+    '/:idInmobiliaria',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(getReservaParamsSchema),
+    reservaController.getAllReservasByInmobiliariaController);
 
-// Obtener una reserva por su ID
-router.get('/:id', validateParams(v.getReservaParamsSchema), reservaController.getReservaByIdController);
+// POST /api/Reservas
+router.post(
+    '/', 
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validate(createReservaSchema), 
+    reservaController.createReservaController);
 
-// Crear una nueva reserva
-router.post('/', validate(v.createReservaSchema), reservaController.createReservaController);
+// PUT /api/Reservas/:id
+router.put(
+    '/:id', 
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(updateReservaSchema), 
+    reservaController.updateReservaController);
 
-// Actualizar una reserva existente
-router.put('/:id', validateParams(v.getReservaParamsSchema), validate(v.updateReservaSchema), reservaController.updateReservaController);
+// DELETE /api/Reservas/:id
+router.delete(
+    '/:id',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(deleteReservaParamsSchema),  
+    reservaController.deleteReservaController);
 
-// Eliminar una reserva
-router.delete('/:id', validateParams(v.getReservaParamsSchema), reservaController.deleteReservaController);
-
-export const reservaRoutes = router;
+export const ReservaRoutes = router;
