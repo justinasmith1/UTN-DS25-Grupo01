@@ -1,82 +1,75 @@
 // src/components/SidePanel.jsx
+// Este es el panel lateral que se abre al hacer click en un lote en el mapa
+// - Reservar:      LOT_RESERVE  (Admin, Inmobiliaria)
+// - Editar:        LOT_EDIT     (Admin, Técnico, Gestor)
+// - Ver detalle:   LOT_DETAIL   (todos los roles)
 import { useState } from "react"
 import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
-/*Falta invocar LotInfo para poder ver el detalle completo desde el SidePanel */
+import { useAuth } from "../app/providers/AuthProvider";         // usa la misma ruta que en otros componentes
+import { can } from "../lib/auth/rbac";                          // idem
+import { PERMISSIONS } from "../lib/auth/rbac";
 
 const customStyles = `
-  .brand-pale-green { 
-    background-color: #e6efe9 !important; 
-  }
-  .brand-dark-green { 
-    background-color: #0b3d23 !important; 
-    border-color: #0b3d23 !important; 
-    color: white !important;
-  }
-  .brand-dark-green:hover { 
-    background-color: rgba(11, 61, 35, 0.8) !important; 
-  }
-  .text-brand-dark-green { 
-    color: #0b3d23 !important; 
-  }
-  .border-brand-dark-green { 
-    border-color: #0b3d23 !important; 
-  }
-  .side-panel-card {
-    border-radius: 12px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    transition: all 0.15s ease;
-  }
-  .action-btn {
-    border-radius: 12px !important;
-    transition: all 0.15s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  }
-  .action-btn:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
-    transform: translateY(-1px);
-  }
-  .no-wrap {
-    white-space: nowrap !important;
-  }
+  .brand-pale-green { background-color: #e6efe9 !important; }
+  .brand-dark-green { background-color: #0b3d23 !important; border-color: #0b3d23 !important; color: white !important; }
+  .brand-dark-green:hover { background-color: rgba(11,61,35,.8) !important; border-color: rgba(11,61,35,.8) !important; }
+  .text-brand-dark-green { color: #0b3d23 !important; }
+  .border-brand-dark-green { border-color: #0b3d23 !important; }
+  .side-panel-card { border-radius: 12px !important; overflow: hidden; }
+  .action-btn { border-radius: 10px !important; }
+  .no-wrap { white-space: nowrap; }
+`;
 
-`
+export default function SidePanel({
+  show,
+  onHide,
+  selectedLotId,
+  onViewDetail,
+  lots,
+  abrirModalEditar,
+}) {
+  // ÍNDICES Y DATOS
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const currentLot = lots.find((lot) => lot.id === selectedLotId);
+  if (!currentLot) return null;
 
-export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, lots, abrirModalEditar }) {
-  // Indice de imagen actual en el carrusel
-  const [currentImageIndex, setCurrentImageIndex] = useState(0)
-  // Busca el lote seleccionado en los datos
-  const currentLot = lots.find((lot) => lot.id === selectedLotId)
-  if (!currentLot) return null
+  const images = currentLot.images || [];
 
-  const images = currentLot.images || []
+  // PERMISOS DEL USUARIO (lo calculo una sola vez por render)
+  const { user } = useAuth();
+  const canReserve = can(user, PERMISSIONS.LOT_RESERVE);
+  const canEdit    = can(user, PERMISSIONS.LOT_EDIT);
+  const canDetail  = can(user, PERMISSIONS.LOT_DETAIL);
 
-  // Acciones de ejemplo: editar, reservar, ver cuenta
+  // ACCIONES
   const handleReserve = () => {
-    alert(`Reservar lote ${currentLot.id}`)
-  }
-  /*const handleViewAccount = () => {
-    alert(`Ver cuenta para lote ${currentLot.id}`)
-  }*/
+    // Solo muestro el botón si canReserve === true, así que acá no revalido
+    alert(`Reservar lote ${currentLot.id}`);
+  };
+
   const handleViewDetail = () => {
-    onViewDetail(currentLot.id)
-    onHide()
-  }
+    onViewDetail(currentLot.id);
+    onHide();
+  };
 
   return (
     <>
       <style>{customStyles}</style>
+
       <Offcanvas
         show={show}
         onHide={onHide}
         placement="end"
-        style={{ width: "400px", borderRadius: "12px 0 0 12px", boxShadow: "0 4px 6px rgba(0, 0, 0, 0.15)" }}
+        style={{ width: "400px", borderRadius: "12px 0 0 12px", boxShadow: "0 4px 6px rgba(0,0,0,.15)" }}
       >
         <Offcanvas.Header closeButton className="brand-pale-green">
-          <Offcanvas.Title className="text-brand-dark-green fw-bold">Lote #{currentLot.id}</Offcanvas.Title>
+          <Offcanvas.Title className="text-brand-dark-green fw-bold">
+            Lote #{currentLot.id}
+          </Offcanvas.Title>
         </Offcanvas.Header>
 
         <Offcanvas.Body className="p-4">
-          {/* Image Carousel */}
+          {/* Carrusel de imágenes (si hay varias) */}
           <div className="mb-4">
             {images.length > 1 ? (
               <Carousel
@@ -96,28 +89,22 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
                 ))}
               </Carousel>
             ) : (
-              <div className="side-panel-card overflow-hidden">
-                <img
-                  src={images[0] || "/placeholder.svg?width=400&height=200&text=Imagen+Lote"}
-                  alt={`Imagen de Lote ${currentLot.id}`}
-                  className="img-fluid w-100"
-                  style={{ height: "200px", objectFit: "cover" }}
-                />
-              </div>
+              <Card className="side-panel-card brand-pale-green">
+                <Card.Body className="p-0">
+                  <img
+                    className="d-block w-100"
+                    src={images[0] || "/placeholder.svg"}
+                    alt={`Lote ${currentLot.id}`}
+                    style={{ height: "200px", objectFit: "cover" }}
+                  />
+                </Card.Body>
+              </Card>
             )}
           </div>
 
-          {/* Data Fields */}
+          {/* Datos principales del lote */}
           <div className="mb-4">
             <Row className="g-3">
-              <Col xs={6}>
-                <Card className="brand-pale-green side-panel-card">
-                  <Card.Body className="p-3">
-                    <small className="text-muted text-uppercase fw-bold">ID</small>
-                    <div className="fw-bold text-brand-dark-green">{currentLot.id}</div>
-                  </Card.Body>
-                </Card>
-              </Col>
               <Col xs={6}>
                 <Card className="brand-pale-green side-panel-card">
                   <Card.Body className="p-3">
@@ -126,6 +113,16 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
                   </Card.Body>
                 </Card>
               </Col>
+
+              <Col xs={6}>
+                <Card className="brand-pale-green side-panel-card">
+                  <Card.Body className="p-3">
+                    <small className="text-muted text-uppercase fw-bold">Estado-Plano</small>
+                    <div className="fw-bold text-brand-dark-green">{currentLot.subStatus}</div>
+                  </Card.Body>
+                </Card>
+              </Col>
+
               <Col xs={12}>
                 <Card className="brand-pale-green side-panel-card">
                   <Card.Body className="p-3">
@@ -134,6 +131,7 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
                   </Card.Body>
                 </Card>
               </Col>
+
               <Col xs={6}>
                 <Card className="brand-pale-green side-panel-card">
                   <Card.Body className="p-3">
@@ -142,61 +140,64 @@ export default function SidePanel({ show, onHide, selectedLotId, onViewDetail, l
                   </Card.Body>
                 </Card>
               </Col>
+
               <Col xs={6}>
-                <Card className="brand-pale-green side-panel-card">
-                  <Card.Body className="p-3">
-                    <small className="text-muted text-uppercase fw-bold">Precio</small>
-                    <div className="fw-bold text-brand-dark-green">{currentLot.price || "N/A"}</div>
-                  </Card.Body>
-                </Card>
-              </Col>
-              <Col xs={12}>
                 <Card className="brand-pale-green side-panel-card">
                   <Card.Body className="p-3">
                     <small className="text-muted text-uppercase fw-bold">Ubicación</small>
-                    <div className="fw-bold text-brand-dark-green">{currentLot.location || "N/A"}</div>
+                    <div className="fw-bold text-brand-dark-green">{currentLot.location}</div>
                   </Card.Body>
                 </Card>
               </Col>
             </Row>
           </div>
-        </Offcanvas.Body>
 
-        <div className="p-4 border-top brand-pale-green">
-          <div className="d-grid gap-2">
-            <Row>
-              <Col xs={6}>
-                <Button
-                  variant="outline-success"
-                  className="w-100 action-btn border-brand-dark-green text-brand-dark-green"
-                  onClick={handleReserve}
-                >
-                  Reservar
-                </Button>
-              </Col>
-              <Col xs={6}>
-                <Button className="brand-dark-green w-100 action-btn" onClick={() => abrirModalEditar(currentLot)}>
-                  Editar
-                </Button>
-              </Col>
+          {/* Acciones del lote (visibles según permisos) */}
+          <div className="mb-2">
+            <Row className="g-2">
+              {/* Reservar (Admin, Inmobiliaria) */}
+              {canReserve && (
+                <Col xs={6}>
+                  <Button
+                    variant="outline-success"
+                    className="w-100 action-btn border-brand-dark-green text-brand-dark-green"
+                    onClick={handleReserve}
+                  >
+                    Reservar
+                  </Button>
+                </Col>
+              )}
+
+              {/* Editar (Admin, Técnico, Gestor) */}
+              {canEdit && (
+                <Col xs={6}>
+                  <Button
+                    className="brand-dark-green w-100 action-btn"
+                    onClick={() => abrirModalEditar(currentLot)}
+                  >
+                    Editar
+                  </Button>
+                </Col>
+              )}
             </Row>
+
             <Row>
-              {/*
-              <Col xs={6}>
-                <Button variant="outline-secondary" className="w-100 action-btn" onClick={handleViewAccount}>
-                  Ver cuenta
-                </Button>
-              </Col>
-              */}
-              <Col xs={6}>
-                <Button variant="link" className="text-brand-dark-green w-100 no-wrap" onClick={handleViewDetail}>
-                  Ver detalle completo
-                </Button>
-              </Col>
+              {/* Ver detalle completo (todos los roles) */}
+              {canDetail && (
+                <Col xs={6}>
+                  <Button
+                    variant="link"
+                    className="text-brand-dark-green w-100 no-wrap"
+                    onClick={handleViewDetail}
+                  >
+                    Ver detalle completo
+                  </Button>
+                </Col>
+              )}
             </Row>
           </div>
-        </div>
+        </Offcanvas.Body>
       </Offcanvas>
     </>
-  )
+  );
 }
