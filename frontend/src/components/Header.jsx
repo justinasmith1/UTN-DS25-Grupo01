@@ -3,6 +3,7 @@
 import { Navbar, Nav, Container, Button } from "react-bootstrap"
 import { useNavigate, useLocation } from "react-router-dom"
 import LogoutButton from "./LogoutButton"
+import RoleSwitcher from "./RoleSwitcher"
 
 const customStyles = `
   .navbar-brand-green { 
@@ -70,6 +71,7 @@ export default function Header({ onUserClick, user }) {
                   .map((n) => n[0])
                   .join("") || "U"}
               </Button>
+              <RoleSwitcher className="form-select form-select-sm me-2" /> {/** Switch de rol, solo en modo mock */}
               {/** Botón de logout */}
               <LogoutButton className="btn btn-outline-light btn-sm" aria-label="Cerrar sesión">
                   Cerrar sesión
