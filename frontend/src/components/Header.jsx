@@ -2,6 +2,7 @@
 "use client" // Lo mismo que en el resto de archivos
 import { Navbar, Nav, Container, Button } from "react-bootstrap"
 import { useNavigate, useLocation } from "react-router-dom"
+import LogoutButton from "./LogoutButton"
 
 const customStyles = `
   .navbar-brand-green { 
@@ -35,8 +36,8 @@ export default function Header({ onUserClick, user }) {
             <span style={{ fontSize: "1.25rem", fontWeight: "600" }}>Club de Campo La Federala</span>
           </Navbar.Brand>
           <Navbar.Toggle />
-          <Navbar.Collapse>
-            <Nav className="me-auto">
+          <Navbar.Collapse className="ms-auto">
+            <Nav className="align-items-center gap-2">
               <Button
                 variant="outline-light"
                 className={`me-2 btn-nav-hover ${location.pathname === "/map" ? "btn-nav-active" : ""}`}
@@ -69,6 +70,10 @@ export default function Header({ onUserClick, user }) {
                   .map((n) => n[0])
                   .join("") || "U"}
               </Button>
+              {/** Botón de logout */}
+              <LogoutButton className="btn btn-outline-light btn-sm" aria-label="Cerrar sesión">
+                  Cerrar sesión
+              </LogoutButton>
             </Nav>
           </Navbar.Collapse>
         </Container>
