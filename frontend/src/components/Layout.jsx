@@ -2,9 +2,10 @@
 "use client" //le indica a React que este componente es interactivo
 
 // Importa estado, el placeholder de ruta y datos simulados de un js
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Outlet } from "react-router-dom"
-import { mockLots, mockUser } from "../lib/data"
+import { mockUser } from "../lib/data"
+import { getAllLotes, updateLote, deleteLote, createLote } from "../lib/api/lotes"
 
 // Importa los componentes principales comunes a todas las páginas
 import Header from "./Header"
@@ -18,7 +19,23 @@ import SidePanel from "./SidePanel"
 
 export default function Layout() {
   // Estado global de lotes y filtros
-  const [lotsData, setLotsData] = useState(mockLots);
+  const [lotsData, setLotsData] = useState([]);
+  // Cargo los lotes una sola vez
+  useEffect(() => {
+    let alive = true
+    ;(async () => {
+      try {
+        const res = await getAllLotes()
+        if (alive) setLotsData(res.data || [])
+      } catch (err) {
+        // Manejo simple por ahora; después paso a toasts
+        console.error(err)
+        alert("No pude cargar los lotes")
+      }
+    })()
+    return () => { alive = false }
+  }, [])
+
   const [filters, setFilters] = useState({
     search: "",
     owner: [],
@@ -83,14 +100,29 @@ export default function Layout() {
   const handleClosePanel = () => setShowPanel(false)
 
   // Funciones para cambiar los estados de los lotes
-  const handleStatusChange = (lotId, newStatus) => {
-    setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, status: newStatus } : lot)));
-  };
+  async function handleStatusChange(lotId, newStatus) {
+    try {
+      await updateLote(lotId, { status: newStatus })
+      setLotsData(prev =>
+        prev.map(l => (l.id === lotId ? { ...l, status: newStatus } : l))
+      )
+    } catch (err) {
+      console.error(err)
+      alert("No pude actualizar el estado del lote")
+    }
+  }
 
-  const handleSubStatusChange = (lotId, newSubStatus) => {
-      setLotsData((prev) => prev.map((lot) => (lot.id === lotId ? { ...lot, subStatus: newSubStatus } : lot)));
-    };
-
+  async function handleSubStatusChange(lotId, newSubStatus) {
+  try {
+    await updateLote(lotId, { subStatus: newSubStatus })
+    setLotsData(prev =>
+      prev.map(l => (l.id === lotId ? { ...l, subStatus: newSubStatus } : l))
+    )
+  } catch (err) {
+    console.error(err)
+    alert("No pude actualizar el estado-plano del lote")
+  }
+}
   // Abre el modal para crear un lote
   const abrirModalCrear = () => {
     setModalLote({ show: true, modo: "crear", datosIniciales: null })
