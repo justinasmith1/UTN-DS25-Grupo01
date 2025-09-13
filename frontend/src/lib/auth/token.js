@@ -22,6 +22,6 @@ export function setTokens({ access, refresh }) {
 
 // Limpio ambos tokens (LOGOUT)
 export function clearTokens() {
-  localStorage.removeItem(ACCESS_KEY);
+  localStorage.removeItem(ACCESS_KEY); 
   localStorage.removeItem(REFRESH_KEY); 
 }
