@@ -53,4 +53,4 @@ router.delete(
     validateParams(deleteReservaParamsSchema),  
     reservaController.deleteReservaController);
 
-export const ReservaRoutes = router;
+export const reservaRoutes = router;

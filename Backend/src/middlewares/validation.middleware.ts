@@ -45,7 +45,10 @@ export const validateParams = (schema: ZodTypeAny, remap?: Record<string, string
 export const validateQuery = (schema: ZodTypeAny) => {
   return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      req.query = await schema.parseAsync(req.query) as any; // saneo tipos
+      const parsed = await schema.parseAsync(req.query);
+      const q = req.query as any;
+      for (const k of Object.keys(q)) delete q[k]; // limpio query
+      Object.assign(q, parsed); // reasigno los valores parseados
       next();
     } catch (e) {
       if (e instanceof ZodError) return sendZodError(res, e);

@@ -3,167 +3,172 @@ import { Lote, TipoLote as TipoLotePrisma, EstadoLote as EstadoLotePrisma, Subes
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
 
-// Prisma -> DTO
-const tipoLoteToDto = (tipo: TipoLotePrisma): TipoLoteDto => {
-  const map: Record<TipoLotePrisma, TipoLoteDto> = {
-    LOTE_VENTA: "Lote Venta",
-    ESPACIO_COMUN: "Espacio Comun",
-  };
-  return map[tipo];
-};
-
-// DTO -> Prisma
-const tipoLoteToPrisma = (tipo: TipoLoteDto): TipoLotePrisma => {
+// --------- DTO <-> PRISMA maps ----------
+const tipoLoteToPrisma = (t: TipoLoteDto | undefined): TipoLotePrisma => {
+  if (!t) {
+    throw new Error('Tipo de lote no puede ser undefined');
+  }
   const map: Record<TipoLoteDto, TipoLotePrisma> = {
-    "Lote Venta": "LOTE_VENTA",
-    "Espacio Comun": "ESPACIO_COMUN",
+    'Lote Venta': 'LOTE_VENTA',
+    'Espacio Comun': 'ESPACIO_COMUN',
   };
-  return map[tipo];
+  const result = map[t];
+  if (!result) {
+    throw new Error(`Tipo de lote inválido: ${t}`);
+  }
+  return result;
 };
-
-// Ejemplo para EstadoLoteOpc
-const estadoLoteToDto = (estado: EstadoLotePrisma): EstadoLoteDto => {
-  const map: Record<EstadoLotePrisma, EstadoLoteDto> = {
-    DISPONIBLE: "Disponible",
-    RESERVADO: "Reservado",
-    VENDIDO: "Vendido",
-    NO_DISPONIBLE: "No Disponible",
-    ALQUILADO: "Alquilado",
-    EN_PROMOCION: "En Promoción",
-  };
-  return map[estado];
-};
-
-// DTO -> Prisma para EstadoLoteOpc
-const estadoLoteToPrisma = (estado: EstadoLoteDto): EstadoLotePrisma => {
+const estadoLoteToPrisma = (e: EstadoLoteDto | undefined): EstadoLotePrisma | undefined => {
+  if (!e) return undefined;
   const map: Record<EstadoLoteDto, EstadoLotePrisma> = {
-    "Disponible": "DISPONIBLE",
-    "Reservado": "RESERVADO",
-    "Vendido": "VENDIDO",
-    "No Disponible": "NO_DISPONIBLE",
-    "Alquilado": "ALQUILADO",
-    "En Promoción": "EN_PROMOCION",
+    'Disponible': 'DISPONIBLE',
+    'Reservado': 'RESERVADO',
+    'Vendido': 'VENDIDO',
+    'No Disponible': 'NO_DISPONIBLE',
+    'Alquilado': 'ALQUILADO',
+    'En Promoción': 'EN_PROMOCION',
   };
-  return map[estado];
+  return map[e];
 };
-
-// Ejemplo para SubestadoLote
-const subestadoLoteToDto = (subestado: SubestadoLotePrisma): SubestadoLoteDto => {
-  const map: Record<SubestadoLotePrisma, SubestadoLoteDto> = {
-    EN_CONSTRUCCION: "En Construccion",
-    NO_CONSTRUIDO: "No Construido",
-    CONSTRUIDO: "Construido",
-  };
-  return map[subestado];
-};
-
-// DTO -> Prisma para SubestadoLote
-const subestadoLoteToPrisma = (subestado: SubestadoLoteDto): SubestadoLotePrisma => {
+const subestadoLoteToPrisma = (s: SubestadoLoteDto | undefined): SubestadoLotePrisma | undefined => {
+  if (!s) return undefined;
   const map: Record<SubestadoLoteDto, SubestadoLotePrisma> = {
-    "En Construccion": "EN_CONSTRUCCION",
-    "No Construido": "NO_CONSTRUIDO",
-    "Construido": "CONSTRUIDO",
+    'En Construccion': 'EN_CONSTRUCCION',
+    'No Construido': 'NO_CONSTRUIDO',
+    'Construido': 'CONSTRUIDO',
   };
-  return map[subestado];
+  return map[s];
 };
 
+// Normaliza filtros de query (DTO) a enums Prisma
+function buildWhereFromQueryDTO(query: any, role?: string) {
+  const where: any = {};
 
+  if (query?.estado)      where.estado      = estadoLoteToPrisma(query.estado);
+  if (query?.subestado)   where.subestado   = subestadoLoteToPrisma(query.subestado);
+  if (query?.tipo)    where.tipo    = tipoLoteToPrisma(query.tipo);
+  if (query?.propietarioId) where.propietarioId = Number(query.propietarioId) || undefined;
+  if (query?.ubicacionId)   where.ubicacionId   = Number(query.ubicacionId) || undefined;
 
+  // Regla de negocio: TECNICO solo EN_CONSTRUCCION
+  if (role === 'TECNICO') {
+    where.subestado = 'EN_CONSTRUCCION';
+  }
+  return where;
+}
+// ---------------------------------------
+
+// Obtener todos los lotes, con filtros opcionales
 
 //export const getLotes = async (): Promise<Lote[]> => lotes;
-export async function getAllLotes(): Promise<Lote[]> {
-  const lotes = await prisma.lote.findMany({
-    orderBy: {
-      id: 'asc',
-    },
+export async function getAllLotes(query: any = {}, role?: string) {
+  const where = buildWhereFromQueryDTO(query, role);
+  return prisma.lote.findMany({
+    where,
+    orderBy: { id: 'asc' },
   });
-  return lotes;
 }
 
-export const getLotesById = async (id: number): Promise<Lote | undefined> => {
-  const lote = await prisma.lote.findUnique({
-    where: { id },});
-    if (!lote) {
+
+export async function getLoteById(id: number, role?: string) {
+  const lote = await prisma.lote.findUnique({ where: { id: id } });
+  if (!lote) {
+    const e: any = new Error('Lote no encontrado'); e.statusCode = 404; throw e;
+  }
+  if (role === 'TECNICO' && lote.subestado !== 'EN_CONSTRUCCION') {
+    const e: any = new Error('No autorizado para ver este lote'); e.statusCode = 403; throw e;
+  }
+  return lote;
+}
+
+
+export async function createLote(data: any): Promise<Lote> {
+  // La validación de Zod ya se aseguró de que los campos requeridos existan.
+  // Mantenemos la lógica de negocio específica que no cubre Zod.
+
+  // Regla: precio solo si es Lote Venta
+  if (data.tipo === 'Lote Venta' && data.precio == null) {
+    const error: any = new Error('El precio es obligatorio para "Lote Venta"');
+    error.statusCode = 400;
+    throw error;
+  }
+  if (data.tipo === 'Espacio Comun' && data.precio != null) {
+    const error: any = new Error('El precio no aplica para "Espacio Comun"');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Crear lote. `data` tiene la forma del schema de Zod.
+  return prisma.lote.create({
+    data: {
+      // Mapeo de DTO a Prisma
+      tipo: tipoLoteToPrisma(data.tipo),
+      estado: estadoLoteToPrisma(data.estado),
+      subestado: subestadoLoteToPrisma(data.subestado),
+
+      // Campos directos desde el DTO validado por Zod
+      descripcion: data.descripcion,
+      frente: data.frente,
+      fondo: data.fondo,
+      superficie: data.superficie,
+      precio: data.precio,
+      numPartido: data.numPartido,
+      alquiler: data.alquiler,
+      deuda: data.deuda,
+      nombreEspacioComun: data.nombreEspacioComun,
+      capacidad: data.capacidad,
+
+      // Relaciones por ID
+      fraccion: { connect: { id: data.fraccionId } },
+      propietario: { connect: { id: data.propietarioId } },
+      ...(data.ubicacionId && { ubicacion: { connect: { id: data.ubicacionId } } }),
+    },
+  });
+}
+
+export async function updatedLote(id: number, data: any, role?: string): Promise<Lote> {
+  // La autorización para TECNICO ya fue manejada por el middleware y la lógica en getLoteById.
+  // Aquí solo transformamos el DTO para la actualización.
+  const dataToUpdate: Prisma.LoteUpdateInput = {};
+  const { estado, subestado, tipo, propietarioId, ubicacionId, fraccionId, ...rest } = data;
+
+  if (estado) dataToUpdate.estado = estadoLoteToPrisma(estado);
+  if (subestado) dataToUpdate.subestado = subestadoLoteToPrisma(subestado);
+  if (tipo) dataToUpdate.tipo = tipoLoteToPrisma(tipo);
+  if (propietarioId) dataToUpdate.propietario = { connect: { id: propietarioId } };
+  if (ubicacionId) dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
+  if (fraccionId) dataToUpdate.fraccion = { connect: { id: fraccionId } };
+
+  // Asignar el resto de los campos
+  Object.assign(dataToUpdate, rest);
+
+  try {
+    return await prisma.lote.update({
+      where: { id },
+      data: dataToUpdate,
+    });
+  } catch (e: any) {
+    if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
       const error = new Error('Lote no encontrado');
       (error as any).statusCode = 404;
       throw error;
     }
-  return lote;
-};
-
-export async function createLote(data: PostLoteRequest): Promise<Lote> {
-  const lote = await prisma.lote.findFirst({
-  where: { id: data.id }});
-  if (lote) {
-      const error = new Error('Ya existe un lote con ese ID');
-      (error as any).statusCode = 400;
-      throw error;
+    throw e; // Re-lanzar otros errores
   }
-
-  const newLote = await prisma.lote.create({
-      data: {
-          tipo: tipoLoteToPrisma(data.tipo),
-          descripcion: data.descripcion ?? undefined,
-          frente: data.frente != null ? new Prisma.Decimal(data.frente) : undefined,
-          fondo: data.fondo != null ? new Prisma.Decimal(data.fondo) : undefined, 
-          superficie: data.superficie != null ? new Prisma.Decimal(data.superficie) : undefined,
-          precio: data.precio != null ? new Prisma.Decimal(data.precio) : undefined,
-          estado: estadoLoteToPrisma(data.estado),
-          subestado: subestadoLoteToPrisma(data.subestado),
-          alquiler: data.alquiler ?? undefined,
-          deuda: data.deuda ?? undefined,
-          nombreEspacioComun: data.nombreEspacioComun ?? undefined,
-          capacidad: data.capacidad ?? undefined, 
-          // Relacionando por FK directa
-          fraccion: { connect: { id: data.fraccion.idFraccion } },
-          ubicacion: { connect: { id: data.ubicacion?.id } },
-          propietario: { connect: { id: data.propietario.idPersona } },  
-          createdAt: new Date(),
-          updateAt: undefined,
-      },
-  });
-  return newLote;
 }
 
-export async function updatedLote(id: number, data: Partial<Lote>): Promise<Lote> {
-  if (data.propietarioId) {
-    const propietario = await prisma.persona.findUnique({
-      where: { id: data.propietarioId },
+export async function deleteLote(id: number, role?: string): Promise<DeleteLoteResponse> {
+  if (role === 'TECNICO') {
+    const { count } = await prisma.lote.deleteMany({
+      where: { id: id, subestado: 'EN_CONSTRUCCION' },
     });
-    if (!propietario) {
-      const error = new Error('Propietario no encontrado');
-      (error as any).statusCode = 404;
-      throw error;
+    if (count === 0) {
+      const exists = await prisma.lote.findUnique({ where: { id: id } });
+      const e: any = new Error(exists ? 'No autorizado para eliminar este lote' : 'Lote no encontrado');
+      e.statusCode = exists ? 403 : 404; throw e;
     }
-  }
-
-  try {
-    const updatedLote = await prisma.lote.update({
-      where: { id },
-      data: {
-        ...data,
-        updateAt: new Date(),
-      },
-    });
-    return updatedLote;
-  } catch (error) {
-    console.error('Lote no encontrado:', error);
-    throw new Error('Lote no encontrado');
-  }
-}
-
-export async function deleteLote(id: number): Promise<DeleteLoteResponse> {
-  try {
-    await prisma.lote.delete({
-      where: { id },
-    });
     return { message: 'Lote eliminado correctamente' };
-  } catch (e: any) {
-        if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
-            const error = new Error('Lote no encontrado');
-            (error as any).statusCode = 404;
-            throw error;
-        }
-        throw e; // Re-lanzar otros errores
-    }
   }
+  await prisma.lote.delete({ where: { id: id } });
+  return { message: 'Lote eliminado correctamente' };
+}
