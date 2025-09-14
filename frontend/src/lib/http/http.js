@@ -57,6 +57,9 @@ export async function http(
   path,
   { method = 'GET', headers = {}, body, ...rest } = {}
 ) {
+  const isAbsolute = typeof path === 'string' && /^https?:\/\//i.test(path);
+  const url = isAbsolute ? path : `${API_BASE}${path}`;
+
   const token = getAccessToken();
 
   // Armo headers estándar + Authorization si tengo token
@@ -67,7 +70,7 @@ export async function http(
   };
 
   // Hago la request
-  const res = await fetch(`${API_BASE}${path}`, {
+  const res = await fetch(url, {
     method,
     headers: baseHeaders,
     body: body ? JSON.stringify(body) : undefined,
@@ -89,7 +92,7 @@ export async function http(
       ...(newAccess ? { Authorization: `Bearer ${newAccess}` } : {}),
     };
 
-    return await fetch(`${API_BASE}${path}`, {
+    return await fetch(url, {
       method,
       headers: retryHeaders,
       body: body ? JSON.stringify(body) : undefined,

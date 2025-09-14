@@ -8,6 +8,7 @@ import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
+import { parseApiError } from "../lib/http/errors";
 
 import {
   getAllPersonas,
@@ -83,7 +84,7 @@ export default function Personas() {
         }
       } catch (e) {
         console.error(e);
-        error("No pude cargar las personas");
+        error(parseApiError(e, "No pude cargar las personas"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -134,7 +135,7 @@ export default function Personas() {
       cerrarModal();
     } catch (e) {
       console.error(e);
-      error("No pude guardar la persona");
+      error(parseApiError(e, "No pude guardar la persona"));
     }
   };
 
@@ -148,7 +149,7 @@ export default function Personas() {
       success("Eliminado correctamente");
     } catch (e) {
       console.error(e);
-      error("No pude eliminar");
+      error(parseApiError(e, "No pude eliminar"));
     }
   };
 
