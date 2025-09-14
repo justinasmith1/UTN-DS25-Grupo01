@@ -1,5 +1,5 @@
 // Página de Ventas: lista + crear/editar/eliminar. Respeta permisos del rol.
-// Mantengo los campos simples: lotId, amount, observaciones, status, inmobiliariaId.
+// Mantengo los campos simples: lotId, monto, observaciones, status, inmobiliariaId.
 
 import { useEffect, useMemo, useState } from "react";
 import { Table, Button, Modal, Form, Spinner, Badge, Pagination } from "react-bootstrap";

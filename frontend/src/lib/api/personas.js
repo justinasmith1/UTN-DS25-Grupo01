@@ -1,4 +1,5 @@
-// Adapter de Personas (Propietarios / Inquilinos). Mantengo la UI desacoplada del backend.
+// Adapter de Personas (Propietarios / Inquilinos). UI desacoplada.
+// Devuelvo { data } y, si puedo, sumo { meta } para paginado.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http } from "../http/http";
@@ -16,7 +17,7 @@ const nextId = () => `P${String(PERSONAS.length + 1).padStart(3, "0")}`;
 async function ensureSeeded() {
   if (seeded) return;
   try {
-    const mod = await import("../data"); // opcional, solo si existe
+    const mod = await import("../data"); // opcional
     const arr = mod?.mockPeople || [];
     PERSONAS = arr.map((p) => ({ ...p }));
   } catch {
@@ -26,21 +27,46 @@ async function ensureSeeded() {
   }
 }
 
-async function mockGetAll({ tipo, q } = {}) {
+async function mockGetAll(params = {}) {
   await ensureSeeded();
+
+  // 1) Filtros: tipo + búsqueda q
+  const { tipo, q } = params || {};
   let out = [...PERSONAS];
   if (tipo) out = out.filter((p) => String(p.tipo).toUpperCase() === String(tipo).toUpperCase());
   if (q) {
-    const s = q.toLowerCase();
+    const s = String(q).toLowerCase();
     out = out.filter(
       (p) =>
-        (p.nombre || "").toLowerCase().includes(s) ||
-        (p.email || "").toLowerCase().includes(s) ||
+        String(p.id).toLowerCase().includes(s) ||
+        String(p.nombre || "").toLowerCase().includes(s) ||
+        String(p.email || "").toLowerCase().includes(s) ||
         String(p.dni || "").toLowerCase().includes(s)
     );
   }
-  return ok(out);
+
+  // 2) Orden (sortBy + sortDir)
+  const sortBy  = params.sortBy  || "nombre";     // nombre | email | dni | id | tipo
+  const sortDir = (params.sortDir || "asc").toLowerCase(); // asc | desc
+  out.sort((a, b) => {
+    const A = a?.[sortBy] ?? "";
+    const B = b?.[sortBy] ?? "";
+    if (A < B) return sortDir === "asc" ? -1 : 1;
+    if (A > B) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // 3) Paginación (page + pageSize)
+  const page     = Math.max(1, parseInt(params.page ?? 1, 10));
+  const pageSize = Math.max(1, parseInt(params.pageSize ?? 10, 10));
+  const total    = out.length;
+  const start    = (page - 1) * pageSize;
+  const end      = start + pageSize;
+  const pageItems = out.slice(start, end);
+
+  return { data: pageItems, meta: { total, page, pageSize } };
 }
+
 async function mockGetById(id) {
   await ensureSeeded();
   const found = PERSONAS.find((p) => String(p.id) === String(id));
@@ -51,7 +77,7 @@ async function mockCreate(payload) {
   await ensureSeeded();
   const nuevo = {
     id: nextId(),
-    tipo: "PROPIETARIO", // PROPIETARIO | INQUILINO
+    tipo: "PROPIETARIO",
     nombre: "",
     dni: "",
     email: "",
@@ -81,7 +107,7 @@ async function mockDelete(id) {
 /* ----------------------------- MODO REAL (API) ----------------------------- */
 async function apiGetAll(params = {}) {
   const url = new URL(BASE, import.meta.env.VITE_API_BASE_URL);
-  Object.entries(params).forEach(([k, v]) => {
+  Object.entries(params || {}).forEach(([k, v]) => {
     if (v != null && v !== "") url.searchParams.set(k, v);
   });
   const res = await http(url.toString(), { method: "GET" });
