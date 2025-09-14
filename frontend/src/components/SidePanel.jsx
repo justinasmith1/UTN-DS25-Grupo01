@@ -8,6 +8,8 @@ import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
 import { useAuth } from "../app/providers/AuthProvider";         // usa la misma ruta que en otros componentes
 import { can } from "../lib/auth/rbac";                          // idem
 import { PERMISSIONS } from "../lib/auth/rbac";
+import { useToast } from "../app/providers/ToastProvider";
+import { createReserva } from "../lib/api/reservas";
 
 const customStyles = `
   .brand-pale-green { background-color: #e6efe9 !important; }
@@ -41,11 +43,34 @@ export default function SidePanel({
   const canEdit    = can(user, PERMISSIONS.LOT_EDIT);
   const canDetail  = can(user, PERMISSIONS.LOT_DETAIL);
 
+
+  const { success, error } = useToast() ?? { success: () => {}, error: () => {} };
+
   // ACCIONES
-  const handleReserve = () => {
-    // Solo muestro el botón si canReserve === true, así que acá no revalido
-    alert(`Reservar lote ${currentLot.id}`);
+  const handleReserve = async () => {
+    try {
+      // Armo un payload mínimo. Si después el back pide más campos,
+      // los agregamos acá (esto queda como “adaptador” de la UI).
+      const payload = {
+        lotId: currentLot.id,
+        // monto opcional: uso el price del lote si existe
+        amount: currentLot.price || null,
+        // la inmobiliaria responsable (si el rol es INMOBILIARIA lo tenemos)
+        inmobiliariaId: user?.inmobiliariaId ?? null,
+        // status inicial “Activa” y fecha la pone el adapter (mock) o el back
+      };
+
+      await createReserva(payload);
+
+      // Aviso y cierro el panel (UX simple)
+      success("Reserva creada");
+      onHide();
+    } catch (err) {
+      console.error(err);
+      error("No pude crear la reserva");
+    }
   };
+
 
   const handleViewDetail = () => {
     onViewDetail(currentLot.id);
