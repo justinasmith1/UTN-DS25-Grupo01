@@ -11,6 +11,7 @@ import { PERMISSIONS } from "./lib/auth/rbac";
 
 import Reservas from "./pages/Reservas";
 import Ventas from "./pages/Ventas";
+import Inmobiliarias from "./pages/Inmobiliarias";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -27,6 +28,14 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="map" element={<Map />} />
+          <Route
+            path="inmobiliarias"
+            element={
+              <RequireRole permission={PERMISSIONS.AGENCY_ACCESS}>
+                <Inmobiliarias />
+              </RequireRole>
+            }
+          />
           <Route
             path="ventas"
             element={
