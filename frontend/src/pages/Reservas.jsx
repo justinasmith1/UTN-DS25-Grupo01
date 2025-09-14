@@ -1,4 +1,3 @@
-// src/pages/Reservas.jsx
 // Página de Reservas: lista y CRUD simple usando el adapter.
 // Muestro acciones según permisos del rol.
 

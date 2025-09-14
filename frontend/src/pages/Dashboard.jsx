@@ -1,4 +1,3 @@
-// src/pages/Dashboard.jsx
 // Listado principal de lotes con acciones. Acá aplico RBAC en UI:
 // - Envuelo botones/acciones con <Can permission="...">
 // - Si no tengo permiso para editar el estado, muestro el estado como Badge (solo lectura)
