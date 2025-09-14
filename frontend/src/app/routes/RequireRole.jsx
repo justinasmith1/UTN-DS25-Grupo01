@@ -1,22 +1,31 @@
-// Si no hay permiso, muestro 403 (mensaje simple) en lugar de dejar la pantalla en blanco.
+// Guardia de permisos por ruta.
+// Si no hay sesión → /login.
+// Si hay sesión pero falta permiso → /403.
+// Mantengo los comentarios cortos y claros.
 
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../providers/AuthProvider";
 import { can } from "../../lib/auth/rbac";
 
 export default function RequireRole({ permission, children }) {
-  const { isAuthenticated, loading, user } = useAuth();
+  const { user, loading } = useAuth();
+  const location = useLocation();
 
-  if (loading) return null;                 // El padre (ProtectedRoute) ya muestra spinner
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // Mientras cargo usuario, no renderizo nada (evito parpadeos)
+  if (loading) return null;
 
-  if (!permission || can(user, permission)) return children;
+  // Si no hay sesión, mando a login y guardo de dónde venía
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
 
-  // 403 simple y visible (evita pantalla en blanco)
-  return (
-    <div className="container py-4">
-      <h5 className="mb-2">403 – No tenés permiso</h5>
-      <p className="text-muted m-0">Consultá con un administrador si esto es un error.</p>
-    </div>
-  );
+  // Si hay sesión pero no tiene permiso, mando a 403
+  if (permission && !can(user, permission)) {
+    return <Navigate to="/403" replace state={{ from: location.pathname }} />;
+  }
+
+  // Si pasa, muestro el contenido protegido
+  return children;
 }
+
+
