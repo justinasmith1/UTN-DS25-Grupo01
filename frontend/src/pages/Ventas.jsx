@@ -6,6 +6,7 @@ import { Table, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 import {
   getAllVentas,
@@ -20,6 +21,9 @@ const statusVariant = (s) =>
 
 export default function Ventas() {
   // estado base
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+   const filtroInmoId = searchParams.get("inmobiliariaId");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
 
@@ -47,13 +51,18 @@ export default function Ventas() {
     [user]
   );
 
-  // cargo lista (si rol INMOBILIARIA, puede que queramos filtrar por inmobiliariaId; por ahora no)
+  // Cargo lista: si viene inmobiliariaId en la URL, la uso como filtro
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        const res = await getAllVentas({});
+        const params = {};
+        if (filtroInmoId) {
+          // guardo como number si aplica, si no, en string
+          params.inmobiliariaId = Number(filtroInmoId) || filtroInmoId;
+        }
+        const res = await getAllVentas(params);
         if (alive) setItems(res.data || []);
       } catch (e) {
         console.error(e);
@@ -62,12 +71,17 @@ export default function Ventas() {
         if (alive) setLoading(false);
       }
     })();
-    return () => { alive = false; };
-  }, []);
+    return () => {
+      alive = false;
+    };
+  }, [filtroInmoId]); // ← si cambia el query, recargo
 
   // abrir modal crear
   const abrirCrear = () =>
-    setModal({ show: true, modo: "crear", datos: { lotId: "", amount: "", observaciones: "", status: "Registrada" } });
+    setModal({ show: true, modo: "crear", datos: { lotId: "", amount: "", observaciones: "", status: "Registrada",
+        inmobiliariaId: filtroInmoId ? Number(filtroInmoId) || filtroInmoId : "",
+      },
+     });
 
   // abrir modal editar
   const abrirEditar = (v) => setModal({ show: true, modo: "editar", datos: { ...v } });
@@ -128,11 +142,25 @@ export default function Ventas() {
     <div className="container py-3">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="m-0">Ventas</h5>
-        {p.create && (
-          <Button variant="success" onClick={abrirCrear}>
-            Registrar venta
-          </Button>
-        )}
+
+        <div className="d-flex align-items-center gap-2">
+          {/* Si estoy filtrando por inmobiliaria, lo muestro y doy opción de limpiar */}
+          {filtroInmoId && (
+            <>
+              <span className="small text-muted">Filtrado por Inmobiliaria:</span>
+              <span className="badge bg-info text-dark">{filtroInmoId}</span>
+              <Button size="sm" variant="outline-secondary" onClick={() => navigate("/ventas")}>
+                Quitar filtro
+              </Button>
+            </>
+          )}
+
+          {p.create && (
+            <Button variant="success" onClick={abrirCrear}>
+              Registrar venta
+            </Button>
+          )}
+        </div>
       </div>
 
       <Table hover responsive className="align-middle">
