@@ -61,9 +61,6 @@ export default function Dashboard() {
   // Navego a Ventas prefiltrando el lotId
   const goRegistrarVenta = (lot) => navigate(`/ventas?lotId=${encodeURIComponent(lot.id)}`);
 
-  // Navego a Reservas prefiltrando el lotId
-  const goRegistrarReserva = (lot) => navigate(`/reservas?lotId=${encodeURIComponent(lot.id)}`);
-
   // Edito lote (abre el modal del Layout)
   const onEditar = (lot) => abrirModalEditar?.(lot.id);
 
@@ -148,18 +145,6 @@ export default function Dashboard() {
                             onClick={() => goRegistrarVenta(lot)}
                           >
                             Registrar venta
-                          </Button>
-                        )}
-
-                        {/* Registrar reserva: Admin e Inmobiliaria lo tienen */}
-                        {canResCreate && (
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            className="action-btn"
-                            onClick={() => goRegistrarReserva(lot)}
-                          >
-                            Reservar
                           </Button>
                         )}
 

@@ -1,5 +1,5 @@
 // Adapter único para Ventas. Si USE_MOCK=true uso memoria local; si no, pego al backend.
-// Siempre devuelvo { data: ... } para no acoplar la UI al shape del backend.
+// Siempre devuelvo { data: ... } para no acoplar la UI a la forma del backend.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http } from "../http/http";
@@ -29,15 +29,54 @@ async function ensureSeeded() {
   }
 }
 
+// Funcion de mock para getAll con filtros, orden y paginacion
 async function mockGetAll(params = {}) {
   await ensureSeeded();
+
+  // 1) Filtros (los aplico sobre una copia)
   let out = [...VENTAS];
-  // filtros simples opcionales
-  if (params?.lotId) out = out.filter((v) => String(v.lotId) === String(params.lotId));
-  if (params?.inmobiliariaId != null)
-    out = out.filter((v) => v.inmobiliariaId === params.inmobiliariaId);
-  return ok(out);
+  const { lotId, inmobiliariaId, q } = params || {};
+  if (lotId) out = out.filter((v) => String(v.lotId) === String(lotId));
+  if (inmobiliariaId != null) out = out.filter((v) => String(v.inmobiliariaId) === String(inmobiliariaId));
+  if (q) {
+    const s = String(q).toLowerCase();
+    out = out.filter(
+      (v) =>
+        String(v.id).toLowerCase().includes(s) ||
+        String(v.lotId).toLowerCase().includes(s) ||
+        String(v.observaciones || "").toLowerCase().includes(s)
+    );
+  }
+
+  // 2) Orden (sortBy + sortDir)
+  const sortBy  = params.sortBy  || "date"; // id | date | amount | lotId
+  const sortDir = (params.sortDir || "desc").toLowerCase(); // asc | desc
+  out.sort((a, b) => {
+    const A = a[sortBy];
+    const B = b[sortBy];
+    if (A == null && B == null) return 0;
+    if (A == null) return sortDir === "asc" ? -1 : 1;
+    if (B == null) return sortDir === "asc" ? 1 : -1;
+    if (A < B) return sortDir === "asc" ? -1 : 1;
+    if (A > B) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // 3) Paginación (page + pageSize)
+  const page     = Math.max(1, parseInt(params.page ?? 1, 10));
+  const pageSize = Math.max(1, parseInt(params.pageSize ?? 10, 10));
+  const total    = out.length;
+  const start    = (page - 1) * pageSize;
+  const end      = start + pageSize;
+  const pageItems = out.slice(start, end);
+
+  // Devuelvo datos + meta (el front usa meta si existe; si no, se las arregla)
+  return { data: pageItems, meta: { total, page, pageSize } };
 }
+
+// -----------------------------------
+// Funciones mock CRUD simples
+// -----------------------------------
 async function mockGetById(id) {
   await ensureSeeded();
   const found = VENTAS.find((v) => v.id === id);
@@ -50,7 +89,7 @@ async function mockCreate(payload) {
     id: nextId(),
     date: new Date().toISOString().slice(0, 10), // yyyy-mm-dd
     status: "Registrada",
-    ...payload, // lotId, amount, comprador?, inmobiliariaId, observaciones...
+    ...payload, // lote id, monto, comprador?, inmobiliariaId, observaciones...
   };
   VENTAS.unshift(nuevo);
   return ok(nuevo);
