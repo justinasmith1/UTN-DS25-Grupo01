@@ -26,6 +26,7 @@ export default function Ventas() {
    const filtroInmoId = searchParams.get("inmobiliariaId");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const lotIdParam = searchParams.get("lotId");
 
   // modal crear/editar
   const [modal, setModal] = useState({
@@ -62,6 +63,9 @@ export default function Ventas() {
           // guardo como number si aplica, si no, en string
           params.inmobiliariaId = Number(filtroInmoId) || filtroInmoId;
         }
+        if (lotIdParam) {
+          params.lotId = lotIdParam;
+        }
         const res = await getAllVentas(params);
         if (alive) setItems(res.data || []);
       } catch (e) {
@@ -78,7 +82,7 @@ export default function Ventas() {
 
   // abrir modal crear
   const abrirCrear = () =>
-    setModal({ show: true, modo: "crear", datos: { lotId: "", amount: "", observaciones: "", status: "Registrada",
+    setModal({ show: true, modo: "crear", datos: { lotId: lotIdParam || "", amount: "", observaciones: "", status: "Registrada",
         inmobiliariaId: filtroInmoId ? Number(filtroInmoId) || filtroInmoId : "",
       },
      });
@@ -152,6 +156,14 @@ export default function Ventas() {
               <Button size="sm" variant="outline-secondary" onClick={() => navigate("/ventas")}>
                 Quitar filtro
               </Button>
+            </>
+          )}
+
+          {/* chip de filtro por Lote */}
+          {lotIdParam && (
+            <>
+              <span className="small text-muted">Lote:</span>
+              <span className="badge bg-info text-dark">{lotIdParam}</span>
             </>
           )}
 
