@@ -7,6 +7,8 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 
+import {useNavigate} from "react-router-dom";
+
 import {
   getAllInmobiliarias,
   createInmobiliaria,
@@ -19,6 +21,7 @@ export default function Inmobiliarias() {
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
   const [q, setQ] = useState(""); // texto de búsqueda
+  const navigate = useNavigate();
 
   // modal crear/editar
   const [modal, setModal] = useState({
@@ -193,6 +196,15 @@ export default function Inmobiliarias() {
                       Eliminar
                     </Button>
                   )}
+                    {/* ✅ Ventas realizadas: voy a Ventas con el filtro aplicado */}
+                    {/* Nota: esto sólo se muestra si el usuario también tiene acceso al módulo Ventas */}
+                    <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={() => navigate(`/ventas?inmobiliariaId=${a.id}`)}
+                    >
+                        Ventas realizadas
+                    </Button>
                 </td>
               </tr>
             ))
