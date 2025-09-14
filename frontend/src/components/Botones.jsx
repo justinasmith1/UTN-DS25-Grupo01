@@ -24,7 +24,7 @@ export default function Botones() {
 
   // Defino los módulos con su permiso y (si aplica) a dónde navega
   const modules = [
-    { label: "Ventas",         perm: PERMISSIONS.SALE_ACCESS,    to: null }, // (cuando haya ruta: to: "/ventas")
+    { label: "Ventas",         perm: PERMISSIONS.SALE_ACCESS,    to: "/ventas" }, // (cuando haya ruta: to: "/ventas")
     { label: "Inmobiliarias",  perm: PERMISSIONS.AGENCY_ACCESS,  to: null }, // to: "/inmobiliarias"
     { label: "Personas",       perm: PERMISSIONS.PEOPLE_ACCESS,  to: null }, // to: "/personas"
     { label: "Reservas",       perm: PERMISSIONS.RES_ACCESS,     to: "/reservas" }, // to: "/reservas"

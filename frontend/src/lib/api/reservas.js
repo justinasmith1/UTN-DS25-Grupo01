@@ -1,4 +1,3 @@
-// src/lib/api/reservas.js
 // Adapter de Reservas. Mantengo una interfaz única para mock y real.
 // Notas de diseño:
 // - Siempre devuelvo { data: ... } para que el resto del front no dependa del shape del back.

@@ -1,4 +1,3 @@
-// src/components/Header.jsx
 "use client" // Lo mismo que en el resto de archivos
 import { Navbar, Nav, Container, Button } from "react-bootstrap"
 import { useNavigate, useLocation } from "react-router-dom"

@@ -1,4 +1,3 @@
-// src/App.jsx
 // Defino rutas. El único <BrowserRouter> está en main.jsx.
 
 import { Routes, Route, Navigate } from "react-router-dom";
@@ -9,7 +8,9 @@ import Login from "./pages/Login";
 import ProtectedRoute from "./app/routes/ProtectedRoute";
 import RequireRole from "./app/routes/RequireRole";
 import { PERMISSIONS } from "./lib/auth/rbac";
+
 import Reservas from "./pages/Reservas";
+import Ventas from "./pages/Ventas";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -26,6 +27,14 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="map" element={<Map />} />
+          <Route
+            path="ventas"
+            element={
+              <RequireRole permission={PERMISSIONS.SALE_ACCESS}>
+                <Ventas />
+              </RequireRole>
+            }
+          />
           <Route
             path="reservas"
             element={

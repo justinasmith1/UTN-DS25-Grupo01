@@ -1,4 +1,3 @@
-// src/components/Layout.jsx
 "use client" // este componente es interactivo
 
 // Estado, rutas y adapters

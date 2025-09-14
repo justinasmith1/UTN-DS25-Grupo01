@@ -1,4 +1,3 @@
-// src/components/SidePanel.jsx
 // Este es el panel lateral que se abre al hacer click en un lote en el mapa
 // - Reservar:      LOT_RESERVE  (Admin, Inmobiliaria)
 // - Editar:        LOT_EDIT     (Admin, Técnico, Gestor)
