@@ -1,8 +1,8 @@
 // Página de Ventas: lista + crear/editar/eliminar. Respeta permisos del rol.
-// Mantengo los campos simples: lotId, amount, observaciones, status, inmobiliariaId.
+// Mantengo los campos simples: lotId, monto, observaciones, status, inmobiliariaId.
 
 import { useEffect, useMemo, useState } from "react";
-import { Table, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
+import { Table, Button, Modal, Form, Spinner, Badge, Pagination } from "react-bootstrap";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
@@ -21,12 +21,24 @@ const statusVariant = (s) =>
 
 export default function Ventas() {
   // estado base
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-   const filtroInmoId = searchParams.get("inmobiliariaId");
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
-  const lotIdParam = searchParams.get("lotId");
+  const [total, setTotal] = useState(0); // dejo el total para paginación
+
+  // Querystring (estado de la vista en la URL)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+
+  // Filtros cruzados desde otras pantallas
+  const filtroInmoId = searchParams.get("inmobiliariaId");
+  const lotIdParam   = searchParams.get("lotId");
+
+  // Mis parámetros de vista (persisten en la URL)
+  const q        = searchParams.get("q") || "";
+  const page     = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+  const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10));
+  const sortBy   = searchParams.get("sortBy")  || "date";           // id | date | amount | lotId
+  const sortDir  = (searchParams.get("sortDir") || "desc").toLowerCase(); // asc | desc
 
   // modal crear/editar
   const [modal, setModal] = useState({
@@ -52,22 +64,32 @@ export default function Ventas() {
     [user]
   );
 
-  // Cargo lista: si viene inmobiliariaId en la URL, la uso como filtro
+  // Helper chico para actualizar la URL sin perder otros params
+  const setQS = (patch) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === "") next.delete(k);
+      else next.set(k, String(v));
+    });
+    setSearchParams(next);
+  };
+
+  // Cargo lista: uso querystring (q, sort, paginado) + filtros cruzados
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        const params = {};
-        if (filtroInmoId) {
-          // guardo como number si aplica, si no, en string
-          params.inmobiliariaId = Number(filtroInmoId) || filtroInmoId;
-        }
-        if (lotIdParam) {
-          params.lotId = lotIdParam;
-        }
+
+        const params = { q, page, pageSize, sortBy, sortDir };
+        if (filtroInmoId) params.inmobiliariaId = Number(filtroInmoId) || filtroInmoId;
+        if (lotIdParam)   params.lotId = lotIdParam;
+
         const res = await getAllVentas(params);
-        if (alive) setItems(res.data || []);
+        if (alive) {
+          setItems(res.data || []);
+          setTotal(res.meta?.total ?? (res.data?.length ?? 0));
+        }
       } catch (e) {
         console.error(e);
         error("No pude cargar las ventas");
@@ -75,17 +97,23 @@ export default function Ventas() {
         if (alive) setLoading(false);
       }
     })();
-    return () => {
-      alive = false;
-    };
-  }, [filtroInmoId]); // ← si cambia el query, recargo
+    return () => { alive = false; };
+    // recargo cuando cambie cualquiera de los parámetros que afectan la lista
+  }, [q, page, pageSize, sortBy, sortDir, filtroInmoId, lotIdParam]);
 
-  // abrir modal crear
+  // abrir modal crear (prelleno con lotId/inmobiliariaId si vienen por query)
   const abrirCrear = () =>
-    setModal({ show: true, modo: "crear", datos: { lotId: lotIdParam || "", amount: "", observaciones: "", status: "Registrada",
+    setModal({
+      show: true,
+      modo: "crear",
+      datos: {
+        lotId: lotIdParam || "",
+        amount: "",
+        observaciones: "",
+        status: "Registrada",
         inmobiliariaId: filtroInmoId ? Number(filtroInmoId) || filtroInmoId : "",
       },
-     });
+    });
 
   // abrir modal editar
   const abrirEditar = (v) => setModal({ show: true, modo: "editar", datos: { ...v } });
@@ -107,6 +135,7 @@ export default function Ventas() {
       if (modal.modo === "crear") {
         const res = await createVenta(payload);
         setItems((prev) => [res.data, ...prev]);
+        setTotal((t) => t + 1); // actualizo total local al crear
         success("Venta registrada");
       } else {
         const res = await updateVenta(modal.datos.id, payload);
@@ -126,12 +155,27 @@ export default function Ventas() {
     try {
       await deleteVenta(v.id);
       setItems((prev) => prev.filter((it) => it.id !== v.id));
+      setTotal((t) => Math.max(0, t - 1)); // bajo el total local
       success("Venta eliminada");
     } catch (e) {
       console.error(e);
       error("No pude eliminar la venta");
     }
   };
+
+  // handlers de búsqueda/orden/paginado (dejo simples y claros)
+  const onSearchChange = (e) => setQS({ q: e.target.value, page: 1 });
+
+  const toggleSort = (field) => {
+    if (sortBy === field) {
+      setQS({ sortDir: sortDir === "asc" ? "desc" : "asc", page: 1 });
+    } else {
+      setQS({ sortBy: field, sortDir: "asc", page: 1 });
+    }
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const goPage = (p) => setQS({ page: p });
 
   if (loading) {
     return (
@@ -144,14 +188,24 @@ export default function Ventas() {
 
   return (
     <div className="container py-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div className="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
         <h5 className="m-0">Ventas</h5>
 
         <div className="d-flex align-items-center gap-2">
+          {/* Buscador básico que persiste en la URL (q=) */}
+          <Form.Control
+            size="sm"
+            type="search"
+            placeholder="Buscar por ID, lote u observaciones…"
+            value={q}
+            onChange={onSearchChange}
+            style={{ minWidth: 260 }}
+          />
+
           {/* Si estoy filtrando por inmobiliaria, lo muestro y doy opción de limpiar */}
           {filtroInmoId && (
             <>
-              <span className="small text-muted">Filtrado por Inmobiliaria:</span>
+              <span className="small text-muted">Inmobiliaria:</span>
               <span className="badge bg-info text-dark">{filtroInmoId}</span>
               <Button size="sm" variant="outline-secondary" onClick={() => navigate("/ventas")}>
                 Quitar filtro
@@ -178,11 +232,11 @@ export default function Ventas() {
       <Table hover responsive className="align-middle">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Lote</th>
-            <th>Fecha</th>
-            <th>Estado</th>
-            <th>Monto</th>
+            <ThSort label="ID"      field="id"      sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Lote"    field="lotId"   sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Fecha"   field="date"    sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Estado"  field="status"  sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Monto"   field="amount"  sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
             <th>Inmobiliaria</th>
             <th>Acciones</th>
           </tr>
@@ -226,6 +280,39 @@ export default function Ventas() {
         </tbody>
       </Table>
 
+      {/* Controles de paginado y tamaño de página */}
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="text-muted small">
+          Mostrando página {page} de {totalPages} — Total: {total}
+        </div>
+
+        <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center gap-2">
+            <span className="small text-muted">Filas por página</span>
+            <Form.Select
+              size="sm"
+              value={pageSize}
+              onChange={(e) => setQS({ pageSize: Number(e.target.value), page: 1 })}
+              style={{ width: 100 }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </Form.Select>
+          </div>
+
+          <Pagination className="mb-0">
+            <Pagination.First disabled={page <= 1} onClick={() => goPage(1)} />
+            <Pagination.Prev  disabled={page <= 1} onClick={() => goPage(page - 1)} />
+            <Pagination.Item active>{page}</Pagination.Item>
+            <Pagination.Next  disabled={page >= totalPages} onClick={() => goPage(page + 1)} />
+            <Pagination.Last  disabled={page >= totalPages} onClick={() => goPage(totalPages)} />
+          </Pagination>
+        </div>
+      </div>
+
+      {/* Modal Crear/Editar */}
       <Modal show={modal.show} onHide={cerrarModal} centered>
         <Modal.Header closeButton>
           <Modal.Title>
@@ -293,5 +380,17 @@ export default function Ventas() {
         </Modal.Footer>
       </Modal>
     </div>
+  );
+}
+
+// Encabezado ordenable reutilizable (click para alternar asc/desc).
+// Lo dejo acá para no crear archivo extra.
+function ThSort({ label, field, sortBy, sortDir, onSort }) {
+  const active = sortBy === field;
+  const arrow = !active ? "" : sortDir === "asc" ? " ▲" : " ▼";
+  return (
+    <th role="button" onClick={() => onSort(field)} className="user-select-none">
+      {label}{arrow}
+    </th>
   );
 }
