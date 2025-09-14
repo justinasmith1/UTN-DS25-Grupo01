@@ -1,18 +1,23 @@
-import React from "react"
-import ReactDOM from "react-dom/client"
-import { BrowserRouter } from "react-router-dom"
-import AuthProvider from "./app/providers/AuthProvider"
+// src/main.jsx
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App.jsx";
+import AuthProvider from "./app/providers/AuthProvider.jsx";
 import ToastProvider from "./app/providers/ToastProvider.jsx";
-import App from "./App"
+import { BrowserRouter } from "react-router-dom";
+
+import "bootstrap/dist/css/bootstrap.min.css";
+import "bootstrap-icons/font/bootstrap-icons.css";
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider />
+    <AuthProvider>
+      <ToastProvider>
+        {/* ÚNICO Router de toda la app */}
+        <BrowserRouter>
           <App />
-        <ToastProvider />
-      </AuthProvider>
-    </BrowserRouter>
-  </React.StrictMode>,
-)
+        </BrowserRouter>
+      </ToastProvider>
+    </AuthProvider>
+  </React.StrictMode>
+);
