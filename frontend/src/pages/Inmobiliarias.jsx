@@ -1,13 +1,13 @@
-// CRUD simple de Inmobiliarias. Mantengo campos básicos y filtro por búsqueda.
+// CRUD de Inmobiliarias con búsqueda, orden y paginado en la URL.
+// De esta forma, si refresco o comparto el link, se mantiene el estado.
 
 import { useEffect, useMemo, useState } from "react";
-import { Table, Button, Modal, Form, Spinner } from "react-bootstrap";
+import { Table, Button, Modal, Form, Spinner, Pagination } from "react-bootstrap";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
-
-import {useNavigate} from "react-router-dom";
 
 import {
   getAllInmobiliarias,
@@ -20,13 +20,23 @@ export default function Inmobiliarias() {
   // estado base
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
-  const [q, setQ] = useState(""); // texto de búsqueda
+  const [total, setTotal] = useState(0); // total para paginado
+
+  // querystring
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // leo parámetros de la URL (con defaults)
+  const q        = searchParams.get("q") || "";
+  const page     = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+  const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10));
+  const sortBy   = searchParams.get("sortBy")  || "name"; // name | email | phone | id
+  const sortDir  = (searchParams.get("sortDir") || "asc").toLowerCase(); // asc | desc
 
   // modal crear/editar
   const [modal, setModal] = useState({
     show: false,
-    modo: "crear", // "crear" | "editar"
+    modo: "crear",
     datos: null,
   });
 
@@ -35,11 +45,11 @@ export default function Inmobiliarias() {
   const success = toast?.success ?? (() => {});
   const error = toast?.error ?? (() => {});
 
-  // permisos (según tu definición: solo Admin accede a este módulo)
+  // permisos (según tu definición: solo Admin)
   const { user } = useAuth();
   const p = useMemo(
     () => ({
-      view:   can(user, PERMISSIONS.AGENCY_VIEW ?? PERMISSIONS.AGENCY_ACCESS), // si no tenés AGENCY_VIEW, uso ACCESS
+      view:   can(user, PERMISSIONS.AGENCY_VIEW ?? PERMISSIONS.AGENCY_ACCESS),
       create: can(user, PERMISSIONS.AGENCY_CREATE ?? PERMISSIONS.AGENCY_ACCESS),
       edit:   can(user, PERMISSIONS.AGENCY_EDIT ?? PERMISSIONS.AGENCY_ACCESS),
       del:    can(user, PERMISSIONS.AGENCY_DELETE ?? PERMISSIONS.AGENCY_ACCESS),
@@ -47,14 +57,28 @@ export default function Inmobiliarias() {
     [user]
   );
 
-  // carga inicial + cada vez que cambia el buscador (q)
+  // helper para setear querystring sin perder lo demás
+  const setQS = (patch) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([k, v]) => {
+      if (v === null || v === undefined || v === "") next.delete(k);
+      else next.set(k, String(v));
+    });
+    setSearchParams(next);
+  };
+
+  // cargo lista cada vez que cambian q/sort/paginado
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        const res = await getAllInmobiliarias({ q });
-        if (alive) setItems(res.data || []);
+        const params = { q, page, pageSize, sortBy, sortDir };
+        const res = await getAllInmobiliarias(params);
+        if (alive) {
+          setItems(res.data || []);
+          setTotal(res.meta?.total ?? (res.data?.length ?? 0));
+        }
       } catch (e) {
         console.error(e);
         error("No pude cargar las inmobiliarias");
@@ -63,15 +87,11 @@ export default function Inmobiliarias() {
       }
     })();
     return () => { alive = false; };
-  }, [q]);
+  }, [q, page, pageSize, sortBy, sortDir]);
 
   // abrir modal crear
   const abrirCrear = () =>
-    setModal({
-      show: true,
-      modo: "crear",
-      datos: { name: "", email: "", phone: "", address: "" },
-    });
+    setModal({ show: true, modo: "crear", datos: { name: "", email: "", phone: "", address: "" } });
 
   // abrir modal editar
   const abrirEditar = (a) => setModal({ show: true, modo: "editar", datos: { ...a } });
@@ -97,6 +117,7 @@ export default function Inmobiliarias() {
       if (modal.modo === "crear") {
         const res = await createInmobiliaria(payload);
         setItems((prev) => [res.data, ...prev]);
+        setTotal((t) => t + 1);
         success("Inmobiliaria creada");
       } else {
         const res = await updateInmobiliaria(modal.datos.id, payload);
@@ -116,12 +137,24 @@ export default function Inmobiliarias() {
     try {
       await deleteInmobiliaria(a.id);
       setItems((prev) => prev.filter((it) => String(it.id) !== String(a.id)));
+      setTotal((t) => Math.max(0, t - 1));
       success("Inmobiliaria eliminada");
     } catch (e) {
       console.error(e);
       error("No pude eliminar la inmobiliaria");
     }
   };
+
+  // handlers de búsqueda/orden/paginado
+  const onSearchChange = (e) => setQS({ q: e.target.value, page: 1 });
+
+  const toggleSort = (field) => {
+    if (sortBy === field) setQS({ sortDir: sortDir === "asc" ? "desc" : "asc", page: 1 });
+    else setQS({ sortBy: field, sortDir: "asc", page: 1 });
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const goPage = (p) => setQS({ page: p });
 
   if (loading) {
     return (
@@ -138,13 +171,14 @@ export default function Inmobiliarias() {
         <h5 className="m-0">Inmobiliarias</h5>
 
         <div className="d-flex gap-2">
-          {/* buscador simple */}
+          {/* buscador simple que persiste en la URL */}
           <Form.Control
             size="sm"
             type="search"
-            placeholder="Buscar por nombre o email…"
+            placeholder="Buscar por nombre, email o teléfono…"
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={onSearchChange}
+            style={{ minWidth: 260 }}
           />
           {p.create && (
             <Button size="sm" variant="success" onClick={abrirCrear}>
@@ -157,10 +191,10 @@ export default function Inmobiliarias() {
       <Table hover responsive className="align-middle">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Teléfono</th>
+            <ThSort label="ID"      field="id"     sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Nombre"  field="name"   sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Email"   field="email"  sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
+            <ThSort label="Teléfono" field="phone" sortBy={sortBy} sortDir={sortDir} onSort={toggleSort} />
             <th>Dirección</th>
             <th>Acciones</th>
           </tr>
@@ -180,7 +214,7 @@ export default function Inmobiliarias() {
                 <td>{a.email || "-"}</td>
                 <td>{a.phone || "-"}</td>
                 <td>{a.address || "-"}</td>
-                <td className="d-flex gap-2">
+                <td className="d-flex flex-wrap gap-2">
                   {p.view && (
                     <Button size="sm" variant="outline-primary" onClick={() => abrirEditar(a)}>
                       Ver
@@ -196,21 +230,52 @@ export default function Inmobiliarias() {
                       Eliminar
                     </Button>
                   )}
-                    {/* ✅ Ventas realizadas: voy a Ventas con el filtro aplicado */}
-                    {/* Nota: esto sólo se muestra si el usuario también tiene acceso al módulo Ventas */}
-                    <Button
-                        size="sm"
-                        variant="outline-secondary"
-                        onClick={() => navigate(`/ventas?inmobiliariaId=${a.id}`)}
-                    >
-                        Ventas realizadas
-                    </Button>
+                  {/* Ventas realizadas → voy a /ventas?inmobiliariaId=... */}
+                  <Button
+                    size="sm"
+                    variant="outline-secondary"
+                    onClick={() => navigate(`/ventas?inmobiliariaId=${a.id}`)}
+                  >
+                    Ventas realizadas
+                  </Button>
                 </td>
               </tr>
             ))
           )}
         </tbody>
       </Table>
+
+      {/* paginado */}
+      <div className="d-flex justify-content-between align-items-center mt-3">
+        <div className="text-muted small">
+          Mostrando página {page} de {totalPages} — Total: {total}
+        </div>
+
+        <div className="d-flex align-items-center gap-3">
+          <div className="d-flex align-items-center gap-2">
+            <span className="small text-muted">Filas por página</span>
+            <Form.Select
+              size="sm"
+              value={pageSize}
+              onChange={(e) => setQS({ pageSize: Number(e.target.value), page: 1 })}
+              style={{ width: 100 }}
+            >
+              <option value={5}>5</option>
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </Form.Select>
+          </div>
+
+          <Pagination className="mb-0">
+            <Pagination.First disabled={page <= 1} onClick={() => goPage(1)} />
+            <Pagination.Prev  disabled={page <= 1} onClick={() => goPage(page - 1)} />
+            <Pagination.Item active>{page}</Pagination.Item>
+            <Pagination.Next  disabled={page >= totalPages} onClick={() => goPage(page + 1)} />
+            <Pagination.Last  disabled={page >= totalPages} onClick={() => goPage(totalPages)} />
+          </Pagination>
+        </div>
+      </div>
 
       {/* Modal Crear/Editar */}
       <Modal show={modal.show} onHide={cerrarModal} centered>
@@ -260,5 +325,16 @@ export default function Inmobiliarias() {
         </Modal.Footer>
       </Modal>
     </div>
+  );
+}
+
+// Encabezado ordenable (click alterna asc/desc)
+function ThSort({ label, field, sortBy, sortDir, onSort }) {
+  const active = sortBy === field;
+  const arrow = !active ? "" : sortDir === "asc" ? " ▲" : " ▼";
+  return (
+    <th role="button" onClick={() => onSort(field)} className="user-select-none">
+      {label}{arrow}
+    </th>
   );
 }
