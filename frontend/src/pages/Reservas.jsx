@@ -7,6 +7,7 @@ import { Table, Button, Modal, Form, Spinner, Badge } from "react-bootstrap";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 import {
   getAllReservas,
@@ -23,6 +24,8 @@ export default function Reservas() {
   // Estado base
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState([]);
+  const [searchParams] = useSearchParams();
+  const lotIdParam = searchParams.get("lotId");
 
   // Modal de crear/editar
   const [modal, setModal] = useState({
@@ -49,32 +52,40 @@ export default function Reservas() {
   );
 
   // Cargo la lista (si soy INMOBILIARIA, filtro por su id)
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        const params =
-          user?.role === "INMOBILIARIA" && user?.inmobiliariaId
-            ? { inmobiliariaId: user.inmobiliariaId }
-            : {};
-        const res = await getAllReservas(params);
-        if (alive) setItems(res.data || []);
-      } catch (e) {
-        console.error(e);
-        error("No pude cargar las reservas");
-      } finally {
-        if (alive) setLoading(false);
+useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      setLoading(true);
+
+      // Armo los filtros a enviar al adapter
+      const params = {};
+
+      // Si soy INMOBILIARIA, filtro por su id
+      if (user?.role === "INMOBILIARIA" && user?.inmobiliariaId) {
+        params.inmobiliariaId = user.inmobiliariaId;
       }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [user]);
+
+      // Si vengo con ?lotId=..., filtro por lote
+      if (lotIdParam) {
+        params.lotId = lotIdParam;
+      }
+
+      const res = await getAllReservas(params);
+      if (alive) setItems(res.data || []);
+    } catch (e) {
+      console.error(e);
+      error("No pude cargar las reservas");
+    } finally {
+      if (alive) setLoading(false);
+    }
+  })();
+  return () => { alive = false; };
+}, [user, lotIdParam]);
 
   // Abre modal vacío (crear)
   const abrirCrear = () =>
-    setModal({ show: true, modo: "crear", datos: { lotId: "", amount: "", observaciones: "", status: "Activa" } });
+    setModal({ show: true, modo: "crear", datos: { lotId: lotIdParam || "", amount: "", observaciones: "", status: "Activa" } });
 
   // Abre modal con datos (editar)
   const abrirEditar = (r) => setModal({ show: true, modo: "editar", datos: { ...r } });

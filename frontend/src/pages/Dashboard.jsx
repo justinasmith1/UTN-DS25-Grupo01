@@ -1,89 +1,87 @@
-// Listado principal de lotes con acciones. Acá aplico RBAC en UI:
-// - Envuelo botones/acciones con <Can permission="...">
-// - Si no tengo permiso para editar el estado, muestro el estado como Badge (solo lectura)
+"use client" // habilita hooks en entornos que lo requieran
 
-"use client"; // Habilito hooks en entornos que lo requieran (no afecta Vite)
+import { useNavigate, useOutletContext } from "react-router-dom";
+import { Container, Card, Table, Badge, Button } from "react-bootstrap";
+import { useAuth } from "../app/providers/AuthProvider";
+import { can, PERMISSIONS } from "../lib/auth/rbac";
 
-// Importo el guard de UI y el listado de permisos canónicos
-import Can from "../components/Can"
-import { PERMISSIONS } from "../lib/auth/rbac";
-
-import { useOutletContext } from "react-router-dom";
-import { Container, Card, Table, Badge, Button, Dropdown, Spinner } from "react-bootstrap";
-
-// Estilos mínimos locales (no toco tus CSS globales)
-const customStyles = `
+// Estilos chiquitos para los puntos de estado y hovers
+const css = `
   .brand-gray { background-color: #f0f0f0 !important; }
-  .text-brand-dark-green { color: #0b3d23 !important; }
-  .border-brand-dark-green { border-color: #0b3d23 !important; }
-  .table-row-hover:hover { background-color: rgba(230, 239, 233, 0.5) !important; transition: all 0.15s ease;}
-  .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; margin-right: 8px; }
-  .status-dot-disponible { background-color: #28a745; }
-  .status-dot-nodisponible { background-color: #dc3545; }
-  .status-dot-vendido { background-color: #007bff; }
-  .status-dot-reservado { background-color: #ffff00; }
-  .status-dot-alquilado { background-color: #ff8000; }
-  .action-btn { border-radius: 8px !important; transition: all 0.15s ease; }
-  .action-btn:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); }
+  .table-row-hover:hover { background-color: rgba(230,239,233,.5) !important; transition: .15s; }
+  .status-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
+  .status-dot-disponible { background:#28a745; }
+  .status-dot-nodisponible { background:#dc3545; }
+  .status-dot-vendido { background:#0d6efd; }
+  .status-dot-reservado { background:#ffdd00; }
+  .status-dot-alquilado { background:#ff8c00; }
+  .action-btn { border-radius:8px !important; }
 `;
 
 export default function Dashboard() {
-  // Consumo el contexto expuesto por Layout: lotes + handlers
+  // Traigo del Layout: lista de lotes y handlers de acciones
   const {
-    lots,
-    loadingLots,
-    handleStatusChange,
-    handleViewDetail,
-    abrirModalEditar,
-    abrirModalEliminar,
+    lots,                   // array de lotes ya filtrado
+    handleViewDetail,       // abre SidePanel con el lote
+    abrirModalEditar,       // abre ModalGestionLote en modo editar
+    abrirModalEliminar,     // abre confirmación de eliminar (si está)
+    handleDeleteLote,       // fallback de eliminación directa (si está)
   } = useOutletContext();
 
-    if (loadingLots) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
-        <Spinner animation="border" role="status" />
-        <span className="ms-2">Cargando…</span>
-      </div>
-    );
-  }
+  const navigate = useNavigate();
 
-  // Asigno la clase del "punto" de estado (color semafórico)
-  function getStatusDotClass(status) {
-    switch (status) {
-      case "Disponible":
-        return "status-dot-disponible";
-      case "Vendido":
-        return "status-dot-vendido";
-      case "No Disponible":
-        return "status-dot-nodisponible";
-      case "Reservado":
-        return "status-dot-reservado";
-      case "Alquilado":
-        return "status-dot-alquilado";
-      default:
-        return "bg-secondary";
-    }
-  }
+  // Permisos del usuario para mostrar/ocultar acciones
+  const { user } = useAuth();
+  const canSaleCreate  = can(user, PERMISSIONS.SALE_CREATE);
+  const canResCreate   = can(user, PERMISSIONS.RES_CREATE);
+  const canLotEdit     = can(user, PERMISSIONS.LOT_EDIT);
+  const canLotDelete   = can(user, PERMISSIONS.LOT_DELETE);
 
-  // Selecciono variante de Badge para el sub-estado
-  function getSubStatusVariant(subStatus) {
-    switch (subStatus) {
-      case "En Construccion":
-        return "warning";
-      case "Construido":
-        return "success";
-      case "No Construido":
-        return "danger";
-      default:
-        return "primary";
+  // Pongo color al puntito según estado
+  const dotClass = (status) => {
+    switch ((status || "").toLowerCase()) {
+      case "disponible":   return "status-dot-disponible";
+      case "vendido":      return "status-dot-vendido";
+      case "no disponible":return "status-dot-nodisponible";
+      case "reservado":    return "status-dot-reservado";
+      case "alquilado":    return "status-dot-alquilado";
+      default:             return "status-dot-nodisponible";
     }
-  }
+  };
+
+  // Variante del Badge para sub-estado del plano
+  const subVariant = (s) => {
+    const k = (s || "").toLowerCase();
+    if (k.includes("constru")) return "warning";
+    if (k.includes("no"))      return "secondary";
+    if (k.includes("termin"))  return "success";
+    return "light";
+  };
+
+  // Navego a Ventas prefiltrando el lotId
+  const goRegistrarVenta = (lot) => navigate(`/ventas?lotId=${encodeURIComponent(lot.id)}`);
+
+  // Navego a Reservas prefiltrando el lotId
+  const goRegistrarReserva = (lot) => navigate(`/reservas?lotId=${encodeURIComponent(lot.id)}`);
+
+  // Edito lote (abre el modal del Layout)
+  const onEditar = (lot) => abrirModalEditar?.(lot.id);
+
+  // Ver detalle (panel lateral)
+  const onVer = (lot) => handleViewDetail?.(lot.id);
+
+  // Elimino (uso modal si existe; si no, handler directo; si no, aviso)
+  const onEliminar = (lot) => {
+    if (abrirModalEliminar) return abrirModalEliminar(lot.id);
+    if (handleDeleteLote)   return handleDeleteLote(lot.id);
+    alert("Eliminar no disponible en esta vista.");
+  };
 
   return (
     <>
-      <style>{customStyles}</style>
+      <style>{css}</style>
       <Container className="py-4">
-        <Card style={{ borderRadius: "12px", boxShadow: "0 1px 3px rgba(0, 0, 0, 0.1)" }}>
+        <Card style={{ borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>
           <Card.Body className="p-0">
             <Table hover responsive className="mb-0">
               <thead className="brand-gray">
@@ -98,122 +96,106 @@ export default function Dashboard() {
                 </tr>
               </thead>
               <tbody>
-                {lots.map((lot) => (
+                {(lots || []).map((lot) => (
                   <tr key={lot.id} className="table-row-hover">
+                    {/* Puntito de estado */}
                     <td className="p-3">
-                      <div className={`status-dot ${getStatusDotClass(lot.status)}`}></div>
+                      <span className={`status-dot ${dotClass(lot.status)}`} />
                     </td>
 
+                    {/* ID */}
                     <td className="p-3">
-                      <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: "12px" }}>
+                      <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: 12 }}>
                         {lot.id}
                       </Badge>
                     </td>
 
+                    {/* Estado */}
                     <td className="p-3">
-                      {/* Si tengo permiso de editar lote, muestro el dropdown; si no, solo el estado como Badge */}
-                      <Can
-                        permission={PERMISSIONS.LOT_EDIT}
-                        fallback={
-                          <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: "12px" }}>
-                            {lot.status}
-                          </Badge>
-                        }
-                      >
-                        <Dropdown>
-                          <Dropdown.Toggle
-                            variant="outline-secondary"
-                            size="sm"
-                            className="action-btn"
-                            style={{ minWidth: "140px" }}
-                          >
-                            {lot.status}
-                          </Dropdown.Toggle>
-                          <Dropdown.Menu style={{ borderRadius: "12px" }}>
-                            {["Disponible", "Vendido", "No Disponible", "Reservado", "Alquilado"].map((status) => (
-                              <Dropdown.Item
-                                key={status}
-                                onClick={() => handleStatusChange(lot.id, status)}
-                                style={{ transition: "all 0.15s ease" }}
-                              >
-                                {status}
-                              </Dropdown.Item>
-                            ))}
-                          </Dropdown.Menu>
-                        </Dropdown>
-                      </Can>
-                    </td>
-
-                    <td className="p-3">
-                      <Badge bg={getSubStatusVariant(lot.subStatus)} className="px-3 py-2" style={{ borderRadius: "12px" }}>
-                        {lot.subStatus}
+                      <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: 12 }}>
+                        {lot.status || "-"}
                       </Badge>
                     </td>
 
+                    {/* Estado de plano */}
                     <td className="p-3">
-                      <Badge
-                        bg="light"
-                        text="dark"
-                        className="border-brand-dark-green px-3 py-2"
-                        style={{ borderRadius: "12px", borderWidth: 1, borderStyle: "solid" }}
-                      >
-                        {lot.owner}
+                      <Badge bg={subVariant(lot.subStatus)} className="px-3 py-2" style={{ borderRadius: 12 }}>
+                        {lot.subStatus || "-"}
                       </Badge>
                     </td>
 
+                    {/* Propietario */}
                     <td className="p-3">
-                      <small className="text-muted">{lot.location}</small>
+                      <Badge bg="outline" className="px-3 py-2 border" style={{ borderRadius: 12 }}>
+                        {lot.owner || "CCLF"}
+                      </Badge>
                     </td>
 
+                    {/* Ubicación */}
                     <td className="p-3">
-                      <div className="d-flex gap-1 flex-wrap">
-                        {/* Registrar venta: solo Admin */}
-                        <Can permission={PERMISSIONS.SALE_CREATE}>
+                      <small className="text-muted">{lot.location || "-"}</small>
+                    </td>
+
+                    {/* Acciones */}
+                    <td className="p-3">
+                      <div className="d-flex flex-wrap gap-1">
+                        {/* Registrar venta: sólo si tengo permiso de venta */}
+                        {canSaleCreate && (
                           <Button
                             variant="outline-success"
                             size="sm"
                             className="action-btn"
-                            onClick={() => alert(`Registrar venta ${lot.id}`)}
+                            onClick={() => goRegistrarVenta(lot)}
                           >
                             Registrar venta
                           </Button>
-                        </Can>
+                        )}
 
-                        {/* Ver detalle: lo dejo visible para todos los roles */}
-                        <Can permission={PERMISSIONS.LOT_DETAIL}>
+                        {/* Registrar reserva: Admin e Inmobiliaria lo tienen */}
+                        {canResCreate && (
                           <Button
-                            variant="outline-primary"
+                            variant="outline-secondary"
                             size="sm"
                             className="action-btn"
-                            onClick={() => handleViewDetail(lot.id)}
+                            onClick={() => goRegistrarReserva(lot)}
                           >
-                            <i className="bi bi-eye"></i>
+                            Reservar
                           </Button>
-                        </Can>
+                        )}
 
-                        {/* Editar lote: Admin, Técnico, Gestor */}
-                        <Can permission={PERMISSIONS.LOT_EDIT}>
+                        {/* Ver (siempre) */}
+                        <Button
+                          variant="outline-primary"
+                          size="sm"
+                          className="action-btn"
+                          onClick={() => onVer(lot)}
+                        >
+                          Ver
+                        </Button>
+
+                        {/* Editar: Técnico/Legal/Admin */}
+                        {canLotEdit && (
                           <Button
                             variant="outline-warning"
                             size="sm"
                             className="action-btn"
-                            onClick={() => abrirModalEditar(lot)}
+                            onClick={() => onEditar(lot)}
                           >
-                            <i className="bi bi-pencil"></i>
+                            Editar
                           </Button>
-                        </Can>
+                        )}
 
-                        {/* Eliminar lote: solo Admin */}
-                        <Can permission={PERMISSIONS.LOT_DELETE}>
+                        {/* Eliminar: sólo Admin */}
+                        {canLotDelete && (
                           <Button
                             variant="outline-danger"
                             size="sm"
                             className="action-btn"
-                            onClick={() => abrirModalEliminar(lot)}
+                            onClick={() => onEliminar(lot)}
                           >
-                            <i className="bi bi-trash"></i>
+                            Eliminar
                           </Button>
-                        </Can>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -221,11 +203,13 @@ export default function Dashboard() {
               </tbody>
             </Table>
 
-            {/* Mensaje vacío cuando no hay resultados */}
-            {lots.length === 0 && (
+            {/* Mensaje vacío */}
+            {(lots || []).length === 0 && (
               <div className="text-center py-5">
-                <i className="bi bi-info-circle text-muted" style={{ fontSize: "2rem" }}></i>
-                <p className="text-muted mt-3 mb-0">No se encontraron lotes que coincidan con los filtros aplicados.</p>
+                <i className="bi bi-info-circle text-muted" style={{ fontSize: "2rem" }} />
+                <p className="text-muted mt-3 mb-0">
+                  No se encontraron lotes con los filtros aplicados.
+                </p>
               </div>
             )}
           </Card.Body>
