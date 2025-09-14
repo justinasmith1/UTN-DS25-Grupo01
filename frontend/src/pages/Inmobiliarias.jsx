@@ -1,5 +1,5 @@
 // CRUD de Inmobiliarias con búsqueda, orden y paginado en la URL.
-// De esta forma, si refresco o comparto el link, se mantiene el estado.
+// De esta forma, si recargo o comparto el link, se mantiene el estado.
 
 import { useEffect, useMemo, useState } from "react";
 import { Table, Button, Modal, Form, Spinner, Pagination } from "react-bootstrap";
