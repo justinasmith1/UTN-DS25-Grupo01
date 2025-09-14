@@ -1,4 +1,3 @@
-// src/components/Botones.jsx
 // Barra de módulos. Muestro cada tab según permiso del rol.
 // Ventas (SALE_ACCESS) | Inmobiliarias (AGENCY_ACCESS) | Personas (PEOPLE_ACCESS) | Reservas (RES_ACCESS) | Reportes (REPORTS_ACCESS)
 
@@ -26,7 +25,7 @@ export default function Botones() {
   const modules = [
     { label: "Ventas",         perm: PERMISSIONS.SALE_ACCESS,    to: "/ventas" }, 
     { label: "Inmobiliarias",  perm: PERMISSIONS.AGENCY_ACCESS,  to: "/inmobiliarias" },
-    { label: "Personas",       perm: PERMISSIONS.PEOPLE_ACCESS,  to: null }, // to: "/personas"
+    { label: "Personas",       perm: PERMISSIONS.PEOPLE_ACCESS,  to: "/personas" }, // to: "/personas"
     { label: "Reservas",       perm: PERMISSIONS.RES_ACCESS,     to: "/reservas" }, 
     { label: "Reportes",       perm: PERMISSIONS.REPORTS_ACCESS, to: null }, // to: "/reportes"
   ];

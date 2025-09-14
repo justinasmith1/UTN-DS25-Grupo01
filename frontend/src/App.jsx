@@ -12,6 +12,7 @@ import { PERMISSIONS } from "./lib/auth/rbac";
 import Reservas from "./pages/Reservas";
 import Ventas from "./pages/Ventas";
 import Inmobiliarias from "./pages/Inmobiliarias";
+import Personas from "./pages/Personas";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -49,6 +50,14 @@ export default function App() {
             element={
               <RequireRole permission={PERMISSIONS.RES_ACCESS}>
                 <Reservas />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="personas"
+            element={
+              <RequireRole permission={PERMISSIONS.PEOPLE_ACCESS}>
+                <Personas />
               </RequireRole>
             }
           />
