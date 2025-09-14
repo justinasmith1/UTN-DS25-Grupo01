@@ -14,9 +14,11 @@ import Ventas from "./pages/Ventas";
 import Inmobiliarias from "./pages/Inmobiliarias";
 import Personas from "./pages/Personas";
 import Reportes from "./pages/Reportes";
+import Forbidden from "./pages/Forbidden";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
+import Forbidden from "./pages/Forbidden";
 
 export default function App() {
   return (
@@ -71,6 +73,8 @@ export default function App() {
             }
           />
         </Route>
+        {/* Página 403: sin permisos */}
+        <Route path="/403" element={<Forbidden />} />
       </Route>
 
       {/* Catch-all: si la ruta no existe, vuelvo a la home */}
