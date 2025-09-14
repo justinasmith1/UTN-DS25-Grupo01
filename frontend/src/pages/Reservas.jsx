@@ -52,36 +52,36 @@ export default function Reservas() {
   );
 
   // Cargo la lista (si soy INMOBILIARIA, filtro por su id)
-useEffect(() => {
-  let alive = true;
-  (async () => {
-    try {
-      setLoading(true);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
 
-      // Armo los filtros a enviar al adapter
-      const params = {};
+        // Armo los filtros a enviar al adapter
+        const params = {};
 
-      // Si soy INMOBILIARIA, filtro por su id
-      if (user?.role === "INMOBILIARIA" && user?.inmobiliariaId) {
-        params.inmobiliariaId = user.inmobiliariaId;
+        // Si soy INMOBILIARIA, filtro por su id
+        if (user?.role === "INMOBILIARIA" && user?.inmobiliariaId) {
+          params.inmobiliariaId = user.inmobiliariaId;
+        }
+
+        // Si vengo con ?lotId=..., filtro por lote
+        if (lotIdParam) {
+          params.lotId = lotIdParam;
+        }
+
+        const res = await getAllReservas(params);
+        if (alive) setItems(res.data || []);
+      } catch (e) {
+        console.error(e);
+        error("No pude cargar las reservas");
+      } finally {
+        if (alive) setLoading(false);
       }
-
-      // Si vengo con ?lotId=..., filtro por lote
-      if (lotIdParam) {
-        params.lotId = lotIdParam;
-      }
-
-      const res = await getAllReservas(params);
-      if (alive) setItems(res.data || []);
-    } catch (e) {
-      console.error(e);
-      error("No pude cargar las reservas");
-    } finally {
-      if (alive) setLoading(false);
-    }
-  })();
-  return () => { alive = false; };
-}, [user, lotIdParam]);
+    })();
+    return () => { alive = false; };
+  }, [user, lotIdParam]);
 
   // Abre modal vacío (crear)
   const abrirCrear = () =>
@@ -149,6 +149,14 @@ useEffect(() => {
     <div className="container py-3">
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h5 className="m-0">Reservas</h5>
+
+        {/* Muestro chip de lote cuando vengo desde el Dashboard, así se entiende el filtro aplicado */}
+        {lotIdParam && (
+          <div className="d-flex align-items-center gap-2">
+            <span className="small text-muted">Lote:</span>
+            <span className="badge bg-info text-dark">{lotIdParam}</span>
+          </div>
+        )}
 
         {/* Botón + (crear) solo para quien tenga permiso */}
         {p.create && (
