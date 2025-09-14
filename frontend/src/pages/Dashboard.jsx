@@ -10,7 +10,7 @@ import Can from "../components/Can"
 import { PERMISSIONS } from "../lib/auth/rbac";
 
 import { useOutletContext } from "react-router-dom";
-import { Container, Card, Table, Badge, Button, Dropdown } from "react-bootstrap";
+import { Container, Card, Table, Badge, Button, Dropdown, Spinner } from "react-bootstrap";
 
 // Estilos mínimos locales (no toco tus CSS globales)
 const customStyles = `
@@ -32,11 +32,21 @@ export default function Dashboard() {
   // Consumo el contexto expuesto por Layout: lotes + handlers
   const {
     lots,
+    loadingLots,
     handleStatusChange,
     handleViewDetail,
     abrirModalEditar,
     abrirModalEliminar,
   } = useOutletContext();
+
+    if (loadingLots) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+        <Spinner animation="border" role="status" />
+        <span className="ms-2">Cargando…</span>
+      </div>
+    );
+  }
 
   // Asigno la clase del "punto" de estado (color semafórico)
   function getStatusDotClass(status) {
