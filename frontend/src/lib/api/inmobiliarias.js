@@ -1,4 +1,5 @@
 // Adapter único para Inmobiliarias (mock ↔ real). Mantengo la UI desacoplada.
+// Siempre devuelvo { data: ... } y, si puedo, sumo { meta } con total/paginado.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http } from "../http/http";
@@ -27,20 +28,45 @@ async function ensureSeeded() {
   }
 }
 
-async function mockGetAll({ q } = {}) {
+async function mockGetAll(params = {}) {
   await ensureSeeded();
+
+  // 1) Filtros (q)
   let out = [...AGENCIAS];
+  const { q } = params || {};
   if (q) {
-    const s = q.toLowerCase();
+    const s = String(q).toLowerCase();
     out = out.filter(
       (a) =>
         String(a.id).toLowerCase().includes(s) ||
-        (a.name || "").toLowerCase().includes(s) ||
-        (a.email || "").toLowerCase().includes(s)
+        String(a.name || "").toLowerCase().includes(s) ||
+        String(a.email || "").toLowerCase().includes(s) ||
+        String(a.phone || "").toLowerCase().includes(s)
     );
   }
-  return ok(out);
+
+  // 2) Orden (sortBy + sortDir)
+  const sortBy  = params.sortBy  || "name";       // name | email | phone | id
+  const sortDir = (params.sortDir || "asc").toLowerCase(); // asc | desc
+  out.sort((a, b) => {
+    const A = a?.[sortBy] ?? "";
+    const B = b?.[sortBy] ?? "";
+    if (A < B) return sortDir === "asc" ? -1 : 1;
+    if (A > B) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  // 3) Paginación (page + pageSize)
+  const page     = Math.max(1, parseInt(params.page ?? 1, 10));
+  const pageSize = Math.max(1, parseInt(params.pageSize ?? 10, 10));
+  const total    = out.length;
+  const start    = (page - 1) * pageSize;
+  const end      = start + pageSize;
+  const pageItems = out.slice(start, end);
+
+  return { data: pageItems, meta: { total, page, pageSize } };
 }
+
 async function mockGetById(id) {
   await ensureSeeded();
   const found = AGENCIAS.find((a) => String(a.id) === String(id));
@@ -49,14 +75,7 @@ async function mockGetById(id) {
 }
 async function mockCreate(payload) {
   await ensureSeeded();
-  const nuevo = {
-    id: nextId(),
-    name: "",
-    email: "",
-    phone: "",
-    address: "",
-    ...payload,
-  };
+  const nuevo = { id: nextId(), name: "", email: "", phone: "", address: "", ...payload };
   AGENCIAS.unshift(nuevo);
   return ok(nuevo);
 }
@@ -76,9 +95,11 @@ async function mockDelete(id) {
 }
 
 /* ----------------------------- MODO REAL ----------------------------- */
+// Nota: si el back no devuelve { meta }, la página usa fallbacks locales.
+
 async function apiGetAll(params = {}) {
   const url = new URL(BASE, import.meta.env.VITE_API_BASE_URL);
-  Object.entries(params).forEach(([k, v]) => {
+  Object.entries(params || {}).forEach(([k, v]) => {
     if (v != null && v !== "") url.searchParams.set(k, v);
   });
   const res = await http(url.toString(), { method: "GET" });
