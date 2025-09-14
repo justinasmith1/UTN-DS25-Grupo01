@@ -2,8 +2,8 @@
 
 // Estado, rutas y adapters
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
-import { useToast } from "../app/providers/ToastProvider"; 
+import { Outlet, useSearchParams } from "react-router-dom";
+import { useToast } from "../app/providers/ToastProvider";
 import { mockUser } from "../lib/data"; // solo para el modal de usuario
 import {
   getAllLotes,
@@ -26,10 +26,14 @@ export default function Layout() {
   // Estado global de lotes (la fuente de verdad en el front)
   // ---------------------------------------------------------------------------
   const [lotsData, setLotsData] = useState([]);
-  const [loadingLots, setLoadingLots] = useState(true); // estoy cargando los lotes
+  const [loadingLots, setLoadingLots] = useState(true);
   const { success, error, info } = useToast();
 
-  // Cargo los lotes una sola vez desde el adapter (mock o backend)
+  // Leo querystring (para abrir modal por ?editLotId=)
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editLotId = searchParams.get("editLotId");
+
+  // Cargo los lotes una sola vez
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -39,12 +43,14 @@ export default function Layout() {
         if (alive) setLotsData(res.data || []);
       } catch (err) {
         console.error(err);
-        error("No pude cargar los lotes");     // <-- antes era alert
+        error("No pude cargar los lotes");
       } finally {
         if (alive) setLoadingLots(false);
       }
     })();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // ---------------------------------------------------------------------------
@@ -58,36 +64,20 @@ export default function Layout() {
     subStatus: [],
   });
 
-  // Aplico los filtros sobre la lista en memoria
+  // Aplico filtros sobre la lista en memoria
   const filteredLots = lotsData.filter((lot) => {
-    if (
-      filters.search &&
-      !lot.id.toLowerCase().includes(filters.search.toLowerCase())
-    )
-      return false;
-    if (filters.owner.length > 0 && !filters.owner.includes(lot.owner))
-      return false;
-    if (
-      filters.location.length > 0 &&
-      !filters.location.includes(lot.location || "")
-    )
-      return false;
-    if (filters.status.length > 0 && !filters.status.includes(lot.status))
-      return false;
-    if (
-      filters.subStatus.length > 0 &&
-      !filters.subStatus.includes(lot.subStatus)
-    )
-      return false;
+    if (filters.search && !lot.id.toLowerCase().includes(filters.search.toLowerCase())) return false;
+    if (filters.owner.length > 0 && !filters.owner.includes(lot.owner)) return false;
+    if (filters.location.length > 0 && !filters.location.includes(lot.location || "")) return false;
+    if (filters.status.length > 0 && !filters.status.includes(lot.status)) return false;
+    if (filters.subStatus.length > 0 && !filters.subStatus.includes(lot.subStatus)) return false;
     return true;
   });
 
-  // Limpio todos los filtros
   const handleClearFilters = () => {
     setFilters({ search: "", owner: [], location: [], status: [], subStatus: [] });
   };
 
-  // Accion placeholder (queda para cuando definamos la promo)
   const handleApplyPromotion = () => {
     info("Acción Aplicar Promoción");
   };
@@ -107,14 +97,14 @@ export default function Layout() {
   };
   const handleClosePanel = () => setShowPanel(false);
 
-  // Ver detalle completo del lote (cierra panel y abre vista detalle)
+  // Ver detalle (cierra panel y abre ficha)
   const handleViewDetail = (lotId) => {
     setSelectedLotId(lotId);
     setShowPanel(false);
     setShowLotInfo(true);
   };
 
-  // Modal único de crear/editar/eliminar
+  // Modal único de gestionar lote
   const [modalLote, setModalLote] = useState({
     show: false,
     modo: "crear", // "crear" | "editar" | "borrar"
@@ -133,17 +123,34 @@ export default function Layout() {
     setModalLote({ show: true, modo: "borrar", datosIniciales: lote });
   };
 
+  // Si viene ?editLotId=... → abro el modal en "editar"
+  useEffect(() => {
+    if (!editLotId) return;
+    const lot = (lotsData || []).find((l) => String(l.id) === String(editLotId));
+    if (lot) {
+      setModalLote({ show: true, modo: "editar", datosIniciales: lot });
+    }
+    // Si quisieras, acá podrías hacer getLoteById(editLotId) si no está en memoria.
+  }, [editLotId, lotsData]);
+
+  // Cerrar modal: además limpio ?editLotId para no reabrirlo al volver
+  const cerrarModalGestion = () => {
+    setModalLote((prev) => ({ ...prev, show: false }));
+    if (searchParams.has("editLotId")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("editLotId");
+      setSearchParams(next);
+    }
+  };
+
   // ---------------------------------------------------------------------------
   // Handlers que PERSISTEN y luego sincronizan el estado local
-  // (Uso el adapter: mock o backend según .env)
   // ---------------------------------------------------------------------------
-
-  // Cambio "status" del lote: persisto y después actualizo en memoria
   const handleStatusChange = async (lotId, newStatus) => {
     try {
       await updateLote(lotId, { status: newStatus });
-      setLotsData(prev => prev.map(l => (l.id === lotId ? { ...l, status: newStatus } : l)));
-      success("Estado actualizado");             // feedback positivo
+      setLotsData((prev) => prev.map((l) => (l.id === lotId ? { ...l, status: newStatus } : l)));
+      success("Estado actualizado");
     } catch (err) {
       console.error(err);
       error("No pude actualizar el estado del lote");
@@ -153,7 +160,7 @@ export default function Layout() {
   const handleSubStatusChange = async (lotId, newSubStatus) => {
     try {
       await updateLote(lotId, { subStatus: newSubStatus });
-      setLotsData(prev => prev.map(l => (l.id === lotId ? { ...l, subStatus: newSubStatus } : l)));
+      setLotsData((prev) => prev.map((l) => (l.id === lotId ? { ...l, subStatus: newSubStatus } : l)));
       success("Estado-plano actualizado");
     } catch (err) {
       console.error(err);
@@ -161,36 +168,33 @@ export default function Layout() {
     }
   };
 
-  // Guardar desde el modal:
-  // - si estoy en "editar": update
-  // - si estoy en "crear": create
+  // Guardar desde el modal (crear/editar)
   const guardarLote = async (lote) => {
     try {
       if (modalLote.modo === "editar" && lote?.id) {
         const res = await updateLote(lote.id, lote);
         const updated = res.data || lote;
-        setLotsData(prev => prev.map(l => (l.id === lote.id ? updated : l)));
+        setLotsData((prev) => prev.map((l) => (l.id === lote.id ? updated : l)));
         success("Lote actualizado");
       } else {
         const res = await createLote(lote);
         const created = res.data || lote;
-        setLotsData(prev => [...prev, created]);
+        setLotsData((prev) => [...prev, created]);
         success("Lote creado");
       }
-      setModalLote(prev => ({ ...prev, show: false }));
+      cerrarModalGestion();
     } catch (err) {
       console.error(err);
       error("No pude guardar el lote");
     }
   };
 
-  // Eliminar desde el modal: persisto y después saco de la lista
-
+  // Eliminar desde el modal
   const eliminarLote = async (id) => {
     try {
       await deleteLote(id);
-      setLotsData(prev => prev.filter(l => l.id !== id));
-      setModalLote(prev => ({ ...prev, show: false }));
+      setLotsData((prev) => prev.filter((l) => l.id !== id));
+      cerrarModalGestion();
       success("Lote eliminado");
     } catch (err) {
       console.error(err);
@@ -236,16 +240,12 @@ export default function Layout() {
         selectedLotId={selectedLotId}
         onViewDetail={handleViewDetail}
         lots={filteredLots}
-        abrirModalEditar={abrirModalEditar}
-        abrirModalEliminar={abrirModalEliminar}
+        abrirModalEditar={abrirModalEditar}     // lo dejo para compatibilidad
+        abrirModalEliminar={abrirModalEliminar} // idem
       />
 
       {/* Modal de usuario (placeholder) */}
-      <User
-        show={showUserModal}
-        onHide={() => setShowUserModal(false)}
-        user={mockUser}
-      />
+      <User show={showUserModal} onHide={() => setShowUserModal(false)} user={mockUser} />
 
       {/* Detalle completo del lote */}
       <LotInfo
@@ -262,7 +262,7 @@ export default function Layout() {
         show={modalLote.show}
         modo={modalLote.modo}
         datosIniciales={modalLote.datosIniciales}
-        onHide={() => setModalLote((prev) => ({ ...prev, show: false }))}
+        onHide={cerrarModalGestion}   // ← cierro y limpio ?editLotId
         onSave={guardarLote}
         onDelete={eliminarLote}
       />
