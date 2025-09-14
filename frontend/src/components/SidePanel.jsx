@@ -2,13 +2,17 @@
 // - Reservar:      LOT_RESERVE  (Admin, Inmobiliaria)
 // - Editar:        LOT_EDIT     (Admin, Técnico, Gestor)
 // - Ver detalle:   LOT_DETAIL   (todos los roles)
-import { useState } from "react"
-import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
-import { useAuth } from "../app/providers/AuthProvider";         // usa la misma ruta que en otros componentes
-import { can } from "../lib/auth/rbac";                          // idem
-import { PERMISSIONS } from "../lib/auth/rbac";
+// Panel lateral del lote.
+// Reservar → voy a /reservas?lotId=...
+// Editar   → voy a /?editLotId=...  (Layout abre el modal)
+// Ver det. → usa el handler que ya teníamos.
+
+import { useState } from "react";
+import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap";
+import { useAuth } from "../app/providers/AuthProvider";
+import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
-import { useNavigate } from "react-router-dom"; 
+import { useNavigate } from "react-router-dom";
 
 const customStyles = `
   .brand-pale-green { background-color: #e6efe9 !important; }
@@ -27,9 +31,11 @@ export default function SidePanel({
   selectedLotId,
   onViewDetail,
   lots,
+  // Nota: dejo estos props aunque acá no los uso; no rompo a quien los pase.
   abrirModalEditar,
+  abrirModalEliminar,
 }) {
-  // ÍNDICES Y DATOS
+  // Lote actual
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const currentLot = lots.find((lot) => lot.id === selectedLotId);
   const navigate = useNavigate();
@@ -37,33 +43,34 @@ export default function SidePanel({
 
   const images = currentLot.images || [];
 
-  // PERMISOS DEL USUARIO (lo calculo una sola vez por render)
+  // Permisos
   const { user } = useAuth();
   const canReserve = can(user, PERMISSIONS.LOT_RESERVE);
-  const canEdit    = can(user, PERMISSIONS.LOT_EDIT);
-  const canDetail  = can(user, PERMISSIONS.LOT_DETAIL);
-
+  const canEdit = can(user, PERMISSIONS.LOT_EDIT);
+  const canDetail = can(user, PERMISSIONS.LOT_DETAIL);
 
   const { success, error } = useToast() ?? { success: () => {}, error: () => {} };
 
-  // ACCIONES
+  // Acciones
   const handleReserve = () => {
-    // voy a reservas con el lotId en la URL
     navigate(`/reservas?lotId=${encodeURIComponent(currentLot.id)}`);
-    onHide?.(); // cierro el panel
+    onHide?.();
   };
 
-    // (Opcional) Registrar venta desde el panel si agregamos ese botón
   const handleRegisterSale = () => {
-    // voy a ventas con el lotId en la URL
     navigate(`/ventas?lotId=${encodeURIComponent(currentLot.id)}`);
-    onHide?.(); // cierro el panel
+    onHide?.();
   };
 
+  const handleEdit = () => {
+    // Paso el id por query; Layout abre el modal en "editar"
+    navigate(`/?editLotId=${encodeURIComponent(currentLot.id)}`);
+    onHide?.();
+  };
 
-  const handleViewDetail = () => {
-    onViewDetail(currentLot.id);
-    onHide();
+  const handleDetail = () => {
+    onViewDetail?.(currentLot.id);
+    onHide?.();
   };
 
   return (
@@ -83,7 +90,7 @@ export default function SidePanel({
         </Offcanvas.Header>
 
         <Offcanvas.Body className="p-4">
-          {/* Carrusel de imágenes (si hay varias) */}
+          {/* Imágenes */}
           <div className="mb-4">
             {images.length > 1 ? (
               <Carousel
@@ -116,7 +123,7 @@ export default function SidePanel({
             )}
           </div>
 
-          {/* Datos principales del lote */}
+          {/* Datos rápidos */}
           <div className="mb-4">
             <Row className="g-3">
               <Col xs={6}>
@@ -166,10 +173,9 @@ export default function SidePanel({
             </Row>
           </div>
 
-          {/* Acciones del lote (visibles según permisos) */}
+          {/* Acciones (dependen de permisos) */}
           <div className="mb-2">
             <Row className="g-2">
-              {/* Reservar (Admin, Inmobiliaria) */}
               {canReserve && (
                 <Col xs={6}>
                   <Button
@@ -182,13 +188,9 @@ export default function SidePanel({
                 </Col>
               )}
 
-              {/* Editar (Admin, Técnico, Gestor) */}
               {canEdit && (
                 <Col xs={6}>
-                  <Button
-                    className="brand-dark-green w-100 action-btn"
-                    onClick={() => abrirModalEditar(currentLot)}
-                  >
+                  <Button className="brand-dark-green w-100 action-btn" onClick={handleEdit}>
                     Editar
                   </Button>
                 </Col>
@@ -196,20 +198,22 @@ export default function SidePanel({
             </Row>
 
             <Row>
-              {/* Ver detalle completo (todos los roles) */}
               {canDetail && (
                 <Col xs={6}>
                   <Button
                     variant="link"
                     className="text-brand-dark-green w-100 no-wrap"
-                    onClick={handleViewDetail}
+                    onClick={handleDetail}
                   >
                     Ver detalle completo
                   </Button>
                 </Col>
               )}
             </Row>
-             {/* <Button onClick={handleRegisterSale}>Registrar venta</Button>*/}
+
+            {/* Si más adelante habilitamos venta desde panel:
+                <Button onClick={handleRegisterSale}>Registrar venta</Button>
+            */}
           </div>
         </Offcanvas.Body>
       </Offcanvas>

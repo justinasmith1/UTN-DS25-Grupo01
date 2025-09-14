@@ -8,6 +8,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
+import { parseApiError } from "../lib/http/errors";
 
 import {
   getAllInmobiliarias,
@@ -81,7 +82,7 @@ export default function Inmobiliarias() {
         }
       } catch (e) {
         console.error(e);
-        error("No pude cargar las inmobiliarias");
+        error(parseApiError(e, "No pude cargar las inmobiliarias"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -127,7 +128,7 @@ export default function Inmobiliarias() {
       cerrarModal();
     } catch (e) {
       console.error(e);
-      error("No pude guardar la inmobiliaria");
+      error(parseApiError(e, "No pude guardar la inmobiliaria"));
     }
   };
 
@@ -141,7 +142,7 @@ export default function Inmobiliarias() {
       success("Inmobiliaria eliminada");
     } catch (e) {
       console.error(e);
-      error("No pude eliminar la inmobiliaria");
+      error(parseApiError(e, "No pude eliminar la inmobiliaria"));
     }
   };
 

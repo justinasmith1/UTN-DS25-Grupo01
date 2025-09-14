@@ -7,6 +7,7 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { parseApiError } from "../lib/http/errors";
 
 import {
   getAllVentas,
@@ -92,7 +93,7 @@ export default function Ventas() {
         }
       } catch (e) {
         console.error(e);
-        error("No pude cargar las ventas");
+        error(parseApiError(e, "No pude cargar las ventas"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -145,7 +146,7 @@ export default function Ventas() {
       cerrarModal();
     } catch (e) {
       console.error(e);
-      error("No pude guardar la venta");
+      error(parseApiError(e, "No pude guardar la venta"));
     }
   };
 
@@ -159,7 +160,7 @@ export default function Ventas() {
       success("Venta eliminada");
     } catch (e) {
       console.error(e);
-      error("No pude eliminar la venta");
+      error(parseApiError(e, "No pude eliminar la venta"));
     }
   };
 
