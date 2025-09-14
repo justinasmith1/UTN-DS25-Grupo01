@@ -27,7 +27,7 @@ export default function Botones() {
     { label: "Inmobiliarias",  perm: PERMISSIONS.AGENCY_ACCESS,  to: "/inmobiliarias" },
     { label: "Personas",       perm: PERMISSIONS.PEOPLE_ACCESS,  to: "/personas" }, // to: "/personas"
     { label: "Reservas",       perm: PERMISSIONS.RES_ACCESS,     to: "/reservas" }, 
-    { label: "Reportes",       perm: PERMISSIONS.REPORTS_ACCESS, to: null }, // to: "/reportes"
+    { label: "Reportes",       perm: PERMISSIONS.REPORTS_ACCESS, to: "/reportes" }, // to: "/reportes"
   ];
 
   // Filtro solo los que el usuario puede ver (si tenés el flag VITE_RBAC_DISABLE_UI=true, <Can> ya no oculta nada)

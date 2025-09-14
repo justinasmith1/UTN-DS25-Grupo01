@@ -13,6 +13,7 @@ import Reservas from "./pages/Reservas";
 import Ventas from "./pages/Ventas";
 import Inmobiliarias from "./pages/Inmobiliarias";
 import Personas from "./pages/Personas";
+import Reportes from "./pages/Reportes";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
@@ -58,6 +59,14 @@ export default function App() {
             element={
               <RequireRole permission={PERMISSIONS.PEOPLE_ACCESS}>
                 <Personas />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="reportes"
+            element={
+              <RequireRole permission={PERMISSIONS.REPORTS_ACCESS}>
+                <Reportes />
               </RequireRole>
             }
           />
