@@ -1,22 +1,28 @@
-// Guardia de rutas privadas.
-// Si no hay sesión → me manda a /login y recuerdo de dónde venía.
+// Si todavía estoy cargando la sesión -> muestro spinner.
+// Si no estoy autenticado -> mando a /login.
+// Si ok -> dejo pasar a las rutas hijas (<Outlet/>).
 
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../providers/AuthProvider';
+import { Navigate, Outlet, useLocation } from "react-router-dom";
+import { Spinner } from "react-bootstrap";
+import { useAuth } from "../providers/AuthProvider";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute() {
   const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
 
-  // Espero a que AuthProvider termine su check inicial
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+        <Spinner animation="border" role="status" />
+        <span className="ms-2">Cargando sesión…</span>
+      </div>
+    );
+  }
 
-  // Si no estoy logueado, redirijo a /login
   if (!isAuthenticated) {
+    // Guardo a dónde quería ir para volver después del login
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Si está todo ok, muestro la ruta privada
-  return children;
+  return <Outlet />;
 }

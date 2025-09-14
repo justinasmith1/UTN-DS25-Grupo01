@@ -1,4 +1,3 @@
-// src/components/SidePanel.jsx
 // Este es el panel lateral que se abre al hacer click en un lote en el mapa
 // - Reservar:      LOT_RESERVE  (Admin, Inmobiliaria)
 // - Editar:        LOT_EDIT     (Admin, Técnico, Gestor)
@@ -8,6 +7,8 @@ import { Offcanvas, Button, Card, Row, Col, Carousel } from "react-bootstrap"
 import { useAuth } from "../app/providers/AuthProvider";         // usa la misma ruta que en otros componentes
 import { can } from "../lib/auth/rbac";                          // idem
 import { PERMISSIONS } from "../lib/auth/rbac";
+import { useToast } from "../app/providers/ToastProvider";
+import { useNavigate } from "react-router-dom"; 
 
 const customStyles = `
   .brand-pale-green { background-color: #e6efe9 !important; }
@@ -31,6 +32,7 @@ export default function SidePanel({
   // ÍNDICES Y DATOS
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const currentLot = lots.find((lot) => lot.id === selectedLotId);
+  const navigate = useNavigate();
   if (!currentLot) return null;
 
   const images = currentLot.images || [];
@@ -41,11 +43,23 @@ export default function SidePanel({
   const canEdit    = can(user, PERMISSIONS.LOT_EDIT);
   const canDetail  = can(user, PERMISSIONS.LOT_DETAIL);
 
+
+  const { success, error } = useToast() ?? { success: () => {}, error: () => {} };
+
   // ACCIONES
   const handleReserve = () => {
-    // Solo muestro el botón si canReserve === true, así que acá no revalido
-    alert(`Reservar lote ${currentLot.id}`);
+    // voy a reservas con el lotId en la URL
+    navigate(`/reservas?lotId=${encodeURIComponent(currentLot.id)}`);
+    onHide?.(); // cierro el panel
   };
+
+    // (Opcional) Registrar venta desde el panel si agregamos ese botón
+  const handleRegisterSale = () => {
+    // voy a ventas con el lotId en la URL
+    navigate(`/ventas?lotId=${encodeURIComponent(currentLot.id)}`);
+    onHide?.(); // cierro el panel
+  };
+
 
   const handleViewDetail = () => {
     onViewDetail(currentLot.id);
@@ -195,6 +209,7 @@ export default function SidePanel({
                 </Col>
               )}
             </Row>
+             {/* <Button onClick={handleRegisterSale}>Registrar venta</Button>*/}
           </div>
         </Offcanvas.Body>
       </Offcanvas>
