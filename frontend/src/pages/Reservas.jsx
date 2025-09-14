@@ -8,6 +8,7 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { parseApiError } from "../lib/http/errors";
 
 import {
   getAllReservas,
@@ -75,7 +76,7 @@ export default function Reservas() {
         if (alive) setItems(res.data || []);
       } catch (e) {
         console.error(e);
-        error("No pude cargar las reservas");
+        error(parseApiError(e, "No pude cargar las reservas"));
       } finally {
         if (alive) setLoading(false);
       }
@@ -118,7 +119,7 @@ export default function Reservas() {
       cerrarModal();
     } catch (e) {
       console.error(e);
-      error("No pude guardar la reserva");
+      error(parseApiError(e, "No pude guardar la reserva"));
     }
   };
 
@@ -131,7 +132,7 @@ export default function Reservas() {
       success("Reserva eliminada");
     } catch (e) {
       console.error(e);
-      error("No pude eliminar la reserva");
+      error(parseApiError(e, "No pude eliminar la reserva"));
     }
   };
 
