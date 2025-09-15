@@ -18,7 +18,6 @@ import Forbidden from "./pages/Forbidden";
 
 // Iconos (ok tenerlos acá)
 import "bootstrap-icons/font/bootstrap-icons.css";
-import Forbidden from "./pages/Forbidden";
 
 export default function App() {
   return (
