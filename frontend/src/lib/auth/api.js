@@ -1,92 +1,81 @@
-// Acá concentro las llamadas de auth al backend.
-// Si mañana cambian paths o payloads, solo toco este archivo.
+// Adapter de autenticación REAL contra el backend.
+// Mantengo nombres en un solo lugar para que el Provider quede simple.
 
-// Si VITE_AUTH_USE_MOCK=true uso mocks; si no, pego al backend real.
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === 'true';
+import { http } from "../http/http";
+import { setAccessToken, setRefreshToken, clearTokens } from "./token";
 
-import { http } from '../http/http';
-import { getAccessToken } from './token';
+export const LOGIN_PATH = "/auth/login";
+// No tenés estos endpoints por ahora; los dejamos definidos por si los agregan
+export const REFRESH_PATH = "/auth/refresh";
+export const ME_PATH = "/auth/me";
 
-const LOGIN_PATH   = import.meta.env.VITE_AUTH_LOGIN_PATH   || '/auth/login';
-const ME_PATH      = import.meta.env.VITE_AUTH_ME_PATH      || '/auth/me';
+// Normalizo campos para no acoplar el front al formato exacto del back
+function normalizeAuthResponse(json) {
+  if (!json || typeof json !== "object") return {};
+  const accessToken =
+    json.accessToken || json.access || json.token || json.jwt || null;
+  const refreshToken =
+    json.refreshToken || json.refresh || json.refresh_token || null;
+  const user = json.user || json.usuario || null;
+  return { accessToken, refreshToken, user };
+}
 
-// --------- API PÚBLICA (el resto de la app importa estas dos) ---------
-
-// Hago login con email + password. Devuelvo el JSON (tokens + user).
+// Login real: guarda tokens y devuelve el user
 export async function apiLogin({ email, password }) {
-  if (USE_MOCK) return mockLogin({ email, password });
+  const res = await http(LOGIN_PATH, {
+    method: "POST",
+    body: { email, password },
+  });
 
-  // Backend real
-  const res = await http(LOGIN_PATH, { method: 'POST', body: { email, password } });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data?.error?.message || data?.message || 'Error en login';
-    throw new Error(msg);
+    const msg = data?.message || "Credenciales inválidas";
+    const err = new Error(msg);
+    err.status = res.status;
+    throw err;
   }
-  return data;
+
+  // Tu back devuelve { data: { ... } } → desenvuelvo
+  const payload = data?.data ?? data;
+
+  const { accessToken, refreshToken, user } = normalizeAuthResponse(payload);
+  if (!accessToken) throw new Error("Respuesta de login inválida (sin accessToken)");
+
+  // Guardo tokens (http.js los usará para Authorization)
+  setAccessToken(accessToken);
+  if (refreshToken) setRefreshToken(refreshToken);
+
+  // Devuelvo el usuario (si el back no lo manda, devolvemos {} y lo tratamos en el Provider)
+  return user || {};
 }
 
-// Traigo el usuario actual (debe venir el access en Authorization)
+// Si algún día agregan refresh, esto quedará listo; hoy no se usa.
+export async function apiRefresh() {
+  const res = await http(REFRESH_PATH, { method: "POST" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    clearTokens();
+    const err = new Error(data?.message || "No se pudo refrescar la sesión");
+    err.status = res.status;
+    throw err;
+  }
+  const payload = data?.data ?? data;
+  const { accessToken } = normalizeAuthResponse(payload);
+  if (!accessToken) throw new Error("Refresh inválido (sin accessToken)");
+  setAccessToken(accessToken);
+  return true;
+}
+
+// Tu back no tiene /me; no lo llamamos por ahora
 export async function apiMe() {
-  if (USE_MOCK) return mockMe();
-
-  // Backend real
-  const res = await http(ME_PATH, { method: 'GET' });
+  throw new Error("GET /auth/me no está disponible en el backend");
+  /*
+  const res = await http(ME_PATH, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const msg = data?.error?.message || data?.message || 'Error al cargar sesión';
-    throw new Error(msg);
+    const err = new Error(data?.message || "No pude obtener el usuario");
+    err.status = res.status;
+    throw err;
   }
-  return data;
-}
-
-// --------- MOCKS (solo se usan si USE_MOCK === true) ---------
-
-// Dejo 4 usuarios de ejemplo (roles Prisma). Password plano SOLO para dev.
-const MOCK_USERS = [
-  { id: 1, email: 'admin@lf.com',       username: 'admin',  password: '123456', role: 'ADMINISTRADOR', inmobiliariaId: null },
-  { id: 2, email: 'tecnico@lf.com',     username: 'tec',    password: '123456', role: 'TECNICO',       inmobiliariaId: null },
-  { id: 3, email: 'gestor@lf.com',      username: 'gestor', password: '123456', role: 'GESTOR',        inmobiliariaId: null },
-  { id: 4, email: 'inmo@lf.com',        username: 'inmo1',  password: '123456', role: 'INMOBILIARIA',  inmobiliariaId: 101 },
-];
-
-// Armo una vista pública del usuario (no expongo password)
-function publicUser(u) {
-  const { password, ...rest } = u;
-  return rest;
-}
-
-// Genero tokens mock que incluyen el userId (me sirve para /me)
-function buildTokens(userId) {
-  return {
-    accessToken:  `mock-access:${userId}`,
-    refreshToken: `mock-refresh:${userId}`,
-  };
-}
-
-// Login mock: busco por email y comparo password
-async function mockLogin({ email, password }) {
-  const user = MOCK_USERS.find(u => u.email === email);
-  if (!user || user.password !== password) {
-    // Simulo formato de error común
-    throw new Error('Credenciales inválidas');
-  }
-  const tokens = buildTokens(user.id);
-  return {
-    data: {
-      user: publicUser(user),
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
-    },
-  };
-}
-
-// Me mock: leo el userId del access token guardado
-async function mockMe() {
-  const at = getAccessToken();
-  // Espero formato "mock-access:<id>"
-  const id = Number(at?.split(':')[1] ?? NaN);
-  const user = MOCK_USERS.find(u => u.id === id);
-  if (!user) throw new Error('No hay sesión');
-  return { data: { user: publicUser(user) } };
+  return data?.user || data */
 }
