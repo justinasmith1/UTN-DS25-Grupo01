@@ -1,103 +1,68 @@
-// Manejo la sesión desde acá: login real, usuario actual y logout.
-// Por ahora NO hago refresh token. Eso lo agrego en el siguiente paso.
+// src/app/providers/AuthProvider.jsx
+// Contexto de autenticación REAL (tokens + user persistido local).
+// Expone: { user, loading, login, logout }
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { getAccessToken, setTokens, clearTokens } from '../../lib/auth/token';
-import { apiLogin, apiMe } from '../../lib/auth/api';
+import { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import { apiLogin } from "../../lib/auth/api";
+import { getAccessToken, clearTokens } from "../../lib/auth/token";
 
-const AuthContext = createContext(null);
+const AuthCtx = createContext(null);
 
-export default function AuthProvider({ children }) {
-  // Usuario logueado (null si no hay sesión)
-  const [user, setUser] = useState(null);
-  // Flag de arranque (evito parpadeos)
-  const [loading, setLoading] = useState(true);
+// Clave donde vamos a guardar el user del login
+const USER_KEY = "lf_user";
 
-  // Normalizo el usuario que viene del back a mi shape
-  const normalizeUser = (raw) => {
-    if (!raw) return null;
-    const singleRole = raw.role; // Prisma enum: ADMINISTRADOR | TECNICO | GESTOR | INMOBILIARIA
-    return {
-      ...raw,
-      // Guardo roles como array para unificar el consumo en front
-      roles: Array.isArray(raw.roles) ? raw.roles : (singleRole ? [singleRole] : []),
-    };
-  };
+export function AuthProvider({ children }) {
+  const [user, setUser] = useState(null);   // objeto de usuario
+  const [loading, setLoading] = useState(true); // true mientras intento recuperar sesión
 
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  // Al montar, si hay token intento obtener /auth/me
+  // Al montar: si tengo access token, leo el user desde localStorage
   useEffect(() => {
-    const boot = async () => {
-      try {
-        if (getAccessToken()) {
-          const me = await apiMe();
-          // Normalizo el shape del usuario (me adapto a data.user o user)
-          const profile = me?.data?.user ?? me?.user ?? me;
-          setUser(normalizeUser(profile) || { name: 'Usuario' });
-        } else {
-          setUser(null);
-        }
-      } catch {
-        // Si falla me() limpio sesión para empezar “desde cero”
-        clearTokens();
-        setUser(null);
-      } finally {
+    try {
+      const token = getAccessToken();
+      if (!token) {
         setLoading(false);
+        return;
       }
-    };
-    boot();
+      const raw = localStorage.getItem(USER_KEY);
+      const savedUser = raw ? JSON.parse(raw) : null;
+      setUser(savedUser);
+    } catch {
+      setUser(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  // Hago login contra el back y guardo tokens + usuario
-  const signIn = async ({ email, password }) => {
-    // Llamo al endpoint de login
-    const resp = await apiLogin({ email, password });
+  // Login real → guarda tokens (lo hace el adapter) y persiste user local para levantar tras refresh
+  async function login({ email, password }) {
+    if (!email || !password) throw new Error("Completá email y contraseña");
 
-    // Extraigo tokens con nombres flexibles (me adapto a varias respuestas)
-    const access =
-      resp?.data?.accessToken ?? resp?.accessToken ?? resp?.token ?? null;
-    const refresh =
-      resp?.data?.refreshToken ?? resp?.refreshToken ?? null;
+    const me = await apiLogin({ email, password });
+    setUser(me);
+    localStorage.setItem(USER_KEY, JSON.stringify(me || {}));
 
-    // Guardo tokens si existen
-    if (access || refresh) setTokens({ access, refresh });
+    const from = location.state?.from || "/";
+    navigate(from, { replace: true });
+  }
 
-    // Intento traer el perfil real
-    let profile = resp?.data?.user ?? resp?.user ?? null;
-    if (!profile) {
-      try {
-        const me = await apiMe();
-        profile = me?.data?.user ?? me?.user ?? me ?? null;
-      } catch {
-        profile = null;
-      }
-    }
-    setUser(normalizeUser(profile) || { name: 'Usuario' });
-  };
-
-  // Cierro sesión
-  const logout = () => {
+  // Cerrar sesión → limpio tokens y user local
+  function logout() {
     clearTokens();
+    localStorage.removeItem(USER_KEY);
     setUser(null);
-  };
+    navigate("/login", { replace: true });
+  }
 
-  // Expongo lo que necesito en el resto de la app
-  const value = useMemo(
-    () => ({
-      user,
-      isAuthenticated: !!user,
-      loading,
-      signIn,
-      logout,
-      setUser,
-    }),
-    [user, loading]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  const value = { user, loading, login, logout };
+  return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>;
 }
 
-// Hook para consumir auth
 export function useAuth() {
-  return useContext(AuthContext);
+  return useContext(AuthCtx);
 }
+
+export default AuthProvider;

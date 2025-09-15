@@ -14,11 +14,14 @@ dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 const app = express();
+
+const allowedOrigins = ["http://localhost:5173"];
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 204, // some legacy browsers (IE11, various SmartTVs) choke on 204
 }
 
 
