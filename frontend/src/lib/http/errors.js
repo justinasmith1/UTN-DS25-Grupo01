@@ -25,3 +25,45 @@ export function parseApiError(err, fallback = "Ocurrió un error") {
   // Fallback elegante
   return fallback;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Convierte la respuesta de error del backend (Zod u otros
+// formatos comunes) en { formError, fieldErrors } apto para UI.
+// ─────────────────────────────────────────────────────────────
+export function mapApiValidationToFields(apiError) {
+  const out = { formError: null, fieldErrors: {} };
+  try {
+    const data = apiError?.response?.data || apiError?.data || apiError;
+    if (!data) return out;
+
+    // Formato típico de Zod: { issues: [{ path: ["campo"], message: "..." }, ...] }
+    if (Array.isArray(data.issues)) {
+      for (const it of data.issues) {
+        const key = Array.isArray(it.path) ? it.path[0] : it.path;
+        if (key) out.fieldErrors[key] = it.message || 'Dato inválido';
+      }
+      return out;
+    }
+
+    // { errors: [{ path: "campo" | ["campo"], message: "..." }] }
+    if (Array.isArray(data.errors)) {
+      for (const it of data.errors) {
+        const key = Array.isArray(it.path) ? it.path[0] : it.path;
+        if (key) out.fieldErrors[key] = it.message || 'Dato inválido';
+      }
+      return out;
+    }
+
+    // { fieldErrors: { campo: "mensaje", ... } }
+    if (data.fieldErrors && typeof data.fieldErrors === 'object') {
+      out.fieldErrors = data.fieldErrors;
+      return out;
+    }
+
+    // Mensaje general
+    if (data.message) out.formError = data.message;
+    return out;
+  } catch {
+    return out; // no rompemos la UI por errores en el mapeo
+  }
+}
