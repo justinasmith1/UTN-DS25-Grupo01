@@ -1,18 +1,25 @@
-// Si todavía estoy cargando la sesión -> muestro spinner.
-// Si no estoy autenticado -> mando a /login.
-// Si ok -> dejo pasar a las rutas hijas (<Outlet/>).
-// si loading → null (evito parpadeo)
+// Ruta protegida canónica: si no hay sesión, navega a /login y
+// si hay sesión, renderiza el <Outlet/> (lo que cuelgue debajo).
 
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../providers/AuthProvider";
 
-export default function ProtectedRoute({ children }) {
+// Nota: este ProtectedRoute NO recibe children.
+// Siempre usa <Outlet /> para renderizar lo que esté anidado.
+export default function ProtectedRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  // Mientras cargo sesión, muestro algo simple para evitar "pantalla en blanco"
+  if (loading) {
+    return <div style={{ padding: 24 }}>Cargando sesión…</div>;
+  }
 
-  return children;
+  // Si no hay usuario, redirijo a /login guardando desde dónde venía
+  if (!user) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  // Si hay usuario, dejo pasar al contenido anidado
+  return <Outlet />;
 }
-
