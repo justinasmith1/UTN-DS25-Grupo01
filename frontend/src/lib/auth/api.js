@@ -5,7 +5,6 @@ import { http } from "../http/http";
 import { setAccessToken, setRefreshToken, clearTokens } from "./token";
 
 export const LOGIN_PATH = "/auth/login";
-// No tenés estos endpoints por ahora; los dejamos definidos por si los agregan
 export const REFRESH_PATH = "/auth/refresh";
 export const ME_PATH = "/auth/me";
 
@@ -35,7 +34,6 @@ export async function apiLogin({ email, password }) {
     throw err;
   }
 
-  // Tu back devuelve { data: { ... } } → desenvuelvo
   const payload = data?.data ?? data;
 
   const { accessToken, refreshToken, user } = normalizeAuthResponse(payload);
