@@ -1,56 +1,93 @@
-// Adapter único para Ventas. Si USE_MOCK=true uso memoria local; si no, pego al backend.
-// Siempre devuelvo { data: ... } para no acoplar la UI a la forma del backend.
+// src/lib/api/ventas.js
+// Adapter para Ventas: traduce UI <-> Backend y maneja listado/CRUD.
+// Cambios clave:
+// - Endpoint: intenta "/Ventas" (mayúscula) y si 404 prueba "/ventas".
+// - fromApi / toApi: mapean nombres (fechaVenta<->date, monto<->amount, estado<->status, tipoPago<->paymentType, compradorId<->buyerId).
+// - list(): siempre retorna { data, meta } para que la UI pagine igual, aunque el back no envíe meta.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http } from "../http/http";
 
-const BASE = "/ventas"; // si el back usa otra ruta, solo la cambio acá
+// Endpoint primario y fallback (por diferencia de mayúsculas en el back)
+const PRIMARY = "/Ventas";
+const FALLBACK = "/ventas";
 
 const ok = (data) => ({ data });
 
-/* ----------------------------- MODO MOCK ----------------------------- */
-let VENTAS = [];
-let seeded = false;
+// ---------- Helpers de mapeo ----------
+const toNumberOrNull = (v) => (v === "" || v == null ? null : Number(v));
 
-// genero un id simple "V001", "V002", etc
-const nextId = () => `V${String(VENTAS.length + 1).padStart(3, "0")}`;
+// Backend -> UI
+const fromApi = (row = {}) => ({
+  id: row.id ?? row.ventaId ?? row.Id,
+  lotId: row.lotId ?? row.loteId ?? row.lote_id ?? row.lote ?? row.lot,
+  date: row.date ?? row.fechaVenta ?? row.fecha ?? null,
+  status: row.status ?? row.estado ?? null,
+  amount: typeof row.amount === "number" ? row.amount : (row.monto != null ? Number(row.monto) : null),
+  paymentType: row.paymentType ?? row.tipoPago ?? null,
+  buyerId: row.buyerId ?? row.compradorId ?? null,
+  inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
+  reservaId: row.reservaId ?? row.reserva_id ?? null,
+  observaciones: row.observaciones ?? row.notas ?? "",
+});
 
-async function ensureSeeded() {
-  if (seeded) return;
-  try {
-    // si en lib/data hubiera ventas de ejemplo, las traigo (opcional)
-    const mod = await import("../data");
-    const arr = mod?.mockSales || [];
-    VENTAS = arr.map((v) => ({ ...v }));
-  } catch {
-    VENTAS = [];
-  } finally {
-    seeded = true;
+// UI -> Backend
+const toApi = (form = {}) => ({
+  loteId: form.lotId != null ? String(form.lotId).trim() : undefined,
+  fechaVenta: form.date || form.fechaVenta || null,
+  estado: form.status || "Registrada",
+  monto: toNumberOrNull(form.amount),
+  tipoPago: form.paymentType || form.tipoPago || null,
+  compradorId: form.buyerId ?? form.compradorId ?? null,
+  inmobiliariaId: form.inmobiliariaId ?? null,
+  reservaId: form.reservaId ?? null,
+  observaciones: (form.observaciones ?? "").trim() || null,
+});
+
+// Arma querystring a partir de params (solo agrega definidos)
+function qs(params = {}) {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
   }
+  const str = s.toString();
+  return str ? `?${str}` : "";
 }
 
-// Funcion de mock para getAll con filtros, orden y paginacion
-async function mockGetAll(params = {}) {
-  await ensureSeeded();
-
-  // 1) Filtros (los aplico sobre una copia)
-  let out = [...VENTAS];
-  const { lotId, inmobiliariaId, q } = params || {};
-  if (lotId) out = out.filter((v) => String(v.lotId) === String(lotId));
-  if (inmobiliariaId != null) out = out.filter((v) => String(v.inmobiliariaId) === String(inmobiliariaId));
-  if (q) {
-    const s = String(q).toLowerCase();
-    out = out.filter(
-      (v) =>
-        String(v.id).toLowerCase().includes(s) ||
-        String(v.lotId).toLowerCase().includes(s) ||
-        String(v.observaciones || "").toLowerCase().includes(s)
-    );
+// Intenta primario y si 404 prueba fallback (p.ej. mayúsculas/minúsculas)
+async function fetchWithFallback(path, options) {
+  let res = await http(path, options);
+  if (res.status === 404) {
+    const alt = path.startsWith(PRIMARY) ? path.replace(PRIMARY, FALLBACK) : path.replace(FALLBACK, PRIMARY);
+    res = await http(alt, options);
   }
+  return res;
+}
 
-  // 2) Orden (sortBy + sortDir)
-  const sortBy  = params.sortBy  || "date"; // id | date | amount | lotId
-  const sortDir = (params.sortDir || "desc").toLowerCase(); // asc | desc
+/* ----------------------------- MODO MOCK ----------------------------- */
+// (Dejo tu mock operativo por si usás USE_MOCK=true en algúna demo/local)
+let VENTAS = [];
+let seeded = false;
+const nextId = () => `V${String(VENTAS.length + 1).padStart(3, "0")}`;
+
+function ensureSeed() {
+  if (seeded) return;
+  VENTAS = [
+    { id: "V001", lotId: "L001", date: "2025-01-15", status: "Registrada", amount: 120000, paymentType: "Efectivo", buyerId: 1, inmobiliariaId: 3, observaciones: "" },
+    { id: "V002", lotId: "L002", date: "2025-02-10", status: "Anulada", amount: 95000, paymentType: "Transferencia", buyerId: 2, inmobiliariaId: null, observaciones: "" },
+  ];
+  seeded = true;
+}
+
+function mockFilterSortPage(list, params = {}) {
+  let out = [...list];
+  const q = (params.q || "").toLowerCase();
+  if (q) out = out.filter((v) => String(v.id).toLowerCase().includes(q) || String(v.lotId).toLowerCase().includes(q) || String(v.amount).includes(q));
+  if (params.lotId) out = out.filter((v) => String(v.lotId) === String(params.lotId));
+  if (params.inmobiliariaId) out = out.filter((v) => String(v.inmobiliariaId) === String(params.inmobiliariaId));
+
+  const sortBy = params.sortBy || "date";
+  const sortDir = (params.sortDir || "desc").toLowerCase();
   out.sort((a, b) => {
     const A = a[sortBy];
     const B = b[sortBy];
@@ -62,84 +99,56 @@ async function mockGetAll(params = {}) {
     return 0;
   });
 
-  // 3) Paginación (page + pageSize)
-  const page     = Math.max(1, parseInt(params.page ?? 1, 10));
-  const pageSize = Math.max(1, parseInt(params.pageSize ?? 10, 10));
-  const total    = out.length;
-  const start    = (page - 1) * pageSize;
-  const end      = start + pageSize;
-  const pageItems = out.slice(start, end);
-
-  // Devuelvo datos + meta (el front usa meta si existe; si no, se las arregla)
-  return { data: pageItems, meta: { total, page, pageSize } };
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 10));
+  const total = out.length;
+  const start = (page - 1) * pageSize;
+  const data = out.slice(start, start + pageSize);
+  return { data, meta: { total, page, pageSize } };
 }
 
-// -----------------------------------
-// Funciones mock CRUD simples
-// -----------------------------------
-async function mockGetById(id) {
-  await ensureSeeded();
-  const found = VENTAS.find((v) => v.id === id);
-  if (!found) throw new Error("Venta no encontrada");
-  return ok(found);
-}
-async function mockCreate(payload) {
-  await ensureSeeded();
-  const nuevo = {
-    id: nextId(),
-    date: new Date().toISOString().slice(0, 10), // yyyy-mm-dd
-    status: "Registrada",
-    ...payload, // lote id, monto, comprador?, inmobiliariaId, observaciones...
-  };
-  VENTAS.unshift(nuevo);
-  return ok(nuevo);
-}
-async function mockUpdate(id, payload) {
-  await ensureSeeded();
-  const i = VENTAS.findIndex((v) => v.id === id);
-  if (i === -1) throw new Error("Venta no encontrada");
-  VENTAS[i] = { ...VENTAS[i], ...payload };
-  return ok(VENTAS[i]);
-}
-async function mockDelete(id) {
-  await ensureSeeded();
-  const prev = VENTAS.length;
-  VENTAS = VENTAS.filter((v) => v.id !== id);
-  if (VENTAS.length === prev) throw new Error("Venta no encontrada");
-  return ok(true);
-}
+async function mockGetAll(params = {}) { ensureSeed(); const { data, meta } = mockFilterSortPage(VENTAS, params); return { data, meta }; }
+async function mockGetById(id)        { ensureSeed(); return ok(VENTAS.find((v) => String(v.id) === String(id))); }
+async function mockCreate(payload)     { ensureSeed(); const row = fromApi({ ...toApi(payload), id: nextId() }); VENTAS.unshift(row); return ok(row); }
+async function mockUpdate(id, payload) { ensureSeed(); const idx = VENTAS.findIndex((v) => String(v.id) === String(id)); if (idx < 0) throw new Error("Venta no encontrada"); const row = { ...VENTAS[idx], ...fromApi(toApi(payload)) }; VENTAS[idx] = row; return ok(row); }
+async function mockDelete(id)          { ensureSeed(); const i = VENTAS.findIndex((v) => String(v.id) === String(id)); if (i < 0) throw new Error("Venta no encontrada"); VENTAS.splice(i, 1); return ok(true); }
 
-/* ----------------------------- MODO REAL ----------------------------- */
+/* ------------------------------ MODO API ------------------------------ */
+
 async function apiGetAll(params = {}) {
-  const url = new URL(BASE, import.meta.env.VITE_API_BASE_URL);
-  Object.entries(params).forEach(([k, v]) => {
-    if (v != null && v !== "") url.searchParams.set(k, v);
-  });
-  const res = await http(url.toString(), { method: "GET" });
+  const res = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar ventas");
-  return data?.data ? data : ok(data);
+
+  // Acepto varios formatos de back: [{…}] | { data:[…] } | { data:[…], meta:{…} }
+  const arr = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []));
+  const meta = data?.meta ?? { total: Number(data?.meta?.total ?? arr.length) || arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
+  return { data: arr.map(fromApi), meta };
 }
+
 async function apiGetById(id) {
-  const res = await http(`${BASE}/${id}`, { method: "GET" });
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al cargar la venta");
-  return data?.data ? data : ok(data);
+  if (!res.ok) throw new Error(data?.message || "Error al obtener la venta");
+  return ok(fromApi(data?.data ?? data));
 }
+
 async function apiCreate(payload) {
-  const res = await http(`${BASE}`, { method: "POST", body: payload });
+  const res = await fetchWithFallback(PRIMARY, { method: "POST", body: toApi(payload) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al crear la venta");
-  return data?.data ? data : ok(data);
+  return ok(fromApi(data?.data ?? data));
 }
+
 async function apiUpdate(id, payload) {
-  const res = await http(`${BASE}/${id}`, { method: "PUT", body: payload });
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al actualizar la venta");
-  return data?.data ? data : ok(data);
+  return ok(fromApi(data?.data ?? data));
 }
+
 async function apiDelete(id) {
-  const res = await http(`${BASE}/${id}`, { method: "DELETE" });
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data?.message || "Error al eliminar la venta");
