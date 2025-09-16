@@ -76,9 +76,19 @@ export default function Reservas() {
   const abrirCrear = () => {
     setFormError(""); setModalErrors({});
     setModal({
-      show: true, modo: "crear",
-      datos: { lotId: lotIdParam || "", amount: "", observaciones: "", status: "Activa", inmobiliariaId: "" },
-    });
+    show: true,
+    modo: "crear",
+    datos: {
+      lotId: lotIdParam || "",
+      clienteId: "",          // requerido por back
+      seniaMonto: "",         // se mapea a "sena" en el adapter
+      date: "",               // se mapea a "fechaReserva"
+      observaciones: "",
+      status: "Activa",
+      inmobiliariaId: user?.role === "INMOBILIARIA" ? user.inmobiliariaId : "",
+  },
+});
+
   };
   const abrirEditar = (r) => { setFormError(""); setModalErrors({}); setModal({ show: true, modo: "editar", datos: { ...r } }); };
   const cerrarModal = () => setModal((m) => ({ ...m, show: false }));
@@ -96,10 +106,12 @@ export default function Reservas() {
       setFormError(""); setModalErrors({});
       const payload = {
         lotId: String(modal.datos.lotId).trim(),
-        amount: modal.datos.amount ? Number(modal.datos.amount) : null,
+        clienteId: modal.datos.clienteId ? Number(modal.datos.clienteId) : null,
+        seniaMonto: modal.datos.seniaMonto === "" ? null : Number(modal.datos.seniaMonto),
+        date: modal.datos.date || null,                 // -> fechaReserva (toApi)
         observaciones: modal.datos.observaciones || "",
-        status: modal.datos.status || "Activa",
-        inmobiliariaId: user?.role === "INMOBILIARIA" ? user.inmobiliariaId : modal.datos.inmobiliariaId ?? null,
+        status: modal.datos.status || "Activa",         // -> estado (toApi)
+        inmobiliariaId: user?.role === "INMOBILIARIA" ? user.inmobiliariaId : (modal.datos.inmobiliariaId ?? null),
       };
 
       if (modal.modo === "crear") {
@@ -245,6 +257,37 @@ export default function Reservas() {
             </Form.Select>
             <Form.Control.Feedback type="invalid">{modalErrors?.status}</Form.Control.Feedback>
           </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Fecha de reserva *</Form.Label>
+            <Form.Control
+              type="date"
+              value={modal.datos?.date ?? ""}
+              onChange={onChange("date")}
+              placeholder="YYYY-MM-DD"
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Cliente (ID) *</Form.Label>
+            <Form.Control
+              type="number"
+              value={modal.datos?.clienteId ?? ""}
+              onChange={onChange("clienteId")}
+              placeholder="ID del cliente"
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Seña (monto)</Form.Label>
+            <Form.Control
+              type="number"
+              value={modal.datos?.seniaMonto ?? ""}
+              onChange={onChange("seniaMonto")}
+              placeholder="Ej: 50000"
+            />
+          </Form.Group>
+
 
           {/* Si el usuario NO es INMOBILIARIA, muestro el campo explícito */}
           {user?.role !== "INMOBILIARIA" && (
