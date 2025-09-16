@@ -87,10 +87,17 @@ export default function Ventas() {
   const abrirCrear = () => {
     setFormError(""); setModalErrors({});
     setModal({
-      show: true, modo: "crear",
+      show: true, 
+      modo: "crear",
       datos: {
-        lotId: lotIdParam || "", amount: "", observaciones: "", status: "Registrada",
+        lotId: lotIdParam || "",
+        amount: "",
+        observaciones: "",
+        status: "Registrada",
         inmobiliariaId: filtroInmoId ? Number(filtroInmoId) || filtroInmoId : "",
+        date: "",
+        paymentType: "",
+        buyerId: "",
       },
     });
   };
@@ -112,6 +119,9 @@ export default function Ventas() {
         observaciones: modal.datos.observaciones || "",
         status: modal.datos.status || "Registrada",
         inmobiliariaId: modal.datos.inmobiliariaId ?? null,
+        date: modal.datos.date || null,
+        paymentType: modal.datos.paymentType || null,
+        buyerId: modal.datos.buyerId || null,
       };
 
       if (modal.modo === "crear") {
@@ -273,6 +283,36 @@ export default function Ventas() {
               placeholder="Ej: 250000"
             />
             <Form.Control.Feedback type="invalid">{modalErrors?.amount}</Form.Control.Feedback>
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Fecha de venta *</Form.Label>
+            <Form.Control
+              type="date"
+              value={modal.datos?.date ?? ""}
+              onChange={onChange("date")}
+              placeholder="YYYY-MM-DD"
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Tipo de pago *</Form.Label>
+            <Form.Control
+              type="text"
+              value={modal.datos?.paymentType ?? ""}
+              onChange={onChange("paymentType")}
+              placeholder="Ej: Efectivo, Transferencia, Financiado…"
+            />
+          </Form.Group>
+
+          <Form.Group className="mb-3">
+            <Form.Label>Comprador (ID) *</Form.Label>
+            <Form.Control
+              type="number"
+              value={modal.datos?.buyerId ?? ""}
+              onChange={onChange("buyerId")}
+              placeholder="ID del comprador"
+            />
           </Form.Group>
 
           <Form.Group className="mb-3">
