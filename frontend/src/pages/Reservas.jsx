@@ -111,7 +111,9 @@ export default function Reservas() {
         date: modal.datos.date || null,                 // -> fechaReserva (toApi)
         observaciones: modal.datos.observaciones || "",
         status: modal.datos.status || "Activa",         // -> estado (toApi)
-        inmobiliariaId: user?.role === "INMOBILIARIA" ? user.inmobiliariaId : (modal.datos.inmobiliariaId ?? null),
+        inmobiliariaId: user?.role === "INMOBILIARIA" 
+          ? user.inmobiliariaId 
+          : (modal.datos.inmobiliariaId ?? null),
       };
 
       if (modal.modo === "crear") {
