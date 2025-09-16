@@ -1,121 +1,222 @@
 // src/lib/api/lotes.js
-// Dejo un adapter unico para Lotes. Si USE_MOCK=true, uso data local;
-// si no, pego al backend con el http() que ya inyecta Authorization.
+// Adapter único para LOTES. Traduce entre el contrato del BACK y el shape que la UI ya consume.
+// Objetivo: NO tocar Dashboard/Layout/SidePanel/LotInfo al cambiar el back.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
+import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
-import { http } from "../http/http";
+// Rutas: el back suele estar bajo /api; el prefijo se arma en http.js.
+// Fallback por mayúsculas/minúsculas para evitar 404 en distintos deploys.
+const PRIMARY = "/Lotes";
+const FALLBACK = "/lotes";
 
-// Paths (si el back usa otros, los cambio acá y no toco la UI), lo toco mas adelante
-const BASE = "/lotes";
+// Homogeneizador de respuesta
+const ok = (data) => ({ data });
 
-function ok(data) {
-  // Normalizo la forma de respuesta para el front: { data: ... }
-  return { data };
+// Helpers
+const numOrNull = (v) => (v === "" || v == null ? null : Number(v));
+const strOrNull = (v) => (v == null ? null : String(v));
+
+// --------------------------- MAPEO BACK -> UI ---------------------------
+// UI esperada por tus componentes: 
+// { id, status, subStatus, owner, location, surface, price, images, ... }
+function fromApi(x = {}) {
+  // id legible (si no viene, armo uno con manzana/numero)
+  const id = strOrNull(x.id ?? x.loteId ?? x.Id) ?? `${x.manzana ?? "?"}-${x.numero ?? "?"}`;
+
+  // status: respeta naming del back (no fuerzo lowercase para no romper tu CSS)
+  const status = x.status ?? x.estado ?? null;
+
+  // sub-estado del plano (si tu back lo usa con otro nombre, ajustá acá)
+  const subStatus = x.subStatus ?? x.subEstado ?? x.estadoPlano ?? null;
+
+  // owner: si hay objeto propietario, tomo su nombre; si no, dejo el id
+  const owner =
+    x.owner ??
+    x.propietario?.nombre ??
+    x.propietarioId ??
+    null;
+
+  // location compacta para mostrar en dashboard/tablas
+  const location =
+    x.location ??
+    (x.manzana != null || x.numero != null
+      ? `Mz ${x.manzana ?? "?"} - Lt ${x.numero ?? "?"}`
+      : null);
+
+  return {
+    id,
+    status,
+    subStatus,
+    owner,
+    location,
+    surface: numOrNull(x.surface ?? x.superficieM2 ?? x.superficie),
+    price: numOrNull(x.price ?? x.precio),
+    images: Array.isArray(x.images ?? x.imagenes) ? (x.images ?? x.imagenes) : [],
+    // Conservo el resto por si algún componente lo necesita sin mapeo:
+    ...x,
+  };
 }
 
-/* -------------------------- MODO MOCK (DESARROLLO) , esto se va dsp ------------------------- */
-let LOTS = [];
-async function ensureMockLoaded() {
-  if (LOTS.length === 0) {
-    const mod = await import("../data"); // <- usa mock actual que dsp voy a borrar
-    LOTS = (mod.mockLots || []).map((x) => ({ ...x }));
+// --------------------------- MAPEO UI -> BACK ---------------------------
+// Traduce el payload que envía la UI al contrato real del back.
+function toApi(payload = {}) {
+  const out = { ...payload };
+
+  // status -> estado (mayúsculas si tu back lo define así)
+  if (out.status !== undefined && out.estado === undefined) {
+    out.estado = typeof out.status === "string" ? out.status : out.status;
+    delete out.status;
   }
+
+  // subStatus -> subEstado (o estadoPlano). Si tu back usa "estadoPlano", cambia esta línea.
+  if (out.subStatus !== undefined && out.subEstado === undefined && out.estadoPlano === undefined) {
+    out.subEstado = out.subStatus;
+    delete out.subStatus;
+  }
+
+  // owner -> propietarioId (si viene como id string/number)
+  if (out.owner !== undefined && out.propietarioId === undefined) {
+    // si owner es objeto, esperaría owner.id; si es primitivo, lo mando directo
+    out.propietarioId =
+      typeof out.owner === "object" && out.owner !== null ? out.owner.id : out.owner;
+    delete out.owner;
+  }
+
+  // location NO se persiste (se deriva de manzana/numero). Borro si vino de UI.
+  if (out.location !== undefined) delete out.location;
+
+  // surface/price -> campos del back
+  if (out.surface !== undefined && out.superficieM2 === undefined) {
+    out.superficieM2 = numOrNull(out.surface);
+    delete out.surface;
+  }
+  if (out.price !== undefined && out.precio === undefined) {
+    out.precio = numOrNull(out.price);
+    delete out.price;
+  }
+
+  // Aseguro tipos básicos
+  if (out.manzana !== undefined) out.manzana = strOrNull(out.manzana);
+  if (out.numero !== undefined) out.numero = numOrNull(out.numero);
+  if (out.reservaId !== undefined) out.reservaId = strOrNull(out.reservaId);
+  if (out.observaciones !== undefined) {
+    out.observaciones = (out.observaciones ?? "").trim() || null;
+  }
+
+  return out;
 }
 
-async function mockGetAll() {
-  await ensureMockLoaded();
-  return ok(LOTS);
+// ------------------------------ QUERYSTRING ------------------------------
+function qs(params = {}) {
+  const s = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
+  }
+  const str = s.toString();
+  return str ? `?${str}` : "";
 }
 
-async function mockGetById(id) {
-  await ensureMockLoaded();
-  const found = LOTS.find((l) => l.id === id);
-  if (!found) throw new Error("Lote no encontrado");
-  return ok(found);
+// --------------- Fallback de ruta (PRIMARY -> FALLBACK y viceversa) ---------------
+async function fetchWithFallback(path, options) {
+  let res = await http(path, options);
+  if (res.status === 404) {
+    const alt = path.startsWith(PRIMARY)
+      ? path.replace(PRIMARY, FALLBACK)
+      : path.replace(FALLBACK, PRIMARY);
+    res = await http(alt, options);
+  }
+  return res;
 }
 
-async function mockCreate(payload) {
-  await ensureMockLoaded();
-  // Genero un id simple si no viene (no me importa la forma exacta en mock)
-  const id = payload?.id || `L${String(LOTS.length + 1).padStart(3, "0")}`;
-  const nuevo = { id, ...payload };
-  LOTS.push(nuevo);
-  return ok(nuevo);
+/* ================================= MOCK ================================= */
+let LOTES = [];
+let seeded = false;
+const nextId = () => `L${String(LOTES.length + 1).padStart(3, "0")}`;
+
+function ensureSeed() {
+  if (seeded) return;
+  LOTES = [
+    { id: "L001", manzana: "A", numero: 1, estado: "DISPONIBLE", superficieM2: 300, propietarioId: null, observaciones: "" },
+    { id: "L002", manzana: "A", numero: 2, estado: "RESERVADO",  superficieM2: 280, propietarioId: null, observaciones: "" },
+  ];
+  seeded = true;
+}
+async function mockGetAll(params = {}) {
+  ensureSeed();
+  // filtro/sort/paginado liviano
+  let out = [...LOTES];
+  const q = (params.q || "").toLowerCase();
+  if (q) out = out.filter(l =>
+    String(l.id).toLowerCase().includes(q) ||
+    String(l.manzana).toLowerCase().includes(q) ||
+    String(l.numero).toLowerCase().includes(q)
+  );
+  const page = Math.max(1, Number(params.page || 1));
+  const pageSize = Math.max(1, Number(params.pageSize || 12));
+  const total = out.length;
+  const start = (page - 1) * pageSize;
+  const data = out.slice(start, start + pageSize).map(fromApi);
+  return { data, meta: { total, page, pageSize } };
+}
+async function mockGetById(id)      { ensureSeed(); const f = LOTES.find(l => String(l.id) === String(id)); if (!f) throw new Error("Lote no encontrado"); return ok(fromApi(f)); }
+async function mockCreate(payload)   { ensureSeed(); const row = toApi(payload); row.id = nextId(); LOTES.unshift(row); return ok(fromApi(row)); }
+async function mockUpdate(id, p)     { ensureSeed(); const i = LOTES.findIndex(l => String(l.id) === String(id)); if (i < 0) throw new Error("Lote no encontrado"); LOTES[i] = { ...LOTES[i], ...toApi(p) }; return ok(fromApi(LOTES[i])); }
+async function mockDelete(id)        { ensureSeed(); const n = LOTES.length; LOTES = LOTES.filter(l => String(l.id) !== String(id)); if (LOTES.length === n) throw new Error("Lote no encontrado"); return ok(true); }
+
+/* ================================ API REAL ================================ */
+// GET /lotes
+async function apiGetAll(params = {}) {
+  const res  = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || "Error al cargar lotes");
+
+  // Soporta: { data:[...] } | [...] liso | { items:[...], meta:{} }
+  const list = Array.isArray(json?.data) ? json.data
+             : Array.isArray(json)      ? json
+             : Array.isArray(json?.items) ? json.items
+             : [];
+  return ok(list.map(fromApi));
 }
 
-async function mockUpdate(id, payload) {
-  await ensureMockLoaded();
-  const idx = LOTS.findIndex((l) => l.id === id);
-  if (idx === -1) throw new Error("Lote no encontrado");
-  LOTS[idx] = { ...LOTS[idx], ...payload };
-  return ok(LOTS[idx]);
-}
-
-async function mockDelete(id) {
-  await ensureMockLoaded();
-  const prev = LOTS.length;
-  LOTS = LOTS.filter((l) => l.id !== id);
-  if (LOTS.length === prev) throw new Error("Lote no encontrado");
-  return ok(true);
-}
-
-/* --------------------------- MODO REAL (BACKEND) --------------------------- */
-async function apiGetAll() {
-  const res = await http(`${BASE}`, { method: "GET" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al cargar lotes");
-  // Normalizo a { data: [...] } si el back no trae ese envoltorio
-  return data?.data ? data : ok(data);
-}
-
+// GET /lotes/:id
 async function apiGetById(id) {
-  const res = await http(`${BASE}/${id}`, { method: "GET" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al cargar lote");
-  return data?.data ? data : ok(data);
+  const res  = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || "Error al obtener lote");
+  return ok(fromApi(json?.data ?? json));
 }
 
+// POST /lotes
 async function apiCreate(payload) {
-  const res = await http(`${BASE}`, { method: "POST", body: payload });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al crear lote");
-  return data?.data ? data : ok(data);
+  const res  = await fetchWithFallback(PRIMARY, { method: "POST", body: toApi(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || "Error al crear lote");
+  return ok(fromApi(json?.data ?? json));
 }
 
+// PUT /lotes/:id
 async function apiUpdate(id, payload) {
-  const res = await http(`${BASE}/${id}`, { method: "PUT", body: payload });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al actualizar lote");
-  return data?.data ? data : ok(data);
+  const res  = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || "Error al actualizar lote");
+  return ok(fromApi(json?.data ?? json));
 }
 
+// DELETE /lotes/:id
 async function apiDelete(id) {
-  const res = await http(`${BASE}/${id}`, { method: "DELETE" });
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "DELETE" });
   if (!res.ok && res.status !== 204) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || "Error al eliminar lote");
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json?.message || "Error al eliminar lote");
   }
   return ok(true);
 }
 
-/* ------------------------------ EXPORT PÚBLICO ----------------------------- */
-// Exporto la misma interfaz en ambos modos.
-// Cuando este terminado el back, si hay akgo que cambiar que seguro va a pasar
-// lo hago acá y no toco Dashboard/Map/Layout.
-
-export async function getAllLotes() {
-  return USE_MOCK ? mockGetAll() : apiGetAll();
-}
-export async function getLoteById(id) {
-  return USE_MOCK ? mockGetById(id) : apiGetById(id);
-}
-export async function createLote(payload) {
-  return USE_MOCK ? mockCreate(payload) : apiCreate(payload);
-}
-export async function updateLote(id, payload) {
-  return USE_MOCK ? mockUpdate(id, payload) : apiUpdate(id, payload);
-}
-export async function deleteLote(id) {
-  return USE_MOCK ? mockDelete(id) : apiDelete(id);
-}
+/* ------------------------------ EXPORTS ------------------------------ */
+// Misma interfaz que usa tu UI, para no tocar componentes.
+export function getAllLotes(params)   { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
+export function getLoteById(id)       { return USE_MOCK ? mockGetById(id)      : apiGetById(id); }
+export function createLote(payload)   { return USE_MOCK ? mockCreate(payload)  : apiCreate(payload); }
+export function updateLote(id, data)  { return USE_MOCK ? mockUpdate(id, data) : apiUpdate(id, data); }
+export function deleteLote(id)        { return USE_MOCK ? mockDelete(id)       : apiDelete(id); }
