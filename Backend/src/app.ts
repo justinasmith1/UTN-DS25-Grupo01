@@ -15,6 +15,21 @@ dotenv.config();
 const PORT = process.env.PORT || 3000;
 const app = express();
 
+// Evitar 304 en endpoints de API protegidos
+app.set('etag', false); // desactiva ETag (condicionales -> 304)
+
+// Cabeceras anti-cache solo para /api/*
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    res.setHeader('Cache-Control', 'no-store'); // nada de cache en browser/proxy
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    res.setHeader('Vary', 'Authorization');     // importante si usás Bearer
+  }
+  next();
+});
+
+
 const allowedOrigins = ["http://localhost:5173"];
 const corsOptions = {
   origin: allowedOrigins,
