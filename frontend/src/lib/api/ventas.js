@@ -2,19 +2,17 @@
 // Adapter para Ventas: traduce UI <-> Backend y maneja listado/CRUD.
 // Cambios clave:
 // - Endpoint: intenta "/Ventas" (mayúscula) y si 404 prueba "/ventas".
-// - fromApi / toApi: mapean nombres (fechaVenta<->date, monto<->amount, estado<->status, tipoPago<->paymentType, compradorId<->buyerId).
-// - list(): siempre retorna { data, meta } para que la UI pagine igual, aunque el back no envíe meta.
+// - fromApi / toApi: mapean nombres.
+// - list(): usa normalizador para entregar { data, meta } consistente.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http } from "../http/http";
+import { http, normalizeApiListResponse } from "../http/http";
 
-// Endpoint primario y fallback (por diferencia de mayúsculas en el back)
 const PRIMARY = "/Ventas";
 const FALLBACK = "/ventas";
 
 const ok = (data) => ({ data });
 
-// ---------- Helpers de mapeo ----------
 const toNumberOrNull = (v) => (v === "" || v == null ? null : Number(v));
 
 // Backend -> UI
@@ -44,7 +42,7 @@ const toApi = (form = {}) => ({
   observaciones: (form.observaciones ?? "").trim() || null,
 });
 
-// Arma querystring a partir de params (solo agrega definidos)
+// QS
 function qs(params = {}) {
   const s = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -54,7 +52,7 @@ function qs(params = {}) {
   return str ? `?${str}` : "";
 }
 
-// Intenta primario y si 404 prueba fallback (p.ej. mayúsculas/minúsculas)
+// Fallback de ruta
 async function fetchWithFallback(path, options) {
   let res = await http(path, options);
   if (res.status === 404) {
@@ -65,7 +63,6 @@ async function fetchWithFallback(path, options) {
 }
 
 /* ----------------------------- MODO MOCK ----------------------------- */
-// (Dejo tu mock operativo por si usás USE_MOCK=true en algúna demo/local)
 let VENTAS = [];
 let seeded = false;
 const nextId = () => `V${String(VENTAS.length + 1).padStart(3, "0")}`;
@@ -114,14 +111,12 @@ async function mockUpdate(id, payload) { ensureSeed(); const idx = VENTAS.findIn
 async function mockDelete(id)          { ensureSeed(); const i = VENTAS.findIndex((v) => String(v.id) === String(id)); if (i < 0) throw new Error("Venta no encontrada"); VENTAS.splice(i, 1); return ok(true); }
 
 /* ------------------------------ MODO API ------------------------------ */
-
 async function apiGetAll(params = {}) {
   const res = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar ventas");
 
-  // Acepto varios formatos de back: [{…}] | { data:[…] } | { data:[…], meta:{…} }
-  const arr = Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : (Array.isArray(data?.items) ? data.items : []));
+  const arr = normalizeApiListResponse(data);
   const meta = data?.meta ?? { total: Number(data?.meta?.total ?? arr.length) || arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
   return { data: arr.map(fromApi), meta };
 }
