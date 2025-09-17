@@ -7,7 +7,7 @@ import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
 // Rutas: el back suele estar bajo /api; el prefijo se arma en http.js.
 // Fallback por mayúsculas/minúsculas para evitar 404 en distintos deploys.
-const PRIMARY = "/Lotes";
+const PRIMARY = "/lotes";
 const FALLBACK = "/lotes";
 
 // Homogeneizador de respuesta
