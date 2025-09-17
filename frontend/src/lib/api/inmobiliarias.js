@@ -5,7 +5,7 @@
 // - list() siempre entrega { data, meta } para paginar igual en la UI.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http } from "../http/http";
+import { http, normalizeApiListResponse } from "../http/http";
 
 const PRIMARY = "/Inmobiliarias";
 const FALLBACK = "/inmobiliarias";
@@ -103,10 +103,7 @@ async function apiGetAll(params = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar inmobiliarias");
 
-  const arr = Array.isArray(data?.data) ? data.data
-            : Array.isArray(data)      ? data
-            : Array.isArray(data?.items) ? data.items
-            : [];
+  const arr = normalizeApiListResponse(data);
   const meta = data?.meta ?? { total: arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
   return { data: arr.map(fromApi), meta };
 }
