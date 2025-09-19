@@ -3,10 +3,10 @@
 // Motivo: desacoplar la UI del naming del backend y evitar 404 por mayúsculas.
  
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http } from "../http/http";
+import { http, normalizeApiListResponse } from "../http/http";
 
-const PRIMARY = "/Reservas";  // back suele exponer /api/Reservas
-const FALLBACK = "/reservas"; // por si la ruta está en minúsculas
+const PRIMARY = "/Reservas";
+const FALLBACK = "/reservas";
 
 const ok = (data) => ({ data });
 
@@ -26,12 +26,6 @@ const fromApi = (row = {}) => ({
 });
 
 // UI -> Backend
-// Acepto múltiples nombres usados en UI para no romper pantallas existentes:
-// - lotId -> loteId
-// - date|fechaReserva -> fechaReserva
-// - amount|seniaMonto|sena -> sena
-// - status -> estado
-// - clienteId/personaId -> clienteId
 const toApi = (form = {}) => ({
   loteId: form.lotId != null ? String(form.lotId).trim() : undefined,
   fechaReserva: form.fechaReserva || form.date || null,
@@ -118,14 +112,7 @@ async function apiGetAll(params = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar reservas");
 
-  // Formatos aceptados: [{…}] | { data:[…] } | { data:[…], meta:{…} }
-  const arr = Array.isArray(data?.data)
-    ? data.data
-    : Array.isArray(data)
-      ? data
-      : Array.isArray(data?.items)
-        ? data.items
-        : [];
+  const arr = normalizeApiListResponse(data);
   const meta = data?.meta ?? {
     total: Number(data?.meta?.total ?? arr.length) || arr.length,
     page: Number(params.page || 1),
