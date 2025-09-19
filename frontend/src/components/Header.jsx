@@ -12,8 +12,8 @@ export default function Header({ onUserClick, user }) {
   const isMap = pathname.startsWith("/map");
   const isDashboard = pathname === "/" || pathname.startsWith("/dashboard");
 
-  /* ====== CONTROLES RÁPIDOS (editables) ====== */
-  const TABS_BORDER_RADIUS = 5;
+  /* ====== CONTROLES RÁPIDOS ====== */
+  const TABS_BORDER_RADIUS = 4;
   const GAP_BRAND_TABS = 60;
   const PADDING_L = 60;
   const PADDING_R = 12;
@@ -94,7 +94,7 @@ export default function Header({ onUserClick, user }) {
             </button>
           </div>
 
-          {/* DER: saludo + icono persona + logout estilo tab */}
+          {/* DER: saludo + mas boton de usuario + logout estilo tab */}
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
             <span className="d-none d-md-inline">Hola, {firstName}!</span>
 
