@@ -7,7 +7,7 @@ export default function Header({ onUserClick, user }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user: authUser, logout } = useAuth();
-  const currentUser = user || authUser;
+  const currentUser = authUser || user;
 
   const isMap = pathname.startsWith("/map");
   const isDashboard = pathname === "/" || pathname.startsWith("/dashboard");
