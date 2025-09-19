@@ -1,84 +1,134 @@
-"use client" // Lo mismo que en el resto de archivos
-import { Navbar, Nav, Container, Button } from "react-bootstrap"
-import { useNavigate, useLocation } from "react-router-dom"
-import LogoutButton from "./LogoutButton"
-import RoleSwitcher from "./RoleSwitcher"
-
-const customStyles = `
-  .navbar-brand-green { 
-    background-color: #0b3d23 !important; 
-    border: none !important;
-  }
-  .text-brand-dark-green { 
-    color: #0b3d23 !important; 
-  }
-  .btn-nav-active {
-    background-color: rgba(255, 255, 255, 0.3) !important;
-    border-color: rgba(255, 255, 255, 0.3) !important;
-  }
-  .btn-nav-hover:hover {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    border-color: rgba(255, 255, 255, 0.2) !important;
-  }
-`
+"use client"
+import { Navbar, Container } from "react-bootstrap";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../app/providers/AuthProvider";
 
 export default function Header({ onUserClick, user }) {
-  const navigate = useNavigate() // Esto para cambiar de ruta
-  const location = useLocation() // Esto para conocer la ruta actual
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const { user: authUser, logout } = useAuth();
+  const currentUser = user || authUser;
+
+  const isMap = pathname.startsWith("/map");
+  const isDashboard = pathname === "/" || pathname.startsWith("/dashboard");
+
+  /* ====== CONTROLES RÁPIDOS (editables) ====== */
+  const TABS_BORDER_RADIUS = 5;
+  const GAP_BRAND_TABS = 60;
+  const PADDING_L = 60;
+  const PADDING_R = 12;
+  const HEADER_PAD_V = 14;
+  /* ========================================== */
+
+  // nombre real del usuario (varios posibles campos)
+  const firstName = (() => {
+    const u = currentUser || {};
+    const candidates = [
+      u.name, u.nombre, u.fullName, u.given_name, u.username,
+      (u.email && u.email.split("@")[0])
+    ].filter(Boolean);
+    return (candidates[0] || "Usuario").toString().split(" ")[0];
+  })();
 
   return (
-    <>
-      <style>{customStyles}</style>
-      <Navbar className="navbar-brand-green sticky-top" variant="dark" expand="lg">
-        <Container>
-          <Navbar.Brand className="d-flex align-items-center">
-            <i className="bi bi-house-door me-2" style={{ fontSize: "1.5rem" }}></i>
-            <span style={{ fontSize: "1.25rem", fontWeight: "600" }}>Club de Campo La Federala</span>
-          </Navbar.Brand>
-          <Navbar.Toggle />
-          <Navbar.Collapse className="ms-auto">
-            <Nav className="align-items-center gap-2">
-              <Button
-                variant="outline-light"
-                className={`me-2 btn-nav-hover ${location.pathname === "/map" ? "btn-nav-active" : ""}`}
-                onClick={() => navigate("/map")}
-                style={{ borderRadius: "8px" }}
-              >
-                Mapa
-              </Button>
-              <Button
-                variant="outline-light"
-                className={`btn-nav-hover ${location.pathname === "/" ? "btn-nav-active" : ""}`}
-                onClick={() => navigate("/")}
-                style={{ borderRadius: "8px" }}
-              >
-                Dashboard
-              </Button>
-            </Nav>
-            <Nav className="align-items-center">
-              <span className="navbar-text me-3 d-none d-md-inline">
-                Hola, {user?.name?.split(" ")[0] || "Usuario"}!
-              </span>
-              <Button
-                variant="outline-light"
-                className="rounded-circle btn-nav-hover"
-                onClick={onUserClick}
-                style={{ width: "40px", height: "40px", padding: "0" }}
-              >
-                {user?.name
-                  ?.split(" ")
-                  .map((n) => n[0])
-                  .join("") || "U"}
-              </Button>
-              <RoleSwitcher className="form-select form-select-sm me-2" /> {/** Switch de rol, solo en modo mock */}
-              {/** Botón de logout */}
-              <LogoutButton className="btn btn-outline-light btn-sm" aria-label="Cerrar sesión">
-                  Cerrar sesión
-              </LogoutButton>
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
-    </>
-  )
+    <Navbar
+      expand="lg"
+      className="sticky-top"
+      style={{
+        background: 'var(--color-header-bg)',
+        color: 'var(--color-text-light)',
+        boxShadow: 'var(--elev-1)',
+        paddingTop: HEADER_PAD_V,
+        paddingBottom: HEADER_PAD_V,
+      }}
+    >
+      {/* estilos de hover/active para tabs y logout */}
+      <style>{`
+        .cclf-tab, .cclf-logout {
+          border: 1px solid rgba(0,0,0,0.85);
+          border-radius: ${TABS_BORDER_RADIUS}px;
+          font-weight: 700; line-height:1.1; cursor:pointer;
+          box-shadow: var(--elev-1);
+          transition: background .12s ease, transform .06s ease, box-shadow .12s ease;
+        }
+        .cclf-tab { color: var(--color-tab-text); }
+        .cclf-tab--active { background: #AC862D; }         /* var(--color-tab-active) */
+        .cclf-tab--idle   { background: #EBB648; }         /* var(--color-tab-inactive) */
+
+        /* Hover: un pelín más oscuro + leve elevación */
+        .cclf-tab--active:hover { background: #926F25; transform: translateY(-1px); }
+        .cclf-tab--idle:hover   { background: #D1A43F; transform: translateY(-1px); }
+
+        /* Logout igual a las tabs inactivas */
+        .cclf-logout { background: #EBB648; color: #000; }
+        .cclf-logout:hover { background: #D1A43F; transform: translateY(-1px); }
+      `}</style>
+
+      <Container fluid style={{ paddingLeft: PADDING_L, paddingRight: PADDING_R }}>
+        <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+          {/* IZQ: brand */}
+          <div className="d-flex align-items-center" style={{ gap: 8 }}>
+            <i className="bi bi-house-door" style={{ fontSize: "1.4rem" }} />
+            <span style={{ fontSize: "1.1rem", fontWeight: 600 }}>
+              Club de Campo La Federala
+            </span>
+          </div>
+
+          {/* CENTRO: tabs (acercadas al brand) */}
+          <div style={{ display: 'flex', gap: 16, marginLeft: GAP_BRAND_TABS }}>
+            <button
+              type="button"
+              className={`cclf-tab ${isMap ? "cclf-tab--active" : "cclf-tab--idle"}`}
+              style={{ minWidth: 130, padding: "11px 30px" }}
+              onClick={() => navigate("/map")}
+            >
+              Mapa
+            </button>
+            <button
+              type="button"
+              className={`cclf-tab ${isDashboard ? "cclf-tab--active" : "cclf-tab--idle"}`}
+              style={{ minWidth: 130, padding: "11px 30px" }}
+              onClick={() => navigate("/")}
+            >
+              Dashboard
+            </button>
+          </div>
+
+          {/* DER: saludo + icono persona + logout estilo tab */}
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 18 }}>
+            <span className="d-none d-md-inline">Hola, {firstName}!</span>
+
+            <button
+              type="button"
+              onClick={onUserClick}
+              title="Perfil"
+              aria-label="Abrir perfil"
+              style={{
+                width: 38, height: 38,
+                borderRadius: "50%",
+                background: 'transparent',
+                color: 'var(--color-text-light)',
+                border: '1px solid rgba(255,255,255,0.75)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <i className="bi bi-person" style={{ fontSize: "1.1rem" }} />
+            </button>
+
+            {/* Reemplazo LogoutButton por un botón controlado para asegurar estilo */}
+            <button
+              type="button"
+              className="cclf-logout"
+              style={{ padding: "10px 18px" }}
+              onClick={logout}
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </Container>
+    </Navbar>
+  );
 }
