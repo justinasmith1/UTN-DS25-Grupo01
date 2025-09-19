@@ -1,0 +1,47 @@
+/* src/styles/tokens.css */
+/* Aca esta la base de los estilos que vamos
+a usar para colores/sombras/bordes , etc. Si cambiamos algo aca, afecta
+gralment a todo lo involucrado*/
+
+:root {
+  /* Header */
+  --color-header-bg: #0D3730;
+
+  /* Tabs Mapa/Dashboard (Header) */
+  --color-tab-active:   #AC862D;
+  --color-tab-inactive: #EBB648;
+  --color-tab-text:     #000000;
+
+  /* Píldoras de módulos (Dashboard) */
+  --color-module-active-bg:   #EBB648; /* dentro del módulo */
+  --color-module-inactive-bg: #0D3730; /* fuera del módulo */
+  --color-module-text:        #FFFFFF;
+
+  /* Acciones primarias */
+  --color-action-primary: #2849AF;     /* Modificar/Descargar/Agregar/Aplicar/Guardar */
+
+  /* Acciones destacadas secundarias */
+  --color-action-highlight: #EBB648;   /* Planos/Escritura/Cambiar Imágenes/Boleto */
+
+  /* Acción volver */
+  --color-action-back: #0D3730;
+
+  /* Texto */
+  --color-text-dark:  #000000;
+  --color-text-light: #FFFFFF;
+
+  /* Sombra y borde (según Figma) */
+  --elev-1: -2px 2px 4px 1px rgba(0,0,0,0.25);
+  --border-color: rgba(0,0,0,0.85);
+  --border-inside-1: inset 0 0 0 1px var(--border-color);
+
+  /* Radios/espaciados base */
+  --radius-lg: 12px;
+  --radius-md: 8px;
+  --radius-sm: 6px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}

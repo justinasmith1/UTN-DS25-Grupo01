@@ -116,14 +116,18 @@ export const ROLE_PERMISSIONS = {
   ],
 };
 
+//-----------------
 // Helpers simples
+//-----------------
+
+// Este es para cuando el user puede tener un role o roles (array). Gralmente va a ser uno solo
 export function userRoles(user) {
-  // OJO: Prisma devuelve un único rol
   const role = user?.role;
   const roles = Array.isArray(user?.roles) ? user.roles : (role ? [role] : []);
   return roles;
 }
 
+// Este es para cuando el user puede tener un role o roles (array). Gralmente va a ser uno solo
 export function userPermissions(user) {
   const roles = userRoles(user);
   const perms = new Set();
@@ -131,10 +135,12 @@ export function userPermissions(user) {
   return [...perms];
 }
 
+// Checkea si el user tiene un rol (uno solo o varios)
 export function hasRole(user, role) {
   return userRoles(user).includes(role);
 }
 
+// Checkea si el user tiene un permiso (uno solo o varios)
 export function can(user, permission) {
   return userPermissions(user).includes(permission);
 }
