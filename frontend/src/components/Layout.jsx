@@ -131,7 +131,7 @@ export default function Layout() {
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-white">
-      <Header onUserClick={() => setShowUserModal(true)} user={mockUser} />
+      <Header onUserClick={() => setShowUserModal(true)} />
 
       {/* Píldoras de módulos: debajo del Header y ANTES de la FilterBar */}
       {onDashboard && (
