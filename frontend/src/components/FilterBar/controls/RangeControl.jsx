@@ -3,13 +3,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import noUiSlider from "nouislider";
 import "nouislider/dist/nouislider.css";
 
-/**
- * RangeControl con:
- * - Slider noUi “fino” (la clase .fb-noui se estiliza en FilterBar.css)
- * - Inputs de texto con tipeo libre (string) y commit en blur/Enter
- * - Clamp a [minLimit, maxLimit] y garantía de min <= max
- * - Sincronización bidireccional slider <-> inputs/estado
- */
+// RangeControl es para todo lo que tiene que ver con los filtros ajustables
+// Aca defino que se va a ver, su:
+// - unidad - minimo - maximo - valor - paso
 export default function RangeControl({
   label,
   unit = "",
@@ -26,7 +22,7 @@ export default function RangeControl({
   const [minStr, setMinStr] = useState(String(value.min));
   const [maxStr, setMaxStr] = useState(String(value.max));
 
-  // ↓ Sync descendente cuando cambian props.value
+  // Sincroniza descendente cuando cambian props.value
   useEffect(() => {
     setMinStr(String(value.min));
     setMaxStr(String(value.max));
@@ -68,7 +64,6 @@ export default function RangeControl({
       api.destroy();
       apiRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clamp = (n) =>
@@ -94,7 +89,6 @@ export default function RangeControl({
       <h4>{label}</h4>
 
       <div className="fb-range">
-        {/* El mismo div se vuelve .noUi-target => CSS usa .fb-noui.noUi-target */}
         <div className="fb-noui" ref={sliderRef} />
 
         <div className="fb-range-inputs">

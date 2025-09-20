@@ -3,13 +3,7 @@ import { createPortal } from "react-dom";
 import "./FilterBar.css";
 import RangeControl from "./controls/RangeControl";
 
-/**
- * Cambios clave:
- * - topOffset por defecto = 200 → el card aparece más abajo.
- * - Separadores en CSS (no hace falta tocar JSX para las líneas).
- * - El body del modal scrollea y su altura visible = alto real del TOP (Estado/Sub-estado/Calle)
- *   + colchón, para que “Calle” nunca quede cortada.
- */
+// Esta es la pagina de filtrado general
 export default function FilterBar({ topOffset = 200, onParamsChange }) {
   const ESTADOS    = ["DISPONIBLE","NO_DISPONIBLE","RESERVADO","VENDIDO","ALQUILADO"];
   const SUBESTADOS = ["CONSTRUIDO","EN_CONSTRUCCION","NO_CONSTRUIDO"];
@@ -64,7 +58,7 @@ export default function FilterBar({ topOffset = 200, onParamsChange }) {
       const topEl  = topRef.current;
       const bodyEl = bodyRef.current;
       if (!topEl || !bodyEl) return;
-      const h = Math.ceil(topEl.getBoundingClientRect().height) + 20; // colchón para que "Calle" no se corte
+      const h = Math.ceil(topEl.getBoundingClientRect().height) + 20;
       bodyEl.style.setProperty("--fb-body-max", `${h}px`);
       bodyEl.scrollTo({ top: 0, behavior: "auto" });
     };
