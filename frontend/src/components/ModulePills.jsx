@@ -76,7 +76,6 @@ export default function ModulePills() {
           left: 50%; right: 50%;
           margin-left: -50vw; margin-right: -50vw;
           margin-top: 0;
-          margin-bottom: -4;
           top: -${OVERLAP_PX}px;
           z-index: 20;
         }

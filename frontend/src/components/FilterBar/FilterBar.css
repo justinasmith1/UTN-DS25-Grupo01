@@ -7,7 +7,7 @@
 }
 
 /* ===== Barra ===== */
-.fb{ position: sticky; top: 0; z-index: 8; background:#fff; border-bottom:1px solid var(--fb-line); padding:16px 24px 16px 30px; }
+.fb{ position: sticky; top: 0; z-index: 8; background:#fff; border-bottom:1px solid var(--fb-line);}
 .fb-row{ display:flex; gap:10px; align-items:center; }
 .fb-search{ flex:1 1 560px; max-width:900px; display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--fb-line); border-radius:14px; padding:10px 14px; transition: box-shadow .15s, border-color .15s; }
 .fb-search.is-active{ border-color:var(--fb-green); box-shadow:0 0 0 3px var(--fb-green-soft); }
@@ -15,6 +15,16 @@
 .fb-filters{ display:flex; align-items:center; gap:8px; border:1px solid var(--fb-green); color:var(--fb-green); background:#fff; border-radius:14px; height:40px; padding:0 14px; font-weight:600; cursor:pointer; transition: background .15s, transform .02s, box-shadow .15s; }
 .fb-filters:hover{ background:var(--fb-green-soft); box-shadow:0 0 0 3px var(--fb-green-soft); }
 .fb-badge{ margin-left:4px; font-size:12px; min-width:20px; height:20px; display:inline-grid; place-items:center; background:var(--fb-green); color:#fff; border-radius:999px; padding:0 6px; }
+
+/* Dashboard */
+.fb-dashboard {
+  padding: 10px 24px 20px 30px;
+}
+
+/* Mapa */
+.fb-map {
+  padding: 22px 24px 20px 30px;
+}
 
 /* ===== Overlay ===== */
 .fb-modal{
@@ -29,7 +39,7 @@
 .fb-sheet{
   width: min(860px, 92vw);                
   max-height: calc(100vh - var(--fb-safe-top, 0px));
-  background:#fff; border: 0.2px solid var(--fb-green); border-radius:16px; overflow:hidden;
+  background:#fff; border: 0.1px solid rgb(0, 0, 0, 0.7); border-radius:12px; overflow:hidden;
   box-shadow: 0 20px 60px rgba(0,0,0,.20);
   display:grid; grid-template-rows: auto 1fr auto;
 }
@@ -37,7 +47,7 @@
 /* Header */
 .fb-sheet-header{
   display:flex; align-items:center; justify-content:space-between;
-  padding:16px 20px; border-bottom:1px solid var(--fb-line);
+  padding:16px 20px; border-bottom:1px solid rgba(12, 71, 12, 0.3);
   background:#f1fff4; z-index:1;
 }
 .fb-sheet-header h3{ margin:0; font-size:18px; font-weight:700; color:#333; }
