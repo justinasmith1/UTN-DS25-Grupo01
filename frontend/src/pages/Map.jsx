@@ -1,9 +1,9 @@
-// src/pages/Map.jsx
-import { useState } from "react"
-import { Container } from "react-bootstrap"
-import { mockLots } from "../lib/data"
-import { useOutletContext } from "react-router-dom"
+import { useMemo, useState } from "react";
+import { Container } from "react-bootstrap";
+import { useOutletContext } from "react-router-dom";
 
+import FilterBar from "../components/FilterBar/FilterBar";
+import { applyLoteFilters } from "../utils/applyLoteFilters";
 
 const customStyles = `
   .map-container { 
@@ -48,35 +48,34 @@ const customStyles = `
     opacity: 1; 
     transform: translateX(-50%) translateY(-4px);
   }
-`
+`;
 
 export default function Map() {
-  // Estado local: lote seleccionado, visibilidad del panel y modal, parcela en hover
-  const [selectedLotId, setSelectedLotId] = useState(null)
-  const [showPanel,   setShowPanel]   = useState(false)
-  const [showInfo,    setShowInfo]    = useState(false)
-  const { openSidePanel, handleViewDetail, abrirModalEditar } = useOutletContext()
+  const ctx = useOutletContext() || {};
+  const allLots = ctx.allLots || ctx.lots || [];
 
-  // Abre panel lateral al hacer clic
-  const handleParcelClick = (id) => {
-    setSelectedLotId(id)
-    setShowPanel(true)
-  }
-  // Cierra el panel
-  const handleClosePanel = () => {
-    setShowPanel(false)
-  }
+  const { openSidePanel } = ctx;
 
-  //Cierra la vista de informacion
-  const handleCloseInfo = () => {
-    setShowInfo(false)
-  }
+  const [params, setParams] = useState({});
+  const lots = useMemo(() => applyLoteFilters(allLots, params), [allLots, params]);
+
+  const positions = (idx) => ({
+    top: `${20 + (idx % 6) * 12}%`,
+    left: `${25 + (idx % 8) * 8}%`,
+  });
 
   return (
     <>
       <style>{customStyles}</style>
 
+      {/* FilterBar con padding y offset propios del Mapa */}
+      <FilterBar variant="map" onParamsChange={setParams} />
+
       <Container fluid className="py-4">
+        <div className="text-muted mb-2">
+          Lotes en mapa: {lots.length} de {allLots.length}
+        </div>
+
         <div className="map-container">
           <img
             src="https://lafederalaclub.com/contenidos/uploads/2025/04/Plano-con-Vendidos.jpg"
@@ -85,17 +84,12 @@ export default function Map() {
             style={{ objectFit: "contain" }}
           />
 
-          {mockLots.slice(0, 4).map((lot, index) => (
+          {lots.map((lot, index) => (
             <div
               key={lot.id}
               className="parcel-overlay"
-              style={{
-                top:    `${25 + index * 15}%`,
-                left:   `${30 + index * 10}%`,
-              }}
-              onClick={() => openSidePanel(lot.id)}  
-              onMouseEnter={() => setHoveredParcel(lot.id)} 
-              onMouseLeave={() => setHoveredParcel(null)}
+              style={positions(index)}
+              onClick={() => openSidePanel?.(lot.id)}
             >
               <div className="parcel-label">{lot.id}</div>
             </div>
@@ -103,5 +97,5 @@ export default function Map() {
         </div>
       </Container>
     </>
-  )
+  );
 }

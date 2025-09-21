@@ -9,7 +9,7 @@ import { getAllLotes, updateLote, deleteLote, createLote } from "../lib/api/lote
 import Header from "./Header";
 // import Botones from "./Botones"; // ← evitamos duplicados
 import ModulePills from "./ModulePills";     // ← NUEVO: las píldoras
-import FilterBar from "./FilterBar";
+import FilterBar from "./FilterBar/FilterBar";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
@@ -139,14 +139,6 @@ export default function Layout() {
           <ModulePills />
         </div>
       )}
-
-      <FilterBar
-        filters={filters}
-        onFiltersChange={setFilters}
-        onAddRecord={abrirModalCrear}
-        onApplyPromotion={handleApplyPromotion}
-        onClearFilters={handleClearFilters}
-      />
 
       <Outlet
         context={{
