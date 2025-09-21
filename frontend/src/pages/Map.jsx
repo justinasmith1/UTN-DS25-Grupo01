@@ -1,9 +1,7 @@
-// src/pages/Map.jsx
 import { useMemo, useState } from "react";
 import { Container } from "react-bootstrap";
 import { useOutletContext } from "react-router-dom";
 
-// ⬇️ NUEVO: FilterBar + filtro en memoria
 import FilterBar from "../components/FilterBar/FilterBar";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 
@@ -53,21 +51,16 @@ const customStyles = `
 `;
 
 export default function Map() {
-  // Traigo desde el Layout lo necesario
   const ctx = useOutletContext() || {};
-  // Igual que en Dashboard: preferimos 'allLots', caemos a 'lots' si no existe
   const allLots = ctx.allLots || ctx.lots || [];
 
   const { openSidePanel } = ctx;
 
-  // ⬇️ NUEVO: estado de params que llegan desde FilterBar
   const [params, setParams] = useState({});
-  // ⬇️ NUEVO: filtro en memoria
   const lots = useMemo(() => applyLoteFilters(allLots, params), [allLots, params]);
 
-  // Posiciones de ejemplo (si tu mapa real ya calcula posiciones, usalas allí)
   const positions = (idx) => ({
-    top:  `${20 + (idx % 6) * 12}%`,
+    top: `${20 + (idx % 6) * 12}%`,
     left: `${25 + (idx % 8) * 8}%`,
   });
 
@@ -75,8 +68,8 @@ export default function Map() {
     <>
       <style>{customStyles}</style>
 
-      {/*FilterBar también en el mapa */}
-      <FilterBar topOffset={64} onParamsChange={setParams} />
+      {/* FilterBar con padding y offset propios del Mapa */}
+      <FilterBar variant="map" onParamsChange={setParams} />
 
       <Container fluid className="py-4">
         <div className="text-muted mb-2">
