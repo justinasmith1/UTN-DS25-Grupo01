@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Container } from "react-bootstrap";
 import { useOutletContext } from "react-router-dom";
+import { useAuth } from "../app/providers/AuthProvider";
 
 import FilterBar from "../components/FilterBar/FilterBar";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
@@ -55,6 +56,8 @@ export default function Map() {
   const allLots = ctx.allLots || ctx.lots || [];
 
   const { openSidePanel } = ctx;
+  const { user } = useAuth()
+  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase()
 
   const [params, setParams] = useState({});
   const lots = useMemo(() => applyLoteFilters(allLots, params), [allLots, params]);
@@ -69,7 +72,7 @@ export default function Map() {
       <style>{customStyles}</style>
 
       {/* FilterBar con padding y offset propios del Mapa */}
-      <FilterBar variant="map" onParamsChange={setParams} />
+      <FilterBar variant="map" userRole={userRole} onParamsChange={setParams} />
 
       <Container fluid className="py-4">
         <div className="text-muted mb-2">

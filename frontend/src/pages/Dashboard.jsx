@@ -24,6 +24,9 @@ export default function Dashboard() {
   const ctx = useOutletContext() || {};
   const allLots = ctx.allLots || ctx.lots || [];
 
+  const { user } = useAuth()
+  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase()
+
   const {
     handleViewDetail: _handleViewDetail,
     abrirModalEditar,
@@ -33,7 +36,6 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
 
-  const { user } = useAuth();
   const canSaleCreate = can(user, PERMISSIONS.SALE_CREATE);
   const canResCreate = can(user, PERMISSIONS.RES_CREATE);
   const canLotEdit = can(user, PERMISSIONS.LOT_EDIT);
@@ -83,7 +85,7 @@ export default function Dashboard() {
       <style>{css}</style>
 
       {/* FilterBar con padding y offset de Dashboard mediante `variant` */}
-      <FilterBar variant="dashboard" onParamsChange={setParams} />
+      <FilterBar variant="dashboard" userRole={userRole} onParamsChange={setParams} />
 
       <Container className="py-4">
         <div className="text-muted mb-2">
