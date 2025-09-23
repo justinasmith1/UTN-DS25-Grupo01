@@ -35,6 +35,16 @@
   z-index: 2147483646;
 }
 
+/* Dashboard */
+.fb-modal-dashboard {
+  padding-top: 120px; /* Ajusta este valor para que el card esté más arriba */
+}
+
+/* Mapa */
+.fb-modal-map {
+  padding-top: 120px; /* O el valor que uses en el mapa */
+}
+
 /* ===== Sheet: header / body / footer ===== */
 .fb-sheet{
   width: min(860px, 92vw);                
