@@ -1,17 +1,29 @@
 // components/TablaLotes.jsx
 // -----------------------------------------------------------------------------
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
-// - Muestra filas aunque el padre use "data" como nombre (Dashboard actual).
-// - Selector de columnas (máx. 5) con persistencia en localStorage.
-// - Paginación 10/25/50/Todos, selección por fila, acciones por rol.
+// - Persistencia de columnas VISIBLES por USUARIO+ROL (namespacing + versión).
+// - El botón "Restablecer" limpia el storage del usuario actual y vuelve a defaults.
+// - NO se toca el hover del botón de cantidad ni los botones de promo.
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { Eye, Edit, Trash2, DollarSign, Columns3 } from 'lucide-react';
+import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent } from 'lucide-react';
 
-const LS_KEY = 'tablaLotes:columns:v7';
+// ─────────────────────────────────────────────────────────────
+// 0) Constante legacy (para migración desde la versión previa)
+// ─────────────────────────────────────────────────────────────
+const LS_KEY = 'tablaLotes:columns:v7'; // <<— clave vieja, si existe la migramos una vez
+
+// ─────────────────────────────────────────────────────────────
+// 1) Helpers de storage VERSIONADO + namespacing por usuario/rol
+//    Explicación: guardamos por usuario+rol para que una sesión
+//    no herede la disposición de otra en la misma PC.
+// ─────────────────────────────────────────────────────────────
+const STORAGE_VERSION = 'v2';
+const APP_NS = 'lfed'; // La Federala
+const makeColsKey = (userKey) => `${APP_NS}:tabla-cols:${STORAGE_VERSION}:${userKey}`;
 
 // ----------------------------------
 // ----------- Helpers -------------
@@ -138,7 +150,7 @@ const DEFAULT_COLS = ['id', 'estado', 'propietario', 'calle', 'precio'];
 
 // ------------------------------------------------------
 // -------------- Para elegir las columnas--------
-function ColumnPicker({ all, selected, onChange, max = 5 }) {
+function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) {
   const totalSel = selected.length;
 
   const toggle = (id) => {
@@ -179,7 +191,9 @@ function ColumnPicker({ all, selected, onChange, max = 5 }) {
       <button
         type="button"
         className="tl-btn tl-btn--ghost"
-        onClick={() => onChange([...new Set(DEFAULT_COLS)])}
+        // Importante: delegamos el "reset total" al padre para que limpie
+        // también el localStorage del usuario actual.
+        onClick={() => onResetVisibleCols?.()}
       >
         Restablecer
       </button>
@@ -202,7 +216,13 @@ function PageSizeDropdown({ value, options, onChange }) {
   const label = String(value);
   return (
     <div className={`tl-dd ${open ? 'is-open' : ''}`} ref={ref}>
-      <button type="button" className="tl-dd__button" onClick={() => setOpen((o) => !o)} aria-expanded={open}>
+      {/* Este botón ya queda con el mismo hover/tamaño que “Columnas” */}
+      <button
+        type="button"
+        className="tl-btn tl-btn--ghost tl-btn--md tl-dd_button"
+        onClick={() => setOpen((o) => !o)}
+        aria-expanded={open}
+      >
         {label}<span className="tl-dd__chev">▾</span>
       </button>
       {open && (
@@ -227,7 +247,6 @@ function PageSizeDropdown({ value, options, onChange }) {
 }
 
 // --------------------------- Ancho por columna (grilla) ---------------------------
-// => esto logra espaciado más uniforme/estable según el tipo de dato
 const widthFor = (id) => {
   switch (id) {
     case 'id':         return '96px';
@@ -246,7 +265,6 @@ const widthFor = (id) => {
   }
 };
 
-
 //--------------------------------------------------------------
 // -------------------- Componente principal --------------------
 export default function TablaLotes({
@@ -254,6 +272,7 @@ export default function TablaLotes({
   onVer, onEditar, onRegistrarVenta, onEliminar,
   onAgregarLote, onAplicarPromo,
   roleOverride,
+  userKey,                 
 }) {
   // 1) Dataset (acepta lotes o data)
   const source = useMemo(() => {
@@ -266,17 +285,64 @@ export default function TablaLotes({
   const auth = (() => { try { return useAuth?.() || {}; } catch { return {}; } })();
   const role = (roleOverride || auth?.user?.role || auth?.role || 'admin').toString().toLowerCase();
 
-  // 3) Columnas visibles + persistencia
-  const [colIds, setColIds] = useState(() => {
+  // 2.1) Clave efectiva por usuario+rol
+  // Si viene userKey desde Dashboard, la usamos. Si no, derivamos desde el auth + rol.
+  const effectiveUserKey = useMemo(() => {
+    if (userKey) return userKey;
     try {
-      const raw = localStorage.getItem(LS_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-    } catch {}
-    return DEFAULT_COLS;
-  });
-  useEffect(() => { localStorage.setItem(LS_KEY, JSON.stringify(colIds)); }, [colIds]);
+      const raw = localStorage.getItem('auth:user');
+      const u = raw ? JSON.parse(raw) : null;
+      const id = u?.id || u?.email || u?.username || 'anon';
+      return `${id}:${role || 'norole'}`;
+    } catch {
+      return `anon:${role || 'norole'}`;
+    }
+  }, [userKey, role]);
 
+  // 3) Columnas visibles (inicializa con defaults y luego carga por usuario)
+  const [colIds, setColIds] = useState(DEFAULT_COLS);
+
+  // 3.1) CARGA por usuario/rol + migración desde clave vieja si existía
+  useEffect(() => {
+    const key = makeColsKey(effectiveUserKey);
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length) {
+          // Sanitizar por si cambió el set de columnas
+          const valid = parsed.filter((id) => ALL_SAFE.some((c) => c.id === id));
+          setColIds(valid.length ? valid : DEFAULT_COLS);
+          return;
+        }
+      }
+      // Migración simple desde la clave vieja (una sola vez)
+      const legacy = localStorage.getItem(LS_KEY);
+      if (legacy) {
+        localStorage.setItem(key, legacy); // copiamos a la nueva clave namespaced
+        const parsed = JSON.parse(legacy);
+        const valid = Array.isArray(parsed)
+          ? parsed.filter((id) => ALL_SAFE.some((c) => c.id === id))
+          : DEFAULT_COLS;
+        setColIds(valid.length ? valid : DEFAULT_COLS);
+        return;
+      }
+      // Fallback a defaults
+      setColIds(DEFAULT_COLS);
+    } catch {
+      setColIds(DEFAULT_COLS);
+    }
+  }, [effectiveUserKey]);
+
+  // 3.2) GUARDADO por usuario/rol
+  useEffect(() => {
+    const key = makeColsKey(effectiveUserKey);
+    try {
+      localStorage.setItem(key, JSON.stringify(colIds));
+    } catch {}
+  }, [colIds, effectiveUserKey]);
+
+  // 3.3) Columnas visibles (objetos completos) a partir de colIds
   const visibleCols = useMemo(() => {
     const map = new Map();
     colIds.forEach((id) => {
@@ -328,15 +394,15 @@ export default function TablaLotes({
   const roleActions = useMemo(() => {
     if (role.includes('inmob')) return ['venta', 'ver'];
     if (role.includes('gestor') || role.includes('tecnico')) return ['ver', 'editar'];
-    return ['ver', 'editar', 'venta', 'eliminar']; // admin
+    return ['ver', 'editar', 'venta', 'eliminar', 'aplicarPromo']; // admin
   }, [role]);
   const can = (a) => roleActions.includes(a);
 
   // 7) Grilla: checkbox + columnas visibles + spacer + columna Acciones
   const gridTemplate = useMemo(() => {
     const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
-    /* Importante: agregamos un "minmax(120px,1fr)" como spacer ANTES de la columna de Acciones
-       y ahora también renderizamos un <div> vacío para ocuparlo en header y filas. */
+    // Agregamos un "minmax(120px,1fr)" como spacer ANTES de la columna de Acciones
+    // y renderizamos un <div> vacío para ocuparlo en header y filas.
     return `42px ${cols} minmax(120px,1fr) 220px`;
   }, [visibleCols]);
 
@@ -367,7 +433,20 @@ export default function TablaLotes({
             </button>
 
             <div className="tl-popover__container">
-              <ColumnPicker all={ALL_SAFE} selected={colIds} onChange={setColIds} max={5} />
+              <ColumnPicker
+                all={ALL_SAFE}
+                selected={colIds}
+                onChange={setColIds}
+                max={5}
+                // Importante: al restablecer limpiamos la preferencia del usuario actual
+                // y volvemos a las columnas por defecto.
+                onResetVisibleCols={() => {
+                  try {
+                    localStorage.removeItem(makeColsKey(effectiveUserKey));
+                  } catch {}
+                  setColIds([...new Set(DEFAULT_COLS)]);
+                }}
+              />
             </div>
           </div>
         </div>
@@ -378,9 +457,9 @@ export default function TablaLotes({
               type="button"
               className="tl-btn tl-btn--soft"
               disabled={selectedIds.length === 0}
-              onClick={() => onAplicarPromo?.(selectedIds)}
+              onClick={() => onAplicarPromo?.(selectedIds)} // placeholder de acción de lote múltiple si lo necesitás
             >
-              Aplicar Promoción ({selectedIds.length})
+              Ver en mapa (futuro) ({selectedIds.length})
             </button>
           )}
           {role.includes('admin') && (
@@ -452,12 +531,22 @@ export default function TablaLotes({
                   {/* Acciones (columna a la derecha y botones centrados dentro) */}
                   <div className="tl-td tl-td--actions" data-col="actions">
                     {can('ver') && (
-                      <button className="tl-icon tl-icon--view" aria-label="Ver lote" onClick={() => onVer?.(l)}>
+                      <button
+                        className="tl-icon tl-icon--view"
+                        aria-label="Ver lote"
+                        title="Ver lote"
+                        onClick={() => onVer?.(l)}
+                      >
                         <Eye size={18} strokeWidth={2} />
                       </button>
                     )}
                     {can('editar') && (
-                      <button className="tl-icon tl-icon--edit" aria-label="Editar lote" onClick={() => onEditar?.(l)}>
+                      <button
+                        className="tl-icon tl-icon--edit"
+                        aria-label="Editar lote"
+                        title="Editar lote"
+                        onClick={() => onEditar?.(l)}
+                      >
                         <Edit size={18} strokeWidth={2} />
                       </button>
                     )}
@@ -465,6 +554,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--money"
                         aria-label="Registrar venta"
+                        title="Registrar venta"
                         onClick={() => onRegistrarVenta?.(l)}
                       >
                         <DollarSign size={18} strokeWidth={2} />
@@ -474,9 +564,20 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--delete"
                         aria-label="Eliminar lote"
+                        title="Eliminar lote"
                         onClick={() => onEliminar?.(l)}
                       >
                         <Trash2 size={18} strokeWidth={2} />
+                      </button>
+                    )}
+                    {can('aplicarPromo') && (
+                      <button
+                        className="tl-icon tl-icon--promo"
+                        aria-label="Aplicar promoción"
+                        title="Aplicar promoción"
+                        onClick={() => onAplicarPromo?.(l)}
+                      >
+                        <CirclePercent size={18} strokeWidth={2} />
                       </button>
                     )}
                   </div>

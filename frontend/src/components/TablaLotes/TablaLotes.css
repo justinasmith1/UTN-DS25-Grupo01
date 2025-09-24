@@ -46,7 +46,7 @@
 /* Dropdown cantidad */
 .tl-dd{ position:relative; }
 .tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }
-.tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; }
+.tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; padding-left: 3px; }
 .tl-dd.is-open .tl-dd__chev{ transform:rotate(180deg) translateY(-1px); }
 .tl-dd__menu{ position:absolute; top:42px; left:0; min-width:100%; background:#fff; border:1px solid #d9dee5; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.10); padding:6px; z-index:20; }
 .tl-dd__item{ width:100%; text-align:left; border:0; background:transparent; cursor:pointer; padding:8px 10px; border-radius:8px; font-size:14px; }
@@ -129,11 +129,13 @@
 .tl-icon--edit{   background:#EEF0FF; color:#6C7BFD; }
 .tl-icon--money{  background:#EAF7EE; color:#1F8C5A; }
 .tl-icon--delete{ background:#FEECEC; color:#E05252; }
+.tl-icon--promo{ background:#fdfddc; color:#BA8E23; }
 
 /* Hover: anillo finito del color del ícono */
 .tl-icon--view:hover,
 .tl-icon--edit:hover,
 .tl-icon--money:hover,
+.tl-icon--promo:hover,
 .tl-icon--delete:hover{
   outline:1px solid currentColor;
   outline-offset:-3px;
