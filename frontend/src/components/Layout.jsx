@@ -143,6 +143,7 @@ export default function Layout() {
       <Outlet
         context={{
           lots: filteredLots,
+          allLots: lotsData,
           loadingLots,
           handleStatusChange,
           handleSubStatusChange,
