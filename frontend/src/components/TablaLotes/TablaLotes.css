@@ -57,7 +57,7 @@
 .tl-table{ border:1px solid #e6ebf2; border-radius:12px; overflow:hidden; background:#fff; }
 .tl-thead{ position:sticky; top:0; z-index:5; background:#f7fafc; border-bottom:1px solid #e6ebf2; }
 
-.tl-tr{ display:grid; }
+.tl-tr{ display:grid; column-gap: 20px; } /* <- más espacio entre columnas (no acciones) */
 .tl-th, .tl-td{
   box-sizing:border-box;
   padding:12px 14px; border-bottom:1px solid #eef2f6; font-size:14px;
@@ -71,9 +71,32 @@
 .tl-th--right, .tl-td--right { justify-content:flex-end;   text-align:right; }
 .tl-th--center,.tl-td--center{ justify-content:center;     text-align:center; }
 
-/* Columna Acciones centrada */
+/* -------- Spacer (columna elástica previa a Acciones) -------- */
+.tl-th--spacer, .tl-td--spacer{
+  padding: 0;
+  border-bottom: 1px solid transparent; /* no ensucia el zebra */
+}
+
+/* Columna Acciones: header y celdas alineados y pegados hacia la izquierda de su propia columna */
 .tl-th--actions, .tl-td--actions{ gap:10px; }
-.tl-td--actions { justify-content:center; }
+.tl-th--actions,
+[data-col="actions"].tl-th {
+  justify-self: stretch;
+  width: 100%;
+  min-width: 220px;
+  text-align: initial;
+  justify-content: flex-start;
+  padding-left: 12px;           /* <- mismo offset que pediste */
+}
+.tl-td--actions,
+[data-col="actions"].tl-td {
+  justify-self: stretch;
+  width: 100%;
+  min-width: 220px;
+  text-align: initial;
+  justify-content: flex-start;  /* <- ANTES estaba center: esto fijaba los íconos */
+  padding-left: 12px;           /* <- que los íconos arranquen igual que el header */
+}
 
 /* Zebra */
 .tl-tbody .tl-tr:nth-child(2n) .tl-td{ background:#fcfdfe; }
@@ -135,3 +158,15 @@
 .tl-badge--warn   { background:#FFF6E5; color:#9A5C00; border-color:#FFE2B8; }
 .tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
 .tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
+
+/* === (opcional) Si tu fila de acciones usa un wrapper .tl-actions/.tl-action-group, lo
+   dejo preparado por si quieres afinar más adelante sin tocar celdas.    */
+.tl-td--actions .tl-actions,
+.tl-td--actions .tl-action-group,
+[data-col="actions"].tl-td .tl-actions,
+[data-col="actions"].tl-td .tl-action-group {
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+}
