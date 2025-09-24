@@ -1,0 +1,137 @@
+/* components/TablaLotes.css
+   Estilos del tablero de lotes (tabla con CSS Grid)
+   - Look moderno y consistente con tu UI.
+   - Altura de celdas uniforme, baseline estable y columnas numéricas alineadas.
+*/
+
+/* Wrapper con padding horizontal (tú lo pediste) */
+.tl-wrapper { padding-left: 24px; padding-right: 24px; }
+
+/* ===== Toolbar ===== */
+.tl-toolbar{ display:flex; justify-content:space-between; align-items:center; gap:16px; margin:8px 0 10px; }
+.tl-pages-left{ display:flex; align-items:center; gap:10px; }
+
+.tl-btn{ border:1px solid #d9dee5; background:#fff; border-radius:12px; padding:8px 12px; font-size:14px; cursor:pointer; transition:all .15s ease; }
+.tl-btn:hover{ background:#f6f8fa; }
+.tl-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.tl-btn--primary{ background:#116149; color:#fff; border-color:#116149; }
+.tl-btn--primary:hover{ filter:brightness(1.05); }
+.tl-btn--soft{ background:#eef7f4; color:#116149; border-color:#d1ece3; }
+.tl-btn--ghost{ background:transparent; }
+
+/* Botón "Columnas": icono + texto alineados */
+.tl-btn--columns2{ display:flex; align-items:center; gap:8px; padding:8px 12px; }
+.tl-btn__text{ font-weight:500; color:#2b3748; }
+
+/* Popover columnas */
+.tl-columns{ position:relative; }
+.tl-popover__container{ position:absolute; z-index:15; top:42px; left:0; display:none; }
+.tl-popover__container.is-open,
+.tl-columns:has(.tl-popover__container.is-open) .tl-popover__container{ display:block; }
+
+.tl-popover{
+  width:270px; max-height:360px; overflow:auto; background:#fff;
+  border:1px solid #d9dee5; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.10);
+  padding:10px;
+}
+.tl-popover__header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.tl-chip{ font-size:12px; padding:2px 8px; border-radius:999px; background:#eef1f4; color:#3a4451; }
+.tl-chip.is-max{ background:#ffe9e9; color:#b43636; }
+.tl-popover__list{ display:grid; gap:6px; margin-bottom:8px; }
+.tl-check{ display:grid; grid-template-columns:18px 1fr; align-items:center; gap:8px; padding:6px; border-radius:8px; }
+.tl-check:hover{ background:#f6f8fa; }
+.tl-check.is-checked{ background:#eef7f4; }
+.tl-check.is-disabled{ opacity:.5; }
+
+/* Dropdown cantidad */
+.tl-dd{ position:relative; }
+.tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }
+.tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; }
+.tl-dd.is-open .tl-dd__chev{ transform:rotate(180deg) translateY(-1px); }
+.tl-dd__menu{ position:absolute; top:42px; left:0; min-width:100%; background:#fff; border:1px solid #d9dee5; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.10); padding:6px; z-index:20; }
+.tl-dd__item{ width:100%; text-align:left; border:0; background:transparent; cursor:pointer; padding:8px 10px; border-radius:8px; font-size:14px; }
+.tl-dd__item:hover{ background:#f6f8fa; }
+.tl-dd__item.is-active{ background:#eef7f4; color:#116149; }
+
+/* ===== Tabla ===== */
+.tl-table{ border:1px solid #e6ebf2; border-radius:12px; overflow:hidden; background:#fff; }
+.tl-thead{ position:sticky; top:0; z-index:5; background:#f7fafc; border-bottom:1px solid #e6ebf2; }
+
+.tl-tr{ display:grid; }
+.tl-th, .tl-td{
+  box-sizing:border-box;
+  padding:12px 14px; border-bottom:1px solid #eef2f6; font-size:14px;
+  display:flex; align-items:center; min-height:56px; line-height:1.35; /* altura + línea uniformes */
+}
+.tl-th{ font-weight:600; color:#2b3748; }
+.tl-th--checkbox, .tl-td--checkbox{ justify-content:center; }
+
+/* Alineaciones */
+.tl-th--left,  .tl-td--left  { justify-content:flex-start; text-align:left; }
+.tl-th--right, .tl-td--right { justify-content:flex-end;   text-align:right; }
+.tl-th--center,.tl-td--center{ justify-content:center;     text-align:center; }
+
+/* Columna Acciones centrada */
+.tl-th--actions, .tl-td--actions{ gap:10px; }
+.tl-td--actions { justify-content:center; }
+
+/* Zebra */
+.tl-tbody .tl-tr:nth-child(2n) .tl-td{ background:#fcfdfe; }
+.tl-empty{ padding:24px; text-align:center; color:#6b7787; }
+
+/* ===== Números/Unidades ===== */
+.tl-td[data-col="precio"],
+.tl-td[data-col="superficie"],
+.tl-td[data-col="frente"],
+.tl-td[data-col="fondo"],
+.tl-td[data-col="numero"]{
+  font-variant-numeric: tabular-nums; /* columnas numéricas alinean perfecto */
+}
+.u-m2{ display:inline-flex; align-items:baseline; column-gap:4px; }
+.u-unit{ font-size:.92em; line-height:1; opacity:.9; }
+
+/* ===== Íconos redondos (lucide) ===== */
+.tl-icon{
+  width:36px; height:36px; border-radius:999px;
+  display:grid; place-items:center;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.08);
+  box-shadow:0 1px 2px rgba(16,24,40,.06);
+  transition: transform .14s ease, box-shadow .14s ease, outline-color .14s ease, outline-offset .14s ease;
+}
+.tl-icon svg{ width:18px; height:18px; display:block; }
+
+/* Colores por acción */
+.tl-icon--view{   background:#F2F4F7; color:#475467; }
+.tl-icon--edit{   background:#EEF0FF; color:#6C7BFD; }
+.tl-icon--money{  background:#EAF7EE; color:#1F8C5A; }
+.tl-icon--delete{ background:#FEECEC; color:#E05252; }
+
+/* Hover: anillo finito del color del ícono */
+.tl-icon--view:hover,
+.tl-icon--edit:hover,
+.tl-icon--money:hover,
+.tl-icon--delete:hover{
+  outline:1px solid currentColor;
+  outline-offset:-3px;
+  transform:translateY(-1px);
+  box-shadow:0 2px 8px rgba(16,24,40,.12);
+}
+
+/* ===== Paginación ===== */
+.tl-pagination{ display:flex; justify-content:center; align-items:center; gap:10px; padding:14px 8px; color:#2b3748; }
+.tl-pageinfo{ font-weight:500; }
+
+/* ===== Badges de Estados/Subestados ===== */
+.tl-badge{
+  display:inline-flex; align-items:center; gap:6px;
+  padding:6px 10px; border-radius:999px;
+  font-size:12px; font-weight:600; letter-spacing:.2px;
+  text-transform:uppercase; border:1px solid transparent;
+}
+.tl-badge--muted  { background:#F2F4F7; color:#475467; border-color:#E5E7EB; }
+.tl-badge--success{ background:#E7F7EE; color:#18794E; border-color:#BCE8D3; }
+.tl-badge--danger { background:#FEECEC; color:#C23B3B; border-color:#FAC5C5; }
+.tl-badge--warn   { background:#FFF6E5; color:#9A5C00; border-color:#FFE2B8; }
+.tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
+.tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
