@@ -53,7 +53,7 @@ export default function Header({ onUserClick, user }) {
         }
         .cclf-tab { color: var(--color-tab-text); }
         .cclf-tab--active { background: #EBB648; }         /* var(--color-tab-active) */
-        .cclf-tab--idle   { background: #AC862D; }         /* var(--color-tab-inactive) */
+        .cclf-tab--idle   { background: #EBB648; }         /* var(--color-tab-inactive) */
 
         /* Hover: un pelín más oscuro + leve elevación */
         .cclf-tab--active:hover { background: #926F25; transform: translateY(-1px); }
