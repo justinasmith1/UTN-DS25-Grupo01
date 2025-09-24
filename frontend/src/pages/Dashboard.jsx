@@ -1,31 +1,33 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { Container, Card, Table, Badge, Button } from "react-bootstrap";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import FilterBar from "../components/FilterBar/FilterBar";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
+import TablaLotes from "../components/TablaLotes/TablaLotes";
 
-const css = `
-  .brand-gray { background-color: #f0f0f0 !important; }
-  .table-row-hover:hover { background-color: rgba(230,239,233,.5) !important; transition: .15s; }
-  .status-dot { width:12px; height:12px; border-radius:50%; display:inline-block; margin-right:8px; }
-  .status-dot-disponible { background:#28a745; }
-  .status-dot-nodisponible { background:#dc3545; }
-  .status-dot-vendido { background:#0d6efd; }
-  .status-dot-reservado { background:#ffdd00; }
-  .status-dot-alquilado { background:#ff8c00; }
-  .action-btn { border-radius:8px !important; }
-`;
+/**
+ * Dashboard
+ * - Orquesta FilterBar (filtros globales) + TablaLotes (presentación/acciones locales).
+ * - NO define estilos de la tabla (eso está co-localizado en components/TablaLotes/TablaLotes.css).
+ * - Cuando implementemos los modales de "Aplicar promoción" y "Agregar lote",
+ *   volveremos a pasar los callbacks a TablaLotes (onApplyPromotion / onAddLot).
+ */
 
 export default function Dashboard() {
   const ctx = useOutletContext() || {};
-  const allLots = ctx.allLots || ctx.lots || [];
 
-  const { user } = useAuth()
-  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase()
+  // 🔧 Tomamos el dataset base con nombres alternativos por si cambian en el Layout/Outlet
+  //    (esto evita que quede vacío si la prop se llama distinto).
+  const rawLots =
+    ctx?.allLots ??
+    ctx?.lots ??
+    ctx?.lotes ??
+    ctx?.data?.lotes ??
+    [];
+
+  const { user } = useAuth();
+  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
 
   const {
     handleViewDetail: _handleViewDetail,
@@ -36,163 +38,66 @@ export default function Dashboard() {
 
   const navigate = useNavigate();
 
+  // Permisos (booleans) calculados con tu helper RBAC
   const canSaleCreate = can(user, PERMISSIONS.SALE_CREATE);
-  const canResCreate = can(user, PERMISSIONS.RES_CREATE);
   const canLotEdit = can(user, PERMISSIONS.LOT_EDIT);
   const canLotDelete = can(user, PERMISSIONS.LOT_DELETE);
 
-  const dotClass = (status) => {
-    switch ((status || "").toLowerCase()) {
-      case "disponible":
-        return "status-dot-disponible";
-      case "vendido":
-        return "status-dot-vendido";
-      case "no disponible":
-        return "status-dot-nodisponible";
-      case "reservado":
-        return "status-dot-reservado";
-      case "alquilado":
-        return "status-dot-alquilado";
-      default:
-        return "status-dot-nodisponible";
-    }
-  };
-
-  const subVariant = (s) => {
-    const k = (s || "").toLowerCase();
-    if (k.includes("constru")) return "warning";
-    if (k.includes("no")) return "secondary";
-    if (k.includes("termin")) return "success";
-    return "light";
-    };
-
+  // Navegación / callbacks existentes
   const goRegistrarVenta = (lot) =>
-    navigate(`/ventas?lotId=${encodeURIComponent(lot.id)}`);
+    // Normalizamos id por si viene como idLote
+    navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
 
-  const onEditar = (lot) => abrirModalEditar?.(lot.id);
-  const onVer = (lot) => _handleViewDetail?.(lot.id);
+  const onEditar = (lot) => abrirModalEditar?.(lot?.id ?? lot?.idLote);
+  const onVer = (lot) => _handleViewDetail?.(lot?.id ?? lot?.idLote);
   const onEliminar = (lot) => {
-    if (abrirModalEliminar) return abrirModalEliminar(lot.id);
-    if (handleDeleteLote) return handleDeleteLote(lot.id);
+    const id = lot?.id ?? lot?.idLote;
+    if (abrirModalEliminar) return abrirModalEliminar(id);
+    if (handleDeleteLote) return handleDeleteLote(id);
     alert("Eliminar no disponible en esta vista.");
   };
 
+  // Estado de filtros globales (FilterBar)
   const [params, setParams] = useState({});
-  const lots = useMemo(() => applyLoteFilters(allLots, params), [allLots, params]);
+
+  // 🧠 Regla clara: si NO hay parámetros → mostramos TODO.
+  //                 si HAY parámetros → aplicamos applyLoteFilters(base, params).
+  const lots = useMemo(() => {
+    const base = Array.isArray(rawLots) ? rawLots : [];
+    const hasParams = params && Object.keys(params).length > 0;
+
+    try {
+      return hasParams ? applyLoteFilters(base, params) : base;
+    } catch (e) {
+      if (process.env.NODE_ENV !== "production") {
+        // eslint-disable-next-line no-console
+        console.warn("[Dashboard] applyLoteFilters lanzó error; devuelvo base completa:", e);
+      }
+      return base;
+    }
+  }, [rawLots, params]);
 
   return (
     <>
-      <style>{css}</style>
-
-      {/* FilterBar con padding y offset de Dashboard mediante `variant` */}
+      {/* Barra de filtros globales (controla qué data llega a la tabla) */}
       <FilterBar variant="dashboard" userRole={userRole} onParamsChange={setParams} />
 
-      <Container className="py-4">
-        <div className="text-muted mb-2">
-          Mostrando {lots.length} de {allLots.length} lotes
-        </div>
-
-        <Card style={{ borderRadius: 12, boxShadow: "0 1px 3px rgba(0,0,0,.08)" }}>
-          <Card.Body className="p-0">
-            <Table hover responsive className="mb-0">
-              <thead className="brand-gray">
-                <tr>
-                  <th width="50" className="p-3"></th>
-                  <th className="p-3">ID</th>
-                  <th className="p-3">Estado</th>
-                  <th className="p-3">Estado-Plano</th>
-                  <th className="p-3">Propietario</th>
-                  <th className="p-3">Ubicación</th>
-                  <th className="p-3">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(lots || []).map((lot) => (
-                  <tr key={lot.id} className="table-row-hover">
-                    <td className="p-3">
-                      <span className={`status-dot ${dotClass(lot.status)}`} />
-                    </td>
-                    <td className="p-3">
-                      <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: 12 }}>
-                        {lot.id}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <Badge bg="light" text="dark" className="px-3 py-2" style={{ borderRadius: 12 }}>
-                        {lot.status || "-"}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <Badge bg={subVariant(lot.subStatus)} className="px-3 py-2" style={{ borderRadius: 12 }}>
-                        {lot.subStatus || "-"}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <Badge bg="outline" className="px-3 py-2 border" style={{ borderRadius: 12 }}>
-                        {lot.owner || "CCLF"}
-                      </Badge>
-                    </td>
-                    <td className="p-3">
-                      <small className="text-muted">{lot.location || "-"}</small>
-                    </td>
-                    <td className="p-3">
-                      <div className="d-flex flex-wrap gap-1">
-                        {canSaleCreate && (
-                          <Button
-                            variant="outline-success"
-                            size="sm"
-                            className="action-btn"
-                            onClick={() => goRegistrarVenta(lot)}
-                          >
-                            Registrar venta
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline-primary"
-                          size="sm"
-                          className="action-btn"
-                          onClick={() => onVer(lot)}
-                        >
-                          Ver
-                        </Button>
-                        {canLotEdit && (
-                          <Button
-                            variant="outline-warning"
-                            size="sm"
-                            className="action-btn"
-                            onClick={() => onEditar(lot)}
-                          >
-                            Editar
-                          </Button>
-                        )}
-                        {canLotDelete && (
-                          <Button
-                            variant="outline-danger"
-                            size="sm"
-                            className="action-btn"
-                            onClick={() => onEliminar(lot)}
-                          >
-                            Eliminar
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-
-            {(lots || []).length === 0 && (
-              <div className="text-center py-5">
-                <i className="bi bi-info-circle text-muted" style={{ fontSize: "2rem" }} />
-                <p className="text-muted mt-3 mb-0">
-                  No se encontraron lotes con los filtros aplicados.
-                </p>
-              </div>
-            )}
-          </Card.Body>
-        </Card>
-      </Container>
+      {/* Tablero de información (TablaLotes) */}
+      <TablaLotes
+        userRole={userRole}
+        data={lots}
+        // Permisos (acciones visibles en la tabla)
+        canSaleCreate={canSaleCreate}
+        canLotEdit={canLotEdit}
+        canLotDelete={canLotDelete}
+        // Callbacks actuales
+        onView={onVer}
+        onEdit={onEditar}
+        onDelete={onEliminar}
+        onRegisterSale={goRegistrarVenta}
+        // onApplyPromotion={(ids) => ...} // 👉 lo agregamos cuando esté el modal
+        // onAddLot={() => ...}            // 👉 lo agregamos cuando esté el modal
+      />
     </>
   );
 }
