@@ -332,10 +332,12 @@ export default function TablaLotes({
   }, [role]);
   const can = (a) => roleActions.includes(a);
 
-  // 7) Grilla: checkbox + columnas visibles + columna Acciones
+  // 7) Grilla: checkbox + columnas visibles + spacer + columna Acciones
   const gridTemplate = useMemo(() => {
     const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
-    return `42px ${cols} 220px`; // 220px para acciones, centradas
+    /* Importante: agregamos un "minmax(120px,1fr)" como spacer ANTES de la columna de Acciones
+       y ahora también renderizamos un <div> vacío para ocuparlo en header y filas. */
+    return `42px ${cols} minmax(120px,1fr) 220px`;
   }, [visibleCols]);
 
   const empty = total === 0;
@@ -406,7 +408,10 @@ export default function TablaLotes({
                 {c.titulo}
               </div>
             ))}
-            <div className="tl-th tl-th--actions tl-th--center">Acciones</div>
+            {/* Spacer visual que corresponde a "minmax(120px,1fr)" en el grid */}
+            <div aria-hidden className="tl-th tl-th--spacer" />
+            {/* Columna Acciones anclada a la derecha del grid */}
+            <div className="tl-th tl-th--actions">Acciones</div>
           </div>
         </div>
 
@@ -441,8 +446,11 @@ export default function TablaLotes({
                     );
                   })}
 
-                  {/* Acciones (centradas) */}
-                  <div className="tl-td tl-td--actions tl-td--center">
+                  {/* Spacer que ocupa la columna elástica antes de Acciones */}
+                  <div aria-hidden className="tl-td tl-td--spacer" />
+
+                  {/* Acciones (columna a la derecha y botones centrados dentro) */}
+                  <div className="tl-td tl-td--actions" data-col="actions">
                     {can('ver') && (
                       <button className="tl-icon tl-icon--view" aria-label="Ver lote" onClick={() => onVer?.(l)}>
                         <Eye size={18} strokeWidth={2} />
