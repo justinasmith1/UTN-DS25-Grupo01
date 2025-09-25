@@ -75,6 +75,16 @@
 .tl-th--spacer, .tl-td--spacer{
   padding: 0;
   border-bottom: 1px solid transparent; /* no ensucia el zebra */
+  min-height: 56px; /* misma altura que las otras celdas */
+}
+
+/* -------- Spacer invisible (ancla acciones a la derecha sin espacio visual) -------- */
+.tl-th--spacer-invisible, .tl-td--spacer-invisible{
+  padding: 0;
+  border: none; /* sin bordes */
+  background: transparent; /* sin fondo */
+  min-height: 56px; /* misma altura que las otras celdas */
+  /* Completamente invisible pero ocupa espacio en el grid */
 }
 
 /* Columna Acciones: header y celdas alineados y pegados hacia la izquierda de su propia columna */
@@ -85,8 +95,8 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: flex-start;
-  padding-left: 12px;           /* <- mismo offset que pediste */
+  justify-content: center;
+  padding-left: 12px;           
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {
@@ -94,7 +104,7 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: flex-start;  /* <- ANTES estaba center: esto fijaba los íconos */
+  justify-content: center;  /* <- ANTES estaba center: esto fijaba los íconos */
   padding-left: 12px;           /* <- que los íconos arranquen igual que el header */
 }
 
