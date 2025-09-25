@@ -118,10 +118,10 @@ function getNumero(l) {
 // ---------------------------------------------------
 // -------------------- Columnas --------------------
 const ALL_COLUMNS = [
-  { id: 'id',          titulo: 'ID',         accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—',         align: 'left'  },
-  { id: 'estado',      titulo: 'Estado',     accessor: (l) => estadoBadge(l.estado),                       align: 'left'  },
-  { id: 'propietario', titulo: 'Propietario',accessor: (l) => getPropietarioNombre(l),                    align: 'left'  },
-  { id: 'calle',       titulo: 'Calle',      accessor: (l) => getCalle(l),                                 align: 'left'  },
+  { id: 'id',          titulo: 'ID',         accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—',         align: 'center'  },
+  { id: 'estado',      titulo: 'Estado',     accessor: (l) => estadoBadge(l.estado),                       align: 'center'},
+  { id: 'propietario', titulo: 'Propietario',accessor: (l) => getPropietarioNombre(l),                    align: 'center'  },
+  { id: 'calle',       titulo: 'Calle',      accessor: (l) => getCalle(l),                                 align: 'center'  },
   { id: 'numero',      titulo: 'Número',     accessor: (l) => getNumero(l),                                align: 'center'},
   { id: 'superficie',  titulo: 'Superficie', accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2),     align: 'right' },
   { id: 'frente',      titulo: 'Frente',     accessor: (l) => fmtM(l.frente),                              align: 'right' },
@@ -138,7 +138,7 @@ const ALL_COLUMNS = [
       ),
     align: 'center',
   },
-  { id: 'subestado',   titulo: 'Subestado',  accessor: (l) => subestadoBadge(l.subestado),                 align: 'left'  },
+  { id: 'subestado',   titulo: 'Subestado',  accessor: (l) => subestadoBadge(l.subestado),                 align: 'center'  },
   { id: 'descripcion', titulo: 'Descripción',accessor: (l) => l.descripcion ?? '—',                        align: 'left'  },
 ];
 
@@ -254,7 +254,7 @@ const widthFor = (id) => {
     case 'subestado':  return '170px';
     case 'propietario':return '220px';
     case 'calle':      return '220px';
-    case 'descripcion':return 'minmax(240px,2fr)';
+    case 'descripcion':return 'minmax(370px,2fr)';
     case 'numero':     return '120px';
     case 'superficie': return '120px';
     case 'frente':     return '120px';
@@ -398,12 +398,10 @@ export default function TablaLotes({
   }, [role]);
   const can = (a) => roleActions.includes(a);
 
-  // 7) Grilla: checkbox + columnas visibles + spacer + columna Acciones
+  // 7) Grilla: checkbox + columnas visibles + columna Acciones (con flexbox para anclar acciones a la derecha)
   const gridTemplate = useMemo(() => {
     const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
-    // Agregamos un "minmax(120px,1fr)" como spacer ANTES de la columna de Acciones
-    // y renderizamos un <div> vacío para ocuparlo en header y filas.
-    return `42px ${cols} minmax(120px,1fr) 220px`;
+    return `42px ${cols} 1fr 220px`;
   }, [visibleCols]);
 
   const empty = total === 0;
@@ -487,9 +485,9 @@ export default function TablaLotes({
                 {c.titulo}
               </div>
             ))}
-            {/* Spacer visual que corresponde a "minmax(120px,1fr)" en el grid */}
-            <div aria-hidden className="tl-th tl-th--spacer" />
-            {/* Columna Acciones anclada a la derecha del grid */}
+            {/* Spacer invisible para anclar acciones a la derecha */}
+            <div aria-hidden className="tl-th tl-th--spacer-invisible" />
+            {/* Columna Acciones */}
             <div className="tl-th tl-th--actions">Acciones</div>
           </div>
         </div>
@@ -525,10 +523,10 @@ export default function TablaLotes({
                     );
                   })}
 
-                  {/* Spacer que ocupa la columna elástica antes de Acciones */}
-                  <div aria-hidden className="tl-td tl-td--spacer" />
+                  {/* Spacer invisible para anclar acciones a la derecha */}
+                  <div aria-hidden className="tl-td tl-td--spacer-invisible" />
 
-                  {/* Acciones (columna a la derecha y botones centrados dentro) */}
+                  {/* Acciones */}
                   <div className="tl-td tl-td--actions" data-col="actions">
                     {can('ver') && (
                       <button
