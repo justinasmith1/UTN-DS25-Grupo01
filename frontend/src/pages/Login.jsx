@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useAuth } from "../app/providers/AuthProvider";
 import { Form, Button, Card } from "react-bootstrap";
 
-const BG_IMAGE = "https://scontent.faep6-2.fna.fbcdn.net/v/t39.30808-6/480893835_583561564664531_859314170647179816_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=cc71e4&_nc_eui2=AeGEvXWJEfKO4Fb4apddzIL355abZWXOtYPnlptlZc61gzQ18aadYc15q-DHxa3TnbNDS7aSUQvOcysYVMUTsNi5&_nc_ohc=CPOzmnSsVt8Q7kNvwHyJ3xJ&_nc_oc=Adn6O1cq0pXG77-9HQfkHLjf2HQO3vv360r64NjkxsGdtFt2OODo5MpNseXNc7CpgyY&_nc_zt=23&_nc_ht=scontent.faep6-2.fna&_nc_gid=Q5sbZ-skiwNJhwXtL8d7vA&oh=00_AfYTyxXHbVaeRNELbbQSoZgYJI-b5WTY2i8aIYQ8-NuwnQ&oe=68CDF382"; // <- poné tu imagen
+const BG_IMAGE = "https://scontent.flpg4-1.fna.fbcdn.net/v/t39.30808-6/480893835_583561564664531_859314170647179816_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=cc71e4&_nc_eui2=AeGEvXWJEfKO4Fb4apddzIL355abZWXOtYPnlptlZc61gzQ18aadYc15q-DHxa3TnbNDS7aSUQvOcysYVMUTsNi5&_nc_ohc=uVWW53zum4wQ7kNvwHsZE4q&_nc_oc=AdkhqPJf8oATNfq-tQuygNWxz9dkqLQnU88uP_UMKdeZXFI2N7SLjwOn0DIauWnTQuG6nImR8YbAzGZWDETgCIHk&_nc_zt=23&_nc_ht=scontent.flpg4-1.fna&_nc_gid=Gtw6PpxBIai_VMhDdnSKfA&oh=00_Afa5JsDmrKkU1eI0DLGqu8NJCsjYMCJ_JnEszXMUNOHyoA&oe=68DB9302"; // <- poné tu imagen
 const LOGO_IMAGE = null; // opcional: "/ruta/a/tu/logo.png"
 
 export default function Login() {
