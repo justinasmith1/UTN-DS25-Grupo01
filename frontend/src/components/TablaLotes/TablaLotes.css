@@ -43,6 +43,45 @@
 .tl-check.is-checked{ background:#eef7f4; }
 .tl-check.is-disabled{ opacity:.5; }
 
+/* Estilos para drag & drop */
+.tl-check--sortable{
+  display:grid; 
+  grid-template-columns:20px 18px 1fr; 
+  align-items:center; 
+  gap:8px; 
+  padding:6px; 
+  border-radius:8px;
+  cursor:grab;
+  transition:all .15s ease;
+}
+.tl-check--sortable:hover{ background:#f6f8fa; }
+.tl-check--sortable.is-checked{ background:#eef7f4; }
+.tl-check--sortable.is-disabled{ opacity:.5; cursor:not-allowed; }
+
+.tl-check__drag-handle{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#9ca3af;
+  cursor:grab;
+  transition:color .15s ease;
+}
+.tl-check__drag-handle:hover{
+  color:#6b7280;
+}
+.tl-check__drag-handle:active{
+  cursor:grabbing;
+}
+
+.tl-popover__separator{
+  margin:8px 0;
+  padding:4px 0;
+  border-top:1px solid #e5e7eb;
+  font-size:12px;
+  color:#6b7280;
+  text-align:center;
+}
+
 /* Dropdown cantidad */
 .tl-dd{ position:relative; }
 .tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }

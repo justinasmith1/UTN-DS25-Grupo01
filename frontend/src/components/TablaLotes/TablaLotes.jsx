@@ -9,7 +9,25 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
 import { useAuth } from '../../app/providers/AuthProvider';
-import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent } from 'lucide-react';
+import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import {
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 // ─────────────────────────────────────────────────────────────
 // 0) Constante legacy (para migración desde la versión previa)
@@ -152,6 +170,13 @@ const DEFAULT_COLS = ['id', 'estado', 'propietario', 'calle', 'precio'];
 // -------------- Para elegir las columnas--------
 function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) {
   const totalSel = selected.length;
+  
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const toggle = (id) => {
     const isSel = selected.includes(id);
@@ -163,6 +188,20 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     }
   };
 
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = selected.indexOf(active.id);
+      const newIndex = selected.indexOf(over.id);
+      const newSelected = arrayMove(selected, oldIndex, newIndex);
+      onChange(newSelected);
+    }
+  };
+
+  // Solo mostrar las columnas seleccionadas para el drag & drop, respetando el orden de 'selected'
+  const selectedColumns = selected.map(id => all.find(c => c.id === id)).filter(Boolean);
+
   return (
     <div className="tl-popover">
       <div className="tl-popover__header">
@@ -171,7 +210,39 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
       </div>
 
       <div className="tl-popover__list">
-        {all.map((c) => {
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={selected} strategy={verticalListSortingStrategy}>
+            {/* Columnas seleccionadas (con drag & drop) */}
+            {selectedColumns.map((c) => {
+              const checked = selected.includes(c.id);
+              const disabled = !checked && totalSel >= max;
+              return (
+                <SortableItem
+                  key={c.id}
+                  id={c.id}
+                  column={c}
+                  checked={checked}
+                  disabled={disabled}
+                  onToggle={toggle}
+                />
+              );
+            })}
+          </SortableContext>
+        </DndContext>
+
+        {/* Separador */}
+        {selectedColumns.length > 0 && (
+          <div className="tl-popover__separator">
+            <span>Columnas disponibles</span>
+          </div>
+        )}
+
+        {/* Columnas no seleccionadas (sin drag & drop) */}
+        {all.filter(c => !selected.includes(c.id)).map((c) => {
           const checked = selected.includes(c.id);
           const disabled = !checked && totalSel >= max;
           return (
@@ -202,7 +273,46 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
 }
 
 //--------------------------------------------------------------
-// -------------------- Dropdown “cantidad” --------------------
+// -------------------- Componente SortableItem --------------------
+function SortableItem({ id, column, checked, disabled, onToggle }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <label
+      ref={setNodeRef}
+      style={style}
+      className={`tl-check tl-check--sortable ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}
+      {...attributes}
+    >
+      <div className="tl-check__drag-handle" {...listeners}>
+        <GripVertical size={16} />
+      </div>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={() => onToggle(id)}
+      />
+      <span>{column.titulo}</span>
+    </label>
+  );
+}
+
+//--------------------------------------------------------------
+// -------------------- Dropdown "cantidad" --------------------
 function PageSizeDropdown({ value, options, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
