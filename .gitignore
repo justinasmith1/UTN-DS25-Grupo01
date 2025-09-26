@@ -1,1 +1,18 @@
+<<<<<<< HEAD
 .env
+=======
+# NO versionar manifests en la raíz
+/package.json
+/package-lock.json
+/package-lock.local.json
+/package.local.json
+
+# NO versionar manifests del frontend
+/frontend/package.json
+/frontend/package-lock.json
+
+# NO versionar manifests del backend (tu carpeta es con B mayúscula)
+# si tu backend fuera 'backend/' en minúscula, agregá esas rutas también
+/Backend/package.json
+/Backend/package-lock.json
+>>>>>>> a164d8a (Ignorar packages desde root)
