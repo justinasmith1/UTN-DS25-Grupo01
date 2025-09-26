@@ -143,7 +143,7 @@
   min-width: 220px;
   text-align: initial;
   justify-content: center;
-  padding-left: 12px;           
+  padding-right: 55px;           
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {
@@ -151,8 +151,8 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: center;  /* <- ANTES estaba center: esto fijaba los íconos */
-  padding-left: 12px;           /* <- que los íconos arranquen igual que el header */
+  justify-content: center;  
+  padding-right: 55px;           
 }
 
 /* Zebra */
@@ -179,7 +179,7 @@
   box-shadow:0 1px 2px rgba(16,24,40,.06);
   transition: transform .14s ease, box-shadow .14s ease, outline-color .14s ease, outline-offset .14s ease;
 }
-.tl-icon svg{ width:18px; height:18px; display:block; }
+.tl-icon svg{ width:21px; height: 18px; display:block; }
 
 /* Colores por acción */
 .tl-icon--view{   background:#F2F4F7; color:#475467; }
