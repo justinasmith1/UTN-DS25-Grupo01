@@ -40,7 +40,7 @@ services:
     volumes:
       - ./Backend:/app
       - /app/node_modules
-    command: sh -c command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
+    command: sh -c "npx prisma migrate deploy && npx prisma generate && npm run dev"
     networks:
       - app-network
 
