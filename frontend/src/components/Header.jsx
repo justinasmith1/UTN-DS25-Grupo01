@@ -57,7 +57,7 @@ export default function Header({ onUserClick, user }) {
 
         /* Hover: un pelín más oscuro + leve elevación */
         .cclf-tab--active:hover { background: #926F25; transform: translateY(-1px); }
-        .cclf-tab--idle:hover   { background: #D1A43F; transform: translateY(-1px); }
+        .cclf-tab--idle:hover   { background: #926F25; transform: translateY(-1px); }
 
         /* Logout igual a las tabs inactivas */
         .cclf-logout { background: #EBB648; color: #000; }

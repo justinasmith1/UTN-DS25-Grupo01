@@ -3,7 +3,9 @@
 
 import { useState } from "react";
 import { useAuth } from "../app/providers/AuthProvider";
-import { Form, Button, Card } from "react-bootstrap";
+import { Form, Button, Card, InputGroup } from "react-bootstrap";
+import { Eye, EyeOff } from 'lucide-react';
+
 
 const BG_IMAGE = "https://scontent.flpg4-1.fna.fbcdn.net/v/t39.30808-6/480893835_583561564664531_859314170647179816_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=cc71e4&_nc_eui2=AeGEvXWJEfKO4Fb4apddzIL355abZWXOtYPnlptlZc61gzQ18aadYc15q-DHxa3TnbNDS7aSUQvOcysYVMUTsNi5&_nc_ohc=uVWW53zum4wQ7kNvwHsZE4q&_nc_oc=AdkhqPJf8oATNfq-tQuygNWxz9dkqLQnU88uP_UMKdeZXFI2N7SLjwOn0DIauWnTQuG6nImR8YbAzGZWDETgCIHk&_nc_zt=23&_nc_ht=scontent.flpg4-1.fna&_nc_gid=Gtw6PpxBIai_VMhDdnSKfA&oh=00_Afa5JsDmrKkU1eI0DLGqu8NJCsjYMCJ_JnEszXMUNOHyoA&oe=68DB9302"; // <- poné tu imagen
 const LOGO_IMAGE = null; // opcional: "/ruta/a/tu/logo.png"
@@ -16,6 +18,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -69,13 +73,18 @@ export default function Login() {
 
               <Form.Group className="mb-2">
                 <Form.Label className="lf-label">Contraseña</Form.Label>
-                <Form.Control
-                  className="lf-input"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <InputGroup>
+                  <Form.Control
+                    className="lf-input"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <Button variant="outline-secondary" onClick={() => setShowPassword(!showPassword)} className="lf-password-toggle">
+                    {showPassword ? <EyeOff /> : <Eye />}
+                  </Button>
+                </InputGroup>
               </Form.Group>
 
               <div className="d-grid mt-1">
@@ -154,6 +163,18 @@ const css = `
   box-shadow: 0 0 0 .25rem rgba(14,163,122,.15);
   background: rgba(255,255,255,.12);
 }
+
+.lf-password-toggle {
+  border-radius: 0 10px 10px 0;
+  border-color: rgba(255, 255, 255, 0.22);
+  background-color: rgba(255, 255, 255, 0.08);
+  color: var(--lf-text);
+}
+
+.lf-password-toggle:hover {
+  background-color: rgba(255, 255, 255, 0.12);
+}
+
 
 .lf-btn{
   height:44px; border-radius:10px; border:0;
