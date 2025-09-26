@@ -43,10 +43,49 @@
 .tl-check.is-checked{ background:#eef7f4; }
 .tl-check.is-disabled{ opacity:.5; }
 
+/* Estilos para drag & drop */
+.tl-check--sortable{
+  display:grid; 
+  grid-template-columns:20px 18px 1fr; 
+  align-items:center; 
+  gap:8px; 
+  padding:6px; 
+  border-radius:8px;
+  cursor:grab;
+  transition:all .15s ease;
+}
+.tl-check--sortable:hover{ background:#f6f8fa; }
+.tl-check--sortable.is-checked{ background:#eef7f4; }
+.tl-check--sortable.is-disabled{ opacity:.5; cursor:not-allowed; }
+
+.tl-check__drag-handle{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#9ca3af;
+  cursor:grab;
+  transition:color .15s ease;
+}
+.tl-check__drag-handle:hover{
+  color:#6b7280;
+}
+.tl-check__drag-handle:active{
+  cursor:grabbing;
+}
+
+.tl-popover__separator{
+  margin:8px 0;
+  padding:4px 0;
+  border-top:1px solid #e5e7eb;
+  font-size:12px;
+  color:#6b7280;
+  text-align:center;
+}
+
 /* Dropdown cantidad */
 .tl-dd{ position:relative; }
 .tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }
-.tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; }
+.tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; padding-left: 3px; }
 .tl-dd.is-open .tl-dd__chev{ transform:rotate(180deg) translateY(-1px); }
 .tl-dd__menu{ position:absolute; top:42px; left:0; min-width:100%; background:#fff; border:1px solid #d9dee5; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.10); padding:6px; z-index:20; }
 .tl-dd__item{ width:100%; text-align:left; border:0; background:transparent; cursor:pointer; padding:8px 10px; border-radius:8px; font-size:14px; }
@@ -75,6 +114,16 @@
 .tl-th--spacer, .tl-td--spacer{
   padding: 0;
   border-bottom: 1px solid transparent; /* no ensucia el zebra */
+  min-height: 56px; /* misma altura que las otras celdas */
+}
+
+/* -------- Spacer invisible (ancla acciones a la derecha sin espacio visual) -------- */
+.tl-th--spacer-invisible, .tl-td--spacer-invisible{
+  padding: 0;
+  border: none; /* sin bordes */
+  background: transparent; /* sin fondo */
+  min-height: 56px; /* misma altura que las otras celdas */
+  /* Completamente invisible pero ocupa espacio en el grid */
 }
 
 /* Columna Acciones: header y celdas alineados y pegados hacia la izquierda de su propia columna */
@@ -85,8 +134,8 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: flex-start;
-  padding-left: 12px;           /* <- mismo offset que pediste */
+  justify-content: center;
+  padding-left: 12px;           
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {
@@ -94,7 +143,7 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: flex-start;  /* <- ANTES estaba center: esto fijaba los íconos */
+  justify-content: center;  /* <- ANTES estaba center: esto fijaba los íconos */
   padding-left: 12px;           /* <- que los íconos arranquen igual que el header */
 }
 
@@ -129,11 +178,13 @@
 .tl-icon--edit{   background:#EEF0FF; color:#6C7BFD; }
 .tl-icon--money{  background:#EAF7EE; color:#1F8C5A; }
 .tl-icon--delete{ background:#FEECEC; color:#E05252; }
+.tl-icon--promo{ background:#fdfddc; color:#BA8E23; }
 
 /* Hover: anillo finito del color del ícono */
 .tl-icon--view:hover,
 .tl-icon--edit:hover,
 .tl-icon--money:hover,
+.tl-icon--promo:hover,
 .tl-icon--delete:hover{
   outline:1px solid currentColor;
   outline-offset:-3px;
