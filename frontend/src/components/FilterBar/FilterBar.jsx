@@ -14,6 +14,7 @@ import RangeControl from "./controls/RangeControl";
  * Comportamiento por rol:
  * - INMOBILIARIA: oculta "Deudor" y no permite "NO_DISPONIBLE" en Estado.
  */
+const DEBOUNCE_MS = 250;
 export default function FilterBar({
   variant = "dashboard",
   userRole = "GENERAL",
@@ -23,12 +24,11 @@ export default function FilterBar({
   const isInmo = String(userRole).toUpperCase() === "INMOBILIARIA";
 
   /* === Catálogos base === */
-  const ALL_ESTADOS = ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"];
   // Si es inmobiliaria, quitamos NO_DISPONIBLE de la UI
-  const ESTADOS = useMemo(
-    () => (isInmo ? ALL_ESTADOS.filter((e) => e !== "NO_DISPONIBLE") : ALL_ESTADOS),
-    [isInmo]
-  );
+  const ESTADOS = useMemo(() => {
+    const ALL_ESTADOS = ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"];
+    return isInmo ? ALL_ESTADOS.filter((e) => e !== "NO_DISPONIBLE") : ALL_ESTADOS;
+  }, [isInmo]);
   const SUBESTADOS = ["CONSTRUIDO", "EN_CONSTRUCCION", "NO_CONSTRUIDO"];
   const CALLES = [
     "REINAMORA","MACA","ZORZAL","CAUQUEN","ALONDRA","JACANA",
@@ -52,6 +52,21 @@ export default function FilterBar({
   const [precio, setPrecio] = useState({ min: 0, max: 300000 });
   const [deudor, setDeudor] = useState(null); // null=Todos, true=Solo deudor, false=Sin deuda
 
+  /* === Estado de filtros aplicados ===
+     Solo estos se muestran en chips y badges
+  */
+  const [appliedFilters, setAppliedFilters] = useState({
+    q: "",
+    estado: [],
+    subestado: [],
+    calle: [],
+    frente: { min: 0, max: 100 },
+    fondo: { min: 0, max: 100 },
+    sup: { min: 0, max: 5000 },
+    precio: { min: 0, max: 300000 },
+    deudor: null
+  });
+
   /* Refs para el alto inicial del modal (mostrar solo el bloque superior al abrir) */
   const bodyRef = useRef(null);
   const topRef  = useRef(null);
@@ -70,46 +85,84 @@ export default function FilterBar({
   /* Contador del badge (si es INMOBILIARIA, no cuenta "deudor") */
   const activeCount = useMemo(
     () =>
-      (q ? 1 : 0) +
-      estado.length +
-      subestado.length +
-      calle.length +
-      (frente.min !== 0 || frente.max !== 100 ? 1 : 0) +
-      (fondo.min !== 0 || fondo.max !== 100 ? 1 : 0) +
-      (sup.min !== 0 || sup.max !== 5000 ? 1 : 0) +
-      (precio.min !== 0 || precio.max !== 300000 ? 1 : 0) +
-      (isInmo ? 0 : deudor === null ? 0 : 1),
-    [q, estado, subestado, calle, frente, fondo, sup, precio, deudor, isInmo]
+      (appliedFilters.q ? 1 : 0) +
+      appliedFilters.estado.length +
+      appliedFilters.subestado.length +
+      appliedFilters.calle.length +
+      (appliedFilters.frente.min !== 0 || appliedFilters.frente.max !== 100 ? 1 : 0) +
+      (appliedFilters.fondo.min !== 0 || appliedFilters.fondo.max !== 100 ? 1 : 0) +
+      (appliedFilters.sup.min !== 0 || appliedFilters.sup.max !== 5000 ? 1 : 0) +
+      (appliedFilters.precio.min !== 0 || appliedFilters.precio.max !== 300000 ? 1 : 0) +
+      (isInmo ? 0 : appliedFilters.deudor === null ? 0 : 1),
+    [appliedFilters, isInmo]
   );
 
   /* Chips activos (no mostramos deudor si es INMOBILIARIA) */
   const chips = useMemo(() => {
+    console.log('[DEBUG] Calculando chips con appliedFilters:', appliedFilters);
     const arr = [];
-    if (q) arr.push({ k: "q", label: `Buscar: ${q}` });
-    estado
-      .filter((v) => v !== "NO_DISPONIBLE")
+    if (appliedFilters.q) arr.push({ k: "q", label: `Buscar: ${appliedFilters.q}` });
+    appliedFilters.estado
+      .filter((v) => isInmo ? v !== "NO_DISPONIBLE" : true)
       .forEach((v) => arr.push({ k: "estado", v, label: nice(v) }));
-    subestado.forEach((v) => arr.push({ k: "subestado", v, label: nice(v) }));
-    calle.forEach((v) => arr.push({ k: "calle", v, label: nice(v) }));
-    if (frente.min !== 0 || frente.max !== 100) arr.push({ k: "frente", label: `Frente ${frente.min}–${frente.max} m` });
-    if (fondo.min !== 0 || fondo.max !== 100) arr.push({ k: "fondo", label: `Fondo ${fondo.min}–${fondo.max} m` });
-    if (sup.min !== 0 || sup.max !== 5000)    arr.push({ k: "sup",    label: `Sup ${sup.min}–${sup.max} m²` });
-    if (precio.min !== 0 || precio.max !== 300000) arr.push({ k: "precio", label: `Precio ${precio.min}–${precio.max} USD` });
-    if (!isInmo && deudor !== null) arr.push({ k: "deudor", label: deudor ? "Solo deudor" : "Sin deuda" });
+    appliedFilters.subestado.forEach((v) => arr.push({ k: "subestado", v, label: nice(v) }));
+    appliedFilters.calle.forEach((v) => arr.push({ k: "calle", v, label: nice(v) }));
+    if (appliedFilters.frente.min !== 0 || appliedFilters.frente.max !== 100) arr.push({ k: "frente", label: `Frente ${appliedFilters.frente.min}–${appliedFilters.frente.max} m` });
+    if (appliedFilters.fondo.min !== 0 || appliedFilters.fondo.max !== 100) arr.push({ k: "fondo", label: `Fondo ${appliedFilters.fondo.min}–${appliedFilters.fondo.max} m` });
+    if (appliedFilters.sup.min !== 0 || appliedFilters.sup.max !== 5000)    arr.push({ k: "sup",    label: `Sup ${appliedFilters.sup.min}–${appliedFilters.sup.max} m²` });
+    if (appliedFilters.precio.min !== 0 || appliedFilters.precio.max !== 300000) arr.push({ k: "precio", label: `Precio ${appliedFilters.precio.min}–${appliedFilters.precio.max} USD` });
+    if (!isInmo && appliedFilters.deudor !== null) arr.push({ k: "deudor", label: appliedFilters.deudor ? "Solo deudor" : "Sin deuda" });
+    console.log('[DEBUG] Chips calculados:', arr);
     return arr;
-  }, [q, estado, subestado, calle, frente, fondo, sup, precio, deudor, isInmo]);
+  }, [appliedFilters, isInmo]);
 
   const removeChip = (chip) => {
     switch (chip.k) {
-      case "q": setQ(""); break;
-      case "estado": setEstado((prev) => prev.filter((v) => v !== chip.v)); break;
-      case "subestado": setSubestado((prev) => prev.filter((v) => v !== chip.v)); break;
-      case "calle": setCalle((prev) => prev.filter((v) => v !== chip.v)); break;
-      case "frente": setFrente({ min: 0, max: 100 }); break;
-      case "fondo": setFondo({ min: 0, max: 100 }); break;
-      case "sup": setSup({ min: 0, max: 5000 }); break;
-      case "precio": setPrecio({ min: 0, max: 300000 }); break;
-      case "deudor": setDeudor(null); break;
+      case "q": 
+        setQ("");
+        setAppliedFilters(prev => ({ ...prev, q: "" }));
+        onParamsChange?.({ q: "" });
+        break;
+      case "estado": 
+        setEstado((prev) => prev.filter((v) => v !== chip.v));
+        setAppliedFilters(prev => ({ ...prev, estado: prev.estado.filter((v) => v !== chip.v) }));
+        onParamsChange?.({ estado: appliedFilters.estado.filter((v) => v !== chip.v) });
+        break;
+      case "subestado": 
+        setSubestado((prev) => prev.filter((v) => v !== chip.v));
+        setAppliedFilters(prev => ({ ...prev, subestado: prev.subestado.filter((v) => v !== chip.v) }));
+        onParamsChange?.({ subestado: appliedFilters.subestado.filter((v) => v !== chip.v) });
+        break;
+      case "calle": 
+        setCalle((prev) => prev.filter((v) => v !== chip.v));
+        setAppliedFilters(prev => ({ ...prev, calle: prev.calle.filter((v) => v !== chip.v) }));
+        onParamsChange?.({ calle: appliedFilters.calle.filter((v) => v !== chip.v) });
+        break;
+      case "frente": 
+        setFrente({ min: 0, max: 100 });
+        setAppliedFilters(prev => ({ ...prev, frente: { min: 0, max: 100 } }));
+        onParamsChange?.({ frenteMin: undefined, frenteMax: undefined });
+        break;
+      case "fondo": 
+        setFondo({ min: 0, max: 100 });
+        setAppliedFilters(prev => ({ ...prev, fondo: { min: 0, max: 100 } }));
+        onParamsChange?.({ fondoMin: undefined, fondoMax: undefined });
+        break;
+      case "sup": 
+        setSup({ min: 0, max: 5000 });
+        setAppliedFilters(prev => ({ ...prev, sup: { min: 0, max: 5000 } }));
+        onParamsChange?.({ supMin: undefined, supMax: undefined });
+        break;
+      case "precio": 
+        setPrecio({ min: 0, max: 300000 });
+        setAppliedFilters(prev => ({ ...prev, precio: { min: 0, max: 300000 } }));
+        onParamsChange?.({ priceMin: undefined, priceMax: undefined });
+        break;
+      case "deudor": 
+        setDeudor(null);
+        setAppliedFilters(prev => ({ ...prev, deudor: null }));
+        onParamsChange?.({ deudor: null });
+        break;
       default: break;
     }
   };
@@ -157,20 +210,68 @@ export default function FilterBar({
     };
   }, [open]);
 
+  // BÚSQUEDA EN VIVO: cuando cambia 'q', notificamos al padre solo ese parche.
+// No afecta al resto de filtros (siguen aplicándose con el botón "Aplicar filtros").
+  useEffect(() => {
+    const id = setTimeout(() => {
+      // Actualizar también los filtros aplicados para la búsqueda
+      setAppliedFilters(prev => ({ ...prev, q }));
+      onParamsChange?.({ q }); // ← enviamos sólo el campo 'q'
+    }, DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [q, onParamsChange]);
+
   /* Aplicar / Limpiar — ÚNICOS lugares donde notificamos al padre */
   const applyFilters = () => {
-    const safeEstado = isInmo ? estado.filter((v) => v !== "NO_DISPONIBLE") : estado;
-    onParamsChange?.({
+    const safeDeudor = isInmo ? null : deudor;
+    
+    const newAppliedFilters = {
       q,
-      estado: safeEstado,
+      estado: estado, // Usar el estado original, no el filtrado
       subestado,
       calle,
-      frenteMin: frente.min, frenteMax: frente.max,
-      fondoMin:  fondo.min,  fondoMax:  fondo.max,
-      supMin:    sup.min,    supMax:    sup.max,
-      priceMin:  precio.min, priceMax:  precio.max,
-      deudor: isInmo ? null : deudor, // jamás filtrar por deudor si es inmobiliaria
-    });
+      frente,
+      fondo,
+      sup,
+      precio,
+      deudor: safeDeudor
+    };
+    
+    console.log('[DEBUG] Aplicando filtros:', newAppliedFilters);
+    
+    // Actualizar el estado de filtros aplicados usando callback para asegurar actualización inmediata
+    setAppliedFilters(() => newAppliedFilters);
+    
+    // Solo incluir filtros de rango si han sido modificados desde sus valores por defecto
+    const params = {
+      q,
+      estado: estado, // Enviar el estado original, no el filtrado
+      subestado,
+      calle,
+      deudor: safeDeudor, // jamás filtrar por deudor si es inmobiliaria
+    };
+    
+    // Solo agregar filtros de rango si han sido modificados
+    if (frente.min !== 0 || frente.max !== 100) {
+      params.frenteMin = frente.min;
+      params.frenteMax = frente.max;
+    }
+    if (fondo.min !== 0 || fondo.max !== 100) {
+      params.fondoMin = fondo.min;
+      params.fondoMax = fondo.max;
+    }
+    if (sup.min !== 0 || sup.max !== 5000) {
+      params.supMin = sup.min;
+      params.supMax = sup.max;
+    }
+    if (precio.min !== 0 || precio.max !== 300000) {
+      params.priceMin = precio.min;
+      params.priceMax = precio.max;
+    }
+    
+    console.log('[DEBUG] Parámetros enviados:', params);
+    
+    onParamsChange?.(params);
     setOpen(false);
   };
 
@@ -179,6 +280,20 @@ export default function FilterBar({
     setFrente({ min: 0, max: 100 }); setFondo({ min: 0, max: 100 });
     setSup({ min: 0, max: 5000 });   setPrecio({ min: 0, max: 300000 });
     setDeudor(null);
+    
+    // Limpiar también los filtros aplicados
+    setAppliedFilters({
+      q: "",
+      estado: [],
+      subestado: [],
+      calle: [],
+      frente: { min: 0, max: 100 },
+      fondo: { min: 0, max: 100 },
+      sup: { min: 0, max: 5000 },
+      precio: { min: 0, max: 300000 },
+      deudor: null
+    });
+    
     onParamsChange?.({});
   };
 

@@ -17,17 +17,16 @@ import TablaLotes from "../components/TablaLotes/TablaLotes";
 export default function Dashboard() {
   const ctx = useOutletContext() || {};
 
-  // 🔧 Tomamos el dataset base con nombres alternativos por si cambian en el Layout/Outlet
-  //    (esto evita que quede vacío si la prop se llama distinto).
-  const rawLots =
-    ctx?.allLots ??
-    ctx?.lots ??
-    ctx?.lotes ??
-    ctx?.data?.lotes ??
-    [];
-
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
+
+  const authRaw = localStorage.getItem('auth:user');
+  const authUser = authRaw ? JSON.parse(authRaw) : null;
+
+  const userKey = [
+    authUser?.id || authUser?.email || authUser?.username || 'anon',
+    userRole
+  ].join(':');
 
   const {
     handleViewDetail: _handleViewDetail,
@@ -60,31 +59,53 @@ export default function Dashboard() {
   // Estado de filtros globales (FilterBar)
   const [params, setParams] = useState({});
 
+  const handleParamsChange = (patch) => {
+    if (!patch || Object.keys(patch).length === 0) {
+      // Caso "Limpiar": vaciamos todo
+      setParams({});
+      return;
+    }
+    // Caso "parche" (e.g. { q }) o "aplicar filtros" (objeto completo):
+    setParams((prev) => ({ ...prev, ...patch }));
+  };
   // 🧠 Regla clara: si NO hay parámetros → mostramos TODO.
   //                 si HAY parámetros → aplicamos applyLoteFilters(base, params).
   const lots = useMemo(() => {
+    // 🔧 Tomamos el dataset base con nombres alternativos por si cambian en el Layout/Outlet
+    //    (esto evita que quede vacío si la prop se llama distinto).
+    const rawLots =
+      ctx?.allLots ??
+      ctx?.lots ??
+      ctx?.lotes ??
+      ctx?.data?.lotes ??
+      [];
+    
     const base = Array.isArray(rawLots) ? rawLots : [];
     const hasParams = params && Object.keys(params).length > 0;
 
+    console.log('[DEBUG] Dashboard - rawLots:', base);
+    console.log('[DEBUG] Dashboard - params:', params);
+    console.log('[DEBUG] Dashboard - hasParams:', hasParams);
+
     try {
-      return hasParams ? applyLoteFilters(base, params) : base;
+      const result = hasParams ? applyLoteFilters(base, params) : base;
+      console.log('[DEBUG] Dashboard - resultado final:', result);
+      return result;
     } catch (e) {
-      if (process.env.NODE_ENV !== "production") {
-        // eslint-disable-next-line no-console
-        console.warn("[Dashboard] applyLoteFilters lanzó error; devuelvo base completa:", e);
-      }
+      console.warn("[Dashboard] applyLoteFilters lanzó error; devuelvo base completa:", e);
       return base;
     }
-  }, [rawLots, params]);
+  }, [ctx, params]);
 
   return (
     <>
       {/* Barra de filtros globales (controla qué data llega a la tabla) */}
-      <FilterBar variant="dashboard" userRole={userRole} onParamsChange={setParams} />
+      <FilterBar variant="dashboard" userRole={userRole} onParamsChange={handleParamsChange} />
 
       {/* Tablero de información (TablaLotes) */}
       <TablaLotes
         userRole={userRole}
+        userKey={userKey}
         data={lots}
         // Permisos (acciones visibles en la tabla)
         canSaleCreate={canSaleCreate}
@@ -95,7 +116,7 @@ export default function Dashboard() {
         onEdit={onEditar}
         onDelete={onEliminar}
         onRegisterSale={goRegistrarVenta}
-        // onApplyPromotion={(ids) => ...} // 👉 lo agregamos cuando esté el modal
+        // onVerEnMapa={(ids) => ...} // 👉 lo agregamos cuando esté el modal
         // onAddLot={() => ...}            // 👉 lo agregamos cuando esté el modal
       />
     </>
