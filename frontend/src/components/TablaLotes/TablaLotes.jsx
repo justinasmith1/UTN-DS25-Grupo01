@@ -329,7 +329,7 @@ function PageSizeDropdown({ value, options, onChange }) {
       {/* Este botón ya queda con el mismo hover/tamaño que “Columnas” */}
       <button
         type="button"
-        className="tl-btn tl-btn--ghost tl-btn--md tl-dd_button"
+        className="tl-btn tl-btn--ghost tl-btn--columns2 tl-dd__button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
       >
@@ -642,7 +642,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--view"
                         aria-label="Ver lote"
-                        title="Ver lote"
+                        data-tooltip="Ver Lote"
                         onClick={() => onVer?.(l)}
                       >
                         <Eye size={18} strokeWidth={2} />
@@ -652,7 +652,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--edit"
                         aria-label="Editar lote"
-                        title="Editar lote"
+                        data-tooltip="Editar lote"
                         onClick={() => onEditar?.(l)}
                       >
                         <Edit size={18} strokeWidth={2} />
@@ -662,7 +662,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--money"
                         aria-label="Registrar venta"
-                        title="Registrar venta"
+                        data-tooltip="Registrar venta"
                         onClick={() => onRegistrarVenta?.(l)}
                       >
                         <DollarSign size={18} strokeWidth={2} />
@@ -672,7 +672,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--delete"
                         aria-label="Eliminar lote"
-                        title="Eliminar lote"
+                        data-tooltip="Eliminar lote"
                         onClick={() => onEliminar?.(l)}
                       >
                         <Trash2 size={18} strokeWidth={2} />
@@ -682,7 +682,7 @@ export default function TablaLotes({
                       <button
                         className="tl-icon tl-icon--promo"
                         aria-label="Aplicar promoción"
-                        title="Aplicar promoción"
+                        data-tooltip="Aplicar promoción"
                         onClick={() => onAplicarPromo?.(l)}
                       >
                         <CirclePercent size={18} strokeWidth={2} />
