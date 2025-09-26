@@ -85,6 +85,14 @@
 /* Dropdown cantidad */
 .tl-dd{ position:relative; }
 .tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }
+.tl-dd__button{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-width:80px;
+}
+
 .tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; padding-left: 3px; }
 .tl-dd.is-open .tl-dd__chev{ transform:rotate(180deg) translateY(-1px); }
 .tl-dd__menu{ position:absolute; top:42px; left:0; min-width:100%; background:#fff; border:1px solid #d9dee5; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.10); padding:6px; z-index:20; }
@@ -210,8 +218,7 @@
 .tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
 .tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
 
-/* === (opcional) Si tu fila de acciones usa un wrapper .tl-actions/.tl-action-group, lo
-   dejo preparado por si quieres afinar más adelante sin tocar celdas.    */
+/* === (opcional) ===  */
 .tl-td--actions .tl-actions,
 .tl-td--actions .tl-action-group,
 [data-col="actions"].tl-td .tl-actions,
@@ -220,4 +227,57 @@
   align-items:center;
   justify-content:flex-start;
   gap:10px;
+}
+
+/* ----------------------------------------------------------
+   Tooltip “cardcito” para botones de acciones (CSS only)
+   ---------------------------------------------------------- */
+/* La celda de Acciones permite que el tooltip se “asome” */
+.tl-td--actions {
+  position: relative;
+  overflow: visible;
+}
+
+/* Cada icono será el ancla del tooltip */
+.tl-td--actions .tl-icon {
+  position: relative;
+}
+
+/* Tooltip: sale a la IZQUIERDA del icono (evita cortar con el borde derecho) */
+.tl-td--actions .tl-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 12px);        /* 12px a la izquierda del botón */
+  transform: translateY(-50%) translateX(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;       /* mismo tono de tus bordes */
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(16,24,40,0.12);
+
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 9999;
+}
+
+/* Mostrar al pasar el mouse o al enfocar con teclado */
+.tl-td--actions .tl-icon[data-tooltip]:hover::after,
+.tl-td--actions .tl-icon[data-tooltip]:hover::before,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::after,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::before {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0) rotate(45deg);
+}
+
+/* Ajuste fino para el ::after cuando está visible (sin la rotación) */
+.tl-td--actions .tl-icon[data-tooltip]:hover::after,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::after {
+  transform: translateY(-50%);
 }
