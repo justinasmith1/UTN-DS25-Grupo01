@@ -429,6 +429,25 @@ export default function TablaLotes({
     }
   }, [userKey, role]);
 
+  // Helper local: normaliza y detecta “NO DISPONIBLE”
+  const norm = (s) =>
+    (s ?? '')
+      .toString()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  const isNoDisponible = (estado) => norm(estado).replace(/_/g, ' ') === 'no disponible';
+
+  // Regla para INMOBILIARIA:
+  // si el rol incluye "inmob", antes de paginar/mostrar filtramos fuera los NO DISPONIBLE.
+  const filteredSource = useMemo(() => {
+    if (role.includes('inmob')) {
+      return source.filter((l) => !isNoDisponible(l?.estado));
+    }
+    return source;
+  }, [source, role]);
+
   // 3) Columnas visibles (inicializa con defaults y luego carga por usuario)
   const [colIds, setColIds] = useState(DEFAULT_COLS);
 
@@ -484,23 +503,23 @@ export default function TablaLotes({
     return Array.from(map.values());
   }, [colIds]);
 
-  // 4) Paginación + selección
+  // 4) Paginación + selección (ahora sobre filteredSource)
   const PAGE_SIZES = [10, 25, 50, 'Todos'];
   const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   const [page, setPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  useEffect(() => { setPage(1); setSelectedIds([]); }, [source, pageSize]);
+  useEffect(() => { setPage(1); setSelectedIds([]); }, [filteredSource, pageSize]);
 
-  const total = source.length;
+  const total = filteredSource.length;
   const size = pageSize === 'Todos' ? total : Number(pageSize) || PAGE_SIZES[1];
   const pageCount = Math.max(1, Math.ceil((total || 1) / (size || 1)));
   const start = (page - 1) * (size || 0);
   const end = pageSize === 'Todos' ? total : start + size;
 
   const pageItems = useMemo(
-    () => (pageSize === 'Todos' ? source : source.slice(start, end)),
-    [source, pageSize, start, end]
+    () => (pageSize === 'Todos' ? filteredSource : filteredSource.slice(start, end)),
+    [filteredSource, pageSize, start, end]
   );
 
   // 5) Selección por fila
@@ -583,16 +602,13 @@ export default function TablaLotes({
         </div>
 
         <div className="tl-actions-right">
-          {role.includes('admin') && (
-            <button
+          <button
               type="button"
               className="tl-btn tl-btn--soft"
               disabled={selectedIds.length === 0}
-              onClick={() => onAplicarPromo?.(selectedIds)} 
             >
               Ver en mapa (futuro) ({selectedIds.length})
-            </button>
-          )}
+          </button>
           {role.includes('admin') && (
             <button
               type="button"

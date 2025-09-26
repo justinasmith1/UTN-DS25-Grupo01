@@ -303,8 +303,8 @@ export default function FilterBar({
     onParamsChange?.({});
   };
 
-  /* Resets por sección */
-  const resetEstado    = () => setEstado((prev) => (isInmo ? prev.filter((v) => v !== "NO_DISPONIBLE") : []));
+ // Resets por sección
+  const resetEstado    = () => setEstado([]);          // ← FIX: vacía siempre
   const resetSubestado = () => setSubestado([]);
   const resetCalle     = () => setCalle([]);
   const resetFrente    = () => setFrente({ min: 0, max: 100 });
@@ -312,6 +312,7 @@ export default function FilterBar({
   const resetSup       = () => setSup({ min: 0, max: 5000 });
   const resetPrecio    = () => setPrecio({ min: 0, max: 300000 });
   const resetDeudor    = () => setDeudor(null);
+
 
   /* ===== Modal ===== */
   const modal = open && createPortal(
