@@ -1,3 +1,8 @@
+// components/FilterBar/FilterBar.jsx
+// -----------------------------------------------------------------------------
+// FilterBar de Lotes - Contiene todos los posibles filtros a aplicar y todas
+// las divisiones por roles.
+// -----------------------------------------------------------------------------
 import { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import "./FilterBar.css";
@@ -12,9 +17,12 @@ import RangeControl from "./controls/RangeControl";
  *      2) Borrar todo
  *
  * Comportamiento por rol:
- * - INMOBILIARIA: oculta "Deudor" y no permite "NO_DISPONIBLE" en Estado.
+ * - INMOBILIARIA: oculta "Deudor" y no permite "NO_DISPONIBLE" en Estado. El resto de los roles recibe lo mismo que el admin por ahora
  */
+
+/* Lo que tarda en responder con el debounce */
 const DEBOUNCE_MS = 250;
+
 export default function FilterBar({
   variant = "dashboard",
   userRole = "GENERAL",
@@ -52,9 +60,7 @@ export default function FilterBar({
   const [precio, setPrecio] = useState({ min: 0, max: 300000 });
   const [deudor, setDeudor] = useState(null); // null=Todos, true=Solo deudor, false=Sin deuda
 
-  /* === Estado de filtros aplicados ===
-     Solo estos se muestran en chips y badges
-  */
+  /* === Estado de filtros aplicados === Solo estos se muestran en chips y badges */
   const [appliedFilters, setAppliedFilters] = useState({
     q: "",
     estado: [],
@@ -75,7 +81,7 @@ export default function FilterBar({
   const nice = (s) => (s ?? "").replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
   const toggle = (setFn, v) => setFn((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
-  /* Saneamos el draft si cambia el rol a INMOBILIARIA (defensa doble) */
+  /* Saneamos el draft si cambia el rol a INMOBILIARIA */
   useEffect(() => {
     if (!isInmo) return;
     setEstado((prev) => prev.filter((v) => v !== "NO_DISPONIBLE")); // nunca dejarlo seleccionado
@@ -210,7 +216,7 @@ export default function FilterBar({
     };
   }, [open]);
 
-  // BÚSQUEDA EN VIVO: cuando cambia 'q', notificamos al padre solo ese parche.
+// BÚSQUEDA EN VIVO: cuando cambia 'q', notificamos al padre solo ese parche.
 // No afecta al resto de filtros (siguen aplicándose con el botón "Aplicar filtros").
   useEffect(() => {
     const id = setTimeout(() => {

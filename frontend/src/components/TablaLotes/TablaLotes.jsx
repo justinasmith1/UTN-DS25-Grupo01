@@ -1,9 +1,9 @@
 // components/TablaLotes.jsx
 // -----------------------------------------------------------------------------
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
-// - Persistencia de columnas VISIBLES por USUARIO+ROL (namespacing + versión).
-// - El botón "Restablecer" limpia el storage del usuario actual y vuelve a defaults.
-// - NO se toca el hover del botón de cantidad ni los botones de promo.
+// Persistencia de columnas VISIBLES por USUARIO+ROL (namespacing + versión).
+// Utiliza el css personalizado de la tabla
+// Recibe informacion del filtrado de lotes -- no hace request propias al back -- trae todo y sobre eso trabaja
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
@@ -30,7 +30,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 // ─────────────────────────────────────────────────────────────
-// 0) Constante legacy (para migración desde la versión previa)
+// Constante legacy (para migración desde la versión previa)
 // ─────────────────────────────────────────────────────────────
 const LS_KEY = 'tablaLotes:columns:v7'; // <<— clave vieja, si existe la migramos una vez
 
@@ -43,9 +43,11 @@ const STORAGE_VERSION = 'v2';
 const APP_NS = 'lfed'; // La Federala
 const makeColsKey = (userKey) => `${APP_NS}:tabla-cols:${STORAGE_VERSION}:${userKey}`;
 
-// ----------------------------------
-// ----------- Helpers -------------
-const fmtMoney = (v) => {
+// ─────────────────────────────────────────────────────────────
+//              ----------- Helpers -------------
+// ─────────────────────────────────────────────────────────────
+// Para el simbolo de la plata
+const fmtMoney = (v) => { 
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
@@ -56,7 +58,8 @@ const fmtMoney = (v) => {
   });
 };
 
-const fmtM2 = (v) => {
+// Para los metros cuadrados
+const fmtM2 = (v) => { 
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
@@ -68,7 +71,8 @@ const fmtM2 = (v) => {
   );
 };
 
-const fmtM = (v) => {
+// Para los metros
+const fmtM = (v) => { 
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
@@ -80,6 +84,7 @@ const fmtM = (v) => {
   );
 };
 
+// Para el estado
 const fmtEstado = (s) =>
   !s
     ? '—'
@@ -105,6 +110,7 @@ const estadoBadge = (raw) => {
   return badge(s, map[s] || 'muted');
 };
 
+// Paa el subestado
 const subestadoBadge = (raw) => {
   const s = fmtEstado(raw).toUpperCase();
   const map = {
@@ -114,8 +120,11 @@ const subestadoBadge = (raw) => {
   };
   return badge(s, map[s] || 'muted');
 };
+// ─────────────────────────────────────────────────────────────
 
+// ─────────────────────────────────────────────────────────────
 // -------------------- Mapeos según schema --------------------
+// ─────────────────────────────────────────────────────────────
 function getPropietarioNombre(l) {
   const p = l?.propietario;
   if (!p) return l?.propietarioNombre ?? l?.ownerName ?? '—';
@@ -132,9 +141,11 @@ function getNumero(l) {
   const u = l?.ubicacion;
   return u?.numero ?? l?.numero ?? '—';
 }
+// ─────────────────────────────────────────────────────────────
 
-// ---------------------------------------------------
-// -------------------- Columnas --------------------
+// ─────────────────────────────────────────────────────────────
+//    -------------------- Columnas --------------------
+// ─────────────────────────────────────────────────────────────
 const ALL_COLUMNS = [
   { id: 'id',          titulo: 'ID',         accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—',         align: 'center'  },
   { id: 'estado',      titulo: 'Estado',     accessor: (l) => estadoBadge(l.estado),                       align: 'center'},
@@ -166,8 +177,10 @@ const ALL_SAFE = [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()];
 // Columnas por defecto (y para “Restablecer”)
 const DEFAULT_COLS = ['id', 'estado', 'propietario', 'calle', 'precio'];
 
-// ------------------------------------------------------
-// -------------- Para elegir las columnas--------
+
+// ─────────────────────────────────────────────────────────────
+//  ----------- Para elegir las columnas a mostrar  ----------
+// ─────────────────────────────────────────────────────────────
 function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) {
   const totalSel = selected.length;
   
@@ -183,8 +196,8 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     if (isSel) {
       onChange(selected.filter((x) => x !== id));
     } else {
-      if (selected.length >= max) return;             // respeta el límite
-      onChange([...new Set([...selected, id])]);      // sin repetidos
+      if (selected.length >= max) return;             
+      onChange([...new Set([...selected, id])]);      
     }
   };
 
@@ -271,9 +284,11 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     </div>
   );
 }
+// ─────────────────────────────────────────────────────────────
 
-//--------------------------------------------------------------
-// -------------------- Componente SortableItem --------------------
+// ─────────────────────────────────────────────────────────────
+//    ----------------- Componente SortableItem ------------
+// ─────────────────────────────────────────────────────────────
 function SortableItem({ id, column, checked, disabled, onToggle }) {
   const {
     attributes,
@@ -311,8 +326,9 @@ function SortableItem({ id, column, checked, disabled, onToggle }) {
   );
 }
 
-//--------------------------------------------------------------
-// -------------------- Dropdown "cantidad" --------------------
+// ─────────────────────────────────────────────────────────────
+//   -------- Dropdown de cantidad de lotes a mostrar -----
+// ─────────────────────────────────────────────────────────────
 function PageSizeDropdown({ value, options, onChange }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -326,7 +342,6 @@ function PageSizeDropdown({ value, options, onChange }) {
   const label = String(value);
   return (
     <div className={`tl-dd ${open ? 'is-open' : ''}`} ref={ref}>
-      {/* Este botón ya queda con el mismo hover/tamaño que “Columnas” */}
       <button
         type="button"
         className="tl-btn tl-btn--ghost tl-btn--columns2 tl-dd__button"
@@ -355,8 +370,11 @@ function PageSizeDropdown({ value, options, onChange }) {
     </div>
   );
 }
+// ─────────────────────────────────────────────────────────────
 
-// --------------------------- Ancho por columna (grilla) ---------------------------
+// ─────────────────────────────────────────────────────────────
+//    --------- Ancho por columna (grilla) --------------
+// ─────────────────────────────────────────────────────────────
 const widthFor = (id) => {
   switch (id) {
     case 'id':         return '96px';
@@ -374,9 +392,11 @@ const widthFor = (id) => {
     default:           return 'minmax(140px,1fr)';
   }
 };
+// ─────────────────────────────────────────────────────────────
 
-//--------------------------------------------------------------
-// -------------------- Componente principal --------------------
+// ─────────────────────────────────────────────────────────────
+//   ----------------- Componente principal -----------------
+// ─────────────────────────────────────────────────────────────
 export default function TablaLotes({
   lotes, data,
   onVer, onEditar, onRegistrarVenta, onEliminar,
@@ -515,8 +535,11 @@ export default function TablaLotes({
   }, [visibleCols]);
 
   const empty = total === 0;
+// ─────────────────────────────────────────────────────────────
 
+  // ─────────────────────────────────────────────────────────────
   // -------------- Renderizado --------------------------------
+  // ─────────────────────────────────────────────────────────────
   return (
     <div className="tl-wrapper">
       {/* Toolbar */}
@@ -565,7 +588,7 @@ export default function TablaLotes({
               type="button"
               className="tl-btn tl-btn--soft"
               disabled={selectedIds.length === 0}
-              onClick={() => onAplicarPromo?.(selectedIds)} // placeholder de acción de lote múltiple si lo necesitás
+              onClick={() => onAplicarPromo?.(selectedIds)} 
             >
               Ver en mapa (futuro) ({selectedIds.length})
             </button>
