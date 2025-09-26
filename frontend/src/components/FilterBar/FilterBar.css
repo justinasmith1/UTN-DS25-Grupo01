@@ -1,3 +1,4 @@
+/* src/components/FilterBar/FilterBar.css - Contiene todos los estilos de la barra de filtros*/
 :root{
   --fb-green:#0D3730; --fb-green-soft:rgba(13,55,48,.10);
   --fb-line:#E6E6E6;  --fb-text:#1c1c1c;
@@ -24,6 +25,8 @@
 .fb-chip{ display:inline-flex; align-items:center; gap:8px; border:1px solid var(--fb-line); border-radius:999px; padding:6px 10px; background:#fff; color:#333; font-weight:600; cursor:pointer; }
 .fb-chip:hover{ border-color:#9fb4ad; background:#f4f6f5; color:#1c1c1c; }
 .fb-chip .x{ font-weight:800; opacity:.7; }
+/* --------------------------------------------- */
+
 
 /* ===== Modal ===== */
 .fb-modal{ position: fixed; inset: 0; display: flex; justify-content: center; align-items: flex-start; background: rgba(0,0,0,.28); z-index: 2147483646; }
@@ -58,6 +61,8 @@
 .fb-pill{ border:1px solid var(--fb-line); background:#fff; border-radius:999px; padding:8px 14px; font-weight:600; color:#1c1c1c; cursor:pointer; transition:.15s; }
 .fb-pill.is-checked{ border-color:var(--fb-green); background:var(--fb-green-soft); color:var(--fb-green); }
 .fb-pill:focus-visible{ outline:3px solid var(--fb-blue); outline-offset:2px; }
+/* --------------------------------------------- */
+
 
 /* ===== Ranges: tipografía normalizada =====
    Envolvemos cada RangeControl con .fb-range-block y, dentro de ese bloque,
@@ -92,6 +97,7 @@
 .fb-range-inputs input{ border:none; outline:none; width:110px; font-weight:700; font-size:14px; font-variant-numeric: tabular-nums; }
 .fb-range-inputs .dash{ color:#9aa0a6; font-weight:700; }
 .fb-range-inputs .unit{ color:#6b6b6b; font-weight:600; }
+/* --------------------------------------------- */
 
 /* Footer */
 .fb-sheet-footer{ background:#fff; border-top:none; }
@@ -102,6 +108,7 @@
 .fb-btn--danger { background:var(--fb-red);  }
 .fb-btn:hover{ transform: translateY(-1px); filter: brightness(1.06); }
 .fb-btn:active{ transform: translateY(0);   filter: brightness(0.98); }
+/* --------------------------------------------- */
 
 /* Responsive */
 @media (max-width:768px){
@@ -109,3 +116,4 @@
   .fb-search{ flex:1 1 100%; }
   .fb-btn-group{ width:94%; }
 }
+/* --------------------------------------------- */
