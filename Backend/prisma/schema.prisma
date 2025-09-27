@@ -63,6 +63,13 @@ enum EstadoVenta {
   ESCRITURADO
 }
 
+enum TiposArchivos {
+  BOLETO
+  ESCRITURA
+  PLANO
+  IMAGEN
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -77,6 +84,7 @@ model User {
   createdAt    DateTime      @default(now())
   persona      Persona?
   inmobiliaria Inmobiliaria?
+  uplodedFiles Archivos[]
 }
 
 // Persona
@@ -149,6 +157,7 @@ model Lote {
   createdAt DateTime  @default(now())
   updateAt  DateTime?
   Venta     Venta[]
+  archivos  Archivos[]
 }
 
 model Ubicacion {
@@ -200,4 +209,18 @@ model Inmobiliaria {
 
   userId Int?  @unique
   user   User? @relation(fields: [userId], references: [id])
+}
+
+// Archivos
+
+model Archivos {
+  id              Int      @id @default(autoincrement())
+  nombreArchivo   String
+  linkArchivo     String
+  tipo            TiposArchivos
+  idLoteAsociado  Int
+  lote            Lote     @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
+  createdAt       DateTime @default(now())
+  uploadedBy      String?
+  user            User?     @relation(fields: [uploadedBy], references: [username])
 }
