@@ -9,6 +9,7 @@ import { usuarioRoutes } from './routes/usuario.routes';
 import { reservaRoutes } from './routes/reserva.routes';
 import {inmobRoutes} from './routes/inmobiliaria.routes';
 import {ventaRoutes} from "./routes/ventas.routes";
+import { fileRoutes } from './routes/files.routes';
 
 dotenv.config();
 
@@ -54,8 +55,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api/lotes', loteRoutes);
 app.use("/api/usuarios", usuarioRoutes);
 app.use("/api/reservas", reservaRoutes);
-app.use("/api/inmobiliarias", inmobRoutes)
-app.use("/api/ventas", ventaRoutes)
+app.use("/api/inmobiliarias", inmobRoutes);
+app.use("/api/ventas", ventaRoutes);
+app.use('/api/files', fileRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);
