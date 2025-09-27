@@ -22,7 +22,6 @@ router.get(
     '/:id', 
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
-    validateParams(deleteFileMetadataSchema),
     fileController.getFileByIdController);
 
 // Obtener URL firmada para descargar/ver archivo
@@ -32,7 +31,7 @@ router.get(
     authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
     validateParams(deleteFileMetadataSchema),
     fileController.generateSignedUrlController);
- 
+
 //POST /api/files
 router.post(
     '/',
@@ -47,8 +46,8 @@ router.put(
     '/:id',
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(deleteFileMetadataSchema),
-    validate(updateFileMetadataSchema),
+    //validateParams(deleteFileMetadataSchema),
+    //validate(updateFileMetadataSchema),
     fileController.updateFileController);
 
 //DELETE /api/files/:id
@@ -56,7 +55,7 @@ router.delete(
     '/:id', 
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(deleteFileMetadataSchema),
+    //validateParams(deleteFileMetadataSchema),
     fileController.deleteFileController);
 
 export const fileRoutes = router;
