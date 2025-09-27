@@ -5,6 +5,13 @@
 // Utiliza el css personalizado de la tabla
 // Recibe informacion del filtrado de lotes -- no hace request propias al back -- trae todo y sobre eso trabaja
 // -----------------------------------------------------------------------------
+//
+// ✅ Cambio de esta entrega: Selección PERSISTENTE entre páginas
+//    - Ya NO se limpia la selección al cambiar pageSize.
+//    - SÍ se limpia la selección cuando cambia el dataset filtrado (filteredSource).
+//    - “Seleccionar todo” afecta SOLAMENTE a la página visible (pageItems).
+//
+// -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
@@ -507,9 +514,15 @@ export default function TablaLotes({
   const PAGE_SIZES = [10, 25, 50, 'Todos'];
   const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   const [page, setPage] = useState(1);
+
+  // ✅ Selección PERSISTENTE entre páginas
+  //    - Usamos un array local de IDs seleccionados.
+  //    - NO se limpia al cambiar pageSize.
+  //    - SÍ se limpia cuando cambia el dataset filtrado (filteredSource).
   const [selectedIds, setSelectedIds] = useState([]);
 
-  useEffect(() => { setPage(1); setSelectedIds([]); }, [filteredSource, pageSize]);
+  // Cuando cambia el tamaño de página, solo volvemos a la primera página (no tocamos selección)
+  useEffect(() => { setPage(1); }, [pageSize]);
 
   const total = filteredSource.length;
   const size = pageSize === 'Todos' ? total : Number(pageSize) || PAGE_SIZES[1];
@@ -523,7 +536,12 @@ export default function TablaLotes({
   );
 
   // 5) Selección por fila
-  const getRowId = (l) => l.id ?? l.idLote ?? l.codigo;
+  const getRowId = (l) => String(l.id ?? l.idLote ?? l.codigo); // normalizamos a string
+  const dataSignature = useMemo(
+    () => filteredSource.map(getRowId).join(','),
+    [filteredSource]
+  );
+  useEffect(() => { setPage(1); setSelectedIds([]); }, [dataSignature]);
   const allOnPageIds = pageItems.map(getRowId).filter((x) => x != null);
   const allOnPageSelected =
     allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.includes(id));
@@ -531,6 +549,9 @@ export default function TablaLotes({
   const toggleRow = (id) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
+  // 2.2 “Seleccionar todo (página actual)”
+  //  Este checkbox vive en el HEADER (columna de checks).
+  //  Afecta SOLO los IDs visibles en pageItems.
   const toggleAllOnPage = () =>
     setSelectedIds((prev) => {
       const s = new Set(prev);
@@ -609,6 +630,18 @@ export default function TablaLotes({
             >
               Ver en mapa (futuro) ({selectedIds.length})
           </button>
+
+          {/* ✅ Acceso rápido para el usuario: limpiar selección manualmente */}
+          <button
+            type="button"
+            className="tl-btn tl-btn--soft"
+            disabled={selectedIds.length === 0}
+            onClick={() => setSelectedIds([])}
+            title="Quitar selección"
+          >
+            Limpiar selección
+          </button>
+
           {role.includes('admin') && (
             <button
               type="button"
