@@ -222,5 +222,5 @@ model Archivos {
   lote            Lote     @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
   createdAt       DateTime @default(now())
   uploadedBy      String?
-  user            User?     @relation(fields: [uploadedBy], references: [username])
+  user            User?     @relation(fields: [uploadedBy], references: [email])
 }

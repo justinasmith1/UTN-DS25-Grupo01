@@ -5,13 +5,14 @@ import { FileMetadata, NewFileMetadata, UpdateFileMetadata, DeleteFileMetadata, 
 export class fileController {
     static async upload(req: Request, res: Response) {
         const file = req.file as Express.Multer.File;
+        //console.log(file);
         const { tipo, idLoteAsociado } = req.body as { tipo: TipoFile; idLoteAsociado: number };
         if (!file) {
             return res.status(400).json({ message: "No file uploaded" });
         }
 
         const { originalname, buffer, mimetype } = file;
-
+        console.log("TEST: \n", originalname, buffer, mimetype, tipo, idLoteAsociado);
         // Subir el archivo a Supabase Storage
         const { objectPath } = await FileService.uploadFileToSupabase(buffer,{
             idLoteAsociado,
@@ -22,6 +23,7 @@ export class fileController {
         });
 
         // Guardar metadata en la base de datos
+
         const newFile = await FileService.saveFileMetadata({
             filename: originalname,
             url: objectPath,
@@ -34,8 +36,8 @@ export class fileController {
 }
 // Controlador para obtener todos los archivos por lote
 export const getAllFilesController = async (req: Request, res: Response) => {
-    try {
-        const files = await FileService.listByLote(req.query.idLoteAsociado ? parseInt(req.query.idLoteAsociado as string, 10) : 0);
+     try {
+        const files = await FileService.listByLote(req.params.idLoteAsociado ? parseInt(req.params.idLoteAsociado as string, 10) : 0);
         res.status(200).json(files);
     } catch (error) {
         res.status(500).json({ message: "Error retrieving files", error });
@@ -55,6 +57,7 @@ export const generateSignedUrlController = async (req: Request, res: Response) =
 
 // Controlador para obtener un archivo por ID
 export const getFileByIdController = async (req: Request, res: Response) => {
+    console.log(req)
     const id = parseInt(req.params.id, 10);
     try {
         const file = await FileService.getFileById(id);
