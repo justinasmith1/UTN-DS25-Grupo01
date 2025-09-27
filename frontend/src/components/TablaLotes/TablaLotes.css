@@ -1,10 +1,7 @@
 /* components/TablaLotes.css
-   Estilos del tablero de lotes (tabla con CSS Grid)
-   - Look moderno y consistente con tu UI.
-   - Altura de celdas uniforme, baseline estable y columnas numéricas alineadas.
-*/
+   Estilos del tablero de lotes */
 
-/* Wrapper con padding horizontal (tú lo pediste) */
+/* Wrapper con padding horizontal */
 .tl-wrapper { padding-left: 24px; padding-right: 24px; }
 
 /* ===== Toolbar ===== */
@@ -18,10 +15,12 @@
 .tl-btn--primary:hover{ filter:brightness(1.05); }
 .tl-btn--soft{ background:#eef7f4; color:#116149; border-color:#d1ece3; }
 .tl-btn--ghost{ background:transparent; }
+/* --------------------------------------------- */
 
 /* Botón "Columnas": icono + texto alineados */
 .tl-btn--columns2{ display:flex; align-items:center; gap:8px; padding:8px 12px; }
 .tl-btn__text{ font-weight:500; color:#2b3748; }
+/* --------------------------------------------- */
 
 /* Popover columnas */
 .tl-columns{ position:relative; }
@@ -81,16 +80,27 @@
   color:#6b7280;
   text-align:center;
 }
+/* --------------------------------------------- */
 
 /* Dropdown cantidad */
 .tl-dd{ position:relative; }
 .tl-dd__button{ display:flex; align-items:center; gap:10px; min-width:80px; justify-content:space-between; border:1px solid #d9dee5; background:#fff; border-radius:10px; padding:8px 12px; }
+.tl-dd__button{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  min-width:80px;
+}
+
 .tl-dd__chev{ font-size:20px; line-height:1; opacity:.85; transform:translateY(1px); transition:transform .15s ease; padding-left: 3px; }
 .tl-dd.is-open .tl-dd__chev{ transform:rotate(180deg) translateY(-1px); }
 .tl-dd__menu{ position:absolute; top:42px; left:0; min-width:100%; background:#fff; border:1px solid #d9dee5; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.10); padding:6px; z-index:20; }
 .tl-dd__item{ width:100%; text-align:left; border:0; background:transparent; cursor:pointer; padding:8px 10px; border-radius:8px; font-size:14px; }
 .tl-dd__item:hover{ background:#f6f8fa; }
 .tl-dd__item.is-active{ background:#eef7f4; color:#116149; }
+/* --------------------------------------------- */
+
 
 /* ===== Tabla ===== */
 .tl-table{ border:1px solid #e6ebf2; border-radius:12px; overflow:hidden; background:#fff; }
@@ -104,6 +114,8 @@
 }
 .tl-th{ font-weight:600; color:#2b3748; }
 .tl-th--checkbox, .tl-td--checkbox{ justify-content:center; }
+/* --------------------------------------------- */
+
 
 /* Alineaciones */
 .tl-th--left,  .tl-td--left  { justify-content:flex-start; text-align:left; }
@@ -117,16 +129,17 @@
   min-height: 56px; /* misma altura que las otras celdas */
 }
 
-/* -------- Spacer invisible (ancla acciones a la derecha sin espacio visual) -------- */
+/* -------- Spacer invisible -------- */
 .tl-th--spacer-invisible, .tl-td--spacer-invisible{
   padding: 0;
-  border: none; /* sin bordes */
-  background: transparent; /* sin fondo */
-  min-height: 56px; /* misma altura que las otras celdas */
-  /* Completamente invisible pero ocupa espacio en el grid */
+  border: none;
+  background: transparent;
+  min-height: 56px;
 }
+/* --------------------------------------------- */
 
-/* Columna Acciones: header y celdas alineados y pegados hacia la izquierda de su propia columna */
+
+/* === Columna Acciones ===*/
 .tl-th--actions, .tl-td--actions{ gap:10px; }
 .tl-th--actions,
 [data-col="actions"].tl-th {
@@ -135,7 +148,7 @@
   min-width: 220px;
   text-align: initial;
   justify-content: center;
-  padding-left: 12px;           
+  padding-right: 55px;           
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {
@@ -143,9 +156,10 @@
   width: 100%;
   min-width: 220px;
   text-align: initial;
-  justify-content: center;  /* <- ANTES estaba center: esto fijaba los íconos */
-  padding-left: 12px;           /* <- que los íconos arranquen igual que el header */
+  justify-content: center;  
+  padding-right: 55px;           
 }
+/* --------------------------------------------- */
 
 /* Zebra */
 .tl-tbody .tl-tr:nth-child(2n) .tl-td{ background:#fcfdfe; }
@@ -161,6 +175,8 @@
 }
 .u-m2{ display:inline-flex; align-items:baseline; column-gap:4px; }
 .u-unit{ font-size:.92em; line-height:1; opacity:.9; }
+/* --------------------------------------------- */
+
 
 /* ===== Íconos redondos (lucide) ===== */
 .tl-icon{
@@ -171,7 +187,7 @@
   box-shadow:0 1px 2px rgba(16,24,40,.06);
   transition: transform .14s ease, box-shadow .14s ease, outline-color .14s ease, outline-offset .14s ease;
 }
-.tl-icon svg{ width:18px; height:18px; display:block; }
+.tl-icon svg{ width:21px; height: 18px; display:block; }
 
 /* Colores por acción */
 .tl-icon--view{   background:#F2F4F7; color:#475467; }
@@ -191,10 +207,13 @@
   transform:translateY(-1px);
   box-shadow:0 2px 8px rgba(16,24,40,.12);
 }
+/* --------------------------------------------- */
 
 /* ===== Paginación ===== */
 .tl-pagination{ display:flex; justify-content:center; align-items:center; gap:10px; padding:14px 8px; color:#2b3748; }
 .tl-pageinfo{ font-weight:500; }
+/* --------------------------------------------- */
+
 
 /* ===== Badges de Estados/Subestados ===== */
 .tl-badge{
@@ -209,9 +228,10 @@
 .tl-badge--warn   { background:#FFF6E5; color:#9A5C00; border-color:#FFE2B8; }
 .tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
 .tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
+/* --------------------------------------------- */
 
-/* === (opcional) Si tu fila de acciones usa un wrapper .tl-actions/.tl-action-group, lo
-   dejo preparado por si quieres afinar más adelante sin tocar celdas.    */
+
+/* === (opcional) ===  */
 .tl-td--actions .tl-actions,
 .tl-td--actions .tl-action-group,
 [data-col="actions"].tl-td .tl-actions,
@@ -221,3 +241,54 @@
   justify-content:flex-start;
   gap:10px;
 }
+
+/* === Tooltip “cardcito” para botones de acciones (CSS only) === */
+.tl-td--actions {
+  position: relative;
+  overflow: visible;
+}
+
+/* Cada icono será el ancla del tooltip */
+.tl-td--actions .tl-icon {
+  position: relative;
+}
+
+/* Tooltip: sale a la izquierda del icono (evita cortar con el borde derecho en el de aplicar promocion) */
+.tl-td--actions .tl-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 12px);        
+  transform: translateY(-50%) translateX(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;       
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(16,24,40,0.12);
+
+  transition: opacity .15s ease, transform .15s ease;
+  z-index: 9999;
+}
+
+/* Mostrar al pasar el mouse */
+.tl-td--actions .tl-icon[data-tooltip]:hover::after,
+.tl-td--actions .tl-icon[data-tooltip]:hover::before,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::after,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::before {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0) rotate(45deg);
+}
+
+/* Ajuste para el ::after cuando está visible */
+.tl-td--actions .tl-icon[data-tooltip]:hover::after,
+.tl-td--actions .tl-icon[data-tooltip]:focus-visible::after {
+  transform: translateY(-50%);
+}
+/* --------------------------------------------- */
