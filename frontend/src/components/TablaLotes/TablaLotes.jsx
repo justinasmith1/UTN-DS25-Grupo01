@@ -1,22 +1,21 @@
 // components/TablaLotes.jsx
 // -----------------------------------------------------------------------------
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
-// Persistencia de columnas VISIBLES por USUARIO+ROL (namespacing + versión).
-// Utiliza el css personalizado de la tabla
-// Recibe informacion del filtrado de lotes -- no hace request propias al back -- trae todo y sobre eso trabaja
-// -----------------------------------------------------------------------------
-//
-// ✅ Cambio de esta entrega: Selección PERSISTENTE entre páginas
-//    - Ya NO se limpia la selección al cambiar pageSize.
-//    - SÍ se limpia la selección cuando cambia el dataset filtrado (filteredSource).
-//    - “Seleccionar todo” afecta SOLAMENTE a la página visible (pageItems).
-//
+// - No hace requests al backend: recibe un array y trabaja sobre eso.
+// - Persistencia de columnas visibles por USUARIO+ROL (localStorage namespaced).
+// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE".
+// - Esta versión incluye:
+//   1) Selección PERSISTENTE entre páginas (solo se limpia si cambia el dataset).
+//   2) Plantillas de columnas por ROL (inicial y "Restablecer" por rol).
+//   3) Toolbar con botones consistentes (misma altura/estilo).
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent, GripVertical } from 'lucide-react';
+
+// Drag & drop para ordenar columnas elegidas en el picker
 import {
   DndContext,
   closestCenter,
@@ -30,43 +29,34 @@ import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 // ─────────────────────────────────────────────────────────────
-// Constante legacy (para migración desde la versión previa)
+// Clave legacy (solo para migración de una versión anterior)
 // ─────────────────────────────────────────────────────────────
-const LS_KEY = 'tablaLotes:columns:v7'; // <<— clave vieja, si existe la migramos una vez
+const LS_LEGACY_COLS = 'tablaLotes:columns:v7';
 
 // ─────────────────────────────────────────────────────────────
-// 1) Helpers de storage VERSIONADO + namespacing por usuario/rol
-//    Explicación: guardamos por usuario+rol para que una sesión
-//    no herede la disposición de otra en la misma PC.
+// Storage versionado + namespacing por usuario/rol
+// Por qué: evitar que un usuario herede columnas de otro en una misma PC.
 // ─────────────────────────────────────────────────────────────
 const STORAGE_VERSION = 'v2';
 const APP_NS = 'lfed'; // La Federala
 const makeColsKey = (userKey) => `${APP_NS}:tabla-cols:${STORAGE_VERSION}:${userKey}`;
 
 // ─────────────────────────────────────────────────────────────
-//              ----------- Helpers -------------
+// Helpers de formato
 // ─────────────────────────────────────────────────────────────
-// Para el simbolo de la plata
-const fmtMoney = (v) => { 
+const fmtMoney = (v) => {
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
-  return n.toLocaleString('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-    maximumFractionDigits: 0,
-  });
+  return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
 };
 
-// Para los metros cuadrados
-const fmtM2 = (v) => { 
+const fmtM2 = (v) => {
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
@@ -78,8 +68,7 @@ const fmtM2 = (v) => {
   );
 };
 
-// Para los metros
-const fmtM = (v) => { 
+const fmtM = (v) => {
   if (v == null || v === '') return '—';
   const n = Number(v);
   if (Number.isNaN(n)) return '—';
@@ -91,7 +80,6 @@ const fmtM = (v) => {
   );
 };
 
-// Para el estado
 const fmtEstado = (s) =>
   !s
     ? '—'
@@ -117,7 +105,6 @@ const estadoBadge = (raw) => {
   return badge(s, map[s] || 'muted');
 };
 
-// Paa el subestado
 const subestadoBadge = (raw) => {
   const s = fmtEstado(raw).toUpperCase();
   const map = {
@@ -127,10 +114,9 @@ const subestadoBadge = (raw) => {
   };
   return badge(s, map[s] || 'muted');
 };
-// ─────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-// -------------------- Mapeos según schema --------------------
+// Normalización de campos según schema flexible
 // ─────────────────────────────────────────────────────────────
 function getPropietarioNombre(l) {
   const p = l?.propietario;
@@ -140,6 +126,7 @@ function getPropietarioNombre(l) {
   if (partes.length) return partes.join(' ');
   return p.razonSocial ?? String(p.id ?? '—');
 }
+
 function getCalle(l) {
   const u = l?.ubicacion;
   return u?.calle ?? u?.nombreCalle ?? l?.calle ?? '—';
@@ -148,21 +135,20 @@ function getNumero(l) {
   const u = l?.ubicacion;
   return u?.numero ?? l?.numero ?? '—';
 }
-// ─────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-//    -------------------- Columnas --------------------
+// Definición de TODAS las columnas disponibles (catálogo)
 // ─────────────────────────────────────────────────────────────
 const ALL_COLUMNS = [
-  { id: 'id',          titulo: 'ID',         accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—',         align: 'center'  },
-  { id: 'estado',      titulo: 'Estado',     accessor: (l) => estadoBadge(l.estado),                       align: 'center'},
-  { id: 'propietario', titulo: 'Propietario',accessor: (l) => getPropietarioNombre(l),                    align: 'center'  },
-  { id: 'calle',       titulo: 'Calle',      accessor: (l) => getCalle(l),                                 align: 'center'  },
-  { id: 'numero',      titulo: 'Número',     accessor: (l) => getNumero(l),                                align: 'center'},
-  { id: 'superficie',  titulo: 'Superficie', accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2),     align: 'right' },
-  { id: 'frente',      titulo: 'Frente',     accessor: (l) => fmtM(l.frente),                              align: 'right' },
-  { id: 'fondo',       titulo: 'Fondo',      accessor: (l) => fmtM(l.fondo),                               align: 'right' },
-  { id: 'precio',      titulo: 'Precio',     accessor: (l) => fmtMoney(l.precio),                          align: 'center'},
+  { id: 'id',          titulo: 'ID',          accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—', align: 'center' },
+  { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado),               align: 'center' },
+  { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),             align: 'center' },
+  { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                         align: 'center' },
+  { id: 'numero',      titulo: 'Número',      accessor: (l) => getNumero(l),                        align: 'center' },
+  { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
+  { id: 'frente',      titulo: 'Frente',      accessor: (l) => fmtM(l.frente),                      align: 'right' },
+  { id: 'fondo',       titulo: 'Fondo',       accessor: (l) => fmtM(l.fondo),                       align: 'right' },
+  { id: 'precio',      titulo: 'Precio',      accessor: (l) => fmtMoney(l.precio),                  align: 'center' },
   { id: 'deuda',       titulo: 'Deuda',
     accessor: (l) =>
       l.deuda == null ? (
@@ -174,28 +160,40 @@ const ALL_COLUMNS = [
       ),
     align: 'center',
   },
-  { id: 'subestado',   titulo: 'Subestado',  accessor: (l) => subestadoBadge(l.subestado),                 align: 'center'  },
-  { id: 'descripcion', titulo: 'Descripción',accessor: (l) => l.descripcion ?? '—',                        align: 'left'  },
+  { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado),         align: 'center' },
+  { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                align: 'left'   },
 ];
 
-// Sin duplicados por id (evita el doble “subestado”).
+// Evitar duplicados por id ante cambios en el catálogo
 const ALL_SAFE = [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()];
 
-// Columnas por defecto (y para “Restablecer”)
-const DEFAULT_COLS = ['id', 'estado', 'propietario', 'calle', 'precio'];
+// ─────────────────────────────────────────────────────────────
+// Plantillas recomendadas por ROL (solo IDs de columnas)
+// Por qué: onboarding rápido y vistas consistentes por rol.
+// ─────────────────────────────────────────────────────────────
+const COLUMN_TEMPLATES_BY_ROLE = {
+  admin:        ['id','estado','propietario','calle','precio','deuda'],
+  gestor:       ['id','estado', 'subestado','propietario','precio'],
+  tecnico:      ['id','estado','subestado','frente','fondo','superficie'],
+  inmobiliaria: ['id','estado','propietario','calle','precio'],
+};
 
+// Sanitiza contra ALL_SAFE y resuelve fallback
+const getDefaultColsForRole = (role) => {
+  const r = (role || '').toLowerCase();
+  const tpl = COLUMN_TEMPLATES_BY_ROLE[r] || COLUMN_TEMPLATES_BY_ROLE.admin;
+  return tpl.filter((id) => ALL_SAFE.some((c) => c.id === id));
+};
 
 // ─────────────────────────────────────────────────────────────
-//  ----------- Para elegir las columnas a mostrar  ----------
+// Selector visual de columnas (con drag & drop para el orden)
 // ─────────────────────────────────────────────────────────────
 function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) {
   const totalSel = selected.length;
-  
+
   const sensors = useSensors(
     useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
   const toggle = (id) => {
@@ -203,23 +201,20 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     if (isSel) {
       onChange(selected.filter((x) => x !== id));
     } else {
-      if (selected.length >= max) return;             
-      onChange([...new Set([...selected, id])]);      
+      if (selected.length >= max) return;         // límite de columnas visibles
+      onChange([...new Set([...selected, id])]);  // agrega evitando duplicados
     }
   };
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
-
     if (active.id !== over?.id) {
       const oldIndex = selected.indexOf(active.id);
       const newIndex = selected.indexOf(over.id);
-      const newSelected = arrayMove(selected, oldIndex, newIndex);
-      onChange(newSelected);
+      onChange(arrayMove(selected, oldIndex, newIndex)); // reordena visible
     }
   };
 
-  // Solo mostrar las columnas seleccionadas para el drag & drop, respetando el orden de 'selected'
   const selectedColumns = selected.map(id => all.find(c => c.id === id)).filter(Boolean);
 
   return (
@@ -230,13 +225,8 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
       </div>
 
       <div className="tl-popover__list">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={selected} strategy={verticalListSortingStrategy}>
-            {/* Columnas seleccionadas (con drag & drop) */}
             {selectedColumns.map((c) => {
               const checked = selected.includes(c.id);
               const disabled = !checked && totalSel >= max;
@@ -254,25 +244,16 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
           </SortableContext>
         </DndContext>
 
-        {/* Separador */}
         {selectedColumns.length > 0 && (
-          <div className="tl-popover__separator">
-            <span>Columnas disponibles</span>
-          </div>
+          <div className="tl-popover__separator"><span>Columnas disponibles</span></div>
         )}
 
-        {/* Columnas no seleccionadas (sin drag & drop) */}
         {all.filter(c => !selected.includes(c.id)).map((c) => {
           const checked = selected.includes(c.id);
           const disabled = !checked && totalSel >= max;
           return (
             <label key={c.id} className={`tl-check ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}>
-              <input
-                type="checkbox"
-                checked={checked}
-                disabled={disabled}
-                onChange={() => toggle(c.id)}
-              />
+              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(c.id)} />
               <span>{c.titulo}</span>
             </label>
           );
@@ -282,8 +263,7 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
       <button
         type="button"
         className="tl-btn tl-btn--ghost"
-        // Importante: delegamos el "reset total" al padre para que limpie
-        // también el localStorage del usuario actual.
+        // Delegamos al padre para que borre localStorage y aplique plantilla por rol
         onClick={() => onResetVisibleCols?.()}
       >
         Restablecer
@@ -291,50 +271,25 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     </div>
   );
 }
-// ─────────────────────────────────────────────────────────────
 
-// ─────────────────────────────────────────────────────────────
-//    ----------------- Componente SortableItem ------------
-// ─────────────────────────────────────────────────────────────
 function SortableItem({ id, column, checked, disabled, onToggle }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
 
   return (
-    <label
-      ref={setNodeRef}
-      style={style}
+    <label ref={setNodeRef} style={style}
       className={`tl-check tl-check--sortable ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}
       {...attributes}
     >
-      <div className="tl-check__drag-handle" {...listeners}>
-        <GripVertical size={16} />
-      </div>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={() => onToggle(id)}
-      />
+      <div className="tl-check__drag-handle" {...listeners}><GripVertical size={16} /></div>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onToggle(id)} />
       <span>{column.titulo}</span>
     </label>
   );
 }
 
 // ─────────────────────────────────────────────────────────────
-//   -------- Dropdown de cantidad de lotes a mostrar -----
+// Dropdown de cantidad de lotes por página (UI básica)
 // ─────────────────────────────────────────────────────────────
 function PageSizeDropdown({ value, options, onChange }) {
   const [open, setOpen] = useState(false);
@@ -377,10 +332,9 @@ function PageSizeDropdown({ value, options, onChange }) {
     </div>
   );
 }
-// ─────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-//    --------- Ancho por columna (grilla) --------------
+// Ancho por columna (grilla CSS)
 // ─────────────────────────────────────────────────────────────
 const widthFor = (id) => {
   switch (id) {
@@ -399,31 +353,29 @@ const widthFor = (id) => {
     default:           return 'minmax(140px,1fr)';
   }
 };
-// ─────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────
-//   ----------------- Componente principal -----------------
+// Componente principal
 // ─────────────────────────────────────────────────────────────
 export default function TablaLotes({
   lotes, data,
   onVer, onEditar, onRegistrarVenta, onEliminar,
   onAgregarLote, onAplicarPromo,
   roleOverride,
-  userKey,                 
+  userKey, // opcional: para “emular” usuario/rol desde el Dashboard
 }) {
-  // 1) Dataset (acepta lotes o data)
+  // Dataset base: usa `lotes` o `data`
   const source = useMemo(() => {
     if (Array.isArray(lotes) && lotes.length) return lotes;
     if (Array.isArray(data)  && data.length)  return data;
     return Array.isArray(lotes) ? lotes : Array.isArray(data) ? data : [];
   }, [lotes, data]);
 
-  // 2) Rol
+  // Rol del usuario
   const auth = (() => { try { return useAuth?.() || {}; } catch { return {}; } })();
   const role = (roleOverride || auth?.user?.role || auth?.role || 'admin').toString().toLowerCase();
 
-  // 2.1) Clave efectiva por usuario+rol
-  // Si viene userKey desde Dashboard, la usamos. Si no, derivamos desde el auth + rol.
+  // Clave efectiva para persistencia por usuario+rol
   const effectiveUserKey = useMemo(() => {
     if (userKey) return userKey;
     try {
@@ -436,29 +388,21 @@ export default function TablaLotes({
     }
   }, [userKey, role]);
 
-  // Helper local: normaliza y detecta “NO DISPONIBLE”
+  // Regla de negocio: INMOBILIARIA no ve "NO DISPONIBLE"
   const norm = (s) =>
-    (s ?? '')
-      .toString()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
+    (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const isNoDisponible = (estado) => norm(estado).replace(/_/g, ' ') === 'no disponible';
 
-  // Regla para INMOBILIARIA:
-  // si el rol incluye "inmob", antes de paginar/mostrar filtramos fuera los NO DISPONIBLE.
   const filteredSource = useMemo(() => {
-    if (role.includes('inmob')) {
-      return source.filter((l) => !isNoDisponible(l?.estado));
-    }
+    if (role.includes('inmob')) return source.filter((l) => !isNoDisponible(l?.estado));
     return source;
   }, [source, role]);
 
-  // 3) Columnas visibles (inicializa con defaults y luego carga por usuario)
-  const [colIds, setColIds] = useState(DEFAULT_COLS);
+  // Columnas visibles (estado local)
+  // Inicializamos con plantilla del rol (fallback), y luego intentamos cargar preferencia guardada.
+  const [colIds, setColIds] = useState(() => getDefaultColsForRole(role));
 
-  // 3.1) CARGA por usuario/rol + migración desde clave vieja si existía
+  // Carga columnas desde localStorage (por usuario+rol) con migración desde clave legacy
   useEffect(() => {
     const key = makeColsKey(effectiveUserKey);
     try {
@@ -466,39 +410,35 @@ export default function TablaLotes({
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length) {
-          // Sanitizar por si cambió el set de columnas
           const valid = parsed.filter((id) => ALL_SAFE.some((c) => c.id === id));
-          setColIds(valid.length ? valid : DEFAULT_COLS);
+          setColIds(valid.length ? valid : getDefaultColsForRole(role));
           return;
         }
       }
-      // Migración simple desde la clave vieja (una sola vez)
-      const legacy = localStorage.getItem(LS_KEY);
+      const legacy = localStorage.getItem(LS_LEGACY_COLS);
       if (legacy) {
-        localStorage.setItem(key, legacy); // copiamos a la nueva clave namespaced
+        localStorage.setItem(key, legacy);
         const parsed = JSON.parse(legacy);
         const valid = Array.isArray(parsed)
           ? parsed.filter((id) => ALL_SAFE.some((c) => c.id === id))
-          : DEFAULT_COLS;
-        setColIds(valid.length ? valid : DEFAULT_COLS);
+          : getDefaultColsForRole(role);
+        setColIds(valid.length ? valid : getDefaultColsForRole(role));
         return;
       }
-      // Fallback a defaults
-      setColIds(DEFAULT_COLS);
+      // Si no hay preferencia previa: usar plantilla por rol
+      setColIds(getDefaultColsForRole(role));
     } catch {
-      setColIds(DEFAULT_COLS);
+      setColIds(getDefaultColsForRole(role));
     }
-  }, [effectiveUserKey]);
+  }, [effectiveUserKey, role]);
 
-  // 3.2) GUARDADO por usuario/rol
+  // Guarda la preferencia actual
   useEffect(() => {
     const key = makeColsKey(effectiveUserKey);
-    try {
-      localStorage.setItem(key, JSON.stringify(colIds));
-    } catch {}
+    try { localStorage.setItem(key, JSON.stringify(colIds)); } catch {}
   }, [colIds, effectiveUserKey]);
 
-  // 3.3) Columnas visibles (objetos completos) a partir de colIds
+  // Columnas visibles (objetos completos) en el mismo orden de `colIds`
   const visibleCols = useMemo(() => {
     const map = new Map();
     colIds.forEach((id) => {
@@ -510,20 +450,19 @@ export default function TablaLotes({
     return Array.from(map.values());
   }, [colIds]);
 
-  // 4) Paginación + selección (ahora sobre filteredSource)
+  // Paginación
   const PAGE_SIZES = [10, 25, 50, 'Todos'];
   const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   const [page, setPage] = useState(1);
 
-  // ✅ Selección PERSISTENTE entre páginas
-  //    - Usamos un array local de IDs seleccionados.
-  //    - NO se limpia al cambiar pageSize.
-  //    - SÍ se limpia cuando cambia el dataset filtrado (filteredSource).
+  // Selección persistente entre páginas
+  // Motivo: permite acciones masivas reales al navegar por páginas.
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Cuando cambia el tamaño de página, solo volvemos a la primera página (no tocamos selección)
+  // Al cambiar pageSize, solo reseteamos página (no tocamos selección)
   useEffect(() => { setPage(1); }, [pageSize]);
 
+  // Paginación calculada sobre el dataset filtrado
   const total = filteredSource.length;
   const size = pageSize === 'Todos' ? total : Number(pageSize) || PAGE_SIZES[1];
   const pageCount = Math.max(1, Math.ceil((total || 1) / (size || 1)));
@@ -535,23 +474,24 @@ export default function TablaLotes({
     [filteredSource, pageSize, start, end]
   );
 
-  // 5) Selección por fila
-  const getRowId = (l) => String(l.id ?? l.idLote ?? l.codigo); // normalizamos a string
-  const dataSignature = useMemo(
-    () => filteredSource.map(getRowId).join(','),
-    [filteredSource]
-  );
+  // Identificador de fila (normalizado a string)
+  const getRowId = (l) => String(l.id ?? l.idLote ?? l.codigo);
+
+  // Firma estable del dataset: cambia solo si cambian los IDs visibles
+  // Por qué: evita limpiar selección por meros cambios de referencia del array.
+  const dataSignature = useMemo(() => filteredSource.map(getRowId).join('|'), [filteredSource]);
+
+  // Si cambia el dataset (por filtros/rol), limpiamos selección y volvemos a la página 1
   useEffect(() => { setPage(1); setSelectedIds([]); }, [dataSignature]);
+
+  // Selección de la página actual
   const allOnPageIds = pageItems.map(getRowId).filter((x) => x != null);
-  const allOnPageSelected =
-    allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.includes(id));
+  const allOnPageSelected = allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.includes(id));
 
   const toggleRow = (id) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // 2.2 “Seleccionar todo (página actual)”
-  //  Este checkbox vive en el HEADER (columna de checks).
-  //  Afecta SOLO los IDs visibles en pageItems.
+  // “Seleccionar todo” de la página actual: afecta solo los IDs visibles en esta página
   const toggleAllOnPage = () =>
     setSelectedIds((prev) => {
       const s = new Set(prev);
@@ -560,7 +500,7 @@ export default function TablaLotes({
       return Array.from(s);
     });
 
-  // 6) Acciones por rol
+  // Permisos de acciones por rol (UI)
   const roleActions = useMemo(() => {
     if (role.includes('inmob')) return ['venta', 'ver'];
     if (role.includes('gestor') || role.includes('tecnico')) return ['ver', 'editar'];
@@ -568,21 +508,20 @@ export default function TablaLotes({
   }, [role]);
   const can = (a) => roleActions.includes(a);
 
-  // 7) Grilla: checkbox + columnas visibles + columna Acciones (con flexbox para anclar acciones a la derecha)
+  // Grilla: checkbox + columnas visibles + spacer + Acciones
   const gridTemplate = useMemo(() => {
     const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
     return `42px ${cols} 1fr 220px`;
   }, [visibleCols]);
 
   const empty = total === 0;
-// ─────────────────────────────────────────────────────────────
 
   // ─────────────────────────────────────────────────────────────
-  // -------------- Renderizado --------------------------------
+  // Render
   // ─────────────────────────────────────────────────────────────
   return (
     <div className="tl-wrapper">
-      {/* Toolbar */}
+      {/* Toolbar superior */}
       <div className="tl-toolbar">
         <div className="tl-pages-left">
           <PageSizeDropdown
@@ -591,7 +530,7 @@ export default function TablaLotes({
             onChange={(opt) => setPageSize(opt === 'Todos' ? 'Todos' : Number(opt))}
           />
 
-          {/* Columnas */}
+          {/* Selector de columnas */}
           <div className="tl-columns">
             <button
               type="button"
@@ -609,29 +548,22 @@ export default function TablaLotes({
                 selected={colIds}
                 onChange={setColIds}
                 max={5}
-                // Importante: al restablecer limpiamos la preferencia del usuario actual
-                // y volvemos a las columnas por defecto.
                 onResetVisibleCols={() => {
-                  try {
-                    localStorage.removeItem(makeColsKey(effectiveUserKey));
-                  } catch {}
-                  setColIds([...new Set(DEFAULT_COLS)]);
+                  // Restablece a la PLANTILLA del ROL actual y borra preferencia guardada
+                  try { localStorage.removeItem(makeColsKey(effectiveUserKey)); } catch {}
+                  setColIds(getDefaultColsForRole(role));
                 }}
               />
             </div>
           </div>
         </div>
 
+        {/* Acciones a la derecha: misma línea visual y separación */}
         <div className="tl-actions-right">
-          <button
-              type="button"
-              className="tl-btn tl-btn--soft"
-              disabled={selectedIds.length === 0}
-            >
-              Ver en mapa (futuro) ({selectedIds.length})
+          <button type="button" className="tl-btn tl-btn--soft" disabled={selectedIds.length === 0}>
+            Ver en mapa (futuro) ({selectedIds.length})
           </button>
 
-          {/* ✅ Acceso rápido para el usuario: limpiar selección manualmente */}
           <button
             type="button"
             className="tl-btn tl-btn--soft"
@@ -643,11 +575,7 @@ export default function TablaLotes({
           </button>
 
           {role.includes('admin') && (
-            <button
-              type="button"
-              className="tl-btn tl-btn--primary"
-              onClick={() => onAgregarLote?.()}
-            >
+            <button type="button" className="tl-btn tl-btn--primary" onClick={() => onAgregarLote?.()}>
               + Agregar Lote
             </button>
           )}
@@ -663,13 +591,9 @@ export default function TablaLotes({
               <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} />
             </div>
             {visibleCols.map((c) => (
-              <div key={c.id} className={`tl-th tl-th--${c.align || 'left'}`}>
-                {c.titulo}
-              </div>
+              <div key={c.id} className={`tl-th tl-th--${c.align || 'left'}`}>{c.titulo}</div>
             ))}
-            {/* Spacer invisible para anclar acciones a la derecha */}
             <div aria-hidden className="tl-th tl-th--spacer-invisible" />
-            {/* Columna Acciones */}
             <div className="tl-th tl-th--actions">Acciones</div>
           </div>
         </div>
@@ -678,111 +602,71 @@ export default function TablaLotes({
         <div className="tl-tbody">
           {empty && <div className="tl-empty">No se encontraron lotes.</div>}
 
-          {!empty &&
-            pageItems.map((l) => {
-              const rowId = getRowId(l);
-              return (
-                <div key={rowId} className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
-                  <div className="tl-td tl-td--checkbox">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(rowId)}
-                      onChange={() => toggleRow(rowId)}
-                    />
-                  </div>
-
-                  {visibleCols.map((c) => {
-                    const val = c.accessor(l);
-                    return (
-                      <div
-                        key={c.id}
-                        data-col={c.id}
-                        className={`tl-td tl-td--${c.align || 'left'}`}
-                        title={typeof val === 'string' ? val : undefined}
-                      >
-                        {val}
-                      </div>
-                    );
-                  })}
-
-                  {/* Spacer invisible para anclar acciones a la derecha */}
-                  <div aria-hidden className="tl-td tl-td--spacer-invisible" />
-
-                  {/* Acciones */}
-                  <div className="tl-td tl-td--actions" data-col="actions">
-                    {can('ver') && (
-                      <button
-                        className="tl-icon tl-icon--view"
-                        aria-label="Ver lote"
-                        data-tooltip="Ver Lote"
-                        onClick={() => onVer?.(l)}
-                      >
-                        <Eye size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                    {can('editar') && (
-                      <button
-                        className="tl-icon tl-icon--edit"
-                        aria-label="Editar lote"
-                        data-tooltip="Editar lote"
-                        onClick={() => onEditar?.(l)}
-                      >
-                        <Edit size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                    {can('venta') && (
-                      <button
-                        className="tl-icon tl-icon--money"
-                        aria-label="Registrar venta"
-                        data-tooltip="Registrar venta"
-                        onClick={() => onRegistrarVenta?.(l)}
-                      >
-                        <DollarSign size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                    {can('eliminar') && (
-                      <button
-                        className="tl-icon tl-icon--delete"
-                        aria-label="Eliminar lote"
-                        data-tooltip="Eliminar lote"
-                        onClick={() => onEliminar?.(l)}
-                      >
-                        <Trash2 size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                    {can('aplicarPromo') && (
-                      <button
-                        className="tl-icon tl-icon--promo"
-                        aria-label="Aplicar promoción"
-                        data-tooltip="Aplicar promoción"
-                        onClick={() => onAplicarPromo?.(l)}
-                      >
-                        <CirclePercent size={18} strokeWidth={2} />
-                      </button>
-                    )}
-                  </div>
+          {!empty && pageItems.map((l) => {
+            const rowId = getRowId(l);
+            return (
+              <div key={rowId} className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
+                <div className="tl-td tl-td--checkbox">
+                  <input type="checkbox" checked={selectedIds.includes(rowId)} onChange={() => toggleRow(rowId)} />
                 </div>
-              );
-            })}
+
+                {visibleCols.map((c) => {
+                  const val = c.accessor(l);
+                  return (
+                    <div
+                      key={c.id}
+                      data-col={c.id}
+                      className={`tl-td tl-td--${c.align || 'left'}`}
+                      title={typeof val === 'string' ? val : undefined}
+                    >
+                      {val}
+                    </div>
+                  );
+                })}
+
+                <div aria-hidden className="tl-td tl-td--spacer-invisible" />
+
+                <div className="tl-td tl-td--actions" data-col="actions">
+                  {can('ver') && (
+                    <button className="tl-icon tl-icon--view" aria-label="Ver lote" data-tooltip="Ver Lote" onClick={() => onVer?.(l)}>
+                      <Eye size={18} strokeWidth={2} />
+                    </button>
+                  )}
+                  {can('editar') && (
+                    <button className="tl-icon tl-icon--edit" aria-label="Editar lote" data-tooltip="Editar lote" onClick={() => onEditar?.(l)}>
+                      <Edit size={18} strokeWidth={2} />
+                    </button>
+                  )}
+                  {can('venta') && (
+                    <button className="tl-icon tl-icon--money" aria-label="Registrar venta" data-tooltip="Registrar venta" onClick={() => onRegistrarVenta?.(l)}>
+                      <DollarSign size={18} strokeWidth={2} />
+                    </button>
+                  )}
+                  {can('eliminar') && (
+                    <button className="tl-icon tl-icon--delete" aria-label="Eliminar lote" data-tooltip="Eliminar lote" onClick={() => onEliminar?.(l)}>
+                      <Trash2 size={18} strokeWidth={2} />
+                    </button>
+                  )}
+                  {can('aplicarPromo') && (
+                    <button className="tl-icon tl-icon--promo" aria-label="Aplicar promoción" data-tooltip="Aplicar promoción" onClick={() => onAplicarPromo?.(l)}>
+                      <CirclePercent size={18} strokeWidth={2} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Paginador */}
       {pageSize !== 'Todos' && pageCount > 1 && (
         <div className="tl-pagination">
-          <button
-            className="tl-btn tl-btn--ghost"
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page <= 1}
-          >
+          <button className="tl-btn tl-btn--ghost" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
             ‹ Anterior
           </button>
           <span className="tl-pageinfo">Página {page} de {pageCount}</span>
-          <button
-            className="tl-btn tl-btn--ghost"
-            onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
-            disabled={page >= pageCount}
-          >
+          <button className="tl-btn tl-btn--ghost" onClick={() => setPage((p) => Math.min(pageCount, p + 1))} disabled={page >= pageCount}>
             Siguiente ›
           </button>
         </div>
