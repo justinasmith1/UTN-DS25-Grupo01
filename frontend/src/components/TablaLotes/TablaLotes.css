@@ -242,6 +242,20 @@
   gap:10px;
 }
 
+.tl-actions-right{
+  display:flex;
+  align-items:center;
+  gap:12px;            /* <-- separa los botones entre sí */
+}
+
+.tl-actions-right .tl-btn{
+  min-height:36px;     /* <-- misma altura */
+  border-radius:12px;  /* <-- mismo radio que ya usás */
+  padding:8px 12px;    /* <-- consistencia interna */
+}
+
+
+
 /* === Tooltip “cardcito” para botones de acciones (CSS only) === */
 .tl-td--actions {
   position: relative;
