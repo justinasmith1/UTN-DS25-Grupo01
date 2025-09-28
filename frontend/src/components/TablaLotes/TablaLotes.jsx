@@ -3,11 +3,7 @@
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
 // - No hace requests al backend: recibe un array y trabaja sobre eso.
 // - Persistencia de columnas visibles por USUARIO+ROL (localStorage namespaced).
-// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE".
-// - Esta versión incluye:
-//   1) Selección PERSISTENTE entre páginas (solo se limpia si cambia el dataset).
-//   2) Plantillas de columnas por ROL (inicial y "Restablecer" por rol).
-//   3) Toolbar con botones consistentes (misma altura/estilo).
+// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE"
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
@@ -159,7 +155,7 @@ const ALL_SAFE = [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()];
 // Por qué: onboarding rápido y vistas consistentes por rol.
 // ─────────────────────────────────────────────────────────────
 const COLUMN_TEMPLATES_BY_ROLE = {
-  admin:        ['id','estado','propietario','calle','precio','deuda'],
+  admin:        ['id','estado','subestado', 'propietario','precio','deuda'],
   gestor:       ['id','estado', 'subestado','propietario','precio'],
   tecnico:      ['id','estado','subestado','frente','fondo','superficie'],
   inmobiliaria: ['id','estado','propietario','calle','precio'],
@@ -198,7 +194,7 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     if (active.id !== over?.id) {
       const oldIndex = selected.indexOf(active.id);
       const newIndex = selected.indexOf(over.id);
-      onChange(arrayMove(selected, oldIndex, newIndex)); // reordena visible
+      onChange(arrayMove(selected, oldIndex, newIndex)); 
     }
   };
 
@@ -330,7 +326,7 @@ const widthFor = (id) => {
     case 'subestado':  return '170px';
     case 'propietario':return '220px';
     case 'calle':      return '220px';
-    case 'descripcion':return 'minmax(370px,2fr)';
+    case 'descripcion':return 'minmax(280px,370px)';
     case 'numero':     return '120px';
     case 'superficie': return '120px';
     case 'frente':     return '120px';
@@ -382,8 +378,7 @@ export default function TablaLotes({
 
   const filteredSource = useMemo(() => {
     if (role.includes('inmob')) return source.filter((l) => !isNoDisponible(l?.estado));
-    return source;
-  }, [source, role]);
+    return source;}, [source, role]);
 
   const baseDefaultCols = useMemo(() => getDefaultColsForRole(role), [role]);
   const MAX_VISIBLE = Math.max(5, baseDefaultCols.length);
