@@ -25,6 +25,7 @@ export const validate = (schema: ZodTypeAny) => {
   };
 };
 
+
 // Lo que hace esto es validar los parametros de la ruta
 export const validateParams = (schema: ZodTypeAny, remap?: Record<string, string>) => {
   return async (req: Request, res: Response, next: NextFunction) => {
