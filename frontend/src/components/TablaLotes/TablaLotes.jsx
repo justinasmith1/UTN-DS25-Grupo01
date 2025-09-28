@@ -16,21 +16,8 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent, GripVertical } from 'lucide-react';
 
 // Drag & drop para ordenar columnas elegidas en el picker
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,} from '@dnd-kit/core';
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
 // ─────────────────────────────────────────────────────────────
@@ -362,7 +349,7 @@ export default function TablaLotes({
   onVer, onEditar, onRegistrarVenta, onEliminar,
   onAgregarLote, onAplicarPromo,
   roleOverride,
-  userKey, // opcional: para “emular” usuario/rol desde el Dashboard
+  userKey, 
 }) {
   // Dataset base: usa `lotes` o `data`
   const source = useMemo(() => {
@@ -398,9 +385,11 @@ export default function TablaLotes({
     return source;
   }, [source, role]);
 
-  // Columnas visibles (estado local)
-  // Inicializamos con plantilla del rol (fallback), y luego intentamos cargar preferencia guardada.
-  const [colIds, setColIds] = useState(() => getDefaultColsForRole(role));
+  const baseDefaultCols = useMemo(() => getDefaultColsForRole(role), [role]);
+  const MAX_VISIBLE = Math.max(5, baseDefaultCols.length);
+
+  // Columnas visibles (estado local), inicial con plantilla del rol
+  const [colIds, setColIds] = useState(() => baseDefaultCols);
 
   // Carga columnas desde localStorage (por usuario+rol) con migración desde clave legacy
   useEffect(() => {
@@ -411,7 +400,7 @@ export default function TablaLotes({
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length) {
           const valid = parsed.filter((id) => ALL_SAFE.some((c) => c.id === id));
-          setColIds(valid.length ? valid : getDefaultColsForRole(role));
+          setColIds(valid.length ? valid : baseDefaultCols);
           return;
         }
       }
@@ -421,16 +410,16 @@ export default function TablaLotes({
         const parsed = JSON.parse(legacy);
         const valid = Array.isArray(parsed)
           ? parsed.filter((id) => ALL_SAFE.some((c) => c.id === id))
-          : getDefaultColsForRole(role);
-        setColIds(valid.length ? valid : getDefaultColsForRole(role));
+          : baseDefaultCols;
+        setColIds(valid.length ? valid : baseDefaultCols);
         return;
       }
       // Si no hay preferencia previa: usar plantilla por rol
-      setColIds(getDefaultColsForRole(role));
+      setColIds(baseDefaultCols);
     } catch {
-      setColIds(getDefaultColsForRole(role));
+      setColIds(baseDefaultCols);
     }
-  }, [effectiveUserKey, role]);
+  }, [effectiveUserKey, baseDefaultCols]);
 
   // Guarda la preferencia actual
   useEffect(() => {
@@ -456,7 +445,6 @@ export default function TablaLotes({
   const [page, setPage] = useState(1);
 
   // Selección persistente entre páginas
-  // Motivo: permite acciones masivas reales al navegar por páginas.
   const [selectedIds, setSelectedIds] = useState([]);
 
   // Al cambiar pageSize, solo reseteamos página (no tocamos selección)
@@ -478,7 +466,6 @@ export default function TablaLotes({
   const getRowId = (l) => String(l.id ?? l.idLote ?? l.codigo);
 
   // Firma estable del dataset: cambia solo si cambian los IDs visibles
-  // Por qué: evita limpiar selección por meros cambios de referencia del array.
   const dataSignature = useMemo(() => filteredSource.map(getRowId).join('|'), [filteredSource]);
 
   // Si cambia el dataset (por filtros/rol), limpiamos selección y volvemos a la página 1
@@ -547,11 +534,11 @@ export default function TablaLotes({
                 all={ALL_SAFE}
                 selected={colIds}
                 onChange={setColIds}
-                max={5}
+                max={MAX_VISIBLE}
                 onResetVisibleCols={() => {
                   // Restablece a la PLANTILLA del ROL actual y borra preferencia guardada
                   try { localStorage.removeItem(makeColsKey(effectiveUserKey)); } catch {}
-                  setColIds(getDefaultColsForRole(role));
+                  setColIds(baseDefaultCols);
                 }}
               />
             </div>
