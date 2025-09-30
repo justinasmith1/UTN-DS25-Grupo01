@@ -1,7 +1,7 @@
 // Adapter de autenticación REAL contra el backend.
 // Mantengo nombres en un solo lugar para que el Provider quede simple.
 
-import { http } from "../http/http";
+import { http, buildApiUrl as absUrl } from "../http/http";
 import { setAccessToken, setRefreshToken, clearTokens } from "./token";
 
 export const LOGIN_PATH = "/auth/login";
@@ -21,9 +21,13 @@ function normalizeAuthResponse(json) {
 
 // Login real: guarda tokens y devuelve el user
 export async function apiLogin({ email, password }) {
-  const res = await http(LOGIN_PATH, {
+  // Para login, no usamos http() porque no queremos que intente refresh automático
+  const url = absUrl(LOGIN_PATH);
+  const res = await fetch(url, {
     method: "POST",
-    body: { email, password },
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify({ email, password }),
   });
 
   const data = await res.json().catch(() => ({}));
