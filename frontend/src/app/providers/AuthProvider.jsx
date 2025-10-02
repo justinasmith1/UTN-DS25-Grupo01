@@ -41,12 +41,21 @@ export function AuthProvider({ children }) {
   async function login({ email, password }) {
     if (!email || !password) throw new Error("Completá email y contraseña");
 
-    const me = await apiLogin({ email, password });
-    setUser(me);
-    localStorage.setItem(USER_KEY, JSON.stringify(me || {}));
+    try {
+      const me = await apiLogin({ email, password });
+      setUser(me);
+      localStorage.setItem(USER_KEY, JSON.stringify(me || {}));
 
-    const from = location.state?.from || "/";
-    navigate(from, { replace: true });
+      const from = location.state?.from || "/";
+      navigate(from, { replace: true });
+    } catch (error) {
+      // Si el error viene del backend (status 401, 403, etc.), es credenciales incorrectas
+      if (error.status && (error.status === 401 || error.status === 403)) {
+        throw new Error("Contraseña o email incorrecto");
+      }
+      // Re-lanzar otros errores (red, servidor, etc.)
+      throw error;
+    }
   }
 
   // Cerrar sesión → limpio tokens y user local
