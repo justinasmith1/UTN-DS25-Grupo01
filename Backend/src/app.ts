@@ -11,6 +11,8 @@ import {inmobRoutes} from './routes/inmobiliaria.routes';
 import {ventaRoutes} from "./routes/ventas.routes";
 import { fileRoutes } from './routes/files.routes';
 import {personaRoutes} from "./routes/persona.routes";
+import { fraccionRoutes } from './routes/fraccion.routes';
+import { ubicacionRoutes } from './routes/ubicacion.routes';
 
 dotenv.config();
 
@@ -60,6 +62,8 @@ app.use("/api/inmobiliarias", inmobRoutes);
 app.use("/api/ventas", ventaRoutes);
 app.use('/api/files', fileRoutes);
 app.use('/api/personas', personaRoutes);
+app.use('/api/fracciones', fraccionRoutes);
+app.use('/api/ubicaciones', ubicacionRoutes);
 
 app.listen(PORT, () => {
   console.log(`Servidor corriendo en http://localhost:${PORT}`);

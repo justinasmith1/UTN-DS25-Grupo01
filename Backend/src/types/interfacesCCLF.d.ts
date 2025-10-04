@@ -473,3 +473,72 @@ export interface DeletePersonaResponse {
     message: string;
 }   
 //----------------------------------------//
+// FRACCIONES
+
+export interface GetFraccionesResponse {
+    fracciones: Fraccion[];
+    total: number;
+}
+export interface PostFraccionRequest {
+    numero: number;
+}
+export interface PostFraccionResponse {
+    fraccion: Fraccion | null;
+    message: string;
+}   
+export interface GetFraccionRequest {
+    idFraccion: number;
+}
+export interface GetFraccionResponse {
+    fraccion: Fraccion | null;
+    message?: string;
+}
+export interface PutFraccionRequest {
+    numero?: number;
+}
+export interface PutFraccionResponse {
+    message: string;
+}
+export interface DeleteFraccionRequest {
+    idFraccion: number;
+}
+export interface DeleteFraccionResponse {   
+    message: string;
+}
+//----------------------------------------//
+// UBICACIONES
+
+export interface GetUbicacionesResponse {
+    ubicaciones: Ubicacion[];
+    total: number;
+}
+export interface PostUbicacionRequest {
+    calle: Calle;
+    numero: number;
+}
+export interface PostUbicacionResponse {
+    ubicacion: Ubicacion | null;
+    message: string;
+}
+
+export interface GetUbicacionRequest {
+    idUbicacion: number;
+}
+export interface GetUbicacionResponse {
+    ubicacion: Ubicacion | null;
+    message?: string;
+}
+export interface PutUbicacionRequest {
+    calle?: Calle;
+    numero?: number;
+}
+export interface PutUbicacionResponse {
+    message: string;
+}
+export interface DeleteUbicacionRequest {
+    idUbicacion: number;
+}
+export interface DeleteUbicacionResponse {
+    message: string;
+}
+//----------------------------------------//
