@@ -3,7 +3,7 @@
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
 // - No hace requests al backend: recibe un array y trabaja sobre eso.
 // - Persistencia de columnas visibles por USUARIO+ROL (localStorage namespaced).
-// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE"
+// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE" (ahora via rbac.ui)
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
@@ -12,9 +12,14 @@ import { useAuth } from '../../app/providers/AuthProvider';
 import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent, GripVertical } from 'lucide-react';
 
 // Drag & drop para ordenar columnas elegidas en el picker
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,} from '@dnd-kit/core';
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors, } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+// Permisos de UI centralizados
+// - canDashboardAction: decide si una acción del tablero está habilitada para el usuario
+// - filterEstadoOptionsFor: devuelve los estados visibles para el usuario (si saca NO_DISPONIBLE → lo ocultamos también en la grilla)
+import { canDashboardAction, filterEstadoOptionsFor } from '../../lib/auth/rbac.ui';
 
 // ─────────────────────────────────────────────────────────────
 // Clave legacy (solo para migración de una versión anterior)
@@ -155,8 +160,8 @@ const ALL_SAFE = [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()];
 // Por qué: onboarding rápido y vistas consistentes por rol.
 // ─────────────────────────────────────────────────────────────
 const COLUMN_TEMPLATES_BY_ROLE = {
-  admin:        ['id','estado','subestado', 'propietario','precio','deuda'],
-  gestor:       ['id','estado', 'subestado','propietario','precio'],
+  admin:        ['id','estado','subestado','propietario','precio','deuda'],
+  gestor:       ['id','estado','subestado','propietario','precio'],
   tecnico:      ['id','estado','subestado','frente','fondo','superficie'],
   inmobiliaria: ['id','estado','propietario','calle','precio'],
 };
@@ -194,7 +199,7 @@ function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) 
     if (active.id !== over?.id) {
       const oldIndex = selected.indexOf(active.id);
       const newIndex = selected.indexOf(over.id);
-      onChange(arrayMove(selected, oldIndex, newIndex)); 
+      onChange(arrayMove(selected, oldIndex, newIndex));
     }
   };
 
@@ -354,7 +359,7 @@ export default function TablaLotes({
     return Array.isArray(lotes) ? lotes : Array.isArray(data) ? data : [];
   }, [lotes, data]);
 
-  // Rol del usuario
+  // Rol del usuario (sólo para defaults de columnas; las acciones YA no dependen del string del rol)
   const auth = (() => { try { return useAuth?.() || {}; } catch { return {}; } })();
   const role = (roleOverride || auth?.user?.role || auth?.role || 'admin').toString().toLowerCase();
 
@@ -371,14 +376,25 @@ export default function TablaLotes({
     }
   }, [userKey, role]);
 
-  // Regla de negocio: INMOBILIARIA no ve "NO DISPONIBLE"
+  // Regla de visibilidad de estados desde rbac.ui:
+  // - Si filterEstadoOptionsFor remueve "NO_DISPONIBLE" para el usuario → lo ocultamos también en la grilla
+  const ALLEST = ['DISPONIBLE','NO_DISPONIBLE','RESERVADO','VENDIDO','ALQUILADO'];
+  const allowedEstados = useMemo(
+    () => new Set(filterEstadoOptionsFor(auth?.user || { role }, ALLEST)),
+    [auth?.user, role]
+  );
+
   const norm = (s) =>
     (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const isNoDisponible = (estado) => norm(estado).replace(/_/g, ' ') === 'no disponible';
 
   const filteredSource = useMemo(() => {
-    if (role.includes('inmob')) return source.filter((l) => !isNoDisponible(l?.estado));
-    return source;}, [source, role]);
+    if (!allowedEstados.has('NO_DISPONIBLE')) {
+      // Oculta filas NO DISPONIBLE para quienes no deberían ni ver ese estado
+      return source.filter((l) => !isNoDisponible(l?.estado));
+    }
+    return source;
+  }, [source, allowedEstados]);
 
   const baseDefaultCols = useMemo(() => getDefaultColsForRole(role), [role]);
   const MAX_VISIBLE = Math.max(5, baseDefaultCols.length);
@@ -482,13 +498,17 @@ export default function TablaLotes({
       return Array.from(s);
     });
 
-  // Permisos de acciones por rol (UI)
-  const roleActions = useMemo(() => {
-    if (role.includes('inmob')) return ['venta', 'ver'];
-    if (role.includes('gestor') || role.includes('tecnico')) return ['ver', 'editar'];
-    return ['ver', 'editar', 'venta', 'eliminar', 'aplicarPromo']; // admin
-  }, [role]);
-  const can = (a) => roleActions.includes(a);
+  // 🔐 Acciones del tablero evaluadas por permisos centralizados (rbac.ui)
+  const can = (key) => {
+    switch (key) {
+      case 'ver':           return canDashboardAction(auth?.user, 'visualizarLote');
+      case 'editar':        return canDashboardAction(auth?.user, 'editarLote');
+      case 'venta':         return canDashboardAction(auth?.user, 'registrarVenta');
+      case 'eliminar':      return canDashboardAction(auth?.user, 'eliminarLote');
+      case 'aplicarPromo':  return canDashboardAction(auth?.user, 'aplicarPromocion');
+      default:              return false;
+    }
+  };
 
   // Grilla: checkbox + columnas visibles + spacer + Acciones
   const gridTemplate = useMemo(() => {
@@ -556,6 +576,7 @@ export default function TablaLotes({
             Limpiar selección
           </button>
 
+          {/* Mantengo esta visibilidad como estaba (Admin). Si preferís alinear a permiso LOT_CREATE, lo cambiamos luego. */}
           {role.includes('admin') && (
             <button type="button" className="tl-btn tl-btn--primary" onClick={() => onAgregarLote?.()}>
               + Agregar Lote

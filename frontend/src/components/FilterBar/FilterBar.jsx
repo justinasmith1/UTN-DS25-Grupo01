@@ -1,12 +1,17 @@
 // components/FilterBar/FilterBar.jsx
 // -----------------------------------------------------------------------------
 // FilterBar de Lotes - Contiene todos los posibles filtros a aplicar y todas
-// las divisiones por roles.
+// las divisiones por permisos (UI).
 // -----------------------------------------------------------------------------
+
+
 import { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import "./FilterBar.css";
 import RangeControl from "./controls/RangeControl";
+
+// 🔐 Helpers de permisos de UI
+import { filterEstadoOptionsFor, canUseDeudorFilter } from "../../lib/auth/rbac.ui";
 
 // Driver de vistas guardadas (frontend-only, en utils)
 import {
@@ -169,23 +174,26 @@ const DEBOUNCE_MS = 250;
 
 export default function FilterBar({
   variant = "dashboard",
-  userRole = "GENERAL",
+  userRole = "GENERAL",       // ⚠️ seguimos recibiendo el rol por compatibilidad
   onParamsChange,
 }) {
-  /* === Rol === */
-  const isInmo = String(userRole).toUpperCase() === "INMOBILIARIA";
+  // 🔐 Construimos un "usuario mínimo" con el rol recibido para que rbac.ui
+  //     pueda resolver visibilidad (hasta que integremos useAuth aquí).
+  const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
 
-  /* === Catálogos base === */
-  const ESTADOS = useMemo(() => {
-    const ALL_ESTADOS = [
-      "DISPONIBLE",
-      "NO_DISPONIBLE",
-      "RESERVADO",
-      "VENDIDO",
-      "ALQUILADO",
-    ];
-    return isInmo ? ALL_ESTADOS.filter((e) => e !== "NO_DISPONIBLE") : ALL_ESTADOS;
-  }, [isInmo]);
+  /* === Catálogos base controlados por permisos de UI === */
+  const ALL_ESTADOS = useMemo(
+    () => ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"],
+    []
+  );
+  const ESTADOS = useMemo(
+    () => filterEstadoOptionsFor(authUser, ALL_ESTADOS),
+    [authUser, ALL_ESTADOS]
+  );
+  // Si NO puede usar "Deudor" asumimos que es Inmobiliaria para el resto de reglas de UI
+  const canDeudor = canUseDeudorFilter(authUser);
+  const isInmo = !canDeudor;
+
   const SUBESTADOS = ["CONSTRUIDO", "EN_CONSTRUCCION", "NO_CONSTRUIDO"];
   const CALLES = [
     "REINAMORA",
@@ -244,7 +252,7 @@ export default function FilterBar({
   const toggle = (setFn, v) =>
     setFn((prev) => (prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v]));
 
-  /* Regla INMOBILIARIA */
+  /* Regla INMOBILIARIA (vía permisos de UI) */
   useEffect(() => {
     if (!isInmo) return;
     setEstado((prev) => prev.filter((v) => v !== "NO_DISPONIBLE"));
@@ -660,7 +668,7 @@ export default function FilterBar({
                 </div>
               )}
 
-              {!isInmo && (
+              {canDeudor && (
                 <section className="fb-section">
                   <div className="fb-sec-head">
                     <h4>Deudor</h4>

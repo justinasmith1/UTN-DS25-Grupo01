@@ -1,5 +1,5 @@
 // src/app/providers/ToastProvider.jsx
-// Manejador global de toasts. Lo uso para reemplazar "alert" por mensajes lindos.
+// Manejador global de toasts. Lo uso para reemplazar "alert" por mensajes lindos, dsp lo sacamos igual.
 
 import React, { createContext, useContext, useMemo, useState } from "react";
 import { Toast, ToastContainer } from "react-bootstrap";

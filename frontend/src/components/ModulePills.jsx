@@ -3,15 +3,28 @@ import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../app/providers/AuthProvider';
 import { visibleModulesForUser, MODULES } from '../lib/auth/rbac.ui';
 
+// Meta UI local para rótulos y rutas (independiente de cómo exporte rbac.ui MODULES)
+const MODULES_META = {
+  lotes:        { label: 'Dashboard',      path: '/dashboard' },
+  ventas:       { label: 'Ventas',         path: '/ventas' },
+  inmobiliarias:{ label: 'Inmobiliarias',  path: '/inmobiliarias' },
+  reservas:     { label: 'Reservas',       path: '/reservas' },
+  reportes:     { label: 'Reportes',       path: '/reportes' },
+  personas:     { label: 'Personas',       path: '/personas' },
+  // usuarios:  { label: 'Usuarios',       path: '/usuarios' },
+};
+
 export default function ModulePills() {
   const { user } = useAuth();
   const { pathname } = useLocation();
 
-  // Visibilidad por RBAC (fallback a todos para no ocultar la barra)
+  // Visibilidad por RBAC (si auth no cargó, fallback a todos)
   let modules = visibleModulesForUser(user);
-  if (!modules || modules.length === 0) modules = Object.entries(MODULES);
+  const moduleKeys = (modules && modules.length)
+    ? modules.map(([key]) => key)         // nos quedamos con la clave
+    : Object.keys(MODULES);               // fallback: todas las claves definidas en rbac.ui
 
-  // Contenido del menú por módulo
+  // Contenido del menú por módulo (acciones del panel)
   const MENU = useMemo(() => ({
     ventas: [
       { label: 'Ver Ventas', to: '/ventas', disabled: false },
@@ -32,6 +45,9 @@ export default function ModulePills() {
     personas: [
       { label: 'Ver Propietarios', to: '/personas?tipo=propietario', disabled: false },
       { label: 'Ver Inquilinos', to: '/personas?tipo=inquilino', disabled: false },
+    ],
+    lotes: [
+      { label: 'Ver Lotes', to: '/dashboard', disabled: false },
     ],
   }), []);
 
@@ -180,8 +196,9 @@ export default function ModulePills() {
 
       <div className="mods-wrapper" ref={wrapperRef}>
         <nav className="mods-bar" role="menubar" aria-label="Barra de módulos">
-          {modules.map(([key, mod]) => {
-            const active = pathname.startsWith(mod.path);
+          {moduleKeys.map((key) => {
+            const meta = MODULES_META[key] || { label: key, path: '/' };
+            const active = pathname.startsWith(meta.path);
             const open = openKey === key;
             const items = MENU[key] || [];
 
@@ -197,7 +214,7 @@ export default function ModulePills() {
                   onClick={() => setOpenKey(open ? null : key)}
                   aria-haspopup="true"
                   aria-expanded={open}
-                  title={MODULES[key].label}
+                  title={meta.label}
                   style={{
                     all: 'unset',
                     cursor: 'pointer',
@@ -209,13 +226,13 @@ export default function ModulePills() {
                     color: 'inherit',
                   }}
                 >
-                  <span>{MODULES[key].label}</span>
+                  <span>{meta.label}</span>
                   <span className="mods-caret" aria-hidden>▾</span>
                 </button>
 
                 {/* Panel desplegable (100% del ancho del módulo) */}
                 {open && (
-                  <div className="mods-panel" role="menu" aria-label={`Acciones de ${MODULES[key].label}`}>
+                  <div className="mods-panel" role="menu" aria-label={`Acciones de ${meta.label}`}>
                     {items.map((it, idx) =>
                       it.disabled ? (
                         <div key={idx} className="mods-panel__btn mods-panel__btn--disabled" role="menuitem" aria-disabled="true">

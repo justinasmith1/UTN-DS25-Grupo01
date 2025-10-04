@@ -10,7 +10,7 @@ export default function ProtectedRoute() {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // Mientras cargo sesión, muestro algo simple para evitar "pantalla en blanco"
+  // Mientras cargo sesión, muestro algo simple nada rarou
   if (loading) {
     return <div style={{ padding: 24 }}>Cargando sesión…</div>;
   }
