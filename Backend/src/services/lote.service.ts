@@ -63,10 +63,14 @@ function buildWhereFromQueryDTO(query: any, role?: string) {
 //export const getLotes = async (): Promise<Lote[]> => lotes;
 export async function getAllLotes(query: any = {}, role?: string) {
   const where = buildWhereFromQueryDTO(query, role);
-  return prisma.lote.findMany({
-    where,
-    orderBy: { id: 'asc' },
-  });
+  const [lotes, total] = await Promise.all([
+    prisma.lote.findMany({
+      where,
+      orderBy: { id: 'asc' },
+    }),
+    prisma.lote.count({ where }),
+  ]);
+  return { lotes, total };
 }
 
 

@@ -256,8 +256,8 @@ export interface DeleteVentaResponse {
 // Reservas
 //------------------------------------------------//
 export interface GetReservasResponse {
-  reservas: Reserva[];
-  total: number;
+    reservas: Reserva[];
+    total: number;
 }
 
 // Request para crear una nueva reserva
@@ -277,7 +277,7 @@ export interface PostReservaResponse {
 
 // Request para obtener una reserva por ID
 export interface GetReservaRequest {
-  idReserva: number;
+    idReserva: number;
 }
 
 // Response para obtener una reserva por ID
@@ -298,25 +298,25 @@ export interface PutReservaRequest {
 
 // Response para actualizar una reserva
 export interface PutReservaResponse {
-  message: string;          // Mensaje de confirmacion o error
+    message: string;          // Mensaje de confirmacion o error
 }
 
 // Request para eliminar una reserva
 export interface DeleteReservaRequest {
-  idReserva: number;
+    idReserva: number;
 }
 
 // Response para eliminar una reserva
 export interface DeleteReservaResponse {
-  message: string;
+    message: string;
 }
 //------------------------------------------------//
 
 //Inmobiliarias
 //-----------------------------------------//
 export interface GetInmobiliariasResponse {
-  inmobiliarias: Inmobiliaria[];
-  total: number;
+    inmobiliarias: Inmobiliaria[];
+    total: number;
 }
 
 //Request para crear una inmobiliaria
@@ -338,7 +338,7 @@ export interface PostInmobiliariaResponse {
 
 // Request para obtener una inmobiliaria por ID
 export interface GetInmobiliariaRequest {
-  idInmobiliaria: number;
+    idInmobiliaria: number;
 }
 
 // Response para obtener una inmobiliaria por ID
@@ -365,12 +365,12 @@ export interface PutInmobiliariaResponse {
 
 // Request para eliminar una inmobiliaria
 export interface DeleteInmobiliariaRequest {
-  idInmobiliaria: number;
+    idInmobiliaria: number;
 }
 
 // Response para eliminar una inmobiliaria
 export interface DeleteInmobiliariaResponse {
-  message: string;
+    message: string;
 }
 //-----------------------------------------------------//
 
@@ -427,6 +427,118 @@ export interface DeleteUsuarioRequest {
 }
 
 export interface DeleteUsuarioResponse {
+    message: string;
+}
+//----------------------------------------//
+
+//Personas
+//----------------------------------------//
+export interface GetPersonasResponse {
+    personas: Persona[];
+    total: number;
+}   
+export interface PostPersonaRequest {
+    nombre: string;
+    apellido: string;
+    identificador: Identificador;
+    telefono?: number;
+    email?: string;
+}
+export interface PostPersonaResponse {
+    persona: Persona | null;
+    message: string;
+}
+export interface GetPersonaRequest {
+    idPersona: number;
+}
+export interface GetPersonaResponse {
+    persona: Persona | null;
+    message?: string;
+}   
+export interface PutPersonaRequest {
+    nombre?: string;
+    apellido?: string;
+    identificador?: Identificador;
+    telefono?: number;
+    email?: string;
+}
+export interface PutPersonaResponse {
+    persona: Persona;
+    message: string;
+}
+export interface DeletePersonaRequest {
+    idPersona: number;
+}   
+export interface DeletePersonaResponse {
+    message: string;
+}   
+//----------------------------------------//
+// FRACCIONES
+
+export interface GetFraccionesResponse {
+    fracciones: Fraccion[];
+    total: number;
+}
+export interface PostFraccionRequest {
+    numero: number;
+}
+export interface PostFraccionResponse {
+    fraccion: Fraccion | null;
+    message: string;
+}   
+export interface GetFraccionRequest {
+    idFraccion: number;
+}
+export interface GetFraccionResponse {
+    fraccion: Fraccion | null;
+    message?: string;
+}
+export interface PutFraccionRequest {
+    numero?: number;
+}
+export interface PutFraccionResponse {
+    message: string;
+}
+export interface DeleteFraccionRequest {
+    idFraccion: number;
+}
+export interface DeleteFraccionResponse {   
+    message: string;
+}
+//----------------------------------------//
+// UBICACIONES
+
+export interface GetUbicacionesResponse {
+    ubicaciones: Ubicacion[];
+    total: number;
+}
+export interface PostUbicacionRequest {
+    calle: Calle;
+    numero: number;
+}
+export interface PostUbicacionResponse {
+    ubicacion: Ubicacion | null;
+    message: string;
+}
+
+export interface GetUbicacionRequest {
+    idUbicacion: number;
+}
+export interface GetUbicacionResponse {
+    ubicacion: Ubicacion | null;
+    message?: string;
+}
+export interface PutUbicacionRequest {
+    calle?: Calle;
+    numero?: number;
+}
+export interface PutUbicacionResponse {
+    message: string;
+}
+export interface DeleteUbicacionRequest {
+    idUbicacion: number;
+}
+export interface DeleteUbicacionResponse {
     message: string;
 }
 //----------------------------------------//
