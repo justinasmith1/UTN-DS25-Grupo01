@@ -1,364 +1,55 @@
 // components/TablaLotes.jsx
 // -----------------------------------------------------------------------------
 // Tablero de Lotes - robusto y compatible con props {lotes} o {data}
-// - No hace requests al backend: recibe un array y trabaja sobre eso.
-// - Persistencia de columnas visibles por USUARIO+ROL (localStorage namespaced).
-// - Regla de negocio: INMOBILIARIA NO ve lotes "NO DISPONIBLE"
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
+
 import { useAuth } from '../../app/providers/AuthProvider';
-import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent, GripVertical } from 'lucide-react';
+import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent } from 'lucide-react';
 
-// Drag & drop para ordenar columnas elegidas en el picker
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors,} from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable, } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+// rbac y visibilidad de estados
+import { canDashboardAction, filterEstadoOptionsFor } from '../../lib/auth/rbac.ui';
 
-// ─────────────────────────────────────────────────────────────
-// Clave legacy (solo para migración de una versión anterior)
-// ─────────────────────────────────────────────────────────────
+// Partes de UI
+import PageSizeDropdown from './parts/PageSizeDropdown';
+import ColumnPicker from './parts/ColumnPicker';
+
+// Helpers visuales y de formato/getters
+import StatusBadge, { estadoBadge } from './cells/StatusBadge';
+import SubstatusBadge, { subestadoBadge } from './cells/SubstatusBadge';
+import { fmtMoney, fmtM2, fmtM, fmtEstado } from './utils/formatters';
+import { getPropietarioNombre, getCalle, getNumero } from './utils/getters';
+
+// Preset con columnas/anchos/plantillas
+import { lotesTablePreset as tablePreset } from './presets/lotes.table.jsx';
+
+// Claves de storage
 const LS_LEGACY_COLS = 'tablaLotes:columns:v7';
-
-// ─────────────────────────────────────────────────────────────
-// Storage versionado + namespacing por usuario/rol
-// Por qué: evitar que un usuario herede columnas de otro en una misma PC.
-// ─────────────────────────────────────────────────────────────
 const STORAGE_VERSION = 'v2';
-const APP_NS = 'lfed'; // La Federala
+const APP_NS = 'lfed';
 const makeColsKey = (userKey) => `${APP_NS}:tabla-cols:${STORAGE_VERSION}:${userKey}`;
 
-// ─────────────────────────────────────────────────────────────
-// Helpers de formato
-// ─────────────────────────────────────────────────────────────
-const fmtMoney = (v) => {
-  if (v == null || v === '') return '—';
-  const n = Number(v);
-  if (Number.isNaN(n)) return '—';
-  return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 });
-};
-
-const fmtM2 = (v) => {
-  if (v == null || v === '') return '—';
-  const n = Number(v);
-  if (Number.isNaN(n)) return '—';
-  return (
-    <span className="u-m2">
-      {n.toLocaleString('es-AR')}
-      <span className="u-unit">m²</span>
-    </span>
-  );
-};
-
-const fmtM = (v) => {
-  if (v == null || v === '') return '—';
-  const n = Number(v);
-  if (Number.isNaN(n)) return '—';
-  return (
-    <span className="u-m2">
-      {n.toLocaleString('es-AR')}
-      <span className="u-unit">m</span>
-    </span>
-  );
-};
-
-const fmtEstado = (s) =>
-  !s
-    ? '—'
-    : String(s)
-        .toLowerCase()
-        .replace(/_/g, ' ')
-        .replace(/^\w/, (c) => c.toUpperCase());
-
-const badge = (label, variant = 'muted') => (
-  <span className={`tl-badge tl-badge--${variant}`}>{label}</span>
-);
-
-const estadoBadge = (raw) => {
-  const s = fmtEstado(raw).toUpperCase();
-  const map = {
-    'DISPONIBLE': 'success',
-    'EN PROMOCION': 'warn',
-    'RESERVADO': 'info',
-    'ALQUILADO': 'indigo',
-    'VENDIDO': 'success',
-    'NO DISPONIBLE': 'danger',
-  };
-  return badge(s, map[s] || 'muted');
-};
-
-const subestadoBadge = (raw) => {
-  const s = fmtEstado(raw).toUpperCase();
-  const map = {
-    'CONSTRUIDO': 'success',
-    'EN CONSTRUCCION': 'warn',
-    'NO CONSTRUIDO': 'danger',
-  };
-  return badge(s, map[s] || 'muted');
-};
-
-// ─────────────────────────────────────────────────────────────
-// Normalización de campos según schema flexible
-// ─────────────────────────────────────────────────────────────
-function getPropietarioNombre(l) {
-  const p = l?.propietario;
-  if (!p) return l?.propietarioNombre ?? l?.ownerName ?? '—';
-  if (p.nombreCompleto) return p.nombreCompleto;
-  const partes = [p.nombre, p.apellido].filter(Boolean);
-  if (partes.length) return partes.join(' ');
-  return p.razonSocial ?? String(p.id ?? '—');
-}
-
-function getCalle(l) {
-  const u = l?.ubicacion;
-  return u?.calle ?? u?.nombreCalle ?? l?.calle ?? '—';
-}
-function getNumero(l) {
-  const u = l?.ubicacion;
-  return u?.numero ?? l?.numero ?? '—';
-}
-
-// ─────────────────────────────────────────────────────────────
-// Definición de TODAS las columnas disponibles (catálogo)
-// ─────────────────────────────────────────────────────────────
-const ALL_COLUMNS = [
-  { id: 'id',          titulo: 'ID',          accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—', align: 'center' },
-  { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado),               align: 'center' },
-  { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),             align: 'center' },
-  { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                         align: 'center' },
-  { id: 'numero',      titulo: 'Número',      accessor: (l) => getNumero(l),                        align: 'center' },
-  { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
-  { id: 'frente',      titulo: 'Frente',      accessor: (l) => fmtM(l.frente),                      align: 'right' },
-  { id: 'fondo',       titulo: 'Fondo',       accessor: (l) => fmtM(l.fondo),                       align: 'right' },
-  { id: 'precio',      titulo: 'Precio',      accessor: (l) => fmtMoney(l.precio),                  align: 'center' },
-  { id: 'deuda',       titulo: 'Deuda',
-    accessor: (l) =>
-      l.deuda == null ? (
-        <span className="tl-badge tl-badge--muted">N/D</span>
-      ) : l.deuda ? (
-        <span className="tl-badge tl-badge--danger">DEUDOR</span>
-      ) : (
-        <span className="tl-badge tl-badge--success">AL DÍA</span>
-      ),
-    align: 'center',
-  },
-  { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado),         align: 'center' },
-  { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                align: 'left'   },
-];
-
-// Evitar duplicados por id ante cambios en el catálogo
-const ALL_SAFE = [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()];
-
-// ─────────────────────────────────────────────────────────────
-// Plantillas recomendadas por ROL (solo IDs de columnas)
-// Por qué: onboarding rápido y vistas consistentes por rol.
-// ─────────────────────────────────────────────────────────────
-const COLUMN_TEMPLATES_BY_ROLE = {
-  admin:        ['id','estado','subestado', 'propietario','precio','deuda'],
-  gestor:       ['id','estado', 'subestado','propietario','precio'],
-  tecnico:      ['id','estado','subestado','frente','fondo','superficie'],
-  inmobiliaria: ['id','estado','propietario','calle','precio'],
-};
-
-// Sanitiza contra ALL_SAFE y resuelve fallback
-const getDefaultColsForRole = (role) => {
-  const r = (role || '').toLowerCase();
-  const tpl = COLUMN_TEMPLATES_BY_ROLE[r] || COLUMN_TEMPLATES_BY_ROLE.admin;
-  return tpl.filter((id) => ALL_SAFE.some((c) => c.id === id));
-};
-
-// ─────────────────────────────────────────────────────────────
-// Selector visual de columnas (con drag & drop para el orden)
-// ─────────────────────────────────────────────────────────────
-function ColumnPicker({ all, selected, onChange, max = 5, onResetVisibleCols }) {
-  const totalSel = selected.length;
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
-
-  const toggle = (id) => {
-    const isSel = selected.includes(id);
-    if (isSel) {
-      onChange(selected.filter((x) => x !== id));
-    } else {
-      if (selected.length >= max) return;         // límite de columnas visibles
-      onChange([...new Set([...selected, id])]);  // agrega evitando duplicados
-    }
-  };
-
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (active.id !== over?.id) {
-      const oldIndex = selected.indexOf(active.id);
-      const newIndex = selected.indexOf(over.id);
-      onChange(arrayMove(selected, oldIndex, newIndex)); 
-    }
-  };
-
-  const selectedColumns = selected.map(id => all.find(c => c.id === id)).filter(Boolean);
-
-  return (
-    <div className="tl-popover">
-      <div className="tl-popover__header">
-        <strong>Columnas</strong>
-        <span className={`tl-chip ${totalSel >= max ? 'is-max' : ''}`}>{totalSel}/{max}</span>
-      </div>
-
-      <div className="tl-popover__list">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={selected} strategy={verticalListSortingStrategy}>
-            {selectedColumns.map((c) => {
-              const checked = selected.includes(c.id);
-              const disabled = !checked && totalSel >= max;
-              return (
-                <SortableItem
-                  key={c.id}
-                  id={c.id}
-                  column={c}
-                  checked={checked}
-                  disabled={disabled}
-                  onToggle={toggle}
-                />
-              );
-            })}
-          </SortableContext>
-        </DndContext>
-
-        {selectedColumns.length > 0 && (
-          <div className="tl-popover__separator"><span>Columnas disponibles</span></div>
-        )}
-
-        {all.filter(c => !selected.includes(c.id)).map((c) => {
-          const checked = selected.includes(c.id);
-          const disabled = !checked && totalSel >= max;
-          return (
-            <label key={c.id} className={`tl-check ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}>
-              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(c.id)} />
-              <span>{c.titulo}</span>
-            </label>
-          );
-        })}
-      </div>
-
-      <button
-        type="button"
-        className="tl-btn tl-btn--ghost"
-        // Delegamos al padre para que borre localStorage y aplique plantilla por rol
-        onClick={() => onResetVisibleCols?.()}
-      >
-        Restablecer
-      </button>
-    </div>
-  );
-}
-
-function SortableItem({ id, column, checked, disabled, onToggle }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
-  const style = { transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.5 : 1 };
-
-  return (
-    <label ref={setNodeRef} style={style}
-      className={`tl-check tl-check--sortable ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}
-      {...attributes}
-    >
-      <div className="tl-check__drag-handle" {...listeners}><GripVertical size={16} /></div>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onToggle(id)} />
-      <span>{column.titulo}</span>
-    </label>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Dropdown de cantidad de lotes por página (UI básica)
-// ─────────────────────────────────────────────────────────────
-function PageSizeDropdown({ value, options, onChange }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    const onDocClick = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
-  }, []);
-
-  const label = String(value);
-  return (
-    <div className={`tl-dd ${open ? 'is-open' : ''}`} ref={ref}>
-      <button
-        type="button"
-        className="tl-btn tl-btn--ghost tl-btn--columns2 tl-dd__button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-      >
-        {label}<span className="tl-dd__chev">▾</span>
-      </button>
-      {open && (
-        <div className="tl-dd__menu" role="listbox">
-          {options.map((opt) => {
-            const l = String(opt);
-            return (
-              <button
-                type="button"
-                key={l}
-                className={`tl-dd__item ${l === label ? 'is-active' : ''}`}
-                onClick={() => { onChange(opt); setOpen(false); }}
-              >
-                {l}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────
-// Ancho por columna (grilla CSS)
-// ─────────────────────────────────────────────────────────────
-const widthFor = (id) => {
-  switch (id) {
-    case 'id':         return '96px';
-    case 'estado':     return '160px';
-    case 'subestado':  return '170px';
-    case 'propietario':return '220px';
-    case 'calle':      return '220px';
-    case 'descripcion':return 'minmax(280px,370px)';
-    case 'numero':     return '120px';
-    case 'superficie': return '120px';
-    case 'frente':     return '120px';
-    case 'fondo':      return '120px';
-    case 'precio':     return '140px';
-    case 'deuda':      return '140px';
-    default:           return 'minmax(140px,1fr)';
-  }
-};
-
-// ─────────────────────────────────────────────────────────────
-// Componente principal
-// ─────────────────────────────────────────────────────────────
 export default function TablaLotes({
   lotes, data,
   onVer, onEditar, onRegistrarVenta, onEliminar,
   onAgregarLote, onAplicarPromo,
   roleOverride,
-  userKey, 
+  userKey,
 }) {
-  // Dataset base: usa `lotes` o `data`
+  // Dataset 
   const source = useMemo(() => {
     if (Array.isArray(lotes) && lotes.length) return lotes;
-    if (Array.isArray(data)  && data.length)  return data;
+    if (Array.isArray(data) && data.length) return data;
     return Array.isArray(lotes) ? lotes : Array.isArray(data) ? data : [];
   }, [lotes, data]);
 
-  // Rol del usuario
+  // Auth/rol 
   const auth = (() => { try { return useAuth?.() || {}; } catch { return {}; } })();
   const role = (roleOverride || auth?.user?.role || auth?.role || 'admin').toString().toLowerCase();
 
-  // Clave efectiva para persistencia por usuario+rol
+  // userKey persistencia por usuario+rol 
   const effectiveUserKey = useMemo(() => {
     if (userKey) return userKey;
     try {
@@ -371,22 +62,47 @@ export default function TablaLotes({
     }
   }, [userKey, role]);
 
-  // Regla de negocio: INMOBILIARIA no ve "NO DISPONIBLE"
-  const norm = (s) =>
-    (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+  // ===== helpers inyectados al preset =====
+  const helpers = useMemo(() => ({
+    cells: { estadoBadge, subestadoBadge, StatusBadge, SubstatusBadge },
+    fmt: { fmtMoney, fmtM2, fmtM, fmtEstado },
+    getters: { getPropietarioNombre, getCalle, getNumero },
+  }), []);
+
+  // ===== catálogo de columnas desde el preset =====
+  const ALL_COLUMNS = useMemo(() => tablePreset.makeColumns(helpers), [helpers]);
+  const ALL_SAFE = useMemo(
+    () => [...new Map(ALL_COLUMNS.map((c) => [c.id, c])).values()],
+    [ALL_COLUMNS]
+  );
+
+  // ===== plantillas por rol  =====
+  const getDefaultColsForRole = (r) => {
+    const key = (r || '').toLowerCase();
+    const tpl = tablePreset.COLUMN_TEMPLATES_BY_ROLE[key] || tablePreset.COLUMN_TEMPLATES_BY_ROLE.admin;
+    return tpl.filter((id) => ALL_SAFE.some((c) => c.id === id));
+  };
+
+  // ===== visibilidad por estados  =====
+  const ALLEST = ['DISPONIBLE','NO_DISPONIBLE','RESERVADO','VENDIDO','ALQUILADO'];
+  const allowedEstados = useMemo(
+    () => new Set(filterEstadoOptionsFor(auth?.user || { role }, ALLEST)),
+    [auth?.user, role]
+  );
+  const norm = (s) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   const isNoDisponible = (estado) => norm(estado).replace(/_/g, ' ') === 'no disponible';
 
   const filteredSource = useMemo(() => {
-    if (role.includes('inmob')) return source.filter((l) => !isNoDisponible(l?.estado));
-    return source;}, [source, role]);
+    if (!allowedEstados.has('NO_DISPONIBLE')) return source.filter((l) => !isNoDisponible(l?.estado));
+    return source;
+  }, [source, allowedEstados]);
 
+  // ===== columnas visibles  =====
   const baseDefaultCols = useMemo(() => getDefaultColsForRole(role), [role]);
   const MAX_VISIBLE = Math.max(5, baseDefaultCols.length);
 
-  // Columnas visibles (estado local), inicial con plantilla del rol
   const [colIds, setColIds] = useState(() => baseDefaultCols);
 
-  // Carga columnas desde localStorage (por usuario+rol) con migración desde clave legacy
   useEffect(() => {
     const key = makeColsKey(effectiveUserKey);
     try {
@@ -409,20 +125,17 @@ export default function TablaLotes({
         setColIds(valid.length ? valid : baseDefaultCols);
         return;
       }
-      // Si no hay preferencia previa: usar plantilla por rol
       setColIds(baseDefaultCols);
     } catch {
       setColIds(baseDefaultCols);
     }
-  }, [effectiveUserKey, baseDefaultCols]);
+  }, [effectiveUserKey, baseDefaultCols, ALL_SAFE]);
 
-  // Guarda la preferencia actual
   useEffect(() => {
     const key = makeColsKey(effectiveUserKey);
     try { localStorage.setItem(key, JSON.stringify(colIds)); } catch {}
   }, [colIds, effectiveUserKey]);
 
-  // Columnas visibles (objetos completos) en el mismo orden de `colIds`
   const visibleCols = useMemo(() => {
     const map = new Map();
     colIds.forEach((id) => {
@@ -432,20 +145,22 @@ export default function TablaLotes({
       }
     });
     return Array.from(map.values());
-  }, [colIds]);
+  }, [colIds, ALL_SAFE]);
 
-  // Paginación
+  // ===== grilla: usa el widthFor del preset  =====
+  const gridTemplate = useMemo(() => {
+    const cols = visibleCols.map((c) => tablePreset.widthFor(c.id)).join(' ');
+    return `42px ${cols} 1fr 220px`;
+  }, [visibleCols]);
+
+  // ===== paginación / selección  =====
   const PAGE_SIZES = [10, 25, 50, 'Todos'];
   const [pageSize, setPageSize] = useState(PAGE_SIZES[1]);
   const [page, setPage] = useState(1);
-
-  // Selección persistente entre páginas
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Al cambiar pageSize, solo reseteamos página (no tocamos selección)
   useEffect(() => { setPage(1); }, [pageSize]);
 
-  // Paginación calculada sobre el dataset filtrado
   const total = filteredSource.length;
   const size = pageSize === 'Todos' ? total : Number(pageSize) || PAGE_SIZES[1];
   const pageCount = Math.max(1, Math.ceil((total || 1) / (size || 1)));
@@ -457,23 +172,17 @@ export default function TablaLotes({
     [filteredSource, pageSize, start, end]
   );
 
-  // Identificador de fila (normalizado a string)
   const getRowId = (l) => String(l.id ?? l.idLote ?? l.codigo);
-
-  // Firma estable del dataset: cambia solo si cambian los IDs visibles
   const dataSignature = useMemo(() => filteredSource.map(getRowId).join('|'), [filteredSource]);
 
-  // Si cambia el dataset (por filtros/rol), limpiamos selección y volvemos a la página 1
   useEffect(() => { setPage(1); setSelectedIds([]); }, [dataSignature]);
 
-  // Selección de la página actual
   const allOnPageIds = pageItems.map(getRowId).filter((x) => x != null);
   const allOnPageSelected = allOnPageIds.length > 0 && allOnPageIds.every((id) => selectedIds.includes(id));
 
   const toggleRow = (id) =>
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  // “Seleccionar todo” de la página actual: afecta solo los IDs visibles en esta página
   const toggleAllOnPage = () =>
     setSelectedIds((prev) => {
       const s = new Set(prev);
@@ -482,28 +191,23 @@ export default function TablaLotes({
       return Array.from(s);
     });
 
-  // Permisos de acciones por rol (UI)
-  const roleActions = useMemo(() => {
-    if (role.includes('inmob')) return ['venta', 'ver'];
-    if (role.includes('gestor') || role.includes('tecnico')) return ['ver', 'editar'];
-    return ['ver', 'editar', 'venta', 'eliminar', 'aplicarPromo']; // admin
-  }, [role]);
-  const can = (a) => roleActions.includes(a);
-
-  // Grilla: checkbox + columnas visibles + spacer + Acciones
-  const gridTemplate = useMemo(() => {
-    const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
-    return `42px ${cols} 1fr 220px`;
-  }, [visibleCols]);
+  // ===== permisos  =====
+  const can = (key) => {
+    switch (key) {
+      case 'ver':           return canDashboardAction(auth?.user, 'visualizarLote');
+      case 'editar':        return canDashboardAction(auth?.user, 'editarLote');
+      case 'venta':         return canDashboardAction(auth?.user, 'registrarVenta');
+      case 'eliminar':      return canDashboardAction(auth?.user, 'eliminarLote');
+      case 'aplicarPromo':  return canDashboardAction(auth?.user, 'aplicarPromocion');
+      default:              return false;
+    }
+  };
 
   const empty = total === 0;
 
-  // ─────────────────────────────────────────────────────────────
-  // Render
-  // ─────────────────────────────────────────────────────────────
   return (
     <div className="tl-wrapper">
-      {/* Toolbar superior */}
+      {/* Toolbar */}
       <div className="tl-toolbar">
         <div className="tl-pages-left">
           <PageSizeDropdown
@@ -512,7 +216,7 @@ export default function TablaLotes({
             onChange={(opt) => setPageSize(opt === 'Todos' ? 'Todos' : Number(opt))}
           />
 
-          {/* Selector de columnas */}
+          {/* Columnas (popover + DnD) */}
           <div className="tl-columns">
             <button
               type="button"
@@ -529,9 +233,8 @@ export default function TablaLotes({
                 all={ALL_SAFE}
                 selected={colIds}
                 onChange={setColIds}
-                max={MAX_VISIBLE}
+                max={Math.max(5, baseDefaultCols.length)}
                 onResetVisibleCols={() => {
-                  // Restablece a la PLANTILLA del ROL actual y borra preferencia guardada
                   try { localStorage.removeItem(makeColsKey(effectiveUserKey)); } catch {}
                   setColIds(baseDefaultCols);
                 }}
@@ -540,12 +243,10 @@ export default function TablaLotes({
           </div>
         </div>
 
-        {/* Acciones a la derecha: misma línea visual y separación */}
         <div className="tl-actions-right">
           <button type="button" className="tl-btn tl-btn--soft" disabled={selectedIds.length === 0}>
             Ver en mapa (futuro) ({selectedIds.length})
           </button>
-
           <button
             type="button"
             className="tl-btn tl-btn--soft"
@@ -555,7 +256,6 @@ export default function TablaLotes({
           >
             Limpiar selección
           </button>
-
           {role.includes('admin') && (
             <button type="button" className="tl-btn tl-btn--primary" onClick={() => onAgregarLote?.()}>
               + Agregar Lote
@@ -566,7 +266,7 @@ export default function TablaLotes({
 
       {/* Tabla */}
       <div className="tl-table">
-        {/* Header */}
+        {/* Head */}
         <div className="tl-thead">
           <div className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
             <div className="tl-th tl-th--checkbox">

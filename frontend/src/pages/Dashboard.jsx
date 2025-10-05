@@ -5,6 +5,7 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 import FilterBar from "../components/FilterBar/FilterBar";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import TablaLotes from "../components/TablaLotes/TablaLotes";
+import { lotesFilterPreset } from "../components/FilterBar/presets/lotes.preset";
 
 /**
  * Dashboard
@@ -100,7 +101,12 @@ export default function Dashboard() {
   return (
     <>
       {/* Barra de filtros globales (controla qué data llega a la tabla) */}
-      <FilterBar variant="dashboard" userRole={userRole} onParamsChange={handleParamsChange} />
+      <FilterBar 
+        preset={lotesFilterPreset} 
+        variant="dashboard" 
+        userRole={userRole} 
+        onParamsChange={handleParamsChange} 
+      />
 
       {/* Tablero de información (TablaLotes) */}
       <TablaLotes
@@ -116,8 +122,8 @@ export default function Dashboard() {
         onEdit={onEditar}
         onDelete={onEliminar}
         onRegisterSale={goRegistrarVenta}
-        // onVerEnMapa={(ids) => ...} // 👉 lo agregamos cuando esté el modal
-        // onAddLot={() => ...}            // 👉 lo agregamos cuando esté el modal
+        // onVerEnMapa={(ids) => ...} 
+        // onAddLot={() => ...}
       />
     </>
   );

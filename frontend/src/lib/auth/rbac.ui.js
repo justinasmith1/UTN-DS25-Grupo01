@@ -1,30 +1,50 @@
 // src/lib/auth/rbac.ui.js
-// Helpers de UI que se apoyan en tu rbac.js existente (NO lo modifican)
+import { PERMISSIONS, userPermissions, can } from './rbac';
 
-import { PERMISSIONS, ROLE_PERMISSIONS, userPermissions, hasRole } from './rbac';
-
-// Módulos del Dashboard visibles por permiso
+// ================================
+// 1) Módulos visibles en la barra
+// ================================
+// Clave = key del módulo en la UI; valor = permiso mínimo para verlo.
 export const MODULES = {
-  ventas:        { label: 'Ventas',        path: '/ventas',        permission: PERMISSIONS.SALE_ACCESS },
-  inmobiliarias: { label: 'Inmobiliarias', path: '/inmobiliarias', permission: PERMISSIONS.AGENCY_ACCESS },
-  reservas:      { label: 'Reservas',      path: '/reservas',      permission: PERMISSIONS.RES_ACCESS },
-  personas:      { label: 'Personas',      path: '/personas',      permission: PERMISSIONS.PEOPLE_ACCESS },
-  reportes:      { label: 'Reportes',      path: '/reportes',      permission: PERMISSIONS.REPORTS_ACCESS },
+  ventas:        PERMISSIONS.SALE_ACCESS,
+  inmobiliarias: PERMISSIONS.AGENCY_ACCESS,
+  reservas:      PERMISSIONS.RES_ACCESS,
+  reportes:       PERMISSIONS.REPORTS_ACCESS,
+  personas:      PERMISSIONS.PEOPLE_ACCESS,
 };
 
 export function visibleModulesForUser(user) {
-  const perms = new Set(userPermissions(user));
-  return Object.entries(MODULES).filter(([, m]) => perms.has(m.permission));
+  return Object.entries(MODULES).filter(([_, perm]) => can(user, perm));
 }
 
-// Acciones del tablero (según tu overview)
+// ======================================================
+// 2) Acciones del tablero de Lotes (botones por fila)
+// ======================================================
 export function canDashboardAction(user, action) {
   switch (action) {
-    case 'registrarVenta':  return userPermissions(user).includes(PERMISSIONS.SALE_CREATE);
-    case 'visualizarLote':  return userPermissions(user).includes(PERMISSIONS.LOT_DETAIL);
-    case 'editarLote':      return userPermissions(user).includes(PERMISSIONS.LOT_EDIT);
-    case 'eliminarLote':    return hasRole(user, 'ADMINISTRADOR'); // exclusivo Admin
-    case 'aplicarPromocion':return hasRole(user, 'ADMINISTRADOR'); // exclusivo Admin
-    default:                return false;
+    case 'visualizarLote':   return can(user, PERMISSIONS.LOT_VIEW);
+    case 'editarLote':       return can(user, PERMISSIONS.LOT_EDIT);
+    case 'registrarVenta':   return can(user, PERMISSIONS.SALE_CREATE);     // Admin + Gestor
+    case 'eliminarLote':     return can(user, PERMISSIONS.LOT_DELETE);      // Admin + Gestor
+    case 'aplicarPromocion': return can(user, PERMISSIONS.LOT_PROMO);       // Admin + Gestor
+    default:                 return false;
   }
+}
+
+// ==========================================
+// 3) Helpers de visibilidad para FilterBar
+// ==========================================
+
+// Estado: ocultar "NO_DISPONIBLE" para Inmobiliaria (el resto ve todos)
+export function filterEstadoOptionsFor(user, allEstados) {
+  const perms = new Set(userPermissions(user));
+  const isInmo = perms.has(PERMISSIONS.RES_ACCESS) && !perms.has(PERMISSIONS.SALE_ACCESS);
+  return isInmo ? allEstados.filter((e) => e !== 'NO_DISPONIBLE') : allEstados;
+}
+
+// Filtro "Deudor": ocultar para Inmobiliaria
+export function canUseDeudorFilter(user) {
+  const perms = new Set(userPermissions(user));
+  const isInmo = perms.has(PERMISSIONS.RES_ACCESS) && !perms.has(PERMISSIONS.SALE_ACCESS);
+  return !isInmo;
 }
