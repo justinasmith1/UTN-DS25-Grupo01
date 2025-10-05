@@ -1,9 +1,8 @@
 // src/lib/api/lotes.js
-// Adapter único para LOTES. Traduce entre el contrato del BACK y el shape que la UI ya consume.
-// Objetivo: NO tocar Dashboard/Layout/SidePanel/LotInfo al cambiar el back.
+// Cliente de API para LOTES. Devuelve SIEMPRE { data: Array<LoteUI> }.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http, normalizeApiListResponse } from "../http/http"; // usa Authorization y maneja 401/refresh
+import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
 const PRIMARY = "/lotes";
 const FALLBACK = "/lotes";
@@ -17,7 +16,7 @@ const strOrNull = (v) => (v == null ? null : String(v));
 function fromApi(x = {}) {
   const id = strOrNull(x.id ?? x.loteId ?? x.Id) ?? `${x.manzana ?? "?"}-${x.numero ?? "?"}`;
   const status = x.status ?? x.estado ?? null;
-  const subStatus = x.subStatus ?? x.subEstado ?? x.estadoPlano ?? null;
+  const subStatus = x.subStatus ?? x.subestado ?? x.subEstado ?? x.estadoPlano ?? null;
   const owner =
     x.owner ??
     x.propietario?.nombre ??
@@ -31,56 +30,21 @@ function fromApi(x = {}) {
 
   return {
     id,
-    status,
+    status,            // ⇐ ojo: mantenemos status/ subStatus además de los campos originales
     subStatus,
+    estado: x.estado ?? null,
+    subestado: x.subestado ?? null,
     owner,
     location,
-    surface: numOrNull(x.surface ?? x.superficieM2 ?? x.superficie),
+    superficie: numOrNull(x.superficie ?? x.superficieM2 ?? x.surface),
     price: numOrNull(x.price ?? x.precio),
-    images: Array.isArray(x.images ?? x.imagenes) ? (x.images ?? x.imagenes) : [],
-    ...x,
+    precio: numOrNull(x.precio ?? x.price),
+    frente: numOrNull(x.frente),
+    fondo: numOrNull(x.fondo),
+    deuda: x.deuda ?? null,
+    descripcion: x.descripcion ?? null,
+    ...x, // preservo otros campos por compatibilidad
   };
-}
-
-// --------------------------- MAPEO UI -> BACK ---------------------------
-function toApi(payload = {}) {
-  const out = { ...payload };
-
-  if (out.status !== undefined && out.estado === undefined) {
-    out.estado = typeof out.status === "string" ? out.status : out.status;
-    delete out.status;
-  }
-
-  if (out.subStatus !== undefined && out.subEstado === undefined && out.estadoPlano === undefined) {
-    out.subEstado = out.subStatus;
-    delete out.subStatus;
-  }
-
-  if (out.owner !== undefined && out.propietarioId === undefined) {
-    out.propietarioId =
-      typeof out.owner === "object" && out.owner !== null ? out.owner.id : out.owner;
-    delete out.owner;
-  }
-
-  if (out.location !== undefined) delete out.location;
-
-  if (out.surface !== undefined && out.superficieM2 === undefined) {
-    out.superficieM2 = numOrNull(out.surface);
-    delete out.surface;
-  }
-  if (out.price !== undefined && out.precio === undefined) {
-    out.precio = numOrNull(out.price);
-    delete out.price;
-  }
-
-  if (out.manzana !== undefined) out.manzana = strOrNull(out.manzana);
-  if (out.numero !== undefined) out.numero = numOrNull(out.numero);
-  if (out.reservaId !== undefined) out.reservaId = strOrNull(out.reservaId);
-  if (out.observaciones !== undefined) {
-    out.observaciones = (out.observaciones ?? "").trim() || null;
-  }
-
-  return out;
 }
 
 // ------------------------------ QUERYSTRING ------------------------------
@@ -132,42 +96,59 @@ async function mockGetAll(params = {}) {
   const total = out.length;
   const start = (page - 1) * pageSize;
   const data = out.slice(start, start + pageSize).map(fromApi);
-  return { data, meta: { total, page, pageSize } };
+  return ok(data);
 }
 async function mockGetById(id)      { ensureSeed(); const f = LOTES.find(l => String(l.id) === String(id)); if (!f) throw new Error("Lote no encontrado"); return ok(fromApi(f)); }
-async function mockCreate(payload)   { ensureSeed(); const row = toApi(payload); row.id = nextId(); LOTES.unshift(row); return ok(fromApi(row)); }
-async function mockUpdate(id, p)     { ensureSeed(); const i = LOTES.findIndex(l => String(l.id) === String(id)); if (i < 0) throw new Error("Lote no encontrado"); LOTES[i] = { ...LOTES[i], ...toApi(p) }; return ok(fromApi(LOTES[i])); }
+async function mockCreate(payload)   { ensureSeed(); const row = payload; row.id = nextId(); LOTES.unshift(row); return ok(fromApi(row)); }
+async function mockUpdate(id, p)     { ensureSeed(); const i = LOTES.findIndex(l => String(l.id) === String(id)); if (i < 0) throw new Error("Lote no encontrado"); LOTES[i] = { ...LOTES[i], ...p }; return ok(fromApi(LOTES[i])); }
 async function mockDelete(id)        { ensureSeed(); const n = LOTES.length; LOTES = LOTES.filter(l => String(l.id) !== String(id)); if (LOTES.length === n) throw new Error("Lote no encontrado"); return ok(true); }
 
 /* ================================ API REAL ================================ */
+function pickArrayFromApi(json) {
+  // Soporta:
+  // - []                           (ya array)
+  // - { data: [] }                 (array en data)
+  // - { rows: [] }                 (array en rows)
+  // - { data: { lotes: [] } }      (tu backend actual)
+  if (Array.isArray(json)) return json;
+  if (Array.isArray(json?.data)) return json.data;
+  if (Array.isArray(json?.rows)) return json.rows;
+  if (Array.isArray(json?.data?.lotes)) return json.data.lotes;
+  return [];
+}
+
 async function apiGetAll(params = {}) {
   const res  = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.message || "Error al cargar lotes");
 
-  const list = normalizeApiListResponse(json);
-  return ok(list.map(fromApi));
+  const rawList = pickArrayFromApi(json);
+  const list = rawList.map(fromApi);
+  return ok(list); // ← SIEMPRE { data: Array }
 }
 
 async function apiGetById(id) {
   const res  = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.message || "Error al obtener lote");
-  return ok(fromApi(json?.data ?? json));
+  const row = json?.data ?? json;
+  return ok(fromApi(row));
 }
 
 async function apiCreate(payload) {
-  const res  = await fetchWithFallback(PRIMARY, { method: "POST", body: toApi(payload) });
+  const res  = await fetchWithFallback(PRIMARY, { method: "POST", body: payload });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.message || "Error al crear lote");
-  return ok(fromApi(json?.data ?? json));
+  const row = json?.data ?? json;
+  return ok(fromApi(row));
 }
 
 async function apiUpdate(id, payload) {
-  const res  = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
+  const res  = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: payload });
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json?.message || "Error al actualizar lote");
-  return ok(fromApi(json?.data ?? json));
+  const row = json?.data ?? json;
+  return ok(fromApi(row));
 }
 
 async function apiDelete(id) {
