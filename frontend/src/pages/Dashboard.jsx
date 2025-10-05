@@ -79,11 +79,12 @@ export default function Dashboard() {
 
   return (
     <>
-      <FilterBar
-        preset={lotesFilterPreset}
-        variant="dashboard"
-        userRole={userRole}
-        onParamsChange={handleParamsChange}
+      {/* Barra de filtros globales (controla qué data llega a la tabla) */}
+      <FilterBar 
+        preset={lotesFilterPreset} 
+        variant="dashboard" 
+        userRole={userRole} 
+        onParamsChange={handleParamsChange} 
       />
 
       <TablaLotes
@@ -99,9 +100,8 @@ export default function Dashboard() {
         onDelete={onEliminar}
         onRegistrarVenta={goRegistrarVenta}
         onRegisterSale={goRegistrarVenta}
-        canSaleCreate={canSaleCreate}
-        canLotEdit={canLotEdit}
-        canLotDelete={canLotDelete}
+        // onVerEnMapa={(ids) => ...} 
+        // onAddLot={() => ...}
       />
     </>
   );

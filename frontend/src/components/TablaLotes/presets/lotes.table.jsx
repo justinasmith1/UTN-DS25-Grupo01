@@ -1,5 +1,6 @@
 // src/components/TablaLotes/presets/lotes.table.jsx
 import React from 'react';
+// Reutiliza helpers y lo que hace es construir la configuración de la tabla para cada rol.
 
 export const lotesTablePreset = {
   key: 'lotes',
@@ -29,6 +30,7 @@ export const lotesTablePreset = {
     }
   },
 
+  // Construye las columnas con tus helpers 
   makeColumns({ cells = {}, fmt = {}, getters = {} } = {}) {
     const estadoBadge    = cells.estadoBadge;
     const subestadoBadge = cells.subestadoBadge;
@@ -43,14 +45,14 @@ export const lotesTablePreset = {
 
     return [
       { id: 'id',          titulo: 'ID',          accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—', align: 'center' },
-      { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado ?? l.status),          align: 'center' },
-      { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),                    align: 'center' },
-      { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                                align: 'center' },
-      { id: 'numero',      titulo: 'Número',      accessor: (l) => getNumero(l),                               align: 'center' },
-      { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2),    align: 'right'  },
-      { id: 'frente',      titulo: 'Frente',      accessor: (l) => fmtM(l.frente),                             align: 'right'  },
-      { id: 'fondo',       titulo: 'Fondo',       accessor: (l) => fmtM(l.fondo),                              align: 'right'  },
-      { id: 'precio',      titulo: 'Precio',      accessor: (l) => fmtMoney(l.precio ?? l.price ?? l.precioUSD ?? l.priceUSD), align: 'center' },
+      { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado),               align: 'center' },
+      { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),             align: 'center' },
+      { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                         align: 'center' },
+      { id: 'numero',      titulo: 'Número',      accessor: (l) => getNumero(l),                        align: 'center' },
+      { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
+      { id: 'frente',      titulo: 'Frente',      accessor: (l) => fmtM(l.frente),                      align: 'right' },
+      { id: 'fondo',       titulo: 'Fondo',       accessor: (l) => fmtM(l.fondo),                       align: 'right' },
+      { id: 'precio',      titulo: 'Precio',      accessor: (l) => fmtMoney(l.precio),                  align: 'center' },
       {
         id: 'deuda',
         titulo: 'Deuda',
@@ -64,8 +66,8 @@ export const lotesTablePreset = {
           ),
         align: 'center',
       },
-      { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado ?? l.subStatus ?? l.estadoPlano), align: 'center' },
-      { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                       align: 'left'    },
+      { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado),         align: 'center' },
+      { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                align: 'left'   },
     ];
   },
 };
