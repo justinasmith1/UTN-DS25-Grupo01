@@ -1,6 +1,3 @@
-// src/components/TablaLotes/TablaLotes.jsx
-// Wrapper de Lotes: ahora normaliza la fuente de datos ANTES de filtrar por rol.
-
 import React, { useMemo, useState, useEffect } from 'react';
 import './TablaLotes.css';
 
@@ -17,7 +14,7 @@ import { getPropietarioNombre, getCalle, getNumero } from './utils/getters';
 
 import { lotesTablePreset as tablePreset } from './presets/lotes.table.jsx';
 
-// ---- Normalizador (igual que en la base, pero usado acá también)
+// ---- Normalizador
 function toArray(payload) {
   if (Array.isArray(payload)) return payload;
   if (payload && typeof payload === 'object') {
@@ -35,13 +32,9 @@ export default function TablaLotes(props) {
     roleOverride,
   } = props;
 
-  // ===== Auth / rol
   const auth = (() => { try { return useAuth?.() || {}; } catch { return {}; } })();
-  const role = (roleOverride || auth?.user?.role || auth?.role || 'admin')
-    .toString()
-    .toLowerCase();
+  const role = (roleOverride || auth?.user?.role || auth?.role || 'admin').toString().toLowerCase();
 
-  // ===== helpers para preset
   const helpers = useMemo(
     () => ({
       cells: { estadoBadge, subestadoBadge, StatusBadge, SubstatusBadge },
@@ -51,22 +44,15 @@ export default function TablaLotes(props) {
     []
   );
 
-  // ===== columnas
   const ALL_COLUMNS = useMemo(() => tablePreset.makeColumns(helpers), [helpers]);
   const widthFor = tablePreset.widthFor;
 
-  // ===== dataset (normalizado)
   const source = useMemo(() => {
-    // probamos todas las variantes comunes y normalizamos cada una
-    const cands = [
-      lotesFiltrados, lotes, data, rows, items, lots,
-      props?.data, props?.dataset,
-    ];
+    const cands = [lotesFiltrados, lotes, data, rows, items, lots, props?.data, props?.dataset];
     for (const c of cands) {
       const arr = toArray(c);
-      if (arr.length) return arr; // primera no vacía
+      if (arr.length) return arr;
     }
-    // si ninguna es no-vacía, devolvemos la primera que sea array (aunque vacía)
     for (const c of cands) {
       const arr = toArray(c);
       if (Array.isArray(arr)) return arr;
@@ -74,28 +60,24 @@ export default function TablaLotes(props) {
     return [];
   }, [lotesFiltrados, lotes, data, rows, items, lots, props?.data, props?.dataset]);
 
-  // ===== filtro por rol (sin romper si back usa "status")
   const ALL_EST = ['DISPONIBLE', 'NO_DISPONIBLE', 'RESERVADO', 'VENDIDO', 'ALQUILADO'];
   const allowedEstados = useMemo(
     () => new Set(filterEstadoOptionsFor(auth?.user || { role }, ALL_EST)),
     [auth?.user, role]
   );
   const norm = (s) => (s ?? '').toString().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-  const isNoDisponible = (l) => {
-    const raw = l?.estado ?? l?.status ?? '';
-    return norm(String(raw)).replace(/_/g, ' ') === 'no disponible';
-  };
+  const isNoDisponible = (l) => norm(String(l?.estado ?? l?.status ?? '')).replace(/_/g, ' ') === 'no disponible';
 
   const rowsForTable = useMemo(() => {
     if (!allowedEstados.has('NO_DISPONIBLE')) return source.filter((l) => !isNoDisponible(l));
     return source;
   }, [source, allowedEstados]);
 
-  // ===== selección (contador en toolbar)
+  // ===== Selección controlada (para los botones de la toolbar)
   const [selectedIds, setSelectedIds] = useState([]);
+  // si cambian las filas (por filtros), limpiamos selección
   useEffect(() => setSelectedIds([]), [rowsForTable]);
 
-  // ===== acciones por fila (permisos)
   const can = (key) => {
     switch (key) {
       case 'ver':           return canDashboardAction(auth?.user, 'visualizarLote');
@@ -137,10 +119,15 @@ export default function TablaLotes(props) {
     </div>
   );
 
-  // ===== toolbar derecha (exclusivo de Lotes)
+  // ===== toolbar derecha (usa selectedIds controlada)
   const toolbarRight = (
     <div className="tl-actions-right">
-      <button type="button" className="tl-btn tl-btn--soft" disabled>
+      <button
+        type="button"
+        className="tl-btn tl-btn--soft"
+        disabled={selectedIds.length === 0}
+        title={selectedIds.length === 0 ? 'Selecciona filas para ver en mapa' : undefined}
+      >
         Ver en mapa (futuro) ({selectedIds.length})
       </button>
       <button
@@ -160,7 +147,6 @@ export default function TablaLotes(props) {
     </div>
   );
 
-  // ===== visibles por rol
   const baseVisibleIds = useMemo(() => {
     const key = role.toLowerCase();
     const tpl = tablePreset.COLUMN_TEMPLATES_BY_ROLE[key] || tablePreset.COLUMN_TEMPLATES_BY_ROLE.admin || [];
@@ -170,7 +156,7 @@ export default function TablaLotes(props) {
 
   return (
     <TablaBase
-      rows={rowsForTable}           // ← ya normalizado a array
+      rows={rowsForTable}
       rowKey="id"
       columns={ALL_COLUMNS}
       widthFor={widthFor}
@@ -178,7 +164,9 @@ export default function TablaLotes(props) {
       maxVisible={Math.max(5, baseVisibleIds.length)}
       renderRowActions={renderRowActions}
       toolbarRight={toolbarRight}
-      defaultPageSize={25}
+      defaultPageSize={10}
+      selected={selectedIds}
+      onSelectedChange={setSelectedIds}
     />
   );
 }

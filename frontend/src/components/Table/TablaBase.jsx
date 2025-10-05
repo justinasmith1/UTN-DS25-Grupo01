@@ -1,6 +1,3 @@
-// src/components/Table/TablaBase.jsx
-// Tabla genérica. Normaliza "rows" para aceptar [] | {data:[]} | {rows:[]}.
-
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import '../TablaLotes/TablaLotes.css';
 
@@ -37,6 +34,10 @@ export default function TablaBase({
 
   // Paginación
   defaultPageSize = 25,
+
+  // === Selección controlada (nuevo) ===
+  selected,                 // array de ids seleccionados (opcional)
+  onSelectedChange,         // fn(ids[]) (opcional)
 }) {
   // ---- Normalizo una vez ----
   const rowsNorm = useMemo(() => toArray(rows), [rows]);
@@ -96,7 +97,12 @@ export default function TablaBase({
   }, [rowsNorm, page, normalizedPageSize]);
 
   // ===== selección =====
-  const [selectedIds, setSelectedIds] = useState([]);
+  const controlled = Array.isArray(selected) && typeof onSelectedChange === 'function';
+  const [internalSelected, setInternalSelected] = useState([]);
+  // fuente de verdad
+  const selectedIds = controlled ? selected : internalSelected;
+  const setSelectedIds = controlled ? onSelectedChange : setInternalSelected;
+
   const getId = (r) => String(r?.[rowKey]);
   const pageRowIds = useMemo(
     () => pageItems.map(getId).filter((x) => x !== 'undefined' && x !== 'null'),
@@ -104,17 +110,28 @@ export default function TablaBase({
   );
   const allOnPageSelected =
     pageRowIds.length > 0 && pageRowIds.every((id) => selectedIds.includes(id));
+
   const toggleRow = (id) =>
-    setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return Array.from(next);
+    });
+
   const toggleAllOnPage = () =>
     setSelectedIds((prev) => {
-      const s = new Set(prev);
-      if (allOnPageSelected) pageRowIds.forEach((id) => s.delete(id));
-      else pageRowIds.forEach((id) => s.add(id));
-      return Array.from(s);
+      const next = new Set(prev);
+      if (allOnPageSelected) pageRowIds.forEach((id) => next.delete(id));
+      else pageRowIds.forEach((id) => next.add(id));
+      return Array.from(next);
     });
+
+  // Si cambian las filas de la página, mantenemos coherencia
+  useEffect(() => {
+    // eliminar seleccionados que ya no están en la tabla completa
+    const valid = new Set(rowsNorm.map(getId));
+    setSelectedIds((prev) => prev.filter((id) => valid.has(id)));
+  }, [rowsNorm]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ===== ColumnPicker (abre con is-open, lo maneja el CSS) =====
   const colsRef = useRef(null);
@@ -195,7 +212,11 @@ export default function TablaBase({
               return (
                 <div key={id} className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
                   <div className="tl-td tl-td--checkbox">
-                    <input type="checkbox" checked={selectedIds.includes(id)} onChange={() => toggleRow(id)} />
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(id)}
+                      onChange={() => toggleRow(id)}
+                    />
                   </div>
 
                   {visibleCols.map((c) => {
