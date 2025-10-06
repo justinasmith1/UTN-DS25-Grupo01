@@ -41,7 +41,7 @@ export default function FilterBarVentas({
     },
     {
       id: 'fechaVenta',
-      type: 'range',
+      type: 'dateRange',
       label: 'Fecha de Venta',
       defaultValue: { min: null, max: null }
     },

@@ -1,7 +1,7 @@
 // components/FilterBar/FilterBarBase.jsx
 // Componente genérico base para filtros, similar a TablaBase.jsx
 
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import "./FilterBar.css";
 import RangeControl from "./controls/RangeControl";
@@ -106,9 +106,9 @@ export default function FilterBarBase({
     }
   };
 
-  const updateRange = (fieldId, range) => {
+  const updateRange = useCallback((fieldId, range) => {
     setFilterState(prev => ({ ...prev, [fieldId]: range }));
-  };
+  }, []);
 
   const resetField = (fieldId) => {
     const field = fields.find(f => f.id === fieldId);
@@ -200,7 +200,7 @@ export default function FilterBarBase({
           isEmpty = true;
         } else if (Array.isArray(value) && value.length === 0) {
           isEmpty = true;
-        } else if (field.type === 'range' && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
+        } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
           isEmpty = true;
         }
         
@@ -214,7 +214,7 @@ export default function FilterBarBase({
           label = `${field.label}: ${value.join(', ')}`;
         } else if (field.type === 'singleSelect') {
           label = `${field.label}: ${value}`;
-        } else if (field.type === 'range' && typeof value === 'object') {
+        } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object') {
           if (value.min !== null && value.max !== null) {
             label = `${field.label}: ${value.min} - ${value.max}`;
           } else if (value.min !== null) {
@@ -308,17 +308,17 @@ export default function FilterBarBase({
           </div>
 
           <div className="fb-body-rest">
-            {fields.filter(field => field.type === 'range').map(field => (
-              <section key={field.id} className="fb-section">
-                <div className="fb-sec-head">
-                  <h4>{field.label}</h4>
-                  {filterState[field.id] && 
-                   (filterState[field.id].min !== null || filterState[field.id].max !== null) && 
-                   <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
-                  }
-                </div>
+            {fields.filter(field => field.type === 'range' || field.type === 'dateRange').map(field => (
+                <section key={field.id} className="fb-section">
+                  <div className="fb-sec-head">
+                    <h4>{field.label}</h4>
+                    {filterState[field.id] && 
+                     (filterState[field.id].min !== null || filterState[field.id].max !== null) && 
+                     <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
+                    }
+                  </div>
                 <div className="fb-range-block">
-                  {field.id === 'fechaVenta' ? (
+                  {field.type === 'dateRange' ? (
                     <DateRangeControl
                       value={filterState[field.id] || { min: null, max: null }}
                       onChange={(range) => updateRange(field.id, range)}

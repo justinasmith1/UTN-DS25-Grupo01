@@ -1,11 +1,10 @@
 // src/components/FilterBar/controls/DateRangeControl.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import noUiSlider from "nouislider";
 import "nouislider/dist/nouislider.css";
 
 // DateRangeControl especializado para manejar rangos de fechas
 export default function DateRangeControl({
-  label,
   unit = "",
   minLimit,
   maxLimit,
@@ -15,6 +14,12 @@ export default function DateRangeControl({
 }) {
   const sliderRef = useRef(null);
   const apiRef = useRef(null);
+  const onChangeRef = useRef(onChange);
+  
+  // Actualizar la referencia cuando onChange cambie
+  useEffect(() => {
+    onChangeRef.current = onChange;
+  }, [onChange]);
 
   // Convertir timestamps a strings de fecha para mostrar
   const formatDate = (timestamp) => {
@@ -62,7 +67,7 @@ export default function DateRangeControl({
     // Event listener para cambios del slider
     const handleSlide = (values) => {
       const [min, max] = values;
-      onChange({ min: Number(min), max: Number(max) });
+      onChangeRef.current({ min: Number(min), max: Number(max) });
     };
 
     apiRef.current.on('update', handleSlide);
@@ -82,7 +87,7 @@ export default function DateRangeControl({
     
     if (parsed !== null && !isNaN(parsed)) {
       const newValue = { ...value, [type]: parsed };
-      onChange(newValue);
+      onChangeRef.current(newValue);
     } else {
       // Si el input es inválido, revertir al valor anterior
       setMinStr(formatDate(value.min));
