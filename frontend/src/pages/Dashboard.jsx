@@ -2,14 +2,13 @@ import { useMemo, useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
-import FilterBar from "../components/FilterBar/FilterBar";
+import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import TablaLotes from "../components/TablaLotes/TablaLotes";
-import { lotesFilterPreset } from "../components/FilterBar/presets/lotes.preset";
 
 /**
  * Dashboard
- * - Orquesta FilterBar (filtros globales) + TablaLotes (presentación/acciones locales).
+ * - Orquesta FilterBarLotes (filtros globales) + TablaLotes (presentación/acciones locales).
  */
 
 export default function Dashboard() {
@@ -52,7 +51,7 @@ export default function Dashboard() {
     alert("Eliminar no disponible en esta vista.");
   };
 
-  // Estado de filtros (FilterBar)
+  // Estado de filtros (FilterBarLotes)
   const [params, setParams] = useState({});
   const handleParamsChange = (patch) => {
     if (!patch || Object.keys(patch).length === 0) { setParams({}); return; }
@@ -80,8 +79,7 @@ export default function Dashboard() {
   return (
     <>
       {/* Barra de filtros globales (controla qué data llega a la tabla) */}
-      <FilterBar 
-        preset={lotesFilterPreset} 
+      <FilterBarLotes 
         variant="dashboard" 
         userRole={userRole} 
         onParamsChange={handleParamsChange} 

@@ -4,17 +4,38 @@
 import { useMemo } from "react";
 import FilterBarBase from "./FilterBarBase";
 import { lotesFilterPreset } from "./presets/lotes.preset";
+import { chipsFrom, nice } from "./utils/chips";
 import { filterEstadoOptionsFor, canUseDeudorFilter } from "../../lib/auth/rbac.ui";
-import { sanitizeFiltersForRole } from "./utils/role";
 
 export default function FilterBarLotes({
+  preset = lotesFilterPreset,
   variant = "dashboard",
   userRole = "GENERAL",
   onParamsChange,
 }) {
   const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
+
+  // Catálogos desde preset, filtrados por RBAC
+  const ALL_ESTADOS = useMemo(
+    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"],
+    [preset]
+  );
+  const ESTADOS = useMemo(
+    () => filterEstadoOptionsFor(authUser, ALL_ESTADOS),
+    [authUser, ALL_ESTADOS]
+  );
+
   const canDeudor = canUseDeudorFilter(authUser);
   const isInmo = !canDeudor;
+
+  const SUBESTADOS = useMemo(
+    () => preset?.catalogs?.SUBESTADOS ?? ["CONSTRUIDO", "EN_CONSTRUCCION", "NO_CONSTRUIDO"],
+    [preset]
+  );
+  const CALLES = useMemo(() => preset?.catalogs?.CALLES ?? [
+    "REINAMORA", "MACA", "ZORZAL", "CAUQUEN", "ALONDRA", "JACANA", "TACUARITO", 
+    "JILGUERO", "GOLONDRINA", "CALANDRIA", "AGUILAMORA", "LORCA", "MILANO"
+  ], [preset]);
 
   // Configuración de campos para lotes
   const fields = useMemo(() => [
@@ -22,7 +43,7 @@ export default function FilterBarLotes({
       id: 'q',
       type: 'search',
       label: 'Búsqueda',
-      placeholder: 'ID, propietario o calle...',
+      placeholder: 'ID, calle, precio...',
       defaultValue: ''
     },
     {
@@ -34,7 +55,7 @@ export default function FilterBarLotes({
     {
       id: 'subestado',
       type: 'multiSelect',
-      label: 'Sub-estado',
+      label: 'Subestado',
       defaultValue: []
     },
     {
@@ -68,38 +89,71 @@ export default function FilterBarLotes({
       label: 'Precio',
       defaultValue: { min: null, max: null }
     },
-    ...(isInmo ? [] : [{
+    ...(canDeudor ? [{
       id: 'deudor',
       type: 'singleSelect',
       label: 'Deudor',
-      options: ['Sí', 'No'],
       defaultValue: null
-    }])
-  ], [isInmo]);
+    }] : [])
+  ], [canDeudor]);
 
-  // Catálogos filtrados por RBAC
-  const catalogs = useMemo(() => {
-    const ALL_ESTADOS = lotesFilterPreset.catalogs.ESTADOS;
-    const ESTADOS = filterEstadoOptionsFor(authUser, ALL_ESTADOS);
-    
-    return {
-      estado: ESTADOS,
-      subestado: lotesFilterPreset.catalogs.SUBESTADOS,
-      calle: lotesFilterPreset.catalogs.CALLES,
-    };
-  }, [authUser]);
+  // Catálogos para lotes (filtrados por RBAC)
+  const catalogs = useMemo(() => ({
+    estado: ESTADOS,
+    subestado: SUBESTADOS,
+    calle: CALLES,
+    ...(canDeudor ? { deudor: [true, false] } : {})
+  }), [ESTADOS, SUBESTADOS, CALLES, canDeudor]);
 
-  // Configuración de rangos
-  const ranges = useMemo(() => lotesFilterPreset.ranges, []);
+  // Configuración de rangos para lotes
+  const ranges = useMemo(() => ({
+    frente: preset?.ranges?.frente ?? { minLimit: 0, maxLimit: 100, step: 0.1, unit: "m" },
+    fondo: preset?.ranges?.fondo ?? { minLimit: 0, maxLimit: 100, step: 0.1, unit: "m" },
+    sup: preset?.ranges?.sup ?? { minLimit: 0, maxLimit: 5000, step: 1, unit: "m²" },
+    precio: preset?.ranges?.precio ?? { minLimit: 0, maxLimit: 300000, step: 100, unit: "USD" },
+  }), [preset]);
 
-  // Valores por defecto
-  const defaults = useMemo(() => lotesFilterPreset.defaults, []);
+  // Valores por defecto para lotes
+  const defaults = useMemo(() => ({
+    q: "",
+    estado: [],
+    subestado: [],
+    calle: [],
+    frente: { min: null, max: null },
+    fondo: { min: null, max: null },
+    sup: { min: null, max: null },
+    precio: { min: null, max: null },
+    ...(canDeudor ? { deudor: null } : {})
+  }), [canDeudor]);
 
-  // Configuración de vistas
+  // Configuración de vistas con RBAC
   const viewsConfig = useMemo(() => ({
     isInmo,
-    sanitizeForRole: (filters) => sanitizeFiltersForRole(filters, isInmo)
+    sanitizeForRole: (filters) => {
+      // Aplicar sanitización RBAC
+      if (isInmo) {
+        return {
+          ...filters,
+          estado: filters.estado?.filter(v => v !== "NO_DISPONIBLE") || [],
+          deudor: null
+        };
+      }
+      return filters;
+    }
   }), [isInmo]);
+
+  // Función para formatear opciones en el modal
+  const optionFormatter = useMemo(() => ({
+    estado: nice,
+    subestado: nice,
+    calle: nice,
+    deudor: (val) => val === true ? "Solo deudor" : val === false ? "Sin deuda" : val
+  }), []);
+
+  // Función para formatear chips (usando la existente)
+  const chipsFormatter = useMemo(() => (appliedFilters, catalogs) => {
+    return chipsFrom(appliedFilters, defaults, isInmo);
+  }, [defaults, isInmo]);
 
   return (
     <FilterBarBase
@@ -110,6 +164,8 @@ export default function FilterBarLotes({
       viewsConfig={viewsConfig}
       variant={variant}
       onParamsChange={onParamsChange}
+      chipsFormatter={chipsFormatter}
+      optionFormatter={optionFormatter}
     />
   );
 }
