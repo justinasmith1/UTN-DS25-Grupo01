@@ -134,11 +134,9 @@ export default function Layout() {
       <Header onUserClick={() => setShowUserModal(true)} />
 
       {/* Píldoras de módulos: debajo del Header y ANTES de la FilterBar */}
-      {onDashboard && (
-        <div className="container py-2">
-          <ModulePills />
-        </div>
-      )}
+      <div className="container py-2">
+        <ModulePills />
+      </div>
 
       <Outlet
         context={{
