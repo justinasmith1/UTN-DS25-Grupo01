@@ -5,7 +5,7 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
-import TablaLotes from "../components/TablaLotes/TablaLotes";
+import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
 import { getAllLotes } from "../lib/api/lotes";
 
 /**

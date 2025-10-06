@@ -6,7 +6,7 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarInmobiliarias from "../components/FilterBar/FilterBarInmobiliarias";
-import TablaInmobiliarias from "../components/TablaInmobiliarias/TablaInmobiliarias";
+import TablaInmobiliarias from "../components/Table/TablaInmobiliarias/TablaInmobiliarias";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
 

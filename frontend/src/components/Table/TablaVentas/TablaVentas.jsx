@@ -1,12 +1,12 @@
 // src/components/TablaVentas/TablaVentas.jsx
 import React, { useMemo, useState, useEffect } from 'react';
-import TablaBase from '../Table/TablaBase';
-import { useAuth } from '../../app/providers/AuthProvider';
-import { canDashboardAction } from '../../lib/auth/rbac.ui';
+import TablaBase from '../TablaBase';
+import { useAuth } from '../../../app/providers/AuthProvider';
+import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 
 // Helpers visuales y de formato
-import { fmtMoney, fmtEstado } from '../TablaLotes/utils/formatters';
+import { fmtMoney, fmtEstado, fmtFecha, fmtPlazoEscritura } from './utils/formatters';
 
 // Preset con columnas/anchos/plantillas
 import { ventasTablePreset as tablePreset } from './presets/ventas.table.jsx';
@@ -19,6 +19,7 @@ const makeColsKey = (userKey) => `${APP_NS}:tabla-ventas-cols:${STORAGE_VERSION}
 export default function TablaVentas({
   ventas, data,
   onVer, onEditar, onEliminar, onVerDocumentos, onAgregarVenta,
+  selectedIds = [], onSelectedChange,
   roleOverride,
   userKey,
 }) {
@@ -185,14 +186,15 @@ export default function TablaVentas({
         type="button" 
         className="tl-btn tl-btn--soft"
         title="Ver en mapa (futuro)"
-        disabled={true}
+        disabled={selectedIds.length === 0}
       >
-        Ver en mapa (futuro)
+        Ver en mapa (futuro) ({selectedIds.length})
       </button>
       <button 
         type="button" 
         className="tl-btn tl-btn--soft"
-        disabled={true}
+        disabled={selectedIds.length === 0}
+        onClick={() => onSelectedChange?.([])}
         title="Limpiar selección"
       >
         Limpiar selección
@@ -220,6 +222,8 @@ export default function TablaVentas({
       renderRowActions={renderRowActions}
       toolbarRight={toolbarRight}
       defaultPageSize={25}
+      selected={selectedIds}
+      onSelectedChange={onSelectedChange}
     />
   );
 }

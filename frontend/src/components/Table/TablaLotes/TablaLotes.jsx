@@ -6,11 +6,11 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes.css';
 
-import { useAuth } from '../../app/providers/AuthProvider';
+import { useAuth } from '../../../app/providers/AuthProvider';
 import { Eye, Edit, Trash2, DollarSign, Columns3, CirclePercent } from 'lucide-react';
 
 // rbac y visibilidad de estados
-import { canDashboardAction, filterEstadoOptionsFor } from '../../lib/auth/rbac.ui';
+import { canDashboardAction, filterEstadoOptionsFor } from '../../../lib/auth/rbac.ui';
 
 // Partes de UI
 import PageSizeDropdown from './parts/PageSizeDropdown';

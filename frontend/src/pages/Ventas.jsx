@@ -7,7 +7,7 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { getAllVentas } from "../lib/api/ventas";
 import { applyVentaFilters } from "../utils/applyVentaFilters";
-import TablaVentas from "../components/TablaVentas/TablaVentas";
+import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
 
 /**
@@ -33,6 +33,7 @@ export default function Ventas() {
   // Dataset base: obtenemos todas las ventas desde la API una sola vez
   const [allVentas, setAllVentas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // Cargar todas las ventas al montar el componente
   useEffect(() => {
@@ -138,6 +139,8 @@ export default function Ventas() {
         onEliminar={canSaleDelete ? onEliminar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
+        selectedIds={selectedIds}
+        onSelectedChange={setSelectedIds}
       />
     </>
   );

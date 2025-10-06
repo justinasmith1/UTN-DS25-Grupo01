@@ -3,10 +3,11 @@
 
 import { useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../../app/providers/AuthProvider";
-import { can, PERMISSIONS } from "../../lib/auth/rbac";
-import TablaBase from "../Table/TablaBase";
-import { inmobiliariasTablePreset } from "./inmobiliarias.table";
+import { useAuth } from "../../../app/providers/AuthProvider";
+import { can, PERMISSIONS } from "../../../lib/auth/rbac";
+import TablaBase from "../TablaBase";
+import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
+import { fmtComxVenta, fmtCantidadVentas, fmtFecha, fmtContacto } from "./utils/formatters";
 
 export default function TablaInmobiliarias({
   data = [],
