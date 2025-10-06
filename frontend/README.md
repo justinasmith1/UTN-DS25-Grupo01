@@ -1,13 +1,132 @@
 # Frontend
 
-Se implementan las paginas de Mapa, Dashboard, User y Detalle completo de un Lote mediante las tecnologias de React 19.1.0 y React-Bootstrap 
-como libreria UI seleccionada.
-Se emplea una estructura profesional de archivos organizada en carpetas separadas para componentes, pages y lib para datos de simulacion.
-Se utiliza React router configurado utilizando rutas anidadas, donde Map.jsx y Dashboard.jsx son manejadas por la route padre Layout.jsx.
-En esta etapa no se utilizan conexiones con APIs.
+Aplicación React para la gestión de **Lotes**, y base reutilizable para **Ventas**, **Inmobiliarias** y **Reservas**.  
+El foco del front es: **tablero reutilizable**, **barra de filtros reutilizable**, **autenticación/ autorización por rol (RBAC)** y **validaciones de formularios** con feedback profesional.
 
-## Detalle de elementos
-- En la pagina de Mapa (Map.jsx) se visualiza el mapa donde se puede seleccionar un lote, donde se pueden realizar ciertas acciones sobre este como visualizar la informacion asociada.
-- En la pagina de Dashboard se visualiza una vista centrada en la gestion de los lotes y su informacion, donde se detalla un listado de todos ellos junto a accesos directos para la modificacion, eliminacion del mismo o consulta de sus datos, utilizando formularios.
-- Los formularios utilizados presentan un modo de creacion y edicion en cuanto se necesite dicha funcionalidad, estos mismos hacen uso de efectos para inicializarse cuando se cambie de "modo".
-- En el componente Layout se invocan a los componentes comunes a todas las paginas junto variables de estado globales para la informacion de los lotes y guardado de filtros a aplicar, ademas de manejadores para los componentes (utilizados para mostrar u ocultar el componente cuando corresponda).
+---
+
+## Stack
+
+- **React** + **React Router**
+- **CSS** (estilos propios del proyecto)
+- **lucide-react** (iconos)
+- **dnd-kit** (drag & drop en selector de columnas)
+- **ES Modules / Vite** (dev server y build)
+- **Fetch API** con capa HTTP propia (manejo de token, 401, etc.)
+
+---
+
+## Estructura principal
+
+```
+src/
+  app/
+    providers/
+      AuthProvider.jsx        # contexto de usuario/rol y token
+  components/
+    Table/
+      TablaBase.jsx           # tabla genérica (paginación, selección, column picker)
+    TablaLotes/
+      cells/
+        StatusBadge.jsx
+        SubstatusBadge.jsx
+      parts/
+        ColumnPicker.jsx
+        PageSizeDropdown.jsx
+      presets/
+        lotes.table.jsx       # preset de columnas de Lotes
+      utils/
+        formatters.jsx
+        getters.js
+      TablaLotes.jsx          # wrapper de Lotes sobre TablaBase
+      TablaLotes.css
+    FilterBar/
+      controls/
+        RangeControl.jsx
+      hooks/
+        useDebouncedEffect.js
+        useModalSheet.js
+      presets/
+        lotes.preset.js       # preset de filtros de Lotes
+      utils/
+        chips.js
+        param.js
+        role.js
+      FilterBar.jsx
+      FilterBar.css
+    ...
+  lib/
+    api/
+      lotes.js                # adapter de API de Lotes (normaliza respuestas)
+      ventas.js               # (a completar)
+      inmobiliarias.js        # (a completar)
+      reservas.js             # (a completar)
+    http/
+      http.js                 # capa HTTP (token, headers, 401/refresh)
+    filters/
+      applyLoteFilters.js     # filtros en front (por ahora)
+  pages/
+    Dashboard.jsx             # tablero
+    ...                       # (Ventas, Inmobiliarias, Reservas: a cablear)
+  components/
+    Layout.jsx                # shell + rutas anidadas
+    ModulePills.jsx           # accesos a módulos
+    User.jsx / Header.jsx / SidePanel.jsx ...
+```
+
+---
+
+## Conceptos clave de la implementación
+
+### 1) Adaptadores de API (capa de datos)
+- Cada módulo expone un archivo `lib/api/<modulo>.js` que **normaliza** la forma del backend.
+- Contrato estable del front: **todas** las funciones “getAll” devuelven **`{ data: [] }`**.
+- Ejemplo (Lotes): el back responde `{ success:true, data:{ lotes:[], total } }` → el adapter de `lotes.js` lo transforma a `{ data: LoteUI[] }`.
+- Esto evita `ifs` en componentes y facilita reusar UI entre módulos.
+
+### 2) Tabla reutilizable
+- `components/Table/TablaBase.jsx`:
+  - Paginación, selección, **selección controlada** (`selected` + `onSelectedChange`), orden visual por columnas seleccionadas.
+  - **ColumnPicker** con drag & drop (dnd-kit) y límite de columnas visibles por rol.
+  - No sabe de “lotes/ventas”: solo recibe `rows`, `columns` y un `renderRowActions`.
+- **Wrappers por módulo**: `TablaLotes.jsx` usa la tabla base y:
+  - Carga su **preset de columnas** (`presets/lotes.table.jsx`).
+  - Define **acciones por fila** (ver/editar/venta/eliminar/promoción), que se habilitan según permisos.
+  - Muestra la **toolbar del módulo** (Ver en mapa, Limpiar selección, Agregar Lote).
+
+### 3) Filter Bar reutilizable
+- `components/FilterBar/FilterBar.jsx` es única.
+- Cada módulo define su **preset** (chips/controles → claves de filtro). Ej.: `lotes.preset.js`.
+- La página (Dashboard) recibe `onParamsChange` y aplica filtros **en front** con `lib/filters/applyLoteFilters.js`.  
+  > Más adelante, los mismos params se enviarán al backend sin cambiar la UI.
+
+### 4) Autenticación y Autorización (RBAC)
+- **AuthProvider** guarda token y rol del usuario.
+- **RBAC en UI**: helpers en `lib/auth/rbac.ui` gobiernan:
+  - qué **acciones** por fila se muestran,
+  - qué **columnas** aparecen por rol (plantillas en el preset),
+  - qué **estados** se listan (ocultamos “NO_DISPONIBLE” a ciertos perfiles, etc).
+- Lógica visible hoy:  
+  - Solo **admin** ve “+ Agregar Lote”.  
+  - Acciones (👁️ ver, ✏️ editar, 💲 venta, 🗑️ eliminar, % promos) aparecen/ se ocultan por rol.
+- **Rutas protegidas**: la UI ya restringe acciones.
+
+### 5) Validaciones de formularios
+- Los formularios de gestión (crear/editar lote, etc.) muestran **errores por campo** y bloquean envío inválido.
+- Las validaciones son **controladas en React** (reglas por campo y feedback en tiempo real) + verificación del lado del backend.
+
+---
+
+## Flujo actual (Lotes)
+
+1. **Carga**: `getAllLotes()` (adapter) → `{ data: LoteUI[] }`.  
+2. **Dashboard**: mantiene `params` de filtros y el array de lotes.  
+3. **FilterBar (preset de lotes)** emite cambios de filtros → se **filtra en front**.  
+4. **TablaLotes** recibe `rows` filtradas y maneja **selección controlada**:
+   - “Ver en mapa (futuro) (N)” muestra el contador real de seleccionados.
+   - “Limpiar selección” desmarca los checkboxes de la grilla.
+5. **Acciones** por fila se rigen por **permisos** del rol.
+
+La misma estructura se replica para **Ventas / Inmobiliarias / Reservas** cambiando **solo** el adapter de API, el **preset de columnas** y el **preset de filtros**.
+
+---
