@@ -9,7 +9,6 @@ import { getAllLotes, updateLote, deleteLote, createLote } from "../lib/api/lote
 import Header from "./Header";
 // import Botones from "./Botones"; // ← evitamos duplicados
 import ModulePills from "./ModulePills";     // ← NUEVO: las píldoras
-import FilterBar from "./FilterBar/FilterBar";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
@@ -134,11 +133,9 @@ export default function Layout() {
       <Header onUserClick={() => setShowUserModal(true)} />
 
       {/* Píldoras de módulos: debajo del Header y ANTES de la FilterBar */}
-      {onDashboard && (
-        <div className="container py-2">
-          <ModulePills />
-        </div>
-      )}
+      <div className="container py-2">
+        <ModulePills />
+      </div>
 
       <Outlet
         context={{

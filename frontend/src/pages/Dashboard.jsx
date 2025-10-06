@@ -1,21 +1,23 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useOutletContext } from "react-router-dom";
+import { useMemo, useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
-import { can, PERMISSIONS } from "../lib/auth/rbac";
-import FilterBar from "../components/FilterBar/FilterBar";
+// import { can, PERMISSIONS } from "../lib/auth/rbac";
+import { useToast } from "../app/providers/ToastProvider";
+import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
-import TablaLotes from "../components/TablaLotes/TablaLotes";
-import { lotesFilterPreset } from "../components/FilterBar/presets/lotes.preset";
+import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
+import { getAllLotes } from "../lib/api/lotes";
 
 /**
  * Dashboard
- * - Orquesta FilterBar (filtros globales) + TablaLotes (presentación/acciones locales).
+ * - Orquesta FilterBarLotes (filtros globales) + TablaLotes (presentación/acciones locales).
  */
 
 export default function Dashboard() {
-  const ctx = useOutletContext() || {};
   const { user } = useAuth();
+  const { error } = useToast();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
+  const navigate = useNavigate();
 
   const authRaw = localStorage.getItem("auth:user");
   const authUser = authRaw ? JSON.parse(authRaw) : null;
@@ -25,63 +27,97 @@ export default function Dashboard() {
     userRole,
   ].join(":");
 
-  const {
-    handleViewDetail: _handleViewDetail,
-    abrirModalEditar,
-    abrirModalEliminar,
-    handleDeleteLote,
-  } = ctx;
-
-  const navigate = useNavigate();
-
-  // Permisos (booleans)
-  const canSaleCreate = can(user, PERMISSIONS.SALE_CREATE);
-  const canLotEdit = can(user, PERMISSIONS.LOT_EDIT);
-  const canLotDelete = can(user, PERMISSIONS.LOT_DELETE);
-
   // Callbacks normalizados
   const goRegistrarVenta = (lot) =>
     navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
 
-  const onEditar = (lot) => abrirModalEditar?.(lot?.id ?? lot?.idLote);
-  const onVer = (lot) => _handleViewDetail?.(lot?.id ?? lot?.idLote);
+  const onEditar = (lot) => {
+    // TODO: Implementar modal de edición
+    console.log('Editar lote:', lot);
+  };
+  
+  const onVer = (lot) => {
+    // TODO: Implementar modal de visualización
+    console.log('Ver lote:', lot);
+  };
+  
   const onEliminar = (lot) => {
-    const id = lot?.id ?? lot?.idLote;
-    if (abrirModalEliminar) return abrirModalEliminar(id);
-    if (handleDeleteLote) return handleDeleteLote(id);
-    alert("Eliminar no disponible en esta vista.");
+    // TODO: Implementar confirmación y eliminación
+    console.log('Eliminar lote:', lot);
   };
 
-  // Estado de filtros (FilterBar)
+  // Estado de filtros (FilterBarLotes)
   const [params, setParams] = useState({});
-  const handleParamsChange = (patch) => {
-    if (!patch || Object.keys(patch).length === 0) { setParams({}); return; }
-    setParams((prev) => ({ ...prev, ...patch }));
-  };
-
-  // Dataset base: tomamos el que expone Layout vía Outlet
-  const lots = useMemo(() => {
-    const rawLots =
-      ctx?.allLots ??
-      ctx?.lots ??
-      ctx?.lotes ??
-      ctx?.data?.lotes ??
-      [];
-    const base = Array.isArray(rawLots) ? rawLots : [];
-    const hasParams = params && Object.keys(params).length > 0;
-
-    try {
-      return hasParams ? applyLoteFilters(base, params) : base;
-    } catch {
-      return base;
+  const handleParamsChange = useCallback((patch) => {
+    if (!patch || Object.keys(patch).length === 0) { 
+      setParams({}); 
+      return; 
     }
-  }, [ctx, params]);
+    setParams((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  // Dataset base: obtenemos todos los lotes desde la API una sola vez
+  const [allLotes, setAllLotes] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Cargar todos los lotes al montar el componente
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoading(true);
+        console.log('🔍 Cargando lotes desde API...');
+        const res = await getAllLotes({});
+        console.log('📊 Respuesta de API:', res);
+        if (alive) { 
+          const data = res.data || [];
+          console.log('📋 Datos de lotes:', data);
+          setAllLotes(data); 
+        }
+      } catch (err) {
+        if (alive) {
+          console.error('❌ Error al cargar lotes:', err);
+          error("No pude cargar los lotes");
+          setAllLotes([]);
+        }
+      } finally {
+        if (alive) {
+          setLoading(false);
+        }
+      }
+    })();
+    
+    return () => { alive = false; };
+  }, [error]);
+
+  // Aplicar filtros localmente
+  const lots = useMemo(() => {
+    console.log('🔄 Aplicando filtros. allLotes:', allLotes.length, 'params:', params);
+    const hasParams = params && Object.keys(params).length > 0;
+    try {
+      const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
+      console.log('✅ Resultado filtrado:', result.length, 'lotes');
+      return result;
+    } catch (err) {
+      console.error('❌ Error aplicando filtros:', err);
+      return allLotes;
+    }
+  }, [allLotes, params]);
+
+  // Mostrar loading mientras se cargan los datos
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+        <div className="spinner-border" role="status" />
+        <span className="ms-2">Cargando lotes…</span>
+      </div>
+    );
+  }
 
   return (
     <>
       {/* Barra de filtros globales (controla qué data llega a la tabla) */}
-      <FilterBar 
-        preset={lotesFilterPreset} 
+      <FilterBarLotes 
         variant="dashboard" 
         userRole={userRole} 
         onParamsChange={handleParamsChange} 

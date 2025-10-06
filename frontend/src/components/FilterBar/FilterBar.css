@@ -33,12 +33,12 @@
 .fb-modal-dashboard { padding-top: 120px; }
 .fb-modal-map       { padding-top: 120px; }
 
-.fb-sheet{ width: min(860px, 92vw); max-height: calc(100vh - 40px); background:#fff; border: .1px solid rgba(0,0,0,.7); border-radius:16px; overflow:hidden; box-shadow: 0 20px 60px rgba(0,0,0,.20); display:grid; grid-template-rows: auto 1fr auto; }
+.fb-sheet{ width: min(860px, 92vw); height: 580px; background:#fff; border: .1px solid rgba(0,0,0,.7); border-radius:16px; overflow:hidden; box-shadow: 0 20px 60px rgba(0,0,0,.20); display:grid; grid-template-rows: auto 1fr auto; }
 .fb-sheet-header{ display:flex; align-items:center; justify-content:space-between; padding:16px 20px; border-bottom:1px solid var(--fb-line); background:#fff; z-index:1; }
 .fb-sheet-header h3{ margin:0; font-size:18px; font-weight:700; color:#333; }
 .fb-close{ border:none; background:transparent; font-size:26px; line-height:1; cursor:pointer; color:#444; }
 
-.fb-sheet-body{ overflow-y:auto; overflow-x:hidden; max-height: var(--fb-body-max, 420px); padding:12px 20px 16px; }
+.fb-sheet-body{ overflow-y:auto; overflow-x:hidden; padding:12px 20px 16px; }
 
 /* Secciones */
 .fb-section{ padding:14px 0; }

@@ -22,11 +22,24 @@ export function visibleModulesForUser(user) {
 // ======================================================
 export function canDashboardAction(user, action) {
   switch (action) {
+    // Lotes
     case 'visualizarLote':   return can(user, PERMISSIONS.LOT_VIEW);
     case 'editarLote':       return can(user, PERMISSIONS.LOT_EDIT);
     case 'registrarVenta':   return can(user, PERMISSIONS.SALE_CREATE);     // Admin + Gestor
     case 'eliminarLote':     return can(user, PERMISSIONS.LOT_DELETE);      // Admin + Gestor
     case 'aplicarPromocion': return can(user, PERMISSIONS.LOT_PROMO);       // Admin + Gestor
+    
+    // Ventas
+    case 'visualizarVenta':  return can(user, PERMISSIONS.SALE_VIEW);
+    case 'editarVenta':      return can(user, PERMISSIONS.SALE_EDIT);
+    case 'eliminarVenta':    return can(user, PERMISSIONS.SALE_DELETE);
+    case 'verDocumentos':    return can(user, PERMISSIONS.SALE_VIEW);
+    
+    // Reservas
+    case 'visualizarReserva':  return can(user, PERMISSIONS.RES_VIEW);
+    case 'editarReserva':      return can(user, PERMISSIONS.RES_EDIT);
+    case 'eliminarReserva':    return can(user, PERMISSIONS.RES_DELETE);
+    
     default:                 return false;
   }
 }

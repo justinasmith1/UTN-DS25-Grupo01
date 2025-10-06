@@ -1,8 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
-import '../TablaLotes/TablaLotes.css';
+import './TablaLotes/TablaLotes.css';
 
-import PageSizeDropdown from '../TablaLotes/parts/PageSizeDropdown';
-import ColumnPicker from '../TablaLotes/parts/ColumnPicker';
+import PageSizeDropdown from './TablaLotes/parts/PageSizeDropdown';
+import ColumnPicker from './TablaLotes/parts/ColumnPicker';
 import { Columns3 } from 'lucide-react';
 
 // ---- Normalizador robusto ----

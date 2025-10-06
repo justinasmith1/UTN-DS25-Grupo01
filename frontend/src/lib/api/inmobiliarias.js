@@ -14,19 +14,22 @@ const ok = (data) => ({ data });
 
 // ---------- Mapeos ----------
 const fromApi = (row = {}) => ({
-  id: row.id ?? row.inmobiliariaId ?? row.Id,
-  name: row.name ?? row.nombre ?? "",
-  email: row.email ?? row.correo ?? "",
-  phone: row.phone ?? row.telefono ?? "",
-  address: row.address ?? row.direccion ?? "",
+  id: row.id ?? row.idInmobiliaria ?? row.inmobiliariaId ?? row.Id,
+  nombre: row.nombre ?? row.name ?? "",
+  razonSocial: row.razonSocial ?? row.razon_social ?? "",
+  comxventa: row.comxventa ?? row.comision ?? null,
+  contacto: row.contacto ?? row.phone ?? row.telefono ?? "",
+  cantidadVentas: row.cantidadVentas ?? row.ventas_count ?? 0,
+  createdAt: row.createdAt ?? row.created_at ?? null,
+  updateAt: row.updateAt ?? row.updated_at ?? null,
 });
 
 const toApi = (form = {}) => ({
-  // Enviamos en español si el back lo exige; si acepta inglés, también mapea.
-  nombre: (form.name ?? "").trim(),
-  email: (form.email ?? "").trim(),
-  telefono: (form.phone ?? "").trim(),
-  direccion: (form.address ?? "").trim(),
+  // Enviamos en español según el schema de Prisma
+  nombre: (form.nombre ?? "").trim(),
+  razonSocial: (form.razonSocial ?? "").trim(),
+  comxventa: form.comxventa ? Number(form.comxventa) : null,
+  contacto: (form.contacto ?? "").trim(),
 });
 
 // ---------- Utilitarios ----------
@@ -58,8 +61,33 @@ const nextId = () => `I${String(INMOS.length + 1).padStart(3, "0")}`;
 function ensureSeed() {
   if (seeded) return;
   INMOS = [
-    { id: "I001", name: "López Propiedades", email: "info@lopez.com", phone: "11-5555-0001", address: "Av. Siempre Viva 123" },
-    { id: "I002", name: "Delta Real Estate", email: "hola@delta.com", phone: "11-5555-0002", address: "Calle 9 #456" },
+    { 
+      id: "I001", 
+      nombre: "López Propiedades", 
+      razonSocial: "López Propiedades S.A.",
+      comxventa: 3.5,
+      contacto: "11-5555-0001",
+      cantidadVentas: 15,
+      createdAt: "2023-01-15T10:00:00Z"
+    },
+    { 
+      id: "I002", 
+      nombre: "Delta Real Estate", 
+      razonSocial: "Delta Real Estate S.R.L.",
+      comxventa: 4.0,
+      contacto: "11-5555-0002",
+      cantidadVentas: 8,
+      createdAt: "2023-03-20T14:30:00Z"
+    },
+    { 
+      id: "I003", 
+      nombre: "Inmobiliaria Central", 
+      razonSocial: "Inmobiliaria Central S.A.",
+      comxventa: 2.8,
+      contacto: "11-5555-0003",
+      cantidadVentas: 23,
+      createdAt: "2022-11-10T09:15:00Z"
+    },
   ].map(fromApi);
   seeded = true;
 }
@@ -68,12 +96,13 @@ function mockFilterSortPage(list, params = {}) {
   let out = [...list];
   const q = (params.q || "").toLowerCase();
   if (q) out = out.filter((a) =>
-    (a.name || "").toLowerCase().includes(q) ||
-    (a.email || "").toLowerCase().includes(q) ||
-    (a.phone || "").toLowerCase().includes(q)
+    (a.nombre || "").toLowerCase().includes(q) ||
+    (a.razonSocial || "").toLowerCase().includes(q) ||
+    (a.contacto || "").toLowerCase().includes(q) ||
+    String(a.id || "").includes(q)
   );
 
-  const sortBy = params.sortBy || "name";
+  const sortBy = params.sortBy || "nombre";
   const sortDir = (params.sortDir || "asc").toLowerCase();
   out.sort((A, B) => {
     const a = A[sortBy] ?? "";
@@ -103,9 +132,47 @@ async function apiGetAll(params = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar inmobiliarias");
 
+  console.log('🔍 API Response raw data:', data);
+  console.log('🔍 API Response data structure:', JSON.stringify(data, null, 2));
+  console.log('🔍 data.data:', data.data);
+  console.log('🔍 typeof data.data:', typeof data.data);
+  console.log('🔍 Array.isArray(data.data):', Array.isArray(data.data));
+  
+  // Si data.data es un objeto, intentar extraer el array de inmobiliarias
+  let inmobiliariasArray = [];
+  if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
+    console.log('🔍 data.data keys:', Object.keys(data.data));
+    // Buscar posibles claves que contengan el array
+    if (data.data.inmobiliarias && Array.isArray(data.data.inmobiliarias)) {
+      inmobiliariasArray = data.data.inmobiliarias;
+      console.log('🔍 Found inmobiliarias array:', inmobiliariasArray);
+    } else if (data.data.rows && Array.isArray(data.data.rows)) {
+      inmobiliariasArray = data.data.rows;
+      console.log('🔍 Found rows array:', inmobiliariasArray);
+    } else {
+      console.log('🔍 No array found in data.data, trying to convert object to array');
+      // Si es un objeto con propiedades que parecen inmobiliarias, convertirlo a array
+      const values = Object.values(data.data);
+      if (values.length > 0 && typeof values[0] === 'object') {
+        inmobiliariasArray = values;
+        console.log('🔍 Converted object values to array:', inmobiliariasArray);
+      }
+    }
+  }
+  
   const arr = normalizeApiListResponse(data);
+  console.log('🔍 Normalized array:', arr);
+  console.log('🔍 Manual inmobiliarias array:', inmobiliariasArray);
+  
+  // Usar el array manual si el normalizado está vacío
+  const finalArray = arr.length > 0 ? arr : inmobiliariasArray;
+  console.log('🔍 Final array to use:', finalArray);
+  
+  const mapped = finalArray.map(fromApi);
+  console.log('🔍 Mapped data:', mapped);
+  
   const meta = data?.meta ?? { total: arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
-  return { data: arr.map(fromApi), meta };
+  return { data: mapped, meta };
 }
 
 async function apiGetById(id) {

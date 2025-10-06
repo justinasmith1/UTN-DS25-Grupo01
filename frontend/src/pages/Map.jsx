@@ -3,7 +3,7 @@ import { Container } from "react-bootstrap";
 import { useOutletContext } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 
-import FilterBar from "../components/FilterBar/FilterBar";
+import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 
 const customStyles = `
@@ -71,8 +71,8 @@ export default function Map() {
     <>
       <style>{customStyles}</style>
 
-      {/* FilterBar con padding y offset propios del Mapa */}
-      <FilterBar variant="map" userRole={userRole} onParamsChange={setParams} />
+      {/* FilterBarLotes con padding y offset propios del Mapa */}
+      <FilterBarLotes variant="map" userRole={userRole} onParamsChange={setParams} />
 
       <Container fluid className="py-4">
         <div className="text-muted mb-2">
