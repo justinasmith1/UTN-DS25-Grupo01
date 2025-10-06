@@ -35,6 +35,11 @@ export function canDashboardAction(user, action) {
     case 'eliminarVenta':    return can(user, PERMISSIONS.SALE_DELETE);
     case 'verDocumentos':    return can(user, PERMISSIONS.SALE_VIEW);
     
+    // Reservas
+    case 'visualizarReserva':  return can(user, PERMISSIONS.RES_VIEW);
+    case 'editarReserva':      return can(user, PERMISSIONS.RES_EDIT);
+    case 'eliminarReserva':    return can(user, PERMISSIONS.RES_DELETE);
+    
     default:                 return false;
   }
 }

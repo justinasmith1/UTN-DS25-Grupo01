@@ -1,159 +1,427 @@
 // src/lib/api/reservas.js
-// Adapter Reservas: UI <-> Backend con fallback de ruta y normalización de shape.
-// Motivo: desacoplar la UI del naming del backend y evitar 404 por mayúsculas.
- 
+// API adapter para reservas
+
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http, normalizeApiListResponse } from "../http/http";
 
-const PRIMARY = "/Reservas";
-const FALLBACK = "/reservas";
-
-const ok = (data) => ({ data });
-
-// ---------- Helpers de mapeo ----------
-const toNumberOrNull = (v) => (v === "" || v == null ? null : Number(v));
-
-// Backend -> UI
+// ===== NORMALIZADORES =====
 const fromApi = (row = {}) => ({
-  id: row.id ?? row.reservaId ?? row.Id,
-  lotId: row.lotId ?? row.loteId ?? row.lote_id ?? row.lote ?? row.lot,
-  date: row.date ?? row.fechaReserva ?? row.fecha ?? null,
-  status: row.status ?? row.estado ?? null,
-  amount: typeof row.amount === "number" ? row.amount : (row.sena != null ? Number(row.sena) : null),
-  clienteId: row.clienteId ?? row.personaId ?? null,
-  inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
-  observaciones: row.observaciones ?? row.notas ?? "",
+  id: row.id ?? row.idReserva ?? row.reservaId ?? row.Id,
+  loteId: row.loteId ?? row.lote?.id ?? row.lote?.idLote ?? row.loteId,
+  clienteId: row.clienteId ?? row.cliente?.id ?? row.cliente?.idPersona ?? row.clienteId,
+  clienteNombre: row.cliente?.nombre ?? row.clienteNombre ?? '',
+  clienteApellido: row.cliente?.apellido ?? row.clienteApellido ?? '',
+  clienteCompleto: row.cliente?.nombreCompleto || 
+    `${row.cliente?.nombre || ''} ${row.cliente?.apellido || ''}`.trim() || 
+    `${row.clienteNombre || ''} ${row.clienteApellido || ''}`.trim() || '',
+  fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
+  seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
+  inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
+  inmobiliariaNombre: row.inmobiliaria?.nombre ?? row.inmobiliariaNombre ?? '',
+  loteInfo: row.lote ? {
+    fraccion: row.lote.fraccion ?? row.lote.numero ?? '',
+    calle: row.lote.ubicacion?.calle ?? row.lote.calle ?? '',
+    numero: row.lote.ubicacion?.numero ?? row.lote.numero ?? '',
+    estado: row.lote.estado ?? '',
+    precio: row.lote.precio ?? row.lote.valor ?? 0
+  } : null,
+  createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
+  updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt
 });
 
-// UI -> Backend
-const toApi = (form = {}) => ({
-  loteId: form.lotId != null ? String(form.lotId).trim() : undefined,
-  fechaReserva: form.fechaReserva || form.date || null,
-  estado: form.status || "Activa",
-  sena: toNumberOrNull(form.seniaMonto ?? form.amount ?? form.sena),
-  clienteId: form.clienteId ?? form.personaId ?? null,
-  inmobiliariaId: form.inmobiliariaId ?? null,
-  observaciones: (form.observaciones ?? "").trim() || null,
+const toApi = (data = {}) => ({
+  loteId: data.loteId,
+  clienteId: data.clienteId,
+  fechaReserva: data.fechaReserva,
+  seña: data.seña,
+  inmobiliariaId: data.inmobiliariaId
 });
 
-// arma querystring
-function qs(params = {}) {
-  const s = new URLSearchParams();
-  for (const [k, v] of Object.entries(params)) {
-    if (v !== undefined && v !== null && v !== "") s.set(k, String(v));
+// ===== MOCK DATA =====
+const mockReservas = [
+  {
+    id: 1,
+    loteId: 1,
+    clienteId: 1,
+    cliente: { id: 1, nombre: 'Juan', apellido: 'Pérez', nombreCompleto: 'Juan Pérez' },
+    fechaReserva: '2024-01-15T10:00:00Z',
+    seña: 50000,
+    inmobiliariaId: 1,
+    inmobiliaria: { id: 1, nombre: 'Inmobiliaria Central' },
+    lote: {
+      id: 1,
+      fraccion: 1,
+      ubicacion: { calle: 'REINAMORA', numero: 123 },
+      estado: 'RESERVADO',
+      precio: 250000
+    },
+    createdAt: '2024-01-15T10:00:00Z'
+  },
+  {
+    id: 2,
+    loteId: 2,
+    clienteId: 2,
+    cliente: { id: 2, nombre: 'María', apellido: 'González', nombreCompleto: 'María González' },
+    fechaReserva: '2024-01-20T14:30:00Z',
+    seña: 75000,
+    inmobiliariaId: 2,
+    inmobiliaria: { id: 2, nombre: 'Propiedades del Sur' },
+    lote: {
+      id: 2,
+      fraccion: 2,
+      ubicacion: { calle: 'MACA', numero: 456 },
+      estado: 'RESERVADO',
+      precio: 300000
+    },
+    createdAt: '2024-01-20T14:30:00Z'
+  },
+  {
+    id: 3,
+    loteId: 3,
+    clienteId: 3,
+    cliente: { id: 3, nombre: 'Carlos', apellido: 'López', nombreCompleto: 'Carlos López' },
+    fechaReserva: '2024-02-01T09:15:00Z',
+    seña: 60000,
+    inmobiliariaId: 1,
+    inmobiliaria: { id: 1, nombre: 'Inmobiliaria Central' },
+    lote: {
+      id: 3,
+      fraccion: 3,
+      ubicacion: { calle: 'ZORZAL', numero: 789 },
+      estado: 'RESERVADO',
+      precio: 280000
+    },
+    createdAt: '2024-02-01T09:15:00Z'
   }
-  const str = s.toString();
-  return str ? `?${str}` : "";
-}
+];
 
-// intenta ruta primaria y si 404 va al fallback
-async function fetchWithFallback(path, options) {
-  let res = await http(path, options);
-  if (res.status === 404) {
-    const alt = path.startsWith(PRIMARY)
-      ? path.replace(PRIMARY, FALLBACK)
-      : path.replace(FALLBACK, PRIMARY);
-    res = await http(alt, options);
+// ===== FUNCIONES DE API =====
+export const getAllReservas = async (params = {}) => {
+  if (USE_MOCK) {
+    console.log('🔍 [MOCK] Obteniendo reservas...', params);
+    
+    // Simular delay de red
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const filtered = mockFilterSortPage(mockReservas, params);
+    
+    return {
+      success: true,
+      data: filtered.data,
+      total: filtered.total,
+      message: 'Reservas obtenidas correctamente (MOCK)'
+    };
   }
-  return res;
-}
 
-/* ------------------------------ MOCK --------------------------------- */
-let RESERVAS = [];
-let seeded = false;
-const nextId = () => `R${String(RESERVAS.length + 1).padStart(3, "0")}`;
+  try {
+    console.log('🔍 Obteniendo reservas desde API...', params);
+    
+    const queryParams = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        queryParams.append(key, value);
+      }
+    });
 
-function ensureSeed() {
-  if (seeded) return;
-  RESERVAS = [
-    { id: "R001", lotId: "L001", date: "2025-03-01", status: "Activa", amount: 50000, clienteId: 1, inmobiliariaId: 3, observaciones: "" },
-    { id: "R002", lotId: "L002", date: "2025-03-10", status: "Cancelada", amount: 0, clienteId: 2, inmobiliariaId: null, observaciones: "" },
-  ];
-  seeded = true;
-}
+    const response = await fetch(`/api/reservas?${queryParams}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      }
+    });
 
-function mockFilterSortPage(list, params = {}) {
-  let out = [...list];
-  const q = (params.q || "").toLowerCase();
-  if (q) out = out.filter((r) => String(r.id).toLowerCase().includes(q) || String(r.lotId).toLowerCase().includes(q));
-  if (params.lotId) out = out.filter((r) => String(r.lotId) === String(params.lotId));
-  if (params.inmobiliariaId) out = out.filter((r) => String(r.inmobiliariaId) === String(params.inmobiliariaId));
-  if (params.clienteId) out = out.filter((r) => String(r.clienteId) === String(params.clienteId));
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
 
-  const sortBy = params.sortBy || "date";
-  const sortDir = (params.sortDir || "desc").toLowerCase();
-  out.sort((a, b) => {
-    const A = a[sortBy]; const B = b[sortBy];
-    if (A == null && B == null) return 0;
-    if (A == null) return sortDir === "asc" ? -1 : 1;
-    if (B == null) return sortDir === "asc" ? 1 : -1;
-    if (A < B) return sortDir === "asc" ? -1 : 1;
-    if (A > B) return sortDir === "asc" ? 1 : -1;
-    return 0;
-  });
+    const result = await response.json();
+    console.log('✅ Respuesta de API reservas:', result);
 
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 10));
-  const total = out.length;
+    return {
+      success: true,
+      data: result.data || result.reservas || [],
+      total: result.total || result.data?.length || 0,
+      message: result.message || 'Reservas obtenidas correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error obteniendo reservas:', error);
+    return {
+      success: false,
+      data: [],
+      total: 0,
+      message: error.message || 'Error al obtener reservas'
+    };
+  }
+};
+
+export const getReserva = async (id) => {
+  if (USE_MOCK) {
+    const reserva = mockReservas.find(r => r.id === parseInt(id));
+    return {
+      success: true,
+      data: reserva || null,
+      message: reserva ? 'Reserva encontrada (MOCK)' : 'Reserva no encontrada (MOCK)'
+    };
+  }
+
+  try {
+    const response = await fetch(`/api/reservas/${id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.data || result.reserva,
+      message: result.message || 'Reserva obtenida correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error obteniendo reserva:', error);
+    return {
+      success: false,
+      data: null,
+      message: error.message || 'Error al obtener reserva'
+    };
+  }
+};
+
+export const createReserva = async (data) => {
+  if (USE_MOCK) {
+    const newReserva = {
+      id: mockReservas.length + 1,
+      ...data,
+      createdAt: new Date().toISOString()
+    };
+    mockReservas.push(newReserva);
+    return {
+      success: true,
+      data: newReserva,
+      message: 'Reserva creada correctamente (MOCK)'
+    };
+  }
+
+  try {
+    const response = await fetch('/api/reservas', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      },
+      body: JSON.stringify(toApi(data))
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.data || result.reserva,
+      message: result.message || 'Reserva creada correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error creando reserva:', error);
+    return {
+      success: false,
+      data: null,
+      message: error.message || 'Error al crear reserva'
+    };
+  }
+};
+
+export const updateReserva = async (id, data) => {
+  if (USE_MOCK) {
+    const index = mockReservas.findIndex(r => r.id === parseInt(id));
+    if (index !== -1) {
+      mockReservas[index] = { ...mockReservas[index], ...data, updateAt: new Date().toISOString() };
+      return {
+        success: true,
+        data: mockReservas[index],
+        message: 'Reserva actualizada correctamente (MOCK)'
+      };
+    }
+    return {
+      success: false,
+      data: null,
+      message: 'Reserva no encontrada (MOCK)'
+    };
+  }
+
+  try {
+    const response = await fetch(`/api/reservas/${id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      },
+      body: JSON.stringify(toApi(data))
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      data: result.data || result.reserva,
+      message: result.message || 'Reserva actualizada correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error actualizando reserva:', error);
+    return {
+      success: false,
+      data: null,
+      message: error.message || 'Error al actualizar reserva'
+    };
+  }
+};
+
+export const deleteReserva = async (id) => {
+  if (USE_MOCK) {
+    const index = mockReservas.findIndex(r => r.id === parseInt(id));
+    if (index !== -1) {
+      mockReservas.splice(index, 1);
+      return {
+        success: true,
+        message: 'Reserva eliminada correctamente (MOCK)'
+      };
+    }
+    return {
+      success: false,
+      message: 'Reserva no encontrada (MOCK)'
+    };
+  }
+
+  try {
+    const response = await fetch(`/api/reservas/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    return {
+      success: true,
+      message: result.message || 'Reserva eliminada correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error eliminando reserva:', error);
+    return {
+      success: false,
+      message: error.message || 'Error al eliminar reserva'
+    };
+  }
+};
+
+// ===== UTILIDADES =====
+const mockFilterSortPage = (data, params = {}) => {
+  let filtered = [...data];
+
+  // Filtros
+  if (params.q) {
+    const query = params.q.toLowerCase();
+    filtered = filtered.filter(r => 
+      r.cliente?.nombreCompleto?.toLowerCase().includes(query) ||
+      r.cliente?.nombre?.toLowerCase().includes(query) ||
+      r.cliente?.apellido?.toLowerCase().includes(query) ||
+      r.inmobiliaria?.nombre?.toLowerCase().includes(query) ||
+      r.lote?.ubicacion?.calle?.toLowerCase().includes(query) ||
+      String(r.lote?.ubicacion?.numero).includes(query) ||
+      String(r.lote?.fraccion).includes(query)
+    );
+  }
+
+  if (params.inmobiliaria) {
+    filtered = filtered.filter(r => r.inmobiliariaId === parseInt(params.inmobiliaria));
+  }
+
+  if (params.fechaReserva?.min || params.fechaReserva?.max) {
+    filtered = filtered.filter(r => {
+      const fecha = new Date(r.fechaReserva);
+      if (params.fechaReserva.min && fecha < new Date(params.fechaReserva.min)) return false;
+      if (params.fechaReserva.max && fecha > new Date(params.fechaReserva.max)) return false;
+      return true;
+    });
+  }
+
+  if (params.seña?.min || params.seña?.max) {
+    filtered = filtered.filter(r => {
+      const sena = Number(r.seña);
+      if (params.seña.min && sena < Number(params.seña.min)) return false;
+      if (params.seña.max && sena > Number(params.seña.max)) return false;
+      return true;
+    });
+  }
+
+  // Ordenamiento
+  if (params.sortBy) {
+    filtered.sort((a, b) => {
+      const aVal = a[params.sortBy];
+      const bVal = b[params.sortBy];
+      const direction = params.sortDir === 'desc' ? -1 : 1;
+      
+      if (aVal < bVal) return -1 * direction;
+      if (aVal > bVal) return 1 * direction;
+      return 0;
+    });
+  }
+
+  // Paginación
+  const page = parseInt(params.page) || 1;
+  const pageSize = parseInt(params.pageSize) || 25;
   const start = (page - 1) * pageSize;
-  const data = out.slice(start, start + pageSize);
-  return { data, meta: { total, page, pageSize } };
-}
+  const end = start + pageSize;
 
-async function mockGetAll(params = {}) { ensureSeed(); const { data, meta } = mockFilterSortPage(RESERVAS, params); return { data, meta }; }
-async function mockGetById(id)        { ensureSeed(); return ok(RESERVAS.find((r) => String(r.id) === String(id))); }
-async function mockCreate(payload)     { ensureSeed(); const row = fromApi({ ...toApi(payload), id: nextId() }); RESERVAS.unshift(row); return ok(row); }
-async function mockUpdate(id, payload) { ensureSeed(); const i = RESERVAS.findIndex((r) => String(r.id) === String(id)); if (i < 0) throw new Error("Reserva no encontrada"); const row = { ...RESERVAS[i], ...fromApi(toApi(payload)) }; RESERVAS[i] = row; return ok(row); }
-async function mockDelete(id)          { ensureSeed(); const i = RESERVAS.findIndex((r) => String(r.id) === String(id)); if (i < 0) throw new Error("Reserva no encontrada"); RESERVAS.splice(i, 1); return ok(true); }
-
-/* ------------------------------- API --------------------------------- */
-async function apiGetAll(params = {}) {
-  const res = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al cargar reservas");
-
-  const arr = normalizeApiListResponse(data);
-  const meta = data?.meta ?? {
-    total: Number(data?.meta?.total ?? arr.length) || arr.length,
-    page: Number(params.page || 1),
-    pageSize: Number(params.pageSize || arr.length),
+  return {
+    data: filtered.slice(start, end),
+    total: filtered.length
   };
-  return { data: arr.map(fromApi), meta };
-}
+};
 
-async function apiGetById(id) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al obtener la reserva");
-  return ok(fromApi(data?.data ?? data));
-}
-
-async function apiCreate(payload) {
-  const res = await fetchWithFallback(PRIMARY, { method: "POST", body: toApi(payload) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al crear la reserva");
-  return ok(fromApi(data?.data ?? data));
-}
-
-async function apiUpdate(id, payload) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al actualizar la reserva");
-  return ok(fromApi(data?.data ?? data));
-}
-
-async function apiDelete(id) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || "Error al eliminar la reserva");
+// ===== NORMALIZADOR DE RESPUESTA =====
+export const normalizeApiListResponse = (response) => {
+  if (!response || !response.success) {
+    return [];
   }
-  return ok(true);
-}
 
-/* --------------------------- EXPORT PÚBLICO --------------------------- */
-export function getAllReservas(params)  { return USE_MOCK ? mockGetAll(params)  : apiGetAll(params); }
-export function getReservaById(id)      { return USE_MOCK ? mockGetById(id)     : apiGetById(id); }
-export function createReserva(payload)  { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
-export function updateReserva(id,data)  { return USE_MOCK ? mockUpdate(id,data) : apiUpdate(id,data); }
-export function deleteReserva(id)       { return USE_MOCK ? mockDelete(id)      : apiDelete(id); }
+  const data = response.data;
+  if (Array.isArray(data)) {
+    return data.map(fromApi);
+  }
+
+  // Si data es un objeto, intentar extraer el array
+  if (data && typeof data === 'object') {
+    // Buscar arrays anidados
+    const possibleArrays = [
+      data.reservas,
+      data.data,
+      data.rows,
+      data.items,
+      Object.values(data).find(val => Array.isArray(val))
+    ].filter(Boolean);
+
+    if (possibleArrays.length > 0) {
+      return possibleArrays[0].map(fromApi);
+    }
+  }
+
+  return [];
+};
+
+export { fromApi, toApi };
