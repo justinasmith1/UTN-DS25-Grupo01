@@ -18,25 +18,35 @@ export default function RangeControl({
   const sliderRef = useRef(null);
   const apiRef = useRef(null);
 
-  // Strings para permitir tipeo libre sin “rebotar”
-  const [minStr, setMinStr] = useState(String(value.min));
-  const [maxStr, setMaxStr] = useState(String(value.max));
+  // Strings para permitir tipeo libre sin "rebotar"
+  const [minStr, setMinStr] = useState(value.min !== null ? String(value.min) : '');
+  const [maxStr, setMaxStr] = useState(value.max !== null ? String(value.max) : '');
 
   // Sincroniza descendente cuando cambian props.value
   useEffect(() => {
-    setMinStr(String(value.min));
-    setMaxStr(String(value.max));
-    if (apiRef.current) apiRef.current.set([value.min, value.max], false);
-  }, [value.min, value.max]);
+    setMinStr(value.min !== null ? String(value.min) : '');
+    setMaxStr(value.max !== null ? String(value.max) : '');
+    if (apiRef.current) {
+      const minVal = value.min ?? minLimit ?? 0;
+      const maxVal = value.max ?? maxLimit ?? 100;
+      apiRef.current.set([minVal, maxVal], false);
+    }
+  }, [value.min, value.max, minLimit, maxLimit]);
 
   // Init noUiSlider una sola vez
   useEffect(() => {
     if (!sliderRef.current) return;
 
+    // Manejar valores null en los límites
+    const safeMinLimit = minLimit ?? 0;
+    const safeMaxLimit = maxLimit ?? 100;
+    const safeMinValue = value.min ?? safeMinLimit;
+    const safeMaxValue = value.max ?? safeMaxLimit;
+
     apiRef.current = noUiSlider.create(sliderRef.current, {
-      start: [value.min, value.max],
+      start: [safeMinValue, safeMaxValue],
       connect: true,
-      range: { min: minLimit, max: maxLimit },
+      range: { min: safeMinLimit, max: safeMaxLimit },
       step,
       behaviour: "tap-drag",
       keyboardSupport: true,
@@ -70,28 +80,46 @@ export default function RangeControl({
     Math.max(minLimit, Math.min(maxLimit, Number.isFinite(+n) ? +n : minLimit));
 
   const commitFromInput = (which) => {
-    let newMin = clamp(minStr);
-    let newMax = clamp(maxStr);
+    // Si el input está vacío, usar null para indicar "sin límite"
+    const minVal = minStr.trim() === '' ? null : clamp(minStr);
+    const maxVal = maxStr.trim() === '' ? null : clamp(maxStr);
+    
+    // Si ambos son null, usar los límites del slider
+    const newMin = minVal ?? minLimit ?? 0;
+    const newMax = maxVal ?? maxLimit ?? 100;
+    
     if (newMin > newMax) {
-      if (which === "min") newMax = newMin;
-      else newMin = newMax;
+      if (which === "min") {
+        onChange?.({ min: minVal, max: minVal });
+      } else {
+        onChange?.({ min: maxVal, max: maxVal });
+      }
+    } else {
+      onChange?.({ min: minVal, max: maxVal });
     }
-    setMinStr(String(newMin));
-    setMaxStr(String(newMax));
-    onChange?.({ min: newMin, max: newMax });
-    if (apiRef.current) apiRef.current.set([newMin, newMax], false);
+    
+    // Actualizar strings para mostrar
+    setMinStr(minVal !== null ? String(minVal) : '');
+    setMaxStr(maxVal !== null ? String(maxVal) : '');
+    
+    // Actualizar slider
+    if (apiRef.current) {
+      const sliderMin = minVal ?? minLimit ?? 0;
+      const sliderMax = maxVal ?? maxLimit ?? 100;
+      apiRef.current.set([sliderMin, sliderMax], false);
+    }
   };
 
   const unitPretty = useMemo(() => (unit && unit.trim() ? ` ${unit}` : ""), [unit]);
 
   return (
-    <section className="fb-section">
+    <section className="fb-section" onClick={(e) => e.stopPropagation()}>
       <h4>{label}</h4>
 
-      <div className="fb-range">
+      <div className="fb-range" onClick={(e) => e.stopPropagation()}>
         <div className="fb-noui" ref={sliderRef} />
 
-        <div className="fb-range-inputs">
+        <div className="fb-range-inputs" onClick={(e) => e.stopPropagation()}>
           <label>
             <span>Mín</span>
             <input
@@ -101,6 +129,7 @@ export default function RangeControl({
               onChange={(e) => setMinStr(e.target.value)}
               onBlur={() => commitFromInput("min")}
               onKeyDown={(e) => e.key === "Enter" && commitFromInput("min")}
+              onClick={(e) => e.stopPropagation()}
             />
           </label>
 
@@ -115,6 +144,7 @@ export default function RangeControl({
               onChange={(e) => setMaxStr(e.target.value)}
               onBlur={() => commitFromInput("max")}
               onKeyDown={(e) => e.key === "Enter" && commitFromInput("max")}
+              onClick={(e) => e.stopPropagation()}
             />
           </label>
 
