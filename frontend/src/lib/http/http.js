@@ -59,7 +59,11 @@ async function refreshTokens() {
 
   // 2) validamos que exista refresh token (cookie o local)
   const refresh = getRefreshToken();
-  if (!refresh) throw new Error("NoRefreshToken");
+  if (!refresh) {
+    clearTokens();
+    window.location.href = '/login';
+    throw new Error("NoRefreshToken");
+  }
 
   const refreshUrl = absUrl(REFRESH_PATH);
   refreshingPromise = (async () => {
@@ -72,10 +76,15 @@ async function refreshTokens() {
 
     if (!res.ok) {
       clearTokens();
+      window.location.href = '/login';
       throw new Error(`RefreshFail ${res.status}`);
     }
     const json = await res.json().catch(() => ({}));
-    if (!json?.access && !json?.token) throw new Error("RefreshMissingAccess");
+    if (!json?.access && !json?.token) {
+      clearTokens();
+      window.location.href = '/login';
+      throw new Error("RefreshMissingAccess");
+    }
 
     // normalizamos por si el back devuelve "token" en vez de "access"
     setTokens({ access: json.access || json.token, refresh: json.refresh || refresh });
@@ -112,8 +121,9 @@ export async function http(path, opts = {}) {
       access = getAccessToken();
       res = await doFetch(url, { ...opts, access });
     } catch (e) {
-      // refresh falló → limpiamos tokens para forzar login
+      // refresh falló → limpiamos tokens y redirigimos al login
       clearTokens();
+      window.location.href = '/login';
       throw e;
     }
   }

@@ -1,7 +1,8 @@
 // src/lib/api/reservas.js
 // API adapter para reservas
-
+ 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
+import { http, normalizeApiListResponse } from "../http/http";
 
 // ===== NORMALIZADORES =====
 const fromApi = (row = {}) => ({
@@ -12,18 +13,26 @@ const fromApi = (row = {}) => ({
   clienteApellido: row.cliente?.apellido ?? row.clienteApellido ?? '',
   clienteCompleto: row.cliente?.nombreCompleto || 
     `${row.cliente?.nombre || ''} ${row.cliente?.apellido || ''}`.trim() || 
-    `${row.clienteNombre || ''} ${row.clienteApellido || ''}`.trim() || '',
+    `${row.clienteNombre || ''} ${row.clienteApellido || ''}`.trim() || 
+    `Cliente ID: ${row.clienteId || 'N/A'}`,
   fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
   seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
   inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
-  inmobiliariaNombre: row.inmobiliaria?.nombre ?? row.inmobiliariaNombre ?? '',
+  inmobiliariaNombre: row.inmobiliaria?.nombre ?? row.inmobiliariaNombre ?? 
+    `Inmobiliaria ID: ${row.inmobiliariaId || 'N/A'}`,
   loteInfo: row.lote ? {
     fraccion: row.lote.fraccion ?? row.lote.numero ?? '',
     calle: row.lote.ubicacion?.calle ?? row.lote.calle ?? '',
     numero: row.lote.ubicacion?.numero ?? row.lote.numero ?? '',
     estado: row.lote.estado ?? '',
     precio: row.lote.precio ?? row.lote.valor ?? 0
-  } : null,
+  } : {
+    fraccion: `Lote ID: ${row.loteId || 'N/A'}`,
+    calle: '',
+    numero: '',
+    estado: '',
+    precio: 0
+  },
   createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
   updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt
 });
@@ -113,35 +122,71 @@ export const getAllReservas = async (params = {}) => {
   }
 
   try {
-    console.log('🔍 Obteniendo reservas desde API...', params);
-    
+    // Construir query string
     const queryParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value !== null && value !== undefined && value !== '') {
         queryParams.append(key, value);
       }
     });
-
-    const response = await fetch(`/api/reservas?${queryParams}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      }
+    
+    const queryString = queryParams.toString();
+    const url = `/reservas${queryString ? `?${queryString}` : ''}`;
+    
+    const response = await http(url, {
+      method: 'GET'
     });
-
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
+    
+    // Si response es un objeto Response de fetch, necesitamos parsear el JSON
+    let data;
+    if (response && typeof response === 'object' && response.json) {
+      // Es un objeto Response de fetch
+      data = await response.json();
+    } else {
+      // Ya son los datos parseados
+      data = response;
     }
 
-    const result = await response.json();
-    console.log('✅ Respuesta de API reservas:', result);
+    // Manejar diferentes estructuras de respuesta
+    let reservasData = [];
+    let total = 0;
+
+    if (data && typeof data === 'object') {
+      // Si data tiene una propiedad data
+      if (data.data !== undefined) {
+        if (Array.isArray(data.data)) {
+          reservasData = data.data;
+          total = data.data.length;
+        } else if (data.data.reservas && Array.isArray(data.data.reservas)) {
+          reservasData = data.data.reservas;
+          total = data.data.reservas.length;
+        }
+      }
+      // Si data tiene una propiedad reservas
+      else if (data.reservas && Array.isArray(data.reservas)) {
+        reservasData = data.reservas;
+        total = data.reservas.length;
+      }
+      // Si data es directamente un array
+      else if (Array.isArray(data)) {
+        reservasData = data;
+        total = data.length;
+      }
+      // Si data tiene propiedades pero no las esperadas, buscar arrays anidados
+      else {
+        const possibleArrays = Object.values(data).filter(val => Array.isArray(val));
+        if (possibleArrays.length > 0) {
+          reservasData = possibleArrays[0];
+          total = possibleArrays[0].length;
+        }
+      }
+    }
 
     return {
       success: true,
-      data: result.data || result.reservas || [],
-      total: result.total || result.data?.length || 0,
-      message: result.message || 'Reservas obtenidas correctamente'
+      data: reservasData,
+      total: total,
+      message: response.message || 'Reservas obtenidas correctamente'
     };
   } catch (error) {
     console.error('❌ Error obteniendo reservas:', error);
@@ -165,23 +210,14 @@ export const getReserva = async (id) => {
   }
 
   try {
-    const response = await fetch(`/api/reservas/${id}`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      }
+    const response = await http(`/reservas/${id}`, {
+      method: 'GET'
     });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     return {
       success: true,
-      data: result.data || result.reserva,
-      message: result.message || 'Reserva obtenida correctamente'
+      data: response.data || response.reserva,
+      message: response.message || 'Reserva obtenida correctamente'
     };
   } catch (error) {
     console.error('❌ Error obteniendo reserva:', error);
@@ -209,24 +245,15 @@ export const createReserva = async (data) => {
   }
 
   try {
-    const response = await fetch('/api/reservas', {
+    const response = await http('/reservas', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      },
       body: JSON.stringify(toApi(data))
     });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     return {
       success: true,
-      data: result.data || result.reserva,
-      message: result.message || 'Reserva creada correctamente'
+      data: response.data || response.reserva,
+      message: response.message || 'Reserva creada correctamente'
     };
   } catch (error) {
     console.error('❌ Error creando reserva:', error);
@@ -257,24 +284,15 @@ export const updateReserva = async (id, data) => {
   }
 
   try {
-    const response = await fetch(`/api/reservas/${id}`, {
+    const response = await http(`/reservas/${id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      },
       body: JSON.stringify(toApi(data))
     });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     return {
       success: true,
-      data: result.data || result.reserva,
-      message: result.message || 'Reserva actualizada correctamente'
+      data: response.data || response.reserva,
+      message: response.message || 'Reserva actualizada correctamente'
     };
   } catch (error) {
     console.error('❌ Error actualizando reserva:', error);
@@ -303,22 +321,13 @@ export const deleteReserva = async (id) => {
   }
 
   try {
-    const response = await fetch(`/api/reservas/${id}`, {
-      method: 'DELETE',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      }
+    const response = await http(`/reservas/${id}`, {
+      method: 'DELETE'
     });
 
-    if (!response.ok) {
-      throw new Error(`Error ${response.status}: ${response.statusText}`);
-    }
-
-    const result = await response.json();
     return {
       success: true,
-      message: result.message || 'Reserva eliminada correctamente'
+      message: response.message || 'Reserva eliminada correctamente'
     };
   } catch (error) {
     console.error('❌ Error eliminando reserva:', error);
@@ -395,33 +404,24 @@ const mockFilterSortPage = (data, params = {}) => {
 };
 
 // ===== NORMALIZADOR DE RESPUESTA =====
-export const normalizeApiListResponse = (response) => {
-  if (!response || !response.success) {
-    return [];
+// Usando la función normalizeApiListResponse importada desde http/http
+
+// ===== FUNCIÓN LIST ESTÁNDAR =====
+export const list = async (params = {}) => {
+  const result = await getAllReservas(params);
+  
+  if (!result.success) {
+    throw new Error(result.message || 'Error al obtener reservas');
   }
 
-  const data = response.data;
-  if (Array.isArray(data)) {
-    return data.map(fromApi);
-  }
-
-  // Si data es un objeto, intentar extraer el array
-  if (data && typeof data === 'object') {
-    // Buscar arrays anidados
-    const possibleArrays = [
-      data.reservas,
-      data.data,
-      data.rows,
-      data.items,
-      Object.values(data).find(val => Array.isArray(val))
-    ].filter(Boolean);
-
-    if (possibleArrays.length > 0) {
-      return possibleArrays[0].map(fromApi);
+  return {
+    data: result.data,
+    meta: {
+      total: result.total,
+      page: params.page || 1,
+      pageSize: params.pageSize || 25
     }
-  }
-
-  return [];
+  };
 };
 
 export { fromApi, toApi };
