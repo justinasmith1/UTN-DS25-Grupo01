@@ -7,7 +7,7 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     export interface CreatePersonaDto {
     nombre: string;
     apellido: string;
-    identificador: string; // En el DTO, el identificador es un string que contendrá tipo:valor
+    identificador: string; 
     telefono?: number;
     email?: string;
     }
@@ -15,7 +15,7 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     export interface UpdatePersonaDto {
     nombre?: string;
     apellido?: string;
-    identificador?: string; // En el DTO, el identificador es un string que contendrá tipo:valor
+    identificador?: string; 
     telefono?: number;
     email?: string;
     }

@@ -5,7 +5,7 @@ import { createPersonaSchema, updatePersonaSchema, getPersonaSchema, deletePerso
 import { validate, validateParams } from '../middlewares/validation.middleware';
 
 const router = Router();
-const personaController = new PersonaController(); // ← Esta línea está bien
+const personaController = new PersonaController(); 
 
 // GET /api/personas
 router.get(

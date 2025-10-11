@@ -1,6 +1,10 @@
 # ── Archivos sensibles / locales
 .env
 .env.*
+# PERO NO ignorar los archivos de configuración del proyecto
+!.env.development
+!.env.production
+
 *.local
 *.local.*
 *.log

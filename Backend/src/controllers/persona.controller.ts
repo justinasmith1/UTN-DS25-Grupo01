@@ -14,7 +14,7 @@ export class PersonaController {
         // Convertir el identificador de objeto a string para que coincida con CreatePersonaDto
         const createData = {
             ...validatedData,
-            identificador: `${validatedData.identificador.tipo}:${validatedData.identificador.valor}`
+            identificador: `${validatedData.identificador}:${validatedData.identificador}`
         };
 
         const persona = await personaService.create(createData);
