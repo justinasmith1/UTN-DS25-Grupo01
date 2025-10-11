@@ -40,6 +40,11 @@ export function canDashboardAction(user, action) {
     case 'editarReserva':      return can(user, PERMISSIONS.RES_EDIT);
     case 'eliminarReserva':    return can(user, PERMISSIONS.RES_DELETE);
     
+    // Personas
+    case 'visualizarPersona':  return can(user, PERMISSIONS.PEOPLE_VIEW);
+    case 'editarPersona':      return can(user, PERMISSIONS.PEOPLE_EDIT);
+    case 'eliminarPersona':    return can(user, PERMISSIONS.PEOPLE_DELETE);
+    
     default:                 return false;
   }
 }

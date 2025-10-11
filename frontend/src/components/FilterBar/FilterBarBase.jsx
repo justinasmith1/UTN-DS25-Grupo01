@@ -281,21 +281,25 @@ export default function FilterBarBase({
                 {(field.type === 'multiSelect' || field.type === 'singleSelect') && (
                   <div className={field.useGrid ? "fb-options fb-grid" : "fb-options"}>
                     {(catalogs[field.id] || field.options || []).map((option) => {
+                      // Extraer value y label del objeto option
+                      const optionValue = option.value || option;
+                      const optionLabel = option.label || option;
+                      
                       // Usar el formateador si está disponible, sino mostrar la opción tal como está
-                      const formattedOption = optionFormatter[field.id] ? optionFormatter[field.id](option) : option;
+                      const formattedOption = optionFormatter[field.id] ? optionFormatter[field.id](option) : optionLabel;
                       
                       return (
                         <button
-                          key={option}
+                          key={optionValue}
                           className={`fb-pill ${field.type === 'multiSelect' 
-                            ? filterState[field.id]?.includes(option) ? "is-checked" : ""
-                            : filterState[field.id] === option ? "is-checked" : ""
+                            ? filterState[field.id]?.includes(optionValue) ? "is-checked" : ""
+                            : filterState[field.id] === optionValue ? "is-checked" : ""
                           }`}
                           aria-pressed={field.type === 'multiSelect' 
-                            ? filterState[field.id]?.includes(option) 
-                            : filterState[field.id] === option
+                            ? filterState[field.id]?.includes(optionValue) 
+                            : filterState[field.id] === optionValue
                           }
-                          onClick={() => toggle(field.id, option)}
+                          onClick={() => toggle(field.id, optionValue)}
                         >
                           {formattedOption}
                         </button>

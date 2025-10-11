@@ -62,5 +62,12 @@ export function applyLoteFilters(allLots = [], p = {}) {
   if (p.deudor === true)  rows = rows.filter((l) => getDeudor(l) === true);
   if (p.deudor === false) rows = rows.filter((l) => getDeudor(l) === false);
 
+  // Ordenar por ID ascendente por defecto
+  rows.sort((a, b) => {
+    const idA = a?.id ?? a?.idLote ?? 0;
+    const idB = b?.id ?? b?.idLote ?? 0;
+    return idA - idB;
+  });
+
   return rows;
 }

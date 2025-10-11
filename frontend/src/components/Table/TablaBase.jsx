@@ -139,7 +139,10 @@ export default function TablaBase({
   useEffect(() => {
     const onDocClick = (e) => {
       if (!colsRef.current) return;
-      if (!colsRef.current.contains(e.target)) setColsOpen(false);
+      // No cerrar si el click es dentro del contenedor del ColumnPicker
+      if (!colsRef.current.contains(e.target)) {
+        setColsOpen(false);
+      }
     };
     document.addEventListener('click', onDocClick);
     return () => document.removeEventListener('click', onDocClick);

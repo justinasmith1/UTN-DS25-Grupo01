@@ -97,10 +97,24 @@ export default function Dashboard() {
     try {
       const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
       console.log('✅ Resultado filtrado:', result.length, 'lotes');
-      return result;
+      
+      // Aplicar ordenamiento por ID ascendente siempre
+      const sortedResult = [...result].sort((a, b) => {
+        const idA = a?.id ?? a?.idLote ?? 0;
+        const idB = b?.id ?? b?.idLote ?? 0;
+        return idA - idB;
+      });
+      
+      return sortedResult;
     } catch (err) {
       console.error('❌ Error aplicando filtros:', err);
-      return allLotes;
+      // Aplicar ordenamiento incluso en caso de error
+      const sortedAllLotes = [...allLotes].sort((a, b) => {
+        const idA = a?.id ?? a?.idLote ?? 0;
+        const idB = b?.id ?? b?.idLote ?? 0;
+        return idA - idB;
+      });
+      return sortedAllLotes;
     }
   }, [allLotes, params]);
 

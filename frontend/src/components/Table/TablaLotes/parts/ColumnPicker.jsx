@@ -16,8 +16,8 @@ function SortableItem({ id, column, checked, disabled, onToggle }) {
       {...attributes}
     >
       <div className="tl-check__drag-handle" {...listeners}><GripVertical size={16} /></div>
-      <input type="checkbox" checked={checked} disabled={disabled} onChange={() => onToggle(id)} />
-      <span>{column.titulo}</span>
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => onToggle(id, e)} />
+      <span>{column.titulo ?? column.header ?? column.id}</span>
     </label>
   );
 }
@@ -30,7 +30,12 @@ export default function ColumnPicker({ all, selected, onChange, max = 5, onReset
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  const toggle = (id) => {
+  const toggle = (id, event) => {
+    // Prevenir propagación del evento para evitar que se cierre el popover
+    if (event) {
+      event.stopPropagation();
+    }
+    
     const isSel = selected.includes(id);
     if (isSel) onChange(selected.filter((x) => x !== id));
     else {
@@ -70,7 +75,7 @@ export default function ColumnPicker({ all, selected, onChange, max = 5, onReset
                   column={c}
                   checked={checked}
                   disabled={disabled}
-                  onToggle={toggle}
+                  onToggle={(id, event) => toggle(id, event)}
                 />
               );
             })}
@@ -86,8 +91,8 @@ export default function ColumnPicker({ all, selected, onChange, max = 5, onReset
           const disabled = !checked && totalSel >= max;
           return (
             <label key={c.id} className={`tl-check ${checked ? 'is-checked' : ''} ${disabled ? 'is-disabled' : ''}`}>
-              <input type="checkbox" checked={checked} disabled={disabled} onChange={() => toggle(c.id)} />
-              <span>{c.titulo}</span>
+              <input type="checkbox" checked={checked} disabled={disabled} onChange={(e) => toggle(c.id, e)} />
+              <span>{c.titulo ?? c.header ?? c.id}</span>
             </label>
           );
         })}

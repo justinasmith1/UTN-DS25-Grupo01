@@ -1,7 +1,7 @@
 # Frontend
 
-Aplicación React para la gestión de **Lotes**, y base reutilizable para **Ventas**, **Inmobiliarias** y **Reservas**.  
-El foco del front es: **tablero reutilizable**, **barra de filtros reutilizable**, **autenticación/ autorización por rol (RBAC)** y **validaciones de formularios** con feedback profesional.
+Aplicación React para la gestión de **Lotes**, **Ventas**, **Inmobiliarias** y **Reservas** de los mismos.  
+El foco del front es: **tablero reutilizable**, **barra de filtros reutilizable**, **autenticación/ autorización por rol (RBAC)** y **validaciones de formularios**.
 
 ---
 
@@ -26,11 +26,11 @@ src/
   components/
     Table/
       TablaBase.jsx           # tabla genérica (paginación, selección, column picker)
-    TablaLotes/
-      cells/
+    TablaLotes/              
+      cells/                  # manejo de estados (ui)
         StatusBadge.jsx
         SubstatusBadge.jsx
-      parts/
+      parts/                  # comportamiento de botones del header de una tabla
         ColumnPicker.jsx
         PageSizeDropdown.jsx
       presets/
@@ -42,32 +42,33 @@ src/
       TablaLotes.css
     FilterBar/
       controls/
-        RangeControl.jsx
+        RangeControl.jsx      # manejo de filtro para definir rangos (precios, montos, etc.)
       hooks/
         useDebouncedEffect.js
         useModalSheet.js
       presets/
         lotes.preset.js       # preset de filtros de Lotes
       utils/
-        chips.js
+        chips.js              # chip para facil eliminacion de un fitro
         param.js
         role.js
-      FilterBar.jsx
+      FilterBar.jsx           # FilterBar generico 
       FilterBar.css
     ...
   lib/
     api/
       lotes.js                # adapter de API de Lotes (normaliza respuestas)
-      ventas.js               # (a completar)
-      inmobiliarias.js        # (a completar)
-      reservas.js             # (a completar)
+      ventas.js               # idem
+      inmobiliarias.js        # idem
+      reservas.js             # idem
+      ...
     http/
       http.js                 # capa HTTP (token, headers, 401/refresh)
     filters/
-      applyLoteFilters.js     # filtros en front (por ahora)
+      applyLoteFilters.js     # filtros en front 
   pages/
-    Dashboard.jsx             # tablero
-    ...                       # (Ventas, Inmobiliarias, Reservas: a cablear)
+    Dashboard.jsx             # tablero de lotes, pestaña principal
+    ...                       # (Ventas, Inmobiliarias, Reservas, Personas, Reportes)
   components/
     Layout.jsx                # shell + rutas anidadas
     ModulePills.jsx           # accesos a módulos
@@ -123,10 +124,10 @@ src/
 2. **Dashboard**: mantiene `params` de filtros y el array de lotes.  
 3. **FilterBar (preset de lotes)** emite cambios de filtros → se **filtra en front**.  
 4. **TablaLotes** recibe `rows` filtradas y maneja **selección controlada**:
-   - “Ver en mapa (futuro) (N)” muestra el contador real de seleccionados.
+   - “Ver en mapa (futuro) (N)” muestra el contador real de seleccionados para poder verlos en el mapa.
    - “Limpiar selección” desmarca los checkboxes de la grilla.
 5. **Acciones** por fila se rigen por **permisos** del rol.
 
-La misma estructura se replica para **Ventas / Inmobiliarias / Reservas** cambiando **solo** el adapter de API, el **preset de columnas** y el **preset de filtros**.
+La misma estructura se replica para **Ventas / Inmobiliarias / Reservas / Personas** cambiando **solo** el adapter de API, el **preset de columnas** y el **preset de filtros**.
 
 ---
