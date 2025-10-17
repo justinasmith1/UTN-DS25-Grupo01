@@ -16,7 +16,6 @@ import { ubicacionRoutes } from './routes/ubicacion.routes';
 
 dotenv.config();
 
-const PORT = process.env.PORT || 3000;
 const app = express();
 
 // Evitar 304 en endpoints de API protegidos
@@ -64,6 +63,5 @@ app.use('/api/personas', personaRoutes);
 app.use('/api/fracciones', fraccionRoutes);
 app.use('/api/ubicaciones', ubicacionRoutes);
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-});
+
+export default app;
