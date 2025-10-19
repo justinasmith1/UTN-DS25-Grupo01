@@ -5,6 +5,20 @@ El foco del front es: **tablero reutilizable**, **barra de filtros reutilizable*
 
 ---
 
+## Testing
+
+- **Cómo ejecutar los tests**
+  1. Instalá las dependencias (`npm install`).
+  2. Corré la suite con `npm test`.
+  3. Para un archivo específico podés usar `npm test -- nombre-del-archivo`.
+
+- **Qué se está testeando**
+  - Componentes reutilizables (Tabla, FilterBar, layouts) y su comportamiento condicionado por rol.
+  - Hooks y utilidades (`useDebouncedEffect`, `useModalSheet`, formateadores) que encapsulan lógica.
+  - Adaptadores de API en `lib/api/*`, validando la normalización de respuestas y el manejo de errores.
+
+---
+
 ## Stack
 
 - **React** + **React Router**
