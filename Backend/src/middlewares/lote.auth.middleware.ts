@@ -10,24 +10,25 @@ class AppError extends Error {
 }
 }
 
-/**
- * Middleware para autorizar a un TECNICO a operar sobre un lote.
- * Si el usuario es un TECNICO, verifica que el lote esté en estado 'EN_CONSTRUCCION'.
- * Si no es TECNICO, simplemente pasa al siguiente middleware.
- * Este middleware debe usarse DESPUÉS de `authenticate` y `authorize`.
- */
 export const checkLoteStatusForTecnico = async (req: Request, res: Response, next: NextFunction) => {
     try {
         // @ts-ignore - Asumimos que req.user es poblado por el middleware de autenticación
         const user = req.user;
 
         if (user && user.role === 'TECNICO') {
-            const loteId = parseInt(req.params.id, 10);
-            const lote = await loteService.getLoteById(loteId);
-            
-            if (lote && lote.subestado !== 'EN_CONSTRUCCION') {
-                return next(new AppError('Los técnicos solo pueden operar sobre lotes en construcción', 403));
+            if (req.method === 'GET' || req.method === 'PUT' || req.method === 'PATCH') {
+                return next();
             }
+
+            if (req.method === 'DELETE') {
+                return next(new AppError('Los técnicos no pueden eliminar lotes', 403));
+            }
+
+            const loteId = parseInt(req.params.id, 10);
+            if (Number.isNaN(loteId)) {
+                return next(new AppError('Identificador de lote inválido', 400));
+            }
+
         }
         return next();
     } catch (error) {
