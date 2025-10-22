@@ -1,7 +1,7 @@
 // src/lib/api/lotes.js
 // Cliente de API para LOTES. Devuelve SIEMPRE { data: Array<LoteUI> }.
 
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
+const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "false";
 import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
 const PRIMARY = "/lotes";
