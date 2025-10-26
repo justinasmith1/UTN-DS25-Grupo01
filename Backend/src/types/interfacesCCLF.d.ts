@@ -34,6 +34,13 @@ export interface Persona {
     identificador: Identificador;
     telefono?: number;
     email?: string;
+
+    // Extensiones para módulo Propietarios/Inquilinos y Grupo Familiar
+    esPropietario?: boolean;
+    esInquilino?: boolean;
+    esJefeDeFamilia?: boolean;
+    jefeDeFamilia?: { idPersona: number; nombre: string; apellido: string; cuil?: string } | null;
+    miembrosFamilia?: Array<{ idPersona: number; nombre: string; apellido: string; cuil?: string }>;
 }
 
 

@@ -11,10 +11,17 @@ export class PersonaController {
     try {
         const validatedData = createPersonaSchema.parse(req.body);
 
+        // Tomar jefeDeFamiliaId si viene en el body (opcional) y forzar a número
+        const rawJefe = (req.body as any)?.jefeDeFamiliaId;
+        const jefeDeFamiliaId = rawJefe !== undefined && rawJefe !== null && !Number.isNaN(Number(rawJefe))
+          ? Number(rawJefe)
+          : undefined;
+
         // Convertir el identificador de objeto a string para que coincida con CreatePersonaDto
         const createData = {
             ...validatedData,
-            identificador: `${validatedData.identificador}:${validatedData.identificador}`
+            identificador: `${validatedData.identificador.tipo}:${validatedData.identificador.valor}`,
+            ...(jefeDeFamiliaId !== undefined ? { jefeDeFamiliaId } : {})
         };
 
         const persona = await personaService.create(createData);
