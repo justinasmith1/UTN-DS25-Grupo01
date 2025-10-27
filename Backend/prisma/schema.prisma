@@ -96,7 +96,16 @@ model Persona {
   contacto  String?
   userId    Int?      @unique
   user      User?     @relation(fields: [userId], references: [id])
-  lotes     Lote[]
+  // Relación con Lote como propietario
+  lotesPropios    Lote[]    @relation("PropietarioLotes")
+
+  // --- Grupo familiar (auto-relación) ---
+  jefeDeFamiliaId Int?
+  jefeDeFamilia   Persona?  @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  miembrosFamilia Persona[] @relation("GrupoFamiliar")
+
+  // Relación con Lote como inquilino (alquilados)
+  lotesAlquilados Lote[]    @relation("InquilinoLotes")
   createdAt DateTime  @default(now())
   updateAt  DateTime
   Venta     Venta[]
@@ -149,8 +158,13 @@ model Lote {
   fraccionId Int
   fraccion   Fraccion @relation(fields: [fraccionId], references: [id])
 
+  // Propietario (obligatorio)
   propietarioId Int
-  propietario   Persona @relation(fields: [propietarioId], references: [id])
+  propietario   Persona @relation("PropietarioLotes", fields: [propietarioId], references: [id])
+
+  // Inquilino (opcional)
+  inquilinoId Int?
+  inquilino   Persona? @relation("InquilinoLotes", fields: [inquilinoId], references: [id])
 
   reserva Reserva[]
 

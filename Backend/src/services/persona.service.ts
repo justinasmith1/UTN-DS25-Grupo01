@@ -10,6 +10,7 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     identificador: string; 
     telefono?: number;
     email?: string;
+    jefeDeFamiliaId?: number; // NUEVO
     }
 
     export interface UpdatePersonaDto {
@@ -20,11 +21,39 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     email?: string;
     }
 
+    // Tipo local para incluir relaciones y conteos
+    type PersonaWithRelations = PrismaPersona & {
+      _count?: { lotesPropios?: number; lotesAlquilados?: number };
+      jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'cuil'> | null;
+      miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'cuil'>>;
+    };
+
     // mapeo de PrismaPersona a Persona
-    const toPersona = (p: PrismaPersona, telefonoOverride?: number, emailOverride?: string): Persona => {
+    const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOverride?: string): Persona => {
     const contacto = p.contacto;
     const email = emailOverride || parseEmail(contacto);
     const telefono = telefonoOverride || parseTelefono(contacto);
+
+    const esPropietario = (p._count?.lotesPropios ?? 0) > 0;
+    const esInquilino = (p._count?.lotesAlquilados ?? 0) > 0;
+
+    const jefeDeFamilia = p.jefeDeFamilia
+      ? {
+          idPersona: p.jefeDeFamilia.id,
+          nombre: p.jefeDeFamilia.nombre,
+          apellido: p.jefeDeFamilia.apellido,
+          cuil: p.jefeDeFamilia.cuil,
+        }
+      : null;
+
+    const miembrosFamilia = (p.miembrosFamilia ?? []).map((m) => ({
+      idPersona: m.id,
+      nombre: m.nombre,
+      apellido: m.apellido,
+      cuil: m.cuil,
+    }));
+
+    const esJefeDeFamilia = (p.miembrosFamilia?.length ?? 0) > 0;
 
     return {
         idPersona: p.id,
@@ -32,7 +61,12 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
         apellido: p.apellido,
         identificador: getTipoIdentificador(p.cuil),
         email: email,
-        telefono: telefono
+        telefono: telefono,
+        esPropietario,
+        esInquilino,
+        jefeDeFamilia,
+        miembrosFamilia,
+        esJefeDeFamilia,
     };
     };
 
@@ -76,19 +110,15 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
         orderBy: { createdAt: 'desc' },
         take: limit,
         include: {
-        user: {
-            select: {
-            id: true,
-            username: true,
-            email: true,
-            role: true
-            }
-        }
+          user: { select: { id: true, username: true, email: true, role: true } },
+          _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+          jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
+          miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
         }
     });
 
     return {
-        personas: personas.map(p => toPersona(p)),
+        personas: personas.map(p => toPersona(p as PersonaWithRelations)),
         total: await prisma.persona.count()
     };
     }
@@ -98,14 +128,10 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     const persona = await prisma.persona.findUnique({
         where: { id },
         include: {
-        user: {
-            select: {
-            id: true,
-            username: true,
-            email: true,
-            role: true
-            }
-        }
+          user: { select: { id: true, username: true, email: true, role: true } },
+          _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+          jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
+          miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
         }
     });
 
@@ -115,14 +141,14 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
         throw error;
     }
 
-    return toPersona(persona);
+    return toPersona(persona as PersonaWithRelations);
     }
 
     // crear persona
     export async function createPersona(req: CreatePersonaDto): Promise<Persona> {
     // 1. Extraer tipo y valor del identificador
-    const [tipo, valor] = req.identificador.split(':');
-    const identificadorValor = valor;
+    const parts = (req.identificador || '').split(':');
+    const identificadorValor = parts.length > 1 ? parts[1] : req.identificador;
 
     // 2. Verificar si ya existe una persona con el mismo identificador
     const exists = await prisma.persona.findFirst({ where: { cuil: identificadorValor } });
@@ -133,27 +159,41 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
     }
 
     // 3. Crear persona
-    const created = await prisma.persona.create({
-        data: {
-        nombre: req.nombre.trim(),
-        apellido: req.apellido.trim(),
-        cuil: identificadorValor,
-        contacto: formatContacto(req.email, req.telefono),
-        updateAt: new Date()
-        },
-        include: {
-        user: {
-            select: {
-            id: true,
-            username: true,
-            email: true,
-            role: true
-            }
-        }
-        }
+    // Construir data evitando depender de tipos generados aún no actualizados
+    const createData: any = {
+      nombre: req.nombre.trim(),
+      apellido: req.apellido.trim(),
+      cuil: identificadorValor,
+      contacto: formatContacto(req.email, req.telefono),
+      updateAt: new Date()
+    };
+    // Normalizar jefe de familia (si llega)
+    const jefeIdNormalized = (req.jefeDeFamiliaId !== undefined && req.jefeDeFamiliaId !== null && !Number.isNaN(Number(req.jefeDeFamiliaId)))
+      ? Number(req.jefeDeFamiliaId)
+      : undefined;
+
+    const created = await prisma.persona.create({ data: createData });
+
+    // Si vino jefeDeFamiliaId, vincularlo por update/connect (fallback seguro)
+    if (jefeIdNormalized !== undefined) {
+      await prisma.persona.update({
+        where: { id: created.id },
+        data: { jefeDeFamilia: { connect: { id: jefeIdNormalized } } },
+      });
+    }
+
+    // Releer con includes para asegurar relaciones pobladas
+    const full = await prisma.persona.findUnique({
+      where: { id: created.id },
+      include: {
+        user: { select: { id: true, username: true, email: true, role: true } },
+        _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+        jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
+        miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
+      },
     });
 
-    return toPersona(created, req.telefono, req.email);
+    return toPersona(full as PersonaWithRelations, req.telefono, req.email);
     }
 
     // actualizar persona
@@ -322,3 +362,6 @@ import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaReque
         return getPersonaByCuil(cuil);
     }
     }
+
+
+
