@@ -78,10 +78,28 @@ export const ventasTablePreset = {
         accessor: (v) => {
           // DEBUG: inspeccionar qué viene realmente
           console.debug('[Ventas][comprador]', { id: v?.id, comprador: v?.comprador });
+
+          // 1) Objeto embebido típico
           const n = v?.comprador?.nombre && String(v.comprador.nombre).trim();
           const a = v?.comprador?.apellido && String(v.comprador.apellido).trim();
-          const full = [n, a].filter(Boolean).join(' ');
-          return full || '—';
+          const full = [n, a].filter(Boolean).join(' ').trim();
+          if (full) return full;
+
+          // 2) Campos planos/precomputados (por si el join se hace afuera)
+          if (typeof v?.compradorNombreCompleto === 'string' && v.compradorNombreCompleto.trim()) {
+            return v.compradorNombreCompleto.trim();
+          }
+          if (typeof v?.compradorNombre === 'string' && v.compradorNombre.trim()) {
+            return v.compradorNombre.trim();
+          }
+
+          // 3) Si el backend mandó el comprador como string directo
+          if (typeof v?.comprador === 'string' && v.comprador.trim()) {
+            return v.comprador.trim();
+          }
+
+          // 4) Sin dato legible
+          return '—';
         },
         align: 'center',
       },
@@ -91,7 +109,18 @@ export const ventasTablePreset = {
         titulo: 'Inmobiliaria',
         accessor: (v) => {
           const embedded = v?.inmobiliaria?.nombre || v?.inmobiliaria?.razonSocial;
-          return (embedded && String(embedded).trim()) || '—';
+          if (embedded && String(embedded).trim()) return String(embedded).trim();
+
+          // Adicional: si viene en plano
+          if (typeof v?.inmobiliariaNombre === 'string' && v.inmobiliariaNombre.trim()) {
+            return v.inmobiliariaNombre.trim();
+          }
+          if (typeof v?.inmobiliaria === 'string' && v.inmobiliaria.trim()) {
+            return v.inmobiliaria.trim();
+          }
+
+          // Regla de negocio pedida: si no hay asociada → "La Federala"
+          return 'La Federala';
         },
         align: 'center',
       },
