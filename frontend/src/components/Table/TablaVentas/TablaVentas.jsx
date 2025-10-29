@@ -68,7 +68,6 @@ export default function TablaVentas({
   const helpers = useMemo(
     () => ({
       cells: {
-        // ✅ USAR StatusBadge centralizado
         estadoBadge: (estado) => <StatusBadge value={estado} />,
       },
       fmt: { fmtMoney, fmtEstado },
@@ -251,7 +250,7 @@ export default function TablaVentas({
     <TablaBase
       rows={source}
       rowKey="id"
-      columns={visibleCols}
+      columns={ALL_SAFE}
       widthFor={tablePreset.widthFor}
       defaultVisibleIds={baseDefaultCols}
       maxVisible={MAX_VISIBLE}
@@ -260,6 +259,8 @@ export default function TablaVentas({
       defaultPageSize={25}
       selected={selectedIds}
       onSelectedChange={onSelectedChange}
+      visibleIds={colIds}
+      onVisibleIdsChange={setColIds}
     />
   );
 }

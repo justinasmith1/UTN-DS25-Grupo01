@@ -82,27 +82,53 @@ export default function FilterBarVentas({
   }), []);
 
   // ========= Mapeos de shape =========
-  // FilterBarBase -> shape que espera Ventas.jsx
-  const toPageShape = (p) => ({
-    texto: (p?.q ?? "").trim(),
-    estados: p?.estado ?? [],
-    tipoPago: p?.tipoPago ?? [],
-    inmobiliarias: p?.inmobiliaria ?? [],
-    fechaVentaMin: p?.fechaVenta?.min ?? null,
-    fechaVentaMax: p?.fechaVenta?.max ?? null,
-    montoMin: p?.monto?.min ?? null,
-    montoMax: p?.monto?.max ?? null,
-  });
+// FilterBarBase -> shape que espera applyVentaFilters
+const toPageShape = (p) => ({
+  // OJO: acá NO usamos "texto/estados/inmobiliarias/...".
+  // Conservamos exactamente los ids de fields: q, estado, tipoPago, inmobiliaria, fechaVenta, monto.
+  // q puede no usarse; applyVentaFilters ya busca por id/lotId/monto internamente si lo necesitás.
+  estado: Array.isArray(p?.estado) ? p.estado : [],
+  tipoPago: Array.isArray(p?.tipoPago) ? p.tipoPago : [],
+  inmobiliaria: Array.isArray(p?.inmobiliaria) ? p.inmobiliaria : [],
 
-  // (opcional) hidratar desde la página si tenés value externo
-  const fromPageShape = (v = {}) => ({
-    q: v.texto ?? "",
-    estado: v.estados ?? [],
-    tipoPago: v.tipoPago ?? [],
-    inmobiliaria: v.inmobiliarias ?? [],
-    fechaVenta: { min: v.fechaVentaMin ?? null, max: v.fechaVentaMax ?? null },
-    monto: { min: v.montoMin ?? null, max: v.montoMax ?? null },
-  });
+  // Normalizamos a números (timestamps) si vinieran como string/Date
+  fechaVenta: {
+    min: p?.fechaVenta?.min != null ? +p.fechaVenta.min : null,
+    max: p?.fechaVenta?.max != null ? +p.fechaVenta.max : null,
+  },
+
+  monto: {
+    min: p?.monto?.min != null ? +p.monto.min : null,
+    max: p?.monto?.max != null ? +p.monto.max : null,
+  },
+
+  // Si más adelante habilitás el plazo:
+  // plazoEscritura: {
+  //   min: p?.plazoEscritura?.min != null ? +p.plazoEscritura.min : null,
+  //   max: p?.plazoEscritura?.max != null ? +p.plazoEscritura.max : null,
+  // },
+});
+
+// (Opcional) hidratar desde un value externo con ese mismo shape
+const fromPageShape = (v = {}) => ({
+  q: v.q ?? "",
+  estado: v.estado ?? [],
+  tipoPago: v.tipoPago ?? [],
+  inmobiliaria: v.inmobiliaria ?? [],
+  fechaVenta: {
+    min: v?.fechaVenta?.min ?? null,
+    max: v?.fechaVenta?.max ?? null,
+  },
+  monto: {
+    min: v?.monto?.min ?? null,
+    max: v?.monto?.max ?? null,
+  },
+  // plazoEscritura: {
+  //   min: v?.plazoEscritura?.min ?? null,
+  //   max: v?.plazoEscritura?.max ?? null,
+  // },
+});
+
 
   const handleParamsChange = (paramsFromFB) => {
     if (typeof onChange === "function") {
