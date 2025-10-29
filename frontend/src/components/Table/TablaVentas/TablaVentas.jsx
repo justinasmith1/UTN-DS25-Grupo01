@@ -7,6 +7,8 @@ import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 import { fmtMoney, fmtEstado } from './utils/formatters';
 import { ventasTablePreset as tablePreset } from './presets/ventas.table.jsx';
 
+import StatusBadge from './cells/StatusBadge.jsx';
+
 // Persistencia de columnas por usuario
 const STORAGE_VERSION = 'v2';
 const APP_NS = 'lfed';
@@ -62,24 +64,8 @@ export default function TablaVentas({
   const helpers = useMemo(
     () => ({
       cells: {
-        // Colores definitivos los ajustamos en el punto de “estados con color”
-        estadoBadge: (estado) => {
-          const variant =
-            estado === 'ESCRITURADO'
-              ? 'success'
-              : estado === 'CON BOLETO'
-              ? 'warning'
-              : estado === 'INICIADA'
-              ? 'info'
-              : estado === 'CANCELADA'
-              ? 'danger'
-              : 'secondary';
-          return (
-            <span className={`tl-badge tl-badge--${variant}`}>
-              {fmtEstado(estado)}
-            </span>
-          );
-        },
+        // ✅ USAR StatusBadge centralizado
+        estadoBadge: (estado) => <StatusBadge value={estado} />,
       },
       fmt: { fmtMoney, fmtEstado },
 

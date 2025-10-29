@@ -229,14 +229,24 @@ export default function TablaBase({
                         : c.accessorKey
                         ? row?.[c.accessorKey] ?? '—'
                         : '—';
+
+                    // === cambio mínimo: respetar `c.cell` si existe (permite JSX / StatusBadge) ===
+                    const maybeNode =
+                      typeof c.cell === 'function'
+                        ? c.cell({ row: { original: row } })
+                        : val;
+                    const content =
+                      React.isValidElement(maybeNode) ? maybeNode : (maybeNode ?? '—');
+
                     return (
                       <div
                         key={c.id}
                         data-col={c.id}
                         className={`tl-td tl-td--${c.align || 'left'}`}
-                        title={typeof val === 'string' ? val : undefined}
+                        title={typeof content === 'string' ? content : undefined}
+                        style={{ whiteSpace: 'nowrap' }} // evita cortes en dos renglones
                       >
-                        {val}
+                        {content}
                       </div>
                     );
                   })}

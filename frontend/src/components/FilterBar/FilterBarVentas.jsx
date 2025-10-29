@@ -6,6 +6,7 @@ import FilterBarBase from "./FilterBarBase";
 import { ventasFilterPreset } from "./presets/ventas.preset";
 import { ventasChipsFrom, nice } from "./utils/ventasChips";
 
+
 export default function FilterBarVentas({
   variant = "dashboard",
   userRole = "GENERAL",

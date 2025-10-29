@@ -1,10 +1,10 @@
 // src/components/Table/TablaVentas/presets/ventas.table.jsx
 import React from 'react';
-import { fmtMoney, fmtEstado } from '../utils/formatters';
+import { fmtMoney, fmtEstado} from '../utils/formatters';
+import StatusBadge from '../cells/StatusBadge';
 
 // DEBUG: verificar que este preset sea el que usa la tabla de verdad
 console.info('[Ventas][preset activo] ventas.table.jsx cargado');
-
 
 export const ventasTablePreset = {
   key: 'ventas',
@@ -34,7 +34,6 @@ export const ventasTablePreset = {
 
   // makeColumns recibe helpers con { cells, fmt }, pero aquí evitamos depender de getters
   makeColumns({ cells = {}, fmt = {} } = {}) {
-    const estadoBadge = cells.estadoBadge;
     const money = fmt.fmtMoney || fmtMoney;
 
     return [
@@ -63,7 +62,8 @@ export const ventasTablePreset = {
       {
         id: 'estado',
         titulo: 'Estado',
-        accessor: (v) => estadoBadge?.(v.estado ?? v.status) ?? (fmtEstado(v.estado ?? v.status) || '—'),
+        accessor: (v) => v.estado ?? v.status ?? '—',
+        cell: ({ row }) => <StatusBadge value={row?.original?.estado ?? row?.original?.status} />,
         align: 'center',
       },
       {
@@ -76,29 +76,20 @@ export const ventasTablePreset = {
         id: 'comprador',
         titulo: 'Comprador',
         accessor: (v) => {
-          // DEBUG: inspeccionar qué viene realmente
-          console.debug('[Ventas][comprador]', { id: v?.id, comprador: v?.comprador });
-
-          // 1) Objeto embebido típico
           const n = v?.comprador?.nombre && String(v.comprador.nombre).trim();
           const a = v?.comprador?.apellido && String(v.comprador.apellido).trim();
           const full = [n, a].filter(Boolean).join(' ').trim();
           if (full) return full;
 
-          // 2) Campos planos/precomputados (por si el join se hace afuera)
           if (typeof v?.compradorNombreCompleto === 'string' && v.compradorNombreCompleto.trim()) {
             return v.compradorNombreCompleto.trim();
           }
           if (typeof v?.compradorNombre === 'string' && v.compradorNombre.trim()) {
             return v.compradorNombre.trim();
           }
-
-          // 3) Si el backend mandó el comprador como string directo
           if (typeof v?.comprador === 'string' && v.comprador.trim()) {
             return v.comprador.trim();
           }
-
-          // 4) Sin dato legible
           return '—';
         },
         align: 'center',
@@ -111,16 +102,13 @@ export const ventasTablePreset = {
           const embedded = v?.inmobiliaria?.nombre || v?.inmobiliaria?.razonSocial;
           if (embedded && String(embedded).trim()) return String(embedded).trim();
 
-          // Adicional: si viene en plano
           if (typeof v?.inmobiliariaNombre === 'string' && v.inmobiliariaNombre.trim()) {
             return v.inmobiliariaNombre.trim();
           }
           if (typeof v?.inmobiliaria === 'string' && v.inmobiliaria.trim()) {
             return v.inmobiliaria.trim();
           }
-
-          // Regla de negocio pedida: si no hay asociada → "La Federala"
-          return 'La Federala';
+          return 'La Federala'; // fallback de negocio
         },
         align: 'center',
       },
