@@ -8,8 +8,8 @@ export const ventasFilterPreset = {
   // Catálogos para ventas
   catalogs: {
     ESTADOS: ["INICIADA", "CON_BOLETO", "ESCRITURA_PROGRAMADA", "ESCRITURADO"],
-    SUBESTADOS: ["EFECTIVO", "TRANSFERENCIA", "FINANCIADO", "CHEQUE", "TARJETA"], // Para tipos de pago
-    CALLES: ["Inmobiliaria A", "Inmobiliaria B", "Inmobiliaria C", "Inmobiliaria D"], // Para inmobiliarias (datos de prueba)
+    TIPO_PAGO: ["EFECTIVO", "TRANSFERENCIA", "FINANCIADO", "CHEQUE", "TARJETA"], // Para tipos de pago
+    INMOBILIARIAS: ["Andinolfi Inmobiliaria", "Inmobiliaria B", "Inmobiliaria C", "Inmobiliaria D"], // Para inmobiliarias (datos de prueba)
   },
 
   // Configuración de rangos para ventas

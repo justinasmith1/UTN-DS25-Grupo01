@@ -193,12 +193,14 @@
 .tl-icon--view{   background:#F2F4F7; color:#475467; }
 .tl-icon--edit{   background:#EEF0FF; color:#6C7BFD; }
 .tl-icon--money{  background:#EAF7EE; color:#1F8C5A; }
+.tl-icon--docs{   background: #efe2f3; color: rgb(141, 68, 165); }
 .tl-icon--delete{ background:#FEECEC; color:#E05252; }
 .tl-icon--promo{ background:#fdfddc; color:#BA8E23; }
 
 /* Hover: anillo finito del color del ícono */
 .tl-icon--view:hover,
 .tl-icon--edit:hover,
+.tl-icon--docs:hover,
 .tl-icon--money:hover,
 .tl-icon--promo:hover,
 .tl-icon--delete:hover{

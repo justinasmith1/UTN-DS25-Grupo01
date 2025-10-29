@@ -16,6 +16,8 @@ const makeColsKey = (userKey) =>
   `${APP_NS}:tabla-ventas-cols:${STORAGE_VERSION}:${userKey}`;
 
 export default function TablaVentas({
+  // ⬇️ IMPORTANTE: agregamos "rows" (filas ya filtradas)
+  rows,            // <- NUEVO: si viene, se usa como fuente principal (aunque esté vacío)
   ventas,
   data,
   onVer,
@@ -29,11 +31,13 @@ export default function TablaVentas({
   userKey,
 }) {
   // Normalizamos la fuente de datos
+  // CAMBIO: priorizamos "rows" si es un array (incluso si length === 0)
   const source = useMemo(() => {
+    if (Array.isArray(rows)) return rows;
     if (Array.isArray(ventas) && ventas.length) return ventas;
     if (Array.isArray(data) && data.length) return data;
     return Array.isArray(ventas) ? ventas : Array.isArray(data) ? data : [];
-  }, [ventas, data]);
+  }, [rows, ventas, data]);
 
   // Rol (manteniendo el esquema previo)
   const auth = (() => {
@@ -234,7 +238,7 @@ export default function TablaVentas({
       {String(role).includes('admin') && (
         <button
           type="button"
-          className="tl-btn tl-btn--primary"
+          className="tl-btn tl-btn--soft"
           onClick={() => onAgregarVenta?.()}
         >
           + Agregar Venta

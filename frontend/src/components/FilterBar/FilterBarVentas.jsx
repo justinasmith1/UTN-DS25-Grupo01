@@ -1,80 +1,64 @@
 // components/FilterBar/FilterBarVentas.jsx
-// Wrapper específico para ventas que usa FilterBarBase genérico
+// Wrapper de filtros para Ventas. Cambios mínimos:
+// - Catalogs correctos: TIPO_PAGO e INMOBILIARIAS (no SUBESTADOS/CALLES)
+// - Emite onChange con shape que espera Ventas.jsx (texto, estados, tipoPago, inmobiliarias, fechaVentaMin/Max, montoMin/Max)
 
 import { useMemo } from "react";
 import FilterBarBase from "./FilterBarBase";
 import { ventasFilterPreset } from "./presets/ventas.preset";
 import { ventasChipsFrom, nice } from "./utils/ventasChips";
 
-
 export default function FilterBarVentas({
+  // estado externo y callback que espera Ventas.jsx
+  value,
+  onChange,
+
+  // opcionales / métricas UI
+  isLoading,
+  total,
+  filtrados,
+  onClear,
+
+  // fallbacks si el preset no expone las listas:
+  tipoPagoOpts,        // [{ value, label }]
+  inmobiliariasOpts,   // [{ value: id, label: nombre }]
+
   variant = "dashboard",
   userRole = "GENERAL",
-  onParamsChange,
 }) {
-  // Configuración de campos para ventas
+  // ===== Campos (lo que entiende FilterBarBase) =====
   const fields = useMemo(() => [
-    {
-      id: 'q',
-      type: 'search',
-      label: 'Búsqueda',
-      placeholder: 'ID, lote, monto...',
-      defaultValue: ''
-    },
-    {
-      id: 'estado',
-      type: 'multiSelect',
-      label: 'Estado',
-      defaultValue: []
-    },
-    {
-      id: 'tipoPago',
-      type: 'multiSelect',
-      label: 'Tipo de Pago',
-      defaultValue: []
-    },
-    {
-      id: 'inmobiliaria',
-      type: 'multiSelect',
-      label: 'Inmobiliaria',
-      defaultValue: [],
-      useGrid: true
-    },
-    {
-      id: 'fechaVenta',
-      type: 'dateRange',
-      label: 'Fecha de Venta',
-      defaultValue: { min: null, max: null }
-    },
-    {
-      id: 'monto',
-      type: 'range',
-      label: 'Monto',
-      defaultValue: { min: null, max: null }
-    },
-    {
-      id: 'plazoEscritura',
-      type: 'range',
-      label: 'Plazo Escritura',
-      defaultValue: { min: null, max: null }
-    }
+    { id: "q",            type: "search",      label: "Búsqueda",       placeholder: "ID, lote, monto...", defaultValue: "" },
+    { id: "estado",       type: "multiSelect", label: "Estado",         defaultValue: [] },
+    { id: "tipoPago",     type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
+    { id: "inmobiliaria", type: "multiSelect", label: "Inmobiliaria",   defaultValue: [], useGrid: true },
+    { id: "fechaVenta",   type: "dateRange",   label: "Fecha de Venta", defaultValue: { min: null, max: null } },
+    { id: "monto",        type: "range",       label: "Monto",          defaultValue: { min: null, max: null } },
+    // si después querés usarlo:
+    // { id: "plazoEscritura", type: "range", label: "Plazo Escritura", defaultValue: { min: null, max: null } },
   ], []);
 
-  // Catálogos para ventas
-  const catalogs = useMemo(() => ({
-    estado: ventasFilterPreset.catalogs.ESTADOS,
-    tipoPago: ventasFilterPreset.catalogs.SUBESTADOS,
-    inmobiliaria: ventasFilterPreset.catalogs.CALLES,
-  }), []);
+  // ===== Catálogos correctos para Ventas =====
+  const catalogs = useMemo(() => {
+    // Tomamos del preset si existen; si no, usamos los fallbacks por props
+    const ESTADOS = ventasFilterPreset?.catalogs?.ESTADOS ?? [];
+    const TIPO_PAGO = ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? [];
+    const INMOBILIARIAS = ventasFilterPreset?.catalogs?.INMOBILIARIAS ?? inmobiliariasOpts ?? [];
 
-  // Configuración de rangos para ventas
+    return {
+      estado: ESTADOS,
+      tipoPago: TIPO_PAGO,
+      inmobiliaria: INMOBILIARIAS,
+    };
+  }, [tipoPagoOpts, inmobiliariasOpts]);
+
+  // ===== Rangos =====
   const ranges = useMemo(() => ({
-    fechaVenta: ventasFilterPreset.ranges.fechaVenta,
-    monto: ventasFilterPreset.ranges.monto,
-    plazoEscritura: ventasFilterPreset.ranges.plazoEscritura,
+    fechaVenta: ventasFilterPreset?.ranges?.fechaVenta,
+    monto: ventasFilterPreset?.ranges?.monto,
+    // plazoEscritura: ventasFilterPreset?.ranges?.plazoEscritura,
   }), []);
 
-  // Valores por defecto para ventas
   const defaults = useMemo(() => ({
     q: "",
     estado: [],
@@ -82,33 +66,73 @@ export default function FilterBarVentas({
     inmobiliaria: [],
     fechaVenta: { min: null, max: null },
     monto: { min: null, max: null },
-    plazoEscritura: { min: null, max: null }
+    // plazoEscritura: { min: null, max: null },
   }), []);
 
-  // Configuración de vistas (sin RBAC complejo por ahora)
   const viewsConfig = useMemo(() => ({
-    isInmo: false, // Por ahora no hay restricciones de inmobiliaria en ventas
-    sanitizeForRole: (filters) => filters // Sin sanitización por ahora
+    isInmo: false,
+    sanitizeForRole: (filters) => filters,
   }), []);
 
-  // Función para formatear opciones en el modal
+  // Formateo de opciones (si querés “bonito” en chips)
   const optionFormatter = useMemo(() => ({
-    estado: nice, // Formatear estados con nice()
-    tipoPago: nice, // Formatear tipos de pago con nice()
-    inmobiliaria: (val) => val, // Las inmobiliarias se muestran tal como están
+    estado: nice,
+    tipoPago: nice,
+    inmobiliaria: (val) => val, // si tus opciones ya vienen con label correcto
   }), []);
+
+  // ========= Mapeos de shape =========
+  // FilterBarBase -> shape que espera Ventas.jsx
+  const toPageShape = (p) => ({
+    texto: (p?.q ?? "").trim(),
+    estados: p?.estado ?? [],
+    tipoPago: p?.tipoPago ?? [],
+    inmobiliarias: p?.inmobiliaria ?? [],
+    fechaVentaMin: p?.fechaVenta?.min ?? null,
+    fechaVentaMax: p?.fechaVenta?.max ?? null,
+    montoMin: p?.monto?.min ?? null,
+    montoMax: p?.monto?.max ?? null,
+  });
+
+  // (opcional) hidratar desde la página si tenés value externo
+  const fromPageShape = (v = {}) => ({
+    q: v.texto ?? "",
+    estado: v.estados ?? [],
+    tipoPago: v.tipoPago ?? [],
+    inmobiliaria: v.inmobiliarias ?? [],
+    fechaVenta: { min: v.fechaVentaMin ?? null, max: v.fechaVentaMax ?? null },
+    monto: { min: v.montoMin ?? null, max: v.montoMax ?? null },
+  });
+
+  const handleParamsChange = (paramsFromFB) => {
+    if (typeof onChange === "function") {
+      onChange(toPageShape(paramsFromFB));
+    }
+  };
 
   return (
     <FilterBarBase
+      // configuración
       fields={fields}
       catalogs={catalogs}
       ranges={ranges}
       defaults={defaults}
       viewsConfig={viewsConfig}
       variant={variant}
-      onParamsChange={onParamsChange}
       chipsFormatter={ventasChipsFrom}
       optionFormatter={optionFormatter}
+
+      // estado / métricas
+      isLoading={isLoading}
+      total={total}
+      filtrados={filtrados}
+      onClear={onClear}
+
+      // emitir cambios hacia la página
+      onParamsChange={handleParamsChange}
+
+      // hidratar estado inicial si tu FilterBarBase lo soporta:
+      initialValue={fromPageShape(value)}
     />
   );
 }
