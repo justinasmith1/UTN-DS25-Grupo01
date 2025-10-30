@@ -30,7 +30,17 @@ function mapPrismaError(e: unknown) {
 export async function getAllReservas(): Promise<{ reservas: any[]; total: number }> {
   const reservas = await prisma.reserva.findMany({
     orderBy: { fechaReserva: 'desc' },
-    // sin include: mantenemos tipos simples como en las filminas
+    include: {
+          cliente: {
+            select: { id: true, nombre: true, apellido: true }, // lo que muestra la tabla
+          },
+          inmobiliaria: {
+            select: { id: true, nombre: true }, // nombre visible
+          },
+          lote: {
+            select: { id: true, precio: true }, // id y precio
+          },
+        },
   });
   return { reservas, total: reservas.length };
 }
