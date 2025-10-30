@@ -1,102 +1,61 @@
 // src/components/FilterBar/utils/reservasChips.js
-// Utilidades para formatear chips de filtros de reservas
+// Contrato compatible con FilterBarBase y Ventas
 
-// Función para formatear strings (quitar guiones bajos, capitalizar)
-export const nice = (str) => {
-  if (!str) return '';
-  return String(str)
-    .toLowerCase()
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, l => l.toUpperCase());
+const getLabel = (x) => {
+  if (x == null) return "";
+  if (typeof x === "string") return x;
+  if (typeof x === "number") return String(x);
+  if (typeof x === "object") return x.label ?? x.name ?? x.value ?? "";
+  return String(x);
 };
 
-// Función para formatear chips de reservas
-export const reservasChipsFrom = (appliedFilters) => {
+export const nice = (s) =>
+  getLabel(s)
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+export function reservasChipsFrom(applied, catalogs) {
   const chips = [];
 
-  // Búsqueda general
-  if (appliedFilters.q) {
-    chips.push({
-      key: 'q',
-      label: `"${appliedFilters.q}"`,
-      value: appliedFilters.q,
-      type: 'search'
-    });
+  if (applied.q) {
+    chips.push({ k: "q", label: `Buscar: ${applied.q}` });
   }
 
-  // Inmobiliaria
-  if (appliedFilters.inmobiliaria) {
-    const inmobiliaria = appliedFilters.inmobiliaria;
-    if (Array.isArray(inmobiliaria) && inmobiliaria.length > 0) {
-      inmobiliaria.forEach(id => {
-        chips.push({
-          key: `inmobiliaria-${id}`,
-          label: `Inmobiliaria: ${nice(id)}`,
-          value: id,
-          type: 'multiSelect'
-        });
-      });
-    } else if (typeof inmobiliaria === 'string' || typeof inmobiliaria === 'number') {
-      chips.push({
-        key: 'inmobiliaria',
-        label: `Inmobiliaria: ${nice(inmobiliaria)}`,
-        value: inmobiliaria,
-        type: 'singleSelect'
-      });
-    }
+  // Estado (plural, como el field.id)
+  (applied.estado || []).forEach((v) => {
+    chips.push({ k: "estado", v, label: `Estado: ${nice(v)}` });
+  });
+
+  // Inmobiliarias (plural, como el field.id)
+  (applied.inmobiliarias || []).forEach((v) => {
+    const label = getLabel(v);
+    chips.push({ k: "inmobiliarias", v, label: `Inmobiliaria: ${label}` });
+  });
+
+  // Fecha de Reserva
+  if (applied.fechaReserva && (applied.fechaReserva.min !== null || applied.fechaReserva.max !== null)) {
+    const { min, max } = applied.fechaReserva;
+    const minStr = min !== null ? new Date(min).toLocaleDateString("es-AR") : "∞";
+    const maxStr = max !== null ? new Date(max).toLocaleDateString("es-AR") : "∞";
+    chips.push({ k: "fechaReserva", v: { min, max }, label: `Fecha Reserva: ${minStr} - ${maxStr}` });
   }
 
-  // Calle
-  if (appliedFilters.calle) {
-    const calle = appliedFilters.calle;
-    if (Array.isArray(calle) && calle.length > 0) {
-      calle.forEach(c => {
-        chips.push({
-          key: `calle-${c}`,
-          label: `Calle: ${nice(c)}`,
-          value: c,
-          type: 'multiSelect'
-        });
-      });
-    } else if (typeof calle === 'string') {
-      chips.push({
-        key: 'calle',
-        label: `Calle: ${nice(calle)}`,
-        value: calle,
-        type: 'singleSelect'
-      });
-    }
+  // Fecha de Creación
+  if (applied.fechaCreacion && (applied.fechaCreacion.min !== null || applied.fechaCreacion.max !== null)) {
+    const { min, max } = applied.fechaCreacion;
+    const minStr = min !== null ? new Date(min).toLocaleDateString("es-AR") : "∞";
+    const maxStr = max !== null ? new Date(max).toLocaleDateString("es-AR") : "∞";
+    chips.push({ k: "fechaCreacion", v: { min, max }, label: `Fecha Creación: ${minStr} - ${maxStr}` });
   }
 
-  // Fecha de reserva (rango)
-  if (appliedFilters.fechaReserva) {
-    const { min, max } = appliedFilters.fechaReserva;
-    if (min || max) {
-      const minStr = min ? new Date(min).toLocaleDateString('es-AR') : '∞';
-      const maxStr = max ? new Date(max).toLocaleDateString('es-AR') : '∞';
-      chips.push({
-        key: 'fechaReserva',
-        label: `Fecha: ${minStr} - ${maxStr}`,
-        value: { min, max },
-        type: 'dateRange'
-      });
-    }
-  }
-
-  // Seña (rango)
-  if (appliedFilters.seña) {
-    const { min, max } = appliedFilters.seña;
-    if (min !== null || max !== null) {
-      const minStr = min !== null ? `$${min.toLocaleString('es-AR')}` : '∞';
-      const maxStr = max !== null ? `$${max.toLocaleString('es-AR')}` : '∞';
-      chips.push({
-        key: 'seña',
-        label: `Seña: ${minStr} - ${maxStr}`,
-        value: { min, max },
-        type: 'range'
-      });
-    }
+  // Seña (USD)
+  if (applied.seña && (applied.seña.min !== null || applied.seña.max !== null)) {
+    const { min, max } = applied.seña;
+    const minStr = min !== null ? `$${Number(min).toLocaleString("es-AR")}` : "∞";
+    const maxStr = max !== null ? `$${Number(max).toLocaleString("es-AR")}` : "∞";
+    chips.push({ k: "seña", v: { min, max }, label: `Seña: ${minStr} - ${maxStr} USD` });
   }
 
   return chips;
-};
+}

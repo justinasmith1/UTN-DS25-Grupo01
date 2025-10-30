@@ -128,7 +128,9 @@ export default function Reservas() {
       <FilterBarReservas
         variant="dashboard" 
         userRole={user?.role} 
-        onParamsChange={handleParamsChange} 
+        value={params} 
+        onChange={handleParamsChange} 
+        onClear={() => setParams({})} 
       />
 
       <TablaReservas

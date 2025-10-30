@@ -7,6 +7,8 @@ import { Eye, Edit, Trash2, FileText } from 'lucide-react';
 import { fmtMoney, fmtEstado } from './utils/formatters';
 import { ventasTablePreset as tablePreset } from './presets/ventas.table.jsx';
 
+import StatusBadge from './cells/StatusBadge.jsx';
+
 // Persistencia de columnas por usuario
 const STORAGE_VERSION = 'v2';
 const APP_NS = 'lfed';
@@ -14,6 +16,8 @@ const makeColsKey = (userKey) =>
   `${APP_NS}:tabla-ventas-cols:${STORAGE_VERSION}:${userKey}`;
 
 export default function TablaVentas({
+  // ⬇️ IMPORTANTE: agregamos "rows" (filas ya filtradas)
+  rows,            // <- NUEVO: si viene, se usa como fuente principal (aunque esté vacío)
   ventas,
   data,
   onVer,
@@ -27,11 +31,13 @@ export default function TablaVentas({
   userKey,
 }) {
   // Normalizamos la fuente de datos
+  // CAMBIO: priorizamos "rows" si es un array (incluso si length === 0)
   const source = useMemo(() => {
+    if (Array.isArray(rows)) return rows;
     if (Array.isArray(ventas) && ventas.length) return ventas;
     if (Array.isArray(data) && data.length) return data;
     return Array.isArray(ventas) ? ventas : Array.isArray(data) ? data : [];
-  }, [ventas, data]);
+  }, [rows, ventas, data]);
 
   // Rol (manteniendo el esquema previo)
   const auth = (() => {
@@ -62,24 +68,7 @@ export default function TablaVentas({
   const helpers = useMemo(
     () => ({
       cells: {
-        // Colores definitivos los ajustamos en el punto de “estados con color”
-        estadoBadge: (estado) => {
-          const variant =
-            estado === 'ESCRITURADO'
-              ? 'success'
-              : estado === 'CON BOLETO'
-              ? 'warning'
-              : estado === 'INICIADA'
-              ? 'info'
-              : estado === 'CANCELADA'
-              ? 'danger'
-              : 'secondary';
-          return (
-            <span className={`tl-badge tl-badge--${variant}`}>
-              {fmtEstado(estado)}
-            </span>
-          );
-        },
+        estadoBadge: (estado) => <StatusBadge value={estado} />,
       },
       fmt: { fmtMoney, fmtEstado },
 
@@ -192,7 +181,8 @@ export default function TablaVentas({
       {can('ver') && (
         <button
           className="tl-icon tl-icon--view"
-          aria-label="Ver venta"
+          aria-label="Ver Venta"
+          data-tooltip="Ver Venta"
           onClick={() => onVer?.(venta)}
         >
           <Eye size={18} strokeWidth={2} />
@@ -201,7 +191,8 @@ export default function TablaVentas({
       {can('editar') && (
         <button
           className="tl-icon tl-icon--edit"
-          aria-label="Editar venta"
+          aria-label="Editar Venta"
+          data-tooltip="Editar Venta"
           onClick={() => onEditar?.(venta)}
         >
           <Edit size={18} strokeWidth={2} />
@@ -210,7 +201,8 @@ export default function TablaVentas({
       {can('documentos') && (
         <button
           className="tl-icon tl-icon--docs"
-          aria-label="Ver documentos"
+          aria-label="Ver Documentos"
+          data-tooltip="Ver Documentos"
           onClick={() => onVerDocumentos?.(venta)}
         >
           <FileText size={18} strokeWidth={2} />
@@ -219,7 +211,8 @@ export default function TablaVentas({
       {can('eliminar') && (
         <button
           className="tl-icon tl-icon--delete"
-          aria-label="Eliminar venta"
+          aria-label="Eliminar Venta"
+          data-tooltip="Eliminar Venta"
           onClick={() => onEliminar?.(venta)}
         >
           <Trash2 size={18} strokeWidth={2} />
@@ -248,7 +241,7 @@ export default function TablaVentas({
       {String(role).includes('admin') && (
         <button
           type="button"
-          className="tl-btn tl-btn--primary"
+          className="tl-btn tl-btn--soft"
           onClick={() => onAgregarVenta?.()}
         >
           + Agregar Venta
@@ -261,7 +254,7 @@ export default function TablaVentas({
     <TablaBase
       rows={source}
       rowKey="id"
-      columns={visibleCols}
+      columns={ALL_SAFE}
       widthFor={tablePreset.widthFor}
       defaultVisibleIds={baseDefaultCols}
       maxVisible={MAX_VISIBLE}
@@ -270,6 +263,8 @@ export default function TablaVentas({
       defaultPageSize={25}
       selected={selectedIds}
       onSelectedChange={onSelectedChange}
+      visibleIds={colIds}
+      onVisibleIdsChange={setColIds}
     />
   );
 }

@@ -1,126 +1,134 @@
 // src/pages/Ventas.jsx
-// Objetivo: cargar ventas + personas, enriquecer ventas con `comprador`
-// y renderizar la tabla con filtros. Solución estable y directa.
+// Objetivo de la pagina: listar ventas, con filtros y acciones según permisos
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 
-// API: ajustá estos imports si tus paths/nombres difieren
 import { getAllVentas } from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
+import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 
-import { applyVentaFilters } from "../utils/applyVentaFilters";
 import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
+import { applyVentaFilters } from "../utils/applyVentaFilters";
 
-/* -------------------------------------------------------------
-   Helper: normaliza cualquier respuesta a Array.
-   (Muchas APIs devuelven {data:[...]}; otras directamente [...])
--------------------------------------------------------------- */
-function toArray(resp) {
+/** Busca el primer array “razonable” dentro de una respuesta heterogénea */
+const pickArray = (resp, candidates = []) => {
   if (!resp) return [];
   if (Array.isArray(resp)) return resp;
-  if (Array.isArray(resp?.data)) return resp.data;
-  if (Array.isArray(resp?.lista)) return resp.lista;
-  if (Array.isArray(resp?.items)) return resp.items;
-  if (Array.isArray(resp?.results)) return resp.results;
-  if (resp?.data && typeof resp.data === "object") {
-    const d = resp.data;
-    if (Array.isArray(d?.lista)) return d.lista;
-    if (Array.isArray(d?.items)) return d.items;
-    if (Array.isArray(d?.results)) return d.results;
+  if (resp.data && Array.isArray(resp.data)) return resp.data;
+  if (resp.items && Array.isArray(resp.items)) return resp.items;
+
+  // Buscar por claves conocidas dentro de data o raíz
+  const buckets = [
+    ...(candidates || []),                 // ej: ['personas', 'inmobiliarias']
+    "results",
+    "rows",
+    "list",
+  ];
+
+  for (const key of buckets) {
+    if (resp[key] && Array.isArray(resp[key])) return resp[key];
+    if (resp.data && resp.data[key] && Array.isArray(resp.data[key])) return resp.data[key];
   }
+
   return [];
-}
+};
 
-export default function Ventas() {
-  const { user } = useAuth();
-  const userRole = (user?.role ?? user?.rol ?? "ADMIN")
-    .toString()
-    .trim()
-    .toUpperCase();
+/** Construye "Nombre Apellido" desde distintas variantes de campos */
+const buildFullName = (p) => {
+  if (!p) return null;
+  const nombre =
+    p.nombre ?? p.firstName ?? p.name ?? p.nombrePersona ?? null;
+  const apellido =
+    p.apellido ?? p.lastName ?? p.surname ?? p.apellidoPersona ?? null;
+  const full = [nombre, apellido].filter(Boolean).join(" ").trim();
+  return full || p.fullName || p.nombreCompleto || null;
+};
 
+export default function VentasPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  // Filtros provenientes de la FilterBar
-  const [params, setParams] = useState({});
-  const handleParamsChange = useCallback((patch) => {
-    if (!patch || Object.keys(patch).length === 0) {
-      setParams({});
-      return;
-    }
-    setParams((prev) => ({ ...prev, ...patch }));
-  }, []);
-
-  // Dataset base y estados de UI
-  const [allVentas, setAllVentas] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [ventas, setVentas] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  /* -------------------------------------------------------------
-     Carga paralela: Ventas + Personas, y join en front.
-     Por qué: hoy el back de ventas entrega buyerId (no comprador).
-     Estrategia:
-       1) Traigo todas las ventas.
-       2) Traigo todas las personas (única llamada).
-       3) Armo personasById.
-       4) Enriquezco cada venta:
-            - Si YA viene v.comprador del back → se respeta.
-            - Si no viene, lo resuelvo desde personasById[buyerId|compradorId].
-       5) También normalizo alias usados por la tabla (sin destruir originales).
-  -------------------------------------------------------------- */
+  const [filters, setFilters] = useState({
+    texto: "",
+    tipoPago: [],
+    inmobiliarias: [],
+    fechaVentaMin: null,
+    fechaVentaMax: null,
+    montoMin: null,
+    montoMax: null,
+    estados: [],
+  });
+
+  const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
+  const canSaleEdit = can(user, PERMISSIONS.SALE_UPDATE);
+  const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
+
   useEffect(() => {
     let alive = true;
 
     (async () => {
+      setIsLoading(true);
       try {
-        setLoading(true);
-
-        // 1) Llamadas en paralelo
-        const [ventasResp, personasResp] = await Promise.all([
+        const [ventasResp, personasResp, inmosResp] = await Promise.all([
           getAllVentas({}),
           getAllPersonas({}),
+          getAllInmobiliarias({}),
         ]);
 
-        // 2) Normalización a arrays
-        const ventasApi = toArray(ventasResp);
-        const personasApi = toArray(personasResp);
+        // ⬇️ Extrae arrays sin importar el shape
+        const ventasApi = pickArray(ventasResp, ["ventas"]);
+        const personasApi = pickArray(personasResp, ["personas"]);
+        const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
 
-        // 3) Mapa por id para lookup O(1)
+        // 🔒 Mapas por id normalizados a string (evita "3" vs 3)
         const personasById = {};
-        for (const p of personasApi) {
-          if (p && p.id != null) personasById[p.id] = p;
-        }
+        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
 
-        // 4) Enriquecimiento + alias no destructivos
+        const inmosById = {};
+        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
         const enriched = ventasApi.map((v) => {
-          // si el back ya mandó comprador, lo respetamos; si no, buscamos por id
+          // — Comprador: embebido si viene; si no, por id
           const buyerId = v?.buyerId ?? v?.compradorId ?? null;
           const comprador =
-            v?.comprador ??
-            (buyerId != null ? personasById[buyerId] || null : null);
+            v?.comprador ?? (buyerId != null ? personasById[String(buyerId)] || null : null);
 
+          const compradorNombreCompleto = buildFullName(comprador);
+
+          // — Inmobiliaria: embebido si viene; si no, por id; si no existe → La Federala
+          const inmoId = v?.inmobiliariaId ?? v?.inmobiliaria_id ?? null;
+          let inmobiliaria =
+            v?.inmobiliaria ?? (inmoId != null ? inmosById[String(inmoId)] || null : null);
+          if (!inmobiliaria) inmobiliaria = { id: null, nombre: "La Federala" };
+
+          // — Alias que ya usás (no romper filtros)
           return {
-            ...v, // preservamos todo lo que venga del back
-            comprador, // lo que necesita la columna "Comprador"
-            // alias que usa la tabla (dejamos los originales también)
+            ...v,
+            comprador,
+            compradorNombreCompleto,
+            inmobiliaria,
             loteId: v.loteId ?? v.lotId,
             fechaVenta: v.fechaVenta ?? v.date,
             monto: v.monto ?? v.amount,
             estado: v.estado ?? v.status,
             tipoPago: v.tipoPago ?? v.paymentType,
-            // inmobiliaria queda para más adelante cuando el back envíe el objeto
           };
         });
 
-        if (alive) setAllVentas(enriched);
+        if (alive) setVentas(enriched);
       } catch (err) {
-        console.error("[Ventas] Error cargando datos:", err);
-        if (alive) setAllVentas([]);
+        console.error("Error cargando ventas/personas/inmobiliarias:", err);
+        if (alive) setVentas([]);
       } finally {
-        if (alive) setLoading(false);
+        if (alive) setIsLoading(false);
       }
     })();
 
@@ -129,64 +137,48 @@ export default function Ventas() {
     };
   }, []);
 
-  // Aplicación de filtros en cliente
-  const ventas = useMemo(() => {
-    const hasParams = params && Object.keys(params).length > 0;
-    try {
-      return hasParams ? applyVentaFilters(allVentas, params) : allVentas;
-    } catch (err) {
-      console.error("[Ventas] Error aplicando filtros:", err);
-      return allVentas;
-    }
-  }, [allVentas, params]);
+  const ventasFiltradas = useMemo(() => applyVentaFilters(ventas, filters), [ventas, filters]);
 
-  // Permisos (acciones de fila)
-  const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
-  const canSaleEdit = can(user, PERMISSIONS.SALE_EDIT);
-  const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
-
-  const onVer = (venta) => navigate(`/ventas/${venta.id}`);
-  const onEditar = (venta) => navigate(`/ventas/${venta.id}/editar`);
-  const onEliminar = (venta) => {
-    if (window.confirm(`¿Eliminar la venta ${venta.id}?`)) {
-      console.log("Eliminar venta:", venta.id);
-    }
-  };
-  const onVerDocumentos = (venta) => navigate(`/ventas/${venta.id}/documentos`);
-  const onAgregarVenta = () => navigate("/ventas/nueva");
-
-  if (loading) {
-    return (
-      <div
-        className="d-flex justify-content-center align-items-center"
-        style={{ minHeight: "40vh" }}
-      >
-        <div className="spinner-border" role="status" />
-        <span className="ms-2">Cargando ventas…</span>
-      </div>
-    );
-  }
+  const onVer = useCallback((venta) => navigate(`/ventas/${venta.id}`), [navigate]);
+  const onEditar = useCallback((venta) => navigate(`/ventas/${venta.id}/editar`), [navigate]);
+  const onEliminar = useCallback((venta) => navigate(`/ventas/${venta.id}/eliminar`), [navigate]);
+  const onVerDocumentos = useCallback(
+    (venta) => navigate(`/ventas/${venta.id}/documentos`),
+    [navigate]
+  );
+  const onAgregarVenta = useCallback(() => navigate(`/ventas/nueva`), [navigate]);
 
   return (
     <>
-      {/* Barra de Filtros del módulo Ventas */}
       <FilterBarVentas
-        variant="dashboard"
-        userRole={userRole}
-        onParamsChange={handleParamsChange}
+        value={filters}
+        onChange={setFilters}
+        isLoading={isLoading}
+        total={ventas.length}
+        filtrados={ventasFiltradas.length}
+        onClear={() =>
+          setFilters({
+            texto: "",
+            tipoPago: [],
+            inmobiliarias: [],
+            fechaVentaMin: null,
+            fechaVentaMax: null,
+            montoMin: null,
+            montoMax: null,
+            estados: [],
+          })
+        }
       />
 
       <TablaVentas
-        userRole={userRole}
-        ventas={ventas}
+        rows={ventasFiltradas}
+        isLoading={isLoading}
         data={ventas}
         onVer={canSaleView ? onVer : null}
         onEditar={canSaleEdit ? onEditar : null}
         onEliminar={canSaleDelete ? onEliminar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
-        onAgregarVenta={
-          can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null
-        }
+        onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
       />
