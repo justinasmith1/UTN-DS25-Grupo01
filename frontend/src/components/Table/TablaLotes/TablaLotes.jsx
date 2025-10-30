@@ -257,7 +257,7 @@ export default function TablaLotes({
             Limpiar selección
           </button>
           {role.includes('admin') && (
-            <button type="button" className="tl-btn tl-btn--primary" onClick={() => onAgregarLote?.()}>
+            <button type="button" className="tl-btn tl-btn--soft" onClick={() => onAgregarLote?.()}>
               + Agregar Lote
             </button>
           )}
