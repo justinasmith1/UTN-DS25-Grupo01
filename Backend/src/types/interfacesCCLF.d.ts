@@ -14,6 +14,7 @@ export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
 export type TipoLote = "Lote Venta" | "Espacio Comun";
+export type EstadoReserva = "ACTIVA" | "CANCELADA" | "ACEPTADA";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
@@ -34,6 +35,13 @@ export interface Persona {
     identificador: Identificador;
     telefono?: number;
     email?: string;
+
+    // Extensiones para módulo Propietarios/Inquilinos y Grupo Familiar
+    esPropietario?: boolean;
+    esInquilino?: boolean;
+    esJefeDeFamilia?: boolean;
+    jefeDeFamilia?: { idPersona: number; nombre: string; apellido: string; cuil?: string } | null;
+    miembrosFamilia?: Array<{ idPersona: number; nombre: string; apellido: string; cuil?: string }>;
 }
 
 
@@ -113,6 +121,7 @@ export interface Inmobiliaria {
 export interface Reserva {
     idReserva: number;
     lote: LoteVenta;
+    estado: EstadoReserva;
     cliente: Persona;
     fechaReserva: string; 
     seña?: number;
@@ -289,6 +298,7 @@ export interface GetReservaResponse {
 // Request para actualizar una reserva
 export interface PutReservaRequest {
   idReserva: number;        // ID de la reserva a actualizar
+  estado?: EstadoReserva;   // Nuevo estado de la reserva (opcional)
   idLote?: number;          // ID de lote (opcional)
   idCliente?: number;       // ID de cliente (opcional)
   fechaReserva?: string;    // Fecha de reserva (opcional)

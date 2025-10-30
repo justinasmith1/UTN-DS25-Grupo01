@@ -83,6 +83,20 @@ Configura middlewares, rutas y levanta el servidor.
 
 ---
 
+## Testing
+
+- **Cómo ejecutar los tests**
+  1. Instala las dependencias (`npm install`).
+  2. Corre la suite completa con `npm test`.
+  3. Para un archivo puntual utilizá `npm test -- nombre-del-archivo`.
+
+- **Qué se está testeando**
+  - Servicios de negocio (por ejemplo `lote.service`, `venta.service`) mediante mocks de Prisma.
+  - Reglas de autorización y validaciones específicas de cada flujo.
+  - Escenarios CRUD que incluyen caminos felices y manejo de errores (404, 403, etc.).
+
+---
+
 ## 🚀 Flujo general de la aplicación
 1. El **usuario** hace una petición HTTP → `routes/`.
 2. La ruta invoca el **controller** correspondiente.
