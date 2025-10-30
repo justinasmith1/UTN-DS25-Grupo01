@@ -1,7 +1,6 @@
 // components/FilterBar/FilterBarVentas.jsx
-// Wrapper de filtros para Ventas. Cambios mínimos:
-// - Catalogs correctos: TIPO_PAGO e INMOBILIARIAS (no SUBESTADOS/CALLES)
-// - Emite onChange con shape que espera Ventas.jsx (texto, estados, tipoPago, inmobiliarias, fechaVentaMin/Max, montoMin/Max)
+// Propósito: emitir filtros en formato NUEVO y LEGACY a la vez,
+// y normalizar ESTADO a MAYÚSCULAS para que siempre coincida.
 
 import { useMemo } from "react";
 import FilterBarBase from "./FilterBarBase";
@@ -9,136 +8,153 @@ import { ventasFilterPreset } from "./presets/ventas.preset";
 import { ventasChipsFrom, nice } from "./utils/ventasChips";
 
 export default function FilterBarVentas({
-  // estado externo y callback que espera Ventas.jsx
   value,
   onChange,
-
-  // opcionales / métricas UI
   isLoading,
   total,
   filtrados,
   onClear,
-
-  // fallbacks si el preset no expone las listas:
-  tipoPagoOpts,        // [{ value, label }]
-  inmobiliariasOpts,   // [{ value: id, label: nombre }]
-
+  tipoPagoOpts,
+  inmobiliariasOpts,
   variant = "dashboard",
   userRole = "GENERAL",
 }) {
-  // ===== Campos (lo que entiende FilterBarBase) =====
-  const fields = useMemo(() => [
-    { id: "q",            type: "search",      label: "Búsqueda",       placeholder: "ID, lote, monto...", defaultValue: "" },
-    { id: "estado",       type: "multiSelect", label: "Estado",         defaultValue: [] },
-    { id: "tipoPago",     type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
-    { id: "inmobiliaria", type: "multiSelect", label: "Inmobiliaria",   defaultValue: [], useGrid: true },
-    { id: "fechaVenta",   type: "dateRange",   label: "Fecha de Venta", defaultValue: { min: null, max: null } },
-    { id: "monto",        type: "range",       label: "Monto",          defaultValue: { min: null, max: null } },
-    // si después querés usarlo:
-    // { id: "plazoEscritura", type: "range", label: "Plazo Escritura", defaultValue: { min: null, max: null } },
-  ], []);
+  // ===== Definición de campos que maneja FilterBarBase =====
+  const fields = useMemo(
+    () => [
+      { id: "q",              type: "search",      label: "Búsqueda",       placeholder: "ID, lote, monto...", defaultValue: "" },
+      { id: "estado",         type: "multiSelect", label: "Estado",         defaultValue: [] },
+      { id: "tipoPago",       type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
+      { id: "inmobiliarias",  type: "multiSelect", label: "Inmobiliaria",   defaultValue: [] },
+      { id: "fechaVenta",     type: "dateRange",   label: "Fecha de Venta", defaultValue: { min: null, max: null } },
+      { id: "monto",          type: "range",       label: "Monto",          defaultValue: { min: null, max: null } },
+    ],
+    []
+  );
 
-  // ===== Catálogos correctos para Ventas =====
+  // ===== Catálogos =====
   const catalogs = useMemo(() => {
-    // Tomamos del preset si existen; si no, usamos los fallbacks por props
-    const ESTADOS = ventasFilterPreset?.catalogs?.ESTADOS ?? [];
-    const TIPO_PAGO = ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? [];
-    const INMOBILIARIAS = ventasFilterPreset?.catalogs?.INMOBILIARIAS ?? inmobiliariasOpts ?? [];
+    const norm = (arr) =>
+      (arr ?? []).map((o) =>
+        typeof o === "string"
+          ? { value: o, label: o }
+          : {
+              value: o.value ?? o.id ?? o.label ?? String(o),
+              label: o.label ?? o.name ?? String(o.value ?? o.id ?? o),
+            }
+      );
+
+    const ESTADOS = norm(ventasFilterPreset?.catalogs?.ESTADOS ?? []);
+    const TIPO_PAGO = norm(ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? []);
+    const INM_PRESET = norm(ventasFilterPreset?.catalogs?.INMOBILIARIAS ?? inmobiliariasOpts ?? []);
+
+    // Garantizar "La Federala"
+    const hasLF = INM_PRESET.some((o) => (o.value ?? o.label) === "La Federala");
+    const INMOBILIARIAS = hasLF ? INM_PRESET : [{ value: "La Federala", label: "La Federala" }, ...INM_PRESET];
 
     return {
       estado: ESTADOS,
       tipoPago: TIPO_PAGO,
-      inmobiliaria: INMOBILIARIAS,
+      inmobiliarias: INMOBILIARIAS,
     };
   }, [tipoPagoOpts, inmobiliariasOpts]);
 
-  // ===== Rangos =====
-  const ranges = useMemo(() => ({
-    fechaVenta: ventasFilterPreset?.ranges?.fechaVenta,
-    monto: ventasFilterPreset?.ranges?.monto,
-    // plazoEscritura: ventasFilterPreset?.ranges?.plazoEscritura,
-  }), []);
+  const ranges = useMemo(
+    () => ({
+      fechaVenta: ventasFilterPreset?.ranges?.fechaVenta,
+      monto: ventasFilterPreset?.ranges?.monto,
+    }),
+    []
+  );
 
-  const defaults = useMemo(() => ({
-    q: "",
-    estado: [],
-    tipoPago: [],
-    inmobiliaria: [],
-    fechaVenta: { min: null, max: null },
-    monto: { min: null, max: null },
-    // plazoEscritura: { min: null, max: null },
-  }), []);
+  const defaults = useMemo(
+    () => ({
+      q: "",
+      estado: [],
+      tipoPago: [],
+      inmobiliarias: [],
+      fechaVenta: { min: null, max: null },
+      monto: { min: null, max: null },
+    }),
+    []
+  );
 
-  const viewsConfig = useMemo(() => ({
-    isInmo: false,
-    sanitizeForRole: (filters) => filters,
-  }), []);
+  const viewsConfig = useMemo(
+    () => ({
+      isInmo: false,
+      sanitizeForRole: (filters) => filters,
+    }),
+    []
+  );
 
-  // Formateo de opciones (si querés “bonito” en chips)
-  const optionFormatter = useMemo(() => ({
-    estado: nice,
-    tipoPago: nice,
-    inmobiliaria: (val) => val, // si tus opciones ya vienen con label correcto
-  }), []);
+  const optionFormatter = useMemo(
+    () => ({
+      estado: nice,
+      tipoPago: nice,
+      inmobiliarias: nice,
+    }),
+    []
+  );
 
-  // ========= Mapeos de shape =========
-// FilterBarBase -> shape que espera applyVentaFilters
-const toPageShape = (p) => ({
-  // OJO: acá NO usamos "texto/estados/inmobiliarias/...".
-  // Conservamos exactamente los ids de fields: q, estado, tipoPago, inmobiliaria, fechaVenta, monto.
-  // q puede no usarse; applyVentaFilters ya busca por id/lotId/monto internamente si lo necesitás.
-  estado: Array.isArray(p?.estado) ? p.estado : [],
-  tipoPago: Array.isArray(p?.tipoPago) ? p.tipoPago : [],
-  inmobiliaria: Array.isArray(p?.inmobiliaria) ? p.inmobiliaria : [],
+  // ===== Mapeos NUEVO <-> LEGACY + Normalización de valores =====
+  const toUpperArray = (arr) =>
+    (Array.isArray(arr) ? arr : [])
+      .map((v) => (typeof v === "string" ? v.toUpperCase() : v))
+      .filter(Boolean);
 
-  // Normalizamos a números (timestamps) si vinieran como string/Date
-  fechaVenta: {
-    min: p?.fechaVenta?.min != null ? +p.fechaVenta.min : null,
-    max: p?.fechaVenta?.max != null ? +p.fechaVenta.max : null,
-  },
+  const toPageShape = (p) => {
+    // Normalizamos a MAYÚSCULAS porque la data de ventas suele estar en UPPERCASE
+    const estado = toUpperArray(p?.estado);
+    const tipoPago = toUpperArray(p?.tipoPago);
+    // Inmobiliarias se mantiene como texto (no uppercasing)
+    const inmobiliarias = Array.isArray(p?.inmobiliarias) ? p.inmobiliarias : [];
 
-  monto: {
-    min: p?.monto?.min != null ? +p.monto.min : null,
-    max: p?.monto?.max != null ? +p.monto.max : null,
-  },
+    const fvMin = p?.fechaVenta?.min != null ? +p.fechaVenta.min : null;
+    const fvMax = p?.fechaVenta?.max != null ? +p.fechaVenta.max : null;
+    const mMin = p?.monto?.min != null ? +p.monto.min : null;
+    const mMax = p?.monto?.max != null ? +p.monto.max : null;
 
-  // Si más adelante habilitás el plazo:
-  // plazoEscritura: {
-  //   min: p?.plazoEscritura?.min != null ? +p.plazoEscritura.min : null,
-  //   max: p?.plazoEscritura?.max != null ? +p.plazoEscritura.max : null,
-  // },
-});
+    // Emitimos NUEVO + LEGACY (para compatibilidad con el módulo que filtra)
+    return {
+      // NUEVO
+      estado,
+      tipoPago,
+      inmobiliarias,
+      fechaVenta: { min: fvMin, max: fvMax },
+      monto: { min: mMin, max: mMax },
 
-// (Opcional) hidratar desde un value externo con ese mismo shape
-const fromPageShape = (v = {}) => ({
-  q: v.q ?? "",
-  estado: v.estado ?? [],
-  tipoPago: v.tipoPago ?? [],
-  inmobiliaria: v.inmobiliaria ?? [],
-  fechaVenta: {
-    min: v?.fechaVenta?.min ?? null,
-    max: v?.fechaVenta?.max ?? null,
-  },
-  monto: {
-    min: v?.monto?.min ?? null,
-    max: v?.monto?.max ?? null,
-  },
-  // plazoEscritura: {
-  //   min: v?.plazoEscritura?.min ?? null,
-  //   max: v?.plazoEscritura?.max ?? null,
-  // },
-});
+      // LEGACY (claves que algunos módulos leen hoy)
+      estados: estado,             // plural
+      estadoVenta: estado,         // alias usado en algunos lados
+      inmobiliaria: inmobiliarias, // singular
+      fechaVentaMin: fvMin,
+      fechaVentaMax: fvMax,
+      montoMin: mMin,
+      montoMax: mMax,
+    };
+  };
 
+  const fromPageShape = (v = {}) => ({
+    q: v.q ?? "",
+    estado: v.estado ?? v.estados ?? v.estadoVenta ?? [],
+    tipoPago: v.tipoPago ?? [],
+    inmobiliarias: v.inmobiliarias ?? v.inmobiliaria ?? [],
+    fechaVenta: {
+      min: v?.fechaVenta?.min ?? v?.fechaVentaMin ?? null,
+      max: v?.fechaVenta?.max ?? v?.fechaVentaMax ?? null,
+    },
+    monto: {
+      min: v?.monto?.min ?? v?.montoMin ?? null,
+      max: v?.monto?.max ?? v?.montoMax ?? null,
+    },
+  });
 
   const handleParamsChange = (paramsFromFB) => {
-    if (typeof onChange === "function") {
-      onChange(toPageShape(paramsFromFB));
-    }
+    onChange?.(toPageShape(paramsFromFB));
   };
 
   return (
     <FilterBarBase
-      // configuración
       fields={fields}
       catalogs={catalogs}
       ranges={ranges}
@@ -147,17 +163,11 @@ const fromPageShape = (v = {}) => ({
       variant={variant}
       chipsFormatter={ventasChipsFrom}
       optionFormatter={optionFormatter}
-
-      // estado / métricas
       isLoading={isLoading}
       total={total}
       filtrados={filtrados}
       onClear={onClear}
-
-      // emitir cambios hacia la página
       onParamsChange={handleParamsChange}
-
-      // hidratar estado inicial si tu FilterBarBase lo soporta:
       initialValue={fromPageShape(value)}
     />
   );

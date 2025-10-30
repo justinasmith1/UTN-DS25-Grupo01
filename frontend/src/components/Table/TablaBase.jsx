@@ -1,3 +1,4 @@
+// src/components/TablaBase.jsx
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './TablaLotes/TablaLotes.css';
 
@@ -16,39 +17,25 @@ function toArray(payload) {
 }
 
 export default function TablaBase({
-  // Datos (puede venir [] o {data:[]} o {rows:[]})
   rows = [],
   rowKey = 'id',
-
-  // Columnas y layout
-  columns = [],                // [{ id, titulo, align?, accessor(row) | accessorKey }]
+  columns = [],                // [{ id, titulo, align?, accessor(row) | accessorKey | cell(row) }]
   widthFor = () => '1fr',
   defaultVisibleIds = null,
   maxVisible = 6,
-
-  // Acciones por fila
   renderRowActions = null,
-
-  // Toolbar derecha (módulo)
   toolbarRight = null,
-
-  // Paginación
   defaultPageSize = 25,
-
-  // === Selección controlada (nuevo) ===
-  selected,                 // array de ids seleccionados (opcional)
-  onSelectedChange,         // fn(ids[]) (opcional)
+  selected,
+  onSelectedChange,
 }) {
-  // ---- Normalizo una vez ----
   const rowsNorm = useMemo(() => toArray(rows), [rows]);
 
-  // ===== columnas únicas =====
   const ALL_SAFE = useMemo(
     () => [...new Map(columns.map((c) => [c.id, c])).values()],
     [columns]
   );
 
-  // ===== visibles iniciales =====
   const baseDefaultCols = useMemo(() => {
     if (Array.isArray(defaultVisibleIds) && defaultVisibleIds.length) {
       return defaultVisibleIds.filter((id) => ALL_SAFE.some((c) => c.id === id));
@@ -70,13 +57,11 @@ export default function TablaBase({
     return Array.from(map.values());
   }, [colIds, ALL_SAFE]);
 
-  // ===== grilla =====
   const gridTemplate = useMemo(() => {
     const cols = visibleCols.map((c) => widthFor(c.id)).join(' ');
     return `42px ${cols} 1fr 220px`; // checkbox + visibles + spacer + acciones
   }, [visibleCols, widthFor]);
 
-  // ===== paginación =====
   const PAGE_SIZES = [10, 25, 50, 'Todos'];
   const [pageSize, setPageSize] = useState(defaultPageSize);
   const normalizedPageSize =
@@ -96,10 +81,8 @@ export default function TablaBase({
     return rowsNorm.slice(start, start + Number(normalizedPageSize));
   }, [rowsNorm, page, normalizedPageSize]);
 
-  // ===== selección =====
   const controlled = Array.isArray(selected) && typeof onSelectedChange === 'function';
   const [internalSelected, setInternalSelected] = useState([]);
-  // fuente de verdad
   const selectedIds = controlled ? selected : internalSelected;
   const setSelectedIds = controlled ? onSelectedChange : setInternalSelected;
 
@@ -126,20 +109,16 @@ export default function TablaBase({
       return Array.from(next);
     });
 
-  // Si cambian las filas de la página, mantenemos coherencia
   useEffect(() => {
-    // eliminar seleccionados que ya no están en la tabla completa
     const valid = new Set(rowsNorm.map(getId));
     setSelectedIds((prev) => prev.filter((id) => valid.has(id)));
   }, [rowsNorm]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ===== ColumnPicker (abre con is-open, lo maneja el CSS) =====
   const colsRef = useRef(null);
   const [colsOpen, setColsOpen] = useState(false);
   useEffect(() => {
     const onDocClick = (e) => {
       if (!colsRef.current) return;
-      // No cerrar si el click es dentro del contenedor del ColumnPicker
       if (!colsRef.current.contains(e.target)) {
         setColsOpen(false);
       }
@@ -223,30 +202,40 @@ export default function TablaBase({
                   </div>
 
                   {visibleCols.map((c) => {
-                    const val =
-                      typeof c.accessor === 'function'
-                        ? c.accessor(row)
-                        : c.accessorKey
-                        ? row?.[c.accessorKey] ?? '—'
-                        : '—';
+                    let content;
 
-                    // === cambio mínimo: respetar `c.cell` si existe (permite JSX / StatusBadge) ===
-                    const maybeNode =
-                      typeof c.cell === 'function'
-                        ? c.cell({ row: { original: row } })
-                        : val;
-                    const content =
-                      React.isValidElement(maybeNode) ? maybeNode : (maybeNode ?? '—');
+                    if (typeof c.cell === 'function') {
+                      // 👇 Adapta a cell estilo TanStack ({ row: { original } }) y también soporta fila cruda
+                      try {
+                        const tanstackArg = { row: { original: row } };
+                        content = c.cell(tanstackArg);
+                        if (typeof content === 'undefined') {
+                          content = c.cell(row);
+                        }
+                      } catch {
+                        content = c.cell(row);
+                      }
+                    } else if (typeof c.accessor === 'function') {
+                      content = c.accessor(row);
+                    } else if (c.accessorKey) {
+                      content = row?.[c.accessorKey];
+                    } else {
+                      content = row?.[c.id];
+                    }
+
+                    const render =
+                      content === null || content === undefined || content === ''
+                        ? '—'
+                        : content;
 
                     return (
                       <div
                         key={c.id}
                         data-col={c.id}
                         className={`tl-td tl-td--${c.align || 'left'}`}
-                        title={typeof content === 'string' ? content : undefined}
-                        style={{ whiteSpace: 'nowrap' }} // evita cortes en dos renglones
+                        title={typeof render === 'string' ? render : undefined}
                       >
-                        {content}
+                        {render}
                       </div>
                     );
                   })}

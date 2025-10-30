@@ -181,7 +181,8 @@ export default function TablaVentas({
       {can('ver') && (
         <button
           className="tl-icon tl-icon--view"
-          aria-label="Ver venta"
+          aria-label="Ver Venta"
+          data-tooltip="Ver Venta"
           onClick={() => onVer?.(venta)}
         >
           <Eye size={18} strokeWidth={2} />
@@ -190,7 +191,8 @@ export default function TablaVentas({
       {can('editar') && (
         <button
           className="tl-icon tl-icon--edit"
-          aria-label="Editar venta"
+          aria-label="Editar Venta"
+          data-tooltip="Editar Venta"
           onClick={() => onEditar?.(venta)}
         >
           <Edit size={18} strokeWidth={2} />
@@ -199,7 +201,8 @@ export default function TablaVentas({
       {can('documentos') && (
         <button
           className="tl-icon tl-icon--docs"
-          aria-label="Ver documentos"
+          aria-label="Ver Documentos"
+          data-tooltip="Ver Documentos"
           onClick={() => onVerDocumentos?.(venta)}
         >
           <FileText size={18} strokeWidth={2} />
@@ -208,7 +211,8 @@ export default function TablaVentas({
       {can('eliminar') && (
         <button
           className="tl-icon tl-icon--delete"
-          aria-label="Eliminar venta"
+          aria-label="Eliminar Venta"
+          data-tooltip="Eliminar Venta"
           onClick={() => onEliminar?.(venta)}
         >
           <Trash2 size={18} strokeWidth={2} />
