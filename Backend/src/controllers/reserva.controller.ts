@@ -7,7 +7,9 @@ import {
   updateReserva,
   deleteReserva,
   getReservaByImmobiliariaId,
+  getReservaByEstado
 } from '../services/reserva.service';
+import { EstadoReserva } from '../types/interfacesCCLF';
 
 // ==============================
 // Obtener todas las reservas
@@ -38,13 +40,27 @@ export async function getReservaByIdController(req: Request, res: Response, next
 
 export async function getAllReservasByInmobiliariaController(req: Request, res: Response, next: NextFunction) {
   try {
-    const id = Number(req.params.id);
+    const id = parseInt(req.params.id, 10);
     const data = await getReservaByImmobiliariaId(id);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
   }
 }
+
+export async function getAllReservasByEstadoController(req: Request, res: Response, next: NextFunction) {
+  try {
+
+    console.log('Query Params:', req.query);  // Imprime todo el query para depuración
+    const estadoR = req.query.estado as EstadoReserva;
+    console.log('Estado recibido:', estadoR);  // Imprime el valor de 'estado'
+    const data = await getReservaByEstado(estadoR);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
 // ==============================
 // Crear nueva reserva
 // ==============================

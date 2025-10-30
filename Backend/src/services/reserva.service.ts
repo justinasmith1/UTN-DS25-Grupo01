@@ -1,6 +1,7 @@
 // src/services/reserva.service.ts
 import prisma from '../config/prisma'; 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
+import { EstadoReserva } from '../generated/prisma';
 
 // Esto es un mapper de errores de Prisma a errores HTTP para no tenes que hacerlo en cada funcion
 // -------------------------------------
@@ -58,11 +59,23 @@ export async function getReservaByImmobiliariaId(id: number): Promise<any> {
   return row; // devolvemos el registro tal cual viene de Prisma
 }
 
+// Buscar reservas por estado -- Nuevo
+export async function getReservaByEstado(estadoR: EstadoReserva): Promise<any> {
+  const row = await prisma.reserva.findMany({ where: { estado: estadoR } });
+  if (row.length === 0) {
+    const err: any = new Error('No se encontraron reservas con ese estado');
+    err.status = 404;
+    throw err;
+  }
+  return row; // devolvemos el registro tal cual viene de Prisma
+}
+
 // ==============================
 // Crear reserva
 // ==============================
 export async function createReserva(body: {
   fechaReserva: string;           // ISO (lo transformo a Date)
+  estado: EstadoReserva;         // Nuevo campo estado
   loteId: number;
   clienteId: number;
   inmobiliariaId?: number | null;
@@ -77,6 +90,7 @@ export async function createReserva(body: {
         inmobiliariaId: body.inmobiliariaId ?? null,
         // Para Decimal no necesito new Decimal: Prisma acepta number|string
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
+        estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
       },
     });
     return row;
@@ -93,6 +107,7 @@ export async function updateReserva(
   body: Partial<{
     fechaReserva: string;
     loteId: number;
+    estado: EstadoReserva;      // Nuevo campo estado
     clienteId: number;
     inmobiliariaId: number | null;
     sena: number;
@@ -107,6 +122,7 @@ export async function updateReserva(
         ...(body.clienteId !== undefined ? { clienteId: body.clienteId } : {}),
         ...(body.inmobiliariaId !== undefined ? { inmobiliariaId: body.inmobiliariaId } : {}),
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
+        ...(body.estado !== undefined ? { estado: body.estado } : {}),
       },
     });
     return row;

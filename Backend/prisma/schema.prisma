@@ -56,6 +56,12 @@ enum NombreCalle {
   MILANO
 }
 
+enum EstadoReserva {
+  ACTIVA
+  CANCELADA
+  ACEPTADA
+}
+
 enum EstadoVenta {
   INICIADA
   CON_BOLETO
@@ -116,6 +122,7 @@ model Persona {
 model Reserva {
   id             Int      @id @default(autoincrement())
   fechaReserva   DateTime
+  estado         EstadoReserva @default(ACTIVA)
   loteId         Int
   clienteId      Int
   inmobiliariaId Int?

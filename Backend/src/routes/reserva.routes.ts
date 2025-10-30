@@ -21,13 +21,21 @@ router.get(
     validateParams(getReservaParamsSchema),
     reservaController.getReservaByIdController);
 
-// GET /api/Reservas/inmobiliaria/:idInmobiliaria
+// GET /api/Reservas/inmobiliaria/:idInmobiliaria 
 router.get(
-    '/:idInmobiliaria',
+    '/inmob/:id',
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
     validateParams(getReservaParamsSchema),
     reservaController.getAllReservasByInmobiliariaController);
+
+// GET /api/Reservas/filtrarPorEstado?estado=ACTIVA/CANCELADA/ACEPTADA --> No funciona
+router.get(
+    '/filtrarPorEstado',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateQuery(queryReservasSchema),
+    reservaController.getAllReservasByEstadoController);
 
 // POST /api/Reservas
 router.post(
