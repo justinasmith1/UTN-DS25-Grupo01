@@ -2,6 +2,7 @@
 // Cliente de API para LOTES. Devuelve SIEMPRE { data: Array<LoteUI> }.
 
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "false";
+console.log(USE_MOCK)
 import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
 const PRIMARY = "/lotes";
@@ -70,6 +71,7 @@ async function fetchWithFallback(path, options) {
 }
 
 /* ================================= MOCK ================================= */
+/*
 let LOTES = [];
 let seeded = false;
 const nextId = () => `L${String(LOTES.length + 1).padStart(3, "0")}`;
@@ -102,7 +104,7 @@ async function mockGetById(id)      { ensureSeed(); const f = LOTES.find(l => St
 async function mockCreate(payload)   { ensureSeed(); const row = payload; row.id = nextId(); LOTES.unshift(row); return ok(fromApi(row)); }
 async function mockUpdate(id, p)     { ensureSeed(); const i = LOTES.findIndex(l => String(l.id) === String(id)); if (i < 0) throw new Error("Lote no encontrado"); LOTES[i] = { ...LOTES[i], ...p }; return ok(fromApi(LOTES[i])); }
 async function mockDelete(id)        { ensureSeed(); const n = LOTES.length; LOTES = LOTES.filter(l => String(l.id) !== String(id)); if (LOTES.length === n) throw new Error("Lote no encontrado"); return ok(true); }
-
+*/
 /* ================================ API REAL ================================ */
 function pickArrayFromApi(json) {
   // Soporta:
@@ -161,8 +163,17 @@ async function apiDelete(id) {
 }
 
 /* ------------------------------ EXPORTS ------------------------------ */
-export function getAllLotes(params)   { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
+
+/*export function getAllLotes(params)   { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
 export function getLoteById(id)       { return USE_MOCK ? mockGetById(id)      : apiGetById(id); }
 export function createLote(payload)   { return USE_MOCK ? mockCreate(payload)  : apiCreate(payload); }
 export function updateLote(id, data)  { return USE_MOCK ? mockUpdate(id, data) : apiUpdate(id, data); }
 export function deleteLote(id)        { return USE_MOCK ? mockDelete(id)       : apiDelete(id); }
+*/
+
+export function getAllLotes(params)   { return apiGetAll(params); }
+export function getLoteById(id)       { return apiGetById(id); }
+export function createLote(payload)   { return apiCreate(payload); }
+export function updateLote(id, data)  { return apiUpdate(id, data); }
+export function deleteLote(id)        { return apiDelete(id); }
+
