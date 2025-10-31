@@ -315,22 +315,22 @@ export default function TablaLotes({
                     </button>
                   )}
                   {can('editar') && (
-                    <button className="tl-icon tl-icon--edit" aria-label="Editar lote" data-tooltip="Editar lote" onClick={() => onEditar?.(l)}>
+                    <button className="tl-icon tl-icon--edit" aria-label="Editar lote" data-tooltip="Editar Lote" onClick={() => onEditar?.(l)}>
                       <Edit size={18} strokeWidth={2} />
                     </button>
                   )}
                   {can('venta') && (
-                    <button className="tl-icon tl-icon--money" aria-label="Registrar venta" data-tooltip="Registrar venta" onClick={() => onRegistrarVenta?.(l)}>
+                    <button className="tl-icon tl-icon--money" aria-label="Registrar venta" data-tooltip="Registrar Venta" onClick={() => onRegistrarVenta?.(l)}>
                       <DollarSign size={18} strokeWidth={2} />
                     </button>
                   )}
                   {can('eliminar') && (
-                    <button className="tl-icon tl-icon--delete" aria-label="Eliminar lote" data-tooltip="Eliminar lote" onClick={() => onEliminar?.(l)}>
+                    <button className="tl-icon tl-icon--delete" aria-label="Eliminar lote" data-tooltip="Eliminar Lote" onClick={() => onEliminar?.(l)}>
                       <Trash2 size={18} strokeWidth={2} />
                     </button>
                   )}
                   {can('aplicarPromo') && (
-                    <button className="tl-icon tl-icon--promo" aria-label="Aplicar promoción" data-tooltip="Aplicar promoción" onClick={() => onAplicarPromo?.(l)}>
+                    <button className="tl-icon tl-icon--promo" aria-label="Aplicar promoción" data-tooltip="Aplicar Promoción" onClick={() => onAplicarPromo?.(l)}>
                       <CirclePercent size={18} strokeWidth={2} />
                     </button>
                   )}
