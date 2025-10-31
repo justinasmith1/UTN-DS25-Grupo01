@@ -70,17 +70,28 @@ function buildWhereFromQueryDTO(query: any, role?: string) {
 
 export async function getAllLotes(query: any = {}, role?: string) {
   const where = buildWhereFromQueryDTO(query, role);
+
   const [lotes, total] = await Promise.all([
     prisma.lote.findMany({
       where,
       orderBy: { id: 'asc' },
+      include: {
+        // Para mostrar Calle y Número
+        ubicacion: { select: { calle: true, numero: true} },
+        // Para mostrar el nombre del Propietario
+        propietario: { select: { nombre: true, apellido: true } },
+      },
     }),
     prisma.lote.count({ where }),
   ]);
 
-  const lotesVisibles = role === 'TECNICO' ? lotes.map((lote) => stripFieldsForTecnico(lote)) : lotes;
+  const lotesVisibles = role === 'TECNICO'
+    ? lotes.map((lote) => stripFieldsForTecnico(lote))
+    : lotes;
+
   return { lotes: lotesVisibles, total };
 }
+
 
 
 export async function getLoteById(id: number, role?: string) {
