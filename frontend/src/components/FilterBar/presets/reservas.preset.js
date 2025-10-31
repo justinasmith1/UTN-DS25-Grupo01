@@ -1,58 +1,58 @@
 // src/components/FilterBar/presets/reservas.preset.js
 // Preset de configuración para filtros de reservas
 
-// Catálogos para filtros
-export const INMOBILIARIAS = [
-  { value: 1, label: 'Inmobiliaria Central' },
-  { value: 2, label: 'Propiedades del Sur' },
-  { value: 3, label: 'Inmobiliaria Norte' }
-];
-
-export const CALLES = [
-  { value: 'REINAMORA', label: 'Reinamora' },
-  { value: 'MACA', label: 'Maca' },
-  { value: 'ZORZAL', label: 'Zorzal' },
-  { value: 'CAUQUEN', label: 'Cauquén' },
-  { value: 'ALONDRA', label: 'Alondra' },
-  { value: 'JACANA', label: 'Jacana' },
-  { value: 'TACUARITO', label: 'Tacuarito' },
-  { value: 'JILGUERO', label: 'Jilguero' },
-  { value: 'GOLONDRINA', label: 'Golondrina' },
-  { value: 'CALANDRIA', label: 'Calandria' },
-  { value: 'AGUILAMORA', label: 'Aguilamora' },
-  { value: 'LORCA', label: 'Lorca' },
-  { value: 'MILANO', label: 'Milano' }
-];
-
 export const reservasFilterPreset = {
-  // Catálogos para filtros
   catalogs: {
-    INMOBILIARIAS,
-    CALLES
+    // Estados: dejalo vacío si los vas a inyectar desde el container;
+    // o completalo acá con tus 9 estados reales
+    ESTADOS: [
+      "ACTIVA",
+      "CANCELADA",
+      "ACEPTADA"
+    ],
+    // Reutilizamos los nombres tal cual, así no sale [Object Object]
+    INMOBILIARIAS: [
+      "La Federala",
+      "Andinolfi Inmobiliaria",
+      "Andrea Gianfelice Inmb.",
+      "Nicolas Spinosa Operaciones Inmobiliarias",
+      "Martin Azcarate Negocios Inmobiliarios",
+    ],
   },
 
-  // Rangos para filtros numéricos
   ranges: {
+    // Igual que fechaVenta en ventas, pero para reservas
     fechaReserva: {
-      minLimit: new Date('2020-01-01').getTime(),
-      maxLimit: new Date('2030-12-31').getTime(),
-      step: 86400000, // 1 día en ms
-      unit: ''
+      minLimit: new Date("2020-01-01").getTime(),
+      maxLimit: new Date("2030-12-31").getTime(),
+      step: 86400000, // 1 día
+      unit: "",
     },
+    // NUEVO: fecha de creación
+    fechaCreacion: {
+      minLimit: new Date("2020-01-01").getTime(),
+      maxLimit: new Date("2030-12-31").getTime(),
+      step: 86400000,
+      unit: "",
+    },
+    // Ajuste: rango chico y USD (antes ARS enorme)
     seña: {
       minLimit: 0,
-      maxLimit: 1000000,
-      step: 1000,
-      unit: 'ARS'
-    }
+      maxLimit: 20000, // "mucho menor" para tu uso; ajustalo si necesitás
+      step: 100,       // paso razonable
+      unit: "USD",
+    },
   },
 
-  // Valores por defecto
+  // Defaults coherentes con FilterBarBase
   defaults: {
-    q: '',
-    inmobiliaria: null,
-    calle: null,
+    q: "",
+    estado: [],
+    inmobiliarias: [],
     fechaReserva: { min: null, max: null },
-    seña: { min: null, max: null }
-  }
+    fechaCreacion: { min: null, max: null },
+    seña: { min: null, max: null },
+  },
 };
+
+export default reservasFilterPreset;

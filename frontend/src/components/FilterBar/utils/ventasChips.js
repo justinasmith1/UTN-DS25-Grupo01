@@ -1,34 +1,50 @@
-// Formateador de chips específico para ventas
-// Convierte los filtros aplicados en "chips" para mostrar en la UI de ventas
+// utils/ventasChips.js
+// Genera los chips visibles arriba de la tabla.
+// Cambios: soporta inmobiliarias en plural y singular.
+
+const getLabel = (x) => {
+  if (x == null) return "";
+  if (typeof x === "string") return x;
+  if (typeof x === "number") return String(x);
+  if (typeof x === "object") return x.label ?? x.name ?? x.value ?? "";
+  return String(x);
+};
 
 export const nice = (s) =>
-  (s ?? "")
+  getLabel(s)
     .replace(/_/g, " ")
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-export function ventasChipsFrom(applied, catalogs) {
+export function ventasChipsFrom(applied) {
   const arr = [];
-  
-  // Búsqueda
+
   if (applied.q) {
     arr.push({ k: "q", label: `Buscar: ${applied.q}` });
   }
 
-  // Estado - formatear con nice()
-  (applied.estado || [])
-    .forEach((v) => arr.push({ k: "estado", v, label: `Estado: ${nice(v)}` }));
+  // Estado: soportar 'estado', 'estados' y 'estadoVenta'
+  const estados =
+    applied.estado || applied.estados || applied.estadoVenta || [];
+  (estados || []).forEach((v) =>
+    arr.push({ k: "estado", v, label: `Estado: ${nice(v)}` })
+  );
 
-  // Tipo de pago - formatear con nice()
-  (applied.tipoPago || [])
-    .forEach((v) => arr.push({ k: "tipoPago", v, label: `Tipo de pago: ${nice(v)}` }));
+  (applied.tipoPago || []).forEach((v) =>
+    arr.push({ k: "tipoPago", v, label: `Tipo de pago: ${nice(v)}` })
+  );
 
-  // Inmobiliaria
-  (applied.inmobiliaria || [])
-    .forEach((v) => arr.push({ k: "inmobiliaria", v, label: `Inmobiliaria: ${v}` }));
+  // Inmobiliarias: plural o singular
+  const inmList = applied.inmobiliarias ?? applied.inmobiliaria ?? [];
+  (inmList || []).forEach((v) => {
+    const label = getLabel(v);
+    arr.push({ k: "inmobiliarias", v, label: `Inmobiliaria: ${label}` });
+  });
 
-  // Fecha de venta (rango)
-  if (applied.fechaVenta && (applied.fechaVenta.min !== null || applied.fechaVenta.max !== null)) {
+  if (
+    applied.fechaVenta &&
+    (applied.fechaVenta.min !== null || applied.fechaVenta.max !== null)
+  ) {
     if (applied.fechaVenta.min !== null && applied.fechaVenta.max !== null) {
       const minDate = new Date(applied.fechaVenta.min).toLocaleDateString();
       const maxDate = new Date(applied.fechaVenta.max).toLocaleDateString();
@@ -42,25 +58,19 @@ export function ventasChipsFrom(applied, catalogs) {
     }
   }
 
-  // Monto (rango)
-  if (applied.monto && (applied.monto.min !== null || applied.monto.max !== null)) {
+  if (
+    applied.monto &&
+    (applied.monto.min !== null || applied.monto.max !== null)
+  ) {
     if (applied.monto.min !== null && applied.monto.max !== null) {
-      arr.push({ k: "monto", label: `Monto: ${applied.monto.min} - ${applied.monto.max} USD` });
+      arr.push({
+        k: "monto",
+        label: `Monto: ${applied.monto.min} - ${applied.monto.max} USD`,
+      });
     } else if (applied.monto.min !== null) {
       arr.push({ k: "monto", label: `Monto: ≥ ${applied.monto.min} USD` });
     } else if (applied.monto.max !== null) {
       arr.push({ k: "monto", label: `Monto: ≤ ${applied.monto.max} USD` });
-    }
-  }
-
-  // Plazo de escritura (rango)
-  if (applied.plazoEscritura && (applied.plazoEscritura.min !== null || applied.plazoEscritura.max !== null)) {
-    if (applied.plazoEscritura.min !== null && applied.plazoEscritura.max !== null) {
-      arr.push({ k: "plazoEscritura", label: `Plazo: ${applied.plazoEscritura.min} - ${applied.plazoEscritura.max} días` });
-    } else if (applied.plazoEscritura.min !== null) {
-      arr.push({ k: "plazoEscritura", label: `Plazo: ≥ ${applied.plazoEscritura.min} días` });
-    } else if (applied.plazoEscritura.max !== null) {
-      arr.push({ k: "plazoEscritura", label: `Plazo: ≤ ${applied.plazoEscritura.max} días` });
     }
   }
 

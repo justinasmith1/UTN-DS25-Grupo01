@@ -30,6 +30,14 @@ export const applyPersonaFilters = (personas, filters) => {
       if (!matchesSearch) return false;
     }
 
+    if (filters?.tipo === 'propietario' && !persona.esPropietario) {
+      return false;
+    }
+
+    if (filters?.tipo === 'inquilino' && !persona.esInquilino) {
+      return false;
+    }
+
     // Filtro por tipo de identificador
     if (filters.tipoIdentificador) {
       if (persona.identificador !== filters.tipoIdentificador) {

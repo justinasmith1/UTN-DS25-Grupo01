@@ -1,72 +1,149 @@
 // src/utils/applyVentaFilters.js
-export function applyVentaFilters(allVentas = [], p = {}) {
-  const norm = (s) => (s ?? "").toString().trim().toUpperCase().replace(/\s+/g, "_");
-  const getEstado = (v) => v?.status || v?.estado || "";
-  const getTipoPago = (v) => v?.paymentType || v?.tipoPago || "";
-  const getInmobiliaria = (v) => v?.inmobiliariaId || v?.inmobiliaria || "";
-  const num = (x) => (x === null || x === undefined || x === "" ? NaN : +x);
+// Filtra ventas en memoria, tolerante a distintas formas/formatos de datos.
 
-  const getFechaVenta = (v) => {
-    const date = v?.date || v?.fechaVenta || v?.saleDate;
-    if (!date) return NaN;
-    return new Date(date).getTime();
-  };
-  const getMonto = (v) => num(v?.amount ?? v?.monto ?? v?.price ?? v?.precio);
-  const getPlazoEscritura = (v) => num(v?.plazoEscritura ?? v?.deedDeadline ?? v?.deadline);
+const norm = (v) =>
+  (v ?? "")
+    .toString()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[_\s]+/g, " ")
+    .trim();
 
-  let rows = [...(allVentas || [])];
+const toNumber = (v) => {
+  if (v == null) return null;
+  // admite "50.000", "50,000", "$ 50.000", etc.
+  const n = Number(String(v).replace(/[^\d.-]/g, ""));
+  return Number.isFinite(n) ? n : null;
+};
 
-  // Búsqueda por texto
-  const q = (p.q || "").toString().trim().toLowerCase();
-  if (q) {
-    rows = rows.filter((v) => {
-      const idStr = String(v?.id ?? "");
-      const lotId = String(v?.lotId ?? "");
-      const amount = String(v?.amount ?? "");
-      return idStr.includes(q) || lotId.includes(q) || amount.includes(q);
-    });
-  }
+const toTime = (v) => {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  const t = d.getTime();
+  return Number.isFinite(t) ? t : null;
+};
 
-  // Filtros de arrays
-  if (Array.isArray(p.estado) && p.estado.length > 0) {
-    const set = new Set(p.estado.map(norm));
-    rows = rows.filter((v) => set.has(norm(getEstado(v))));
-  }
+export function applyVentaFilters(rows = [], f = {}) {
+  const {
+    texto = "",
+    // arrays (pueden venir como strings, números o incluso objetos con { id })
+    tipoPago = [],
+    inmobiliarias = [],
 
-  if (Array.isArray(p.tipoPago) && p.tipoPago.length > 0) {
-    const set = new Set(p.tipoPago.map(norm));
-    rows = rows.filter((v) => set.has(norm(getTipoPago(v))));
-  }
+    // rangos
+    fechaVentaMin = null,
+    fechaVentaMax = null,
+    montoMin = null,
+    montoMax = null,
 
-  if (Array.isArray(p.inmobiliaria) && p.inmobiliaria.length > 0) {
-    const set = new Set(p.inmobiliaria.map(norm));
-    rows = rows.filter((v) => set.has(norm(getInmobiliaria(v))));
-  }
+    // estado puede venir ["Iniciada", "CON_BOLETO", ...]
+    estados = [],
+  } = f;
 
-  // Función para rangos
-  const inRange = (val, min, max) => {
-    const v = Number.isFinite(val) ? val : NaN;
-    if (Number.isNaN(v)) return false;
-    if (min !== undefined && min !== null && v < +min) return false;
-    if (max !== undefined && max !== null && v > +max) return false;
+  // Normalizaciones base
+  const q = norm(texto);
+  const estadosSet =
+    estados && estados.length
+      ? new Set(estados.map((e) => norm(e)))
+      : null;
+
+  // Aceptar ids de inmobiliaria como [1, "2", { id: 3 }]
+  const inmoIdsSet =
+    inmobiliarias && inmobiliarias.length
+      ? new Set(
+          inmobiliarias.map((x) => {
+            if (x && typeof x === "object") return String(x.id ?? x.value ?? "");
+            return String(x ?? "");
+          })
+        )
+      : null;
+
+  // Rango de fechas (milisegundos)
+  const tMin = toTime(fechaVentaMin);
+  const tMax = toTime(fechaVentaMax);
+
+  // Rango de montos (números)
+  const nMin = toNumber(montoMin);
+  const nMax = toNumber(montoMax);
+
+  return rows.filter((v) => {
+    // ----- Campos base normalizados -----
+    const estadoNorm = norm(v.estado);
+    const tipoPagoNorm = norm(v.tipoPago);
+
+    // Inmobiliaria: id y nombre (por si filtras por texto)
+    const inmoId = v?.inmobiliaria?.id ?? v?.inmobiliariaId ?? v?.inmobiliaria_id ?? null;
+    const inmoIdStr = inmoId != null ? String(inmoId) : "";
+    const inmoNombreNorm = norm(v?.inmobiliaria?.nombre);
+
+    // Comprador para búsqueda por texto
+    const compradorNorm = norm(
+      v?.compradorNombreCompleto ??
+        (v?.comprador && (v.comprador.nombre || v.comprador.apellido)
+          ? `${v.comprador.nombre ?? ""} ${v.comprador.apellido ?? ""}`
+          : "")
+    );
+
+    // Lote e id para búsqueda por texto
+    const loteIdStr = v?.loteId != null ? String(v.loteId) : "";
+    const ventaIdStr = v?.id != null ? String(v.id) : "";
+
+    // Monto y Fecha
+    const montoNum = toNumber(v.monto);
+    const fechaMs = toTime(v.fechaVenta);
+
+    // ----- 1) Texto libre -----
+    if (q) {
+      const haystack = [
+        loteIdStr,
+        ventaIdStr,
+        compradorNorm,
+        inmoNombreNorm,
+        estadoNorm,
+        tipoPagoNorm,
+      ].join(" ");
+      if (!haystack.includes(q)) return false;
+    }
+
+    // ----- 2) Estados -----
+    if (estadosSet && estadosSet.size > 0) {
+      if (!estadosSet.has(estadoNorm)) return false;
+    }
+
+    // ----- 3) Tipo de Pago (si llega como lista) -----
+    if (Array.isArray(tipoPago) && tipoPago.length > 0) {
+      const tiposSet = new Set(tipoPago.map((t) => norm(t)));
+      if (!tiposSet.has(tipoPagoNorm)) return false;
+    }
+
+    // ----- 4) Inmobiliarias -----
+    if (inmoIdsSet && inmoIdsSet.size > 0) {
+      // match por id (preferente) o por nombre: con que coincida una alcanza
+      const matchById = inmoIdStr && inmoIdsSet.has(inmoIdStr);
+      const matchByName =
+        inmoNombreNorm &&
+        [...inmoIdsSet].some((x) => {
+          try {
+            return norm(x) === inmoNombreNorm;
+          } catch (e) {
+            return false;
+          }
+        });
+
+      if (!matchById && !matchByName) return false;
+    }
+
+    // ----- 5) Rango de fechas -----
+    if (tMin != null && (fechaMs == null || fechaMs < tMin)) return false;
+    if (tMax != null && (fechaMs == null || fechaMs > tMax)) return false;
+
+    // ----- 6) Rango de montos -----
+    if (nMin != null && (montoNum == null || montoNum < nMin)) return false;
+    if (nMax != null && (montoNum == null || montoNum > nMax)) return false;
+
     return true;
-  };
-
-  // Filtros de rango - solo aplicar si hay valores válidos (no null)
-  if ((p.fechaVenta?.min !== undefined && p.fechaVenta?.min !== null) || 
-      (p.fechaVenta?.max !== undefined && p.fechaVenta?.max !== null)) {
-    rows = rows.filter((v) => inRange(getFechaVenta(v), p.fechaVenta?.min, p.fechaVenta?.max));
-  }
-
-  if ((p.monto?.min !== undefined && p.monto?.min !== null) || 
-      (p.monto?.max !== undefined && p.monto?.max !== null)) {
-    rows = rows.filter((v) => inRange(getMonto(v), p.monto?.min, p.monto?.max));
-  }
-
-  if ((p.plazoEscritura?.min !== undefined && p.plazoEscritura?.min !== null) || 
-      (p.plazoEscritura?.max !== undefined && p.plazoEscritura?.max !== null)) {
-    rows = rows.filter((v) => inRange(getPlazoEscritura(v), p.plazoEscritura?.min, p.plazoEscritura?.max));
-  }
-
-  return rows;
+  });
 }
+
+export default applyVentaFilters;

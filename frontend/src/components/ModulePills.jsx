@@ -43,6 +43,7 @@ export default function ModulePills() {
       { label: 'Descargar Reporte', to: null, disabled: true },
     ],
     personas: [
+      { label: 'Ver Todos', to: '/personas', disabled: false },
       { label: 'Ver Propietarios', to: '/personas?tipo=propietario', disabled: false },
       { label: 'Ver Inquilinos', to: '/personas?tipo=inquilino', disabled: false },
     ],
@@ -82,6 +83,11 @@ export default function ModulePills() {
   const DIVIDER_COLOR = 'rgba(255, 255, 255, 0.15)'; // color de los divisores del panel
   /* =================================== */
 
+  const HIGHLIGHT_KEYS = useMemo(
+    () => new Set(['ventas', 'inmobiliarias', 'reservas', 'reportes', 'personas']),
+    []
+  );
+
   return (
     <>
       <style>{`
@@ -104,7 +110,7 @@ export default function ModulePills() {
           background: var(--color-header-bg);
           border-radius: 0;
           overflow: visible;
-          box-shadow: var(--elev-1);
+          box-shadow: 2px 3px 2px 1px rgba(0,0,0,0.25);
         }
         /* Única línea fina de separación con el header */
         .mods-bar::before {
@@ -192,6 +198,49 @@ export default function ModulePills() {
         .mods-panel__btn--disabled {
           opacity: .55; cursor: not-allowed;
         }
+
+        /* ===== ACTIVO (resaltado amarillo) solo para módulos seleccionados ===== */
+        .mods-item.is-highlight {
+          background: #EBB648;            /* amarillo figma */
+          color: #101512;                 /* texto oscuro para contraste */
+        }
+        .mods-item.is-highlight .mods-caret {
+          color: #101512; opacity: 1;
+        }
+        /* que el hover no cambie cuando está activo */
+        .mods-item.is-highlight:hover {
+          background: #EBB648;
+          color: #101512;
+        }
+        /* === Tuning visual ModulePills (override) === */
+
+        /* Línea separadora un poco más marcada (en header oscuro queda mejor) */
+        .mods-bar::before { background: rgba(0, 0, 0, 0.35); }
+
+        /* Bordes más suaves en cada item y hover más sutil */
+        .mods-item:hover { background: rgba(255, 255, 255, 0.04); }
+
+        /* Píldora ACTIVA (amarillo Figma + hairline oscuro sutil) */
+        .mods-item.is-highlight {
+          background: #EBB648;           /* amarillo original */
+          color: #0F1412;
+          font-weight: 640;           /* texto bien oscuro */
+          border-top: solid 1px black;
+          box-shadow: inset 0 0 0 1px rgba(15, 20, 18, 0.22); /* hairline */
+        }
+
+        /* Chevron más negro cuando está activo */
+        .mods-item.is-highlight .mods-caret {
+          color: #0B0E0D;
+          opacity: 1;
+        }
+
+        /* Mantener el mismo color en hover cuando está activa */
+        .mods-item.is-highlight:hover {
+          background: #EBB648;
+          color: #0F1412;
+        }
+
       `}</style>
 
       <div className="mods-wrapper" ref={wrapperRef}>
@@ -202,10 +251,13 @@ export default function ModulePills() {
             const open = openKey === key;
             const items = MENU[key] || [];
 
+            // 🔸 NUEVO: solo marcamos en amarillo los módulos definidos en HIGHLIGHT_KEYS
+            const isHighlight = active && HIGHLIGHT_KEYS.has(key);
+
             return (
               <div
                 key={key}
-                className={`mods-item ${open ? 'is-open' : ''}`}
+                className={`mods-item ${open ? 'is-open' : ''} ${isHighlight ? 'is-highlight' : ''}`}
                 aria-current={active ? 'page' : undefined}
               >
                 {/* Botón que abre/cierra el panel (nombre centrado + caret derecha) */}

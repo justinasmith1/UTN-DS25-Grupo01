@@ -1,5 +1,6 @@
 // src/components/TablaVentas/utils/formatters.jsx
 import React from 'react';
+import StatusBadge from '../cells/StatusBadge';
 
 // Formateadores específicos para la tabla de ventas
 
@@ -32,3 +33,7 @@ export const fmtPlazoEscritura = (dias) => {
   if (Number.isNaN(n)) return '—';
   return `${n} días`;
 };
+
+export function formatEstadoVenta(estado) {
+  return <StatusBadge status={estado} />;
+}

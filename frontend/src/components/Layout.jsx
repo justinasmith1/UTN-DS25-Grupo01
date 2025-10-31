@@ -7,8 +7,7 @@ import { mockUser } from "../lib/data";
 import { getAllLotes, updateLote, deleteLote, createLote } from "../lib/api/lotes";
 
 import Header from "./Header";
-// import Botones from "./Botones"; // ← evitamos duplicados
-import ModulePills from "./ModulePills";     // ← NUEVO: las píldoras
+import ModulePills from "./ModulePills";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
@@ -21,7 +20,6 @@ export default function Layout() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const onDashboard = location.pathname === "/" || location.pathname.startsWith("/dashboard");
 
   useEffect(() => {
     let alive = true;
@@ -132,9 +130,9 @@ export default function Layout() {
     <div className="min-vh-100 d-flex flex-column bg-white">
       <Header onUserClick={() => setShowUserModal(true)} />
 
-      {/* Píldoras de módulos: debajo del Header y ANTES de la FilterBar */}
+      {/* Píldoras de módulos en modo CLARO (fondo blanco del layout) */}
       <div className="container py-2">
-        <ModulePills />
+        <ModulePills variant="light" />
       </div>
 
       <Outlet

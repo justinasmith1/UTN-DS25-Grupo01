@@ -1,133 +1,124 @@
-// src/components/FilterBar/controls/DateRangeControl.jsx
-import { useEffect, useRef, useState } from "react";
-import noUiSlider from "nouislider";
+import React, { useEffect, useState } from "react";
+import RangeControl from "./RangeControl"; // reutilizamos su slider para clonar el look de "Monto"
 import "nouislider/dist/nouislider.css";
 
-// DateRangeControl especializado para manejar rangos de fechas
+/**
+ * DateRangeControl
+ * - Replica el estilo de RangeControl numérico pero con inputs <input type="date" />.
+ * - NO renderiza título: el label lo maneja el padre (así evitamos duplicados).
+ * - Internamente usa RangeControl para el slider → mismo aspecto que “Monto”.
+ * - Los inputs numéricos del RangeControl se ocultan por CSS y se reemplazan por inputs de fecha.
+ */
 export default function DateRangeControl({
-  unit = "",
-  minLimit,
-  maxLimit,
-  value,        // { min, max } - timestamps en ms
+  // límites en epoch millis
+  min = new Date(2020, 0, 1).getTime(),
+  max = new Date(2030, 11, 31).getTime(),
+  // value: { min, max } en epoch millis
+  value = { min: null, max: null },
   onChange,
-  step = 86400000, // 1 día en ms por defecto
 }) {
-  const sliderRef = useRef(null);
-  const apiRef = useRef(null);
-  const onChangeRef = useRef(onChange);
-  
-  // Actualizar la referencia cuando onChange cambie
+  const DAY = 24 * 60 * 60 * 1000;
+
+  // límites en “días” para el slider
+  const minD = Math.floor(min / DAY);
+  const maxD = Math.floor(max / DAY);
+
+  // estado interno en días (para RangeControl)
+  const [rangeD, setRangeD] = useState({
+    min: value?.min != null ? Math.floor(value.min / DAY) : minD,
+    max: value?.max != null ? Math.floor(value.max / DAY) : maxD,
+  });
+
+  // sincronizar si viene cambio externo
   useEffect(() => {
-    onChangeRef.current = onChange;
-  }, [onChange]);
-
-  // Convertir timestamps a strings de fecha para mostrar
-  const formatDate = (timestamp) => {
-    if (!timestamp) return '';
-    return new Date(timestamp).toISOString().split('T')[0]; // YYYY-MM-DD
-  };
-
-  // Convertir string de fecha a timestamp
-  const parseDate = (dateStr) => {
-    if (!dateStr) return null;
-    return new Date(dateStr).getTime();
-  };
-
-  // Strings para permitir tipeo libre
-  const [minStr, setMinStr] = useState(formatDate(value.min));
-  const [maxStr, setMaxStr] = useState(formatDate(value.max));
-
-  // Sincroniza descendente cuando cambian props.value
-  useEffect(() => {
-    setMinStr(formatDate(value.min));
-    setMaxStr(formatDate(value.max));
-    if (apiRef.current) apiRef.current.set([value.min, value.max], false);
-  }, [value.min, value.max]);
-
-  // Init noUiSlider una sola vez
-  useEffect(() => {
-    if (!sliderRef.current) return;
-
-    // Manejar valores null en los límites
-    const safeMinLimit = minLimit ?? new Date('2020-01-01').getTime();
-    const safeMaxLimit = maxLimit ?? new Date('2030-12-31').getTime();
-    const safeMinValue = value.min ?? safeMinLimit;
-    const safeMaxValue = value.max ?? safeMaxLimit;
-
-    apiRef.current = noUiSlider.create(sliderRef.current, {
-      start: [safeMinValue, safeMaxValue],
-      connect: true,
-      range: { min: safeMinLimit, max: safeMaxLimit },
-      step,
-      behaviour: "tap-drag",
-      keyboardSupport: true,
-      tooltips: false,
-    });
-
-    // Event listener para cambios del slider
-    const handleSlide = (values) => {
-      const [min, max] = values;
-      onChangeRef.current({ min: Number(min), max: Number(max) });
+    const next = {
+      min: value?.min != null ? Math.floor(value.min / DAY) : minD,
+      max: value?.max != null ? Math.floor(value.max / DAY) : maxD,
     };
+    if (next.min !== rangeD.min || next.max !== rangeD.max) setRangeD(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value?.min, value?.max, min, max]);
 
-    apiRef.current.on('update', handleSlide);
-
-    return () => {
-      if (apiRef.current) {
-        apiRef.current.destroy();
-        apiRef.current = null;
-      }
-    };
-  }, [minLimit, maxLimit, step, value.min, value.max]);
-
-  // Commits desde input a slider
-  const commitFromInput = (type) => {
-    const str = type === "min" ? minStr : maxStr;
-    const parsed = parseDate(str);
-    
-    if (parsed !== null && !isNaN(parsed)) {
-      const newValue = { ...value, [type]: parsed };
-      onChangeRef.current(newValue);
-    } else {
-      // Si el input es inválido, revertir al valor anterior
-      setMinStr(formatDate(value.min));
-      setMaxStr(formatDate(value.max));
-    }
+  // helpers
+  const toInput = (dDays) => {
+    const dt = new Date(dDays * DAY);
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, "0");
+    const dd = String(dt.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+  const fromInput = (str) => {
+    if (!str) return null;
+    const [y, m, d] = str.split("-").map((n) => parseInt(n, 10));
+    return Math.floor(new Date(y, (m || 1) - 1, d || 1).getTime() / DAY);
   };
 
-  const unitPretty = unit;
+  const emit = (nextD) => {
+    onChange && onChange({ min: nextD.min * DAY, max: nextD.max * DAY });
+  };
+
+  const handleSlider = (nextD) => {
+    setRangeD(nextD);
+    emit(nextD);
+  };
+
+  const handleMinChange = (e) => {
+    const v = fromInput(e.target.value);
+    if (v == null) return;
+    const next = { min: Math.max(minD, Math.min(v, rangeD.max)), max: rangeD.max };
+    setRangeD(next);
+    emit(next);
+  };
+
+  const handleMaxChange = (e) => {
+    const v = fromInput(e.target.value);
+    if (v == null) return;
+    const next = { min: rangeD.min, max: Math.min(maxD, Math.max(v, rangeD.min)) };
+    setRangeD(next);
+    emit(next);
+  };
 
   return (
-    <section className="fb-range-control" onClick={(e) => e.stopPropagation()}>
-      <div className="fb-range-slider" ref={sliderRef} onClick={(e) => e.stopPropagation()}></div>
-      
-      <div className="fb-range-inputs" onClick={(e) => e.stopPropagation()}>
-        <label>
-          <span>Mín</span>
+    <div className="fb-date-range">
+      {/* Slider idéntico al de Monto (sin label para evitar duplicados) */}
+      <RangeControl
+        label={null}
+        unit="días"
+        minLimit={minD}
+        maxLimit={maxD}
+        value={rangeD}
+        onChange={handleSlider}
+        step={1}
+      />
+
+      {/* Inputs de fecha con el mismo layout que RangeControl */}
+      <div className="fb-range-inputs fb-date-inputs">
+        <div className="range-input">
+          <span className="muted">Mín</span>
           <input
             type="date"
-            value={minStr}
-            onChange={(e) => setMinStr(e.target.value)}
-            onBlur={() => commitFromInput("min")}
-            onClick={(e) => e.stopPropagation()}
+            value={toInput(rangeD.min)}
+            min={toInput(minD)}
+            max={toInput(rangeD.max)}
+            onChange={handleMinChange}
           />
-        </label>
+        </div>
 
         <span className="dash">—</span>
 
-        <label>
-          <span>Máx</span>
+        <div className="range-input">
+          <span className="muted">Máx</span>
           <input
             type="date"
-            value={maxStr}
-            onChange={(e) => setMaxStr(e.target.value)}
-            onBlur={() => commitFromInput("max")}
-            onClick={(e) => e.stopPropagation()}
+            value={toInput(rangeD.max)}
+            min={toInput(rangeD.min)}
+            max={toInput(maxD)}
+            onChange={handleMaxChange}
           />
-        </label>
+        </div>
 
-        {unitPretty && <span className="unit">{unitPretty}</span>}
+        <span className="unit">días</span>
       </div>
-    </section>
+    </div>
   );
 }

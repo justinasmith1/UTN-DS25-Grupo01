@@ -19,7 +19,9 @@ export const fromApi = (apiPersona) => {
     telefono: apiPersona.telefono || null,
     email: apiPersona.email || null,
     cuil: apiPersona.cuil || '',
-    createdAt: apiPersona.createdAt || new Date().toISOString()
+    createdAt: apiPersona.createdAt || new Date().toISOString(),
+    esPropietario: Boolean(apiPersona.esPropietario),
+    esInquilino: Boolean(apiPersona.esInquilino),
   };
 };
 
@@ -226,7 +228,9 @@ const mockPersonas = [
     telefono: 1123456789,
     email: 'juan.perez@email.com',
     contacto: 'juan.perez@email.com,1123456789',
-    createdAt: '2024-01-15T10:30:00Z'
+    createdAt: '2024-01-15T10:30:00Z',
+    esPropietario: true,
+    esInquilino: false,
   },
   {
     idPersona: 2,
@@ -237,7 +241,9 @@ const mockPersonas = [
     telefono: 1198765432,
     email: 'maria.gonzalez@email.com',
     contacto: 'maria.gonzalez@email.com,1198765432',
-    createdAt: '2024-01-20T14:15:00Z'
+    createdAt: '2024-01-20T14:15:00Z',
+    esPropietario: false,
+    esInquilino: true,
   },
   {
     idPersona: 3,
@@ -248,7 +254,9 @@ const mockPersonas = [
     telefono: 1156789012,
     email: null,
     contacto: '1156789012',
-    createdAt: '2024-02-01T09:45:00Z'
+    createdAt: '2024-02-01T09:45:00Z',
+    esPropietario: false,
+    esInquilino: false,
   },
   {
     idPersona: 4,
@@ -259,7 +267,9 @@ const mockPersonas = [
     telefono: null,
     email: 'ana.martinez@email.com',
     contacto: 'ana.martinez@email.com',
-    createdAt: '2024-02-10T16:20:00Z'
+    createdAt: '2024-02-10T16:20:00Z',
+    esPropietario: true,
+    esInquilino: false,
   }
 ];
 
@@ -273,6 +283,7 @@ export const mockFilterSortPage = (personas, filters = {}, sort = {}, pagination
   if (filters.q) {
     const query = filters.q.toLowerCase();
     filtered = filtered.filter(persona => 
+      (persona.idPersona != null && persona.idPersona.toString().includes(query)) ||
       persona.nombre.toLowerCase().includes(query) ||
       persona.apellido.toLowerCase().includes(query) ||
       persona.cuil.toLowerCase().includes(query) ||
@@ -291,6 +302,12 @@ export const mockFilterSortPage = (personas, filters = {}, sort = {}, pagination
 
   if (filters.tieneTelefono !== undefined) {
     filtered = filtered.filter(persona => !!persona.telefono === filters.tieneTelefono);
+  }
+
+  if (filters.tipo === 'propietario') {
+    filtered = filtered.filter(persona => persona.esPropietario);
+  } else if (filters.tipo === 'inquilino') {
+    filtered = filtered.filter(persona => persona.esInquilino);
   }
 
   if (filters.fechaCreacion) {
@@ -354,3 +371,9 @@ export const getAllPersonasWithMock = async (params = {}) => {
   }
   return getAllPersonas(params);
 };
+
+
+
+
+
+

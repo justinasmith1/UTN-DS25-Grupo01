@@ -47,6 +47,7 @@ export default function FilterBarBase({
       case 'multiSelect': return [];
       case 'range': return { min: null, max: null };
       case 'singleSelect': return null;
+      case 'dateRange': return { min: null, max: null };
       default: return '';
     }
   };
@@ -151,8 +152,8 @@ export default function FilterBarBase({
     } else if (field.type === 'singleSelect') {
       // Para singleSelect, resetear al valor por defecto
       newAppliedFilters[key] = defaults[key] ?? field.defaultValue ?? getDefaultValueForType(field.type);
-    } else if (field.type === 'range') {
-      // Para range, resetear a null
+    } else if (field.type === 'range' || field.type === 'dateRange') {
+      // Para range/dateRange, resetear a null
       newAppliedFilters[key] = { min: null, max: null };
     } else if (field.type === 'search') {
       // Para search, limpiar
@@ -179,36 +180,21 @@ export default function FilterBarBase({
 
   // Generar chips
   const chips = useMemo(() => {
-    console.log('🔍 Generando chips. appliedFilters:', appliedFilters);
-    
     // Si hay un formateador personalizado, usarlo
-    if (chipsFormatter) {
-      const customChips = chipsFormatter(appliedFilters, catalogs);
-      console.log('✅ Chips generados por formatter:', customChips);
-      return customChips;
-    }
+    if (chipsFormatter) return chipsFormatter(appliedFilters, catalogs);
     
     // Fallback a la lógica por defecto
     const result = fields
       .map(field => {
         const value = appliedFilters[field.id];
-        console.log(`🔍 Campo ${field.id}:`, value);
-        
-        // Verificar si el valor está vacío según el tipo de campo
         let isEmpty = false;
-        if (!value) {
-          isEmpty = true;
-        } else if (Array.isArray(value) && value.length === 0) {
-          isEmpty = true;
-        } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
+        if (!value) isEmpty = true;
+        else if (Array.isArray(value) && value.length === 0) isEmpty = true;
+        else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
           isEmpty = true;
         }
-        
-        if (isEmpty) {
-          console.log(`🔍 Campo ${field.id} descartado (valor vacío)`);
-          return null;
-        }
-        
+        if (isEmpty) return null;
+
         let label = '';
         if (field.type === 'multiSelect' && Array.isArray(value)) {
           label = `${field.label}: ${value.join(', ')}`;
@@ -225,13 +211,9 @@ export default function FilterBarBase({
         } else if (field.type === 'search' && value) {
           label = `${field.label}: "${value}"`;
         }
-        
-        console.log(`🔍 Campo ${field.id} generó chip:`, label);
         return label ? { id: field.id, label, value } : null;
       })
       .filter(Boolean);
-    
-    console.log('🔍 Chips generados:', result);
     return result;
   }, [appliedFilters, fields, chipsFormatter, catalogs]);
 
@@ -239,7 +221,6 @@ export default function FilterBarBase({
   const bodyRef = useRef(null);
   const topRef = useRef(null);
   useModalSheet(open, bodyRef, topRef);
-
 
   const modal = open && createPortal(
     <div
@@ -264,7 +245,10 @@ export default function FilterBarBase({
 
         <div className="fb-sheet-body" ref={bodyRef}>
           <div className="fb-body-top" ref={topRef}>
-            {fields.filter(field => field.type !== 'search' && field.type !== 'range').map(field => (
+            {/* ⬇️ Aquí va SOLO lo que NO es búsqueda ni rangos (numéricos o de fecha) */}
+            {fields
+              .filter(field => field.type !== 'search' && field.type !== 'range' && field.type !== 'dateRange')
+              .map(field => (
               <section key={field.id} className="fb-section">
                 <div className="fb-sec-head">
                   <h4>{field.label}</h4>
@@ -346,7 +330,6 @@ export default function FilterBarBase({
             ))}
           </div>
         </div>
-
           <div className="fb-sheet-footer is-green">
             <div className="fb-btn-group">
               <button className="fb-btn fb-btn--danger" onClick={clear}>Borrar todo</button>
