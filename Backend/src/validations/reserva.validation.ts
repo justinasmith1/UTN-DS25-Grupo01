@@ -41,11 +41,14 @@ export const createReservaSchema = z.object({
   - Es parcial (no obligo a mandar todo).
   - PERO no permito body vacío: si viene {}, corto con 400.
 */
-export const updateReservaSchema = createReservaSchema
-  .partial()
-  .refine((obj) => Object.keys(obj).length > 0, {
-    message: 'Debes enviar al menos un campo para actualizar',
-  });
+export const updateReservaSchema = z.object({
+  fechaReserva: isoDate.optional(),                 
+  loteId: idInt.optional(),                         // FK obligatoria
+  clienteId: idInt.optional(),                      // FK obligatoria
+  inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
+  sena: dinero.optional(), 
+  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
+  })
 
 /*  Parametros comunes (/:idReserva)
   -------------------------------
@@ -62,6 +65,7 @@ export const deleteReservaParamsSchema = getReservaParamsSchema;
 export const queryReservasSchema = z.object({
   desde: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "desde" inválida').optional(),
   hasta: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "hasta" inválida').optional(),
+  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
   loteId: idInt.optional(),
   clienteId: idInt.optional(),
   inmobiliariaId: idInt.optional(),

@@ -198,3 +198,10 @@ export async function deleteLote(id: number, role?: string): Promise<DeleteLoteR
   await prisma.lote.delete({ where: { id: id } });
   return { message: 'Lote eliminado correctamente' };
 }
+
+export async function updateLoteState(id: number, newState: EstadoLoteDto): Promise<Lote> {
+  return prisma.lote.update({
+    where: { id },
+    data: { estado: estadoLoteToPrisma(newState) },
+  });
+}
