@@ -5,7 +5,8 @@
 // - fromApi / toApi: mapean nombres.
 // - list(): usa normalizador para entregar { data, meta } consistente.
 
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
+// Usar mock SOLO en desarrollo y controlado por su propio flag
+const USE_MOCK = import.meta.env.VITE_VENTAS_USE_MOCK;
 import { http, normalizeApiListResponse } from "../http/http";
 
 const PRIMARY = "/Ventas";
@@ -63,7 +64,6 @@ async function fetchWithFallback(path, options) {
 }
 
 /* ----------------------------- MODO MOCK ----------------------------- */
-/*
 let VENTAS = [];
 let seeded = false;
 const nextId = () => `V${String(VENTAS.length + 1).padStart(3, "0")}`;
@@ -110,7 +110,7 @@ async function mockGetById(id)        { ensureSeed(); return ok(VENTAS.find((v) 
 async function mockCreate(payload)     { ensureSeed(); const row = fromApi({ ...toApi(payload), id: nextId() }); VENTAS.unshift(row); return ok(row); }
 async function mockUpdate(id, payload) { ensureSeed(); const idx = VENTAS.findIndex((v) => String(v.id) === String(id)); if (idx < 0) throw new Error("Venta no encontrada"); const row = { ...VENTAS[idx], ...fromApi(toApi(payload)) }; VENTAS[idx] = row; return ok(row); }
 async function mockDelete(id)          { ensureSeed(); const i = VENTAS.findIndex((v) => String(v.id) === String(id)); if (i < 0) throw new Error("Venta no encontrada"); VENTAS.splice(i, 1); return ok(true); }
-*/
+
 /* ------------------------------ MODO API ------------------------------ */
 async function apiGetAll(params = {}) {
   const res = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
@@ -153,15 +153,8 @@ async function apiDelete(id) {
 }
 
 /* --------------------------- EXPORT PÚBLICO --------------------------- */
-/*export function getAllVentas(params)  { return USE_MOCK ? mockGetAll(params)  : apiGetAll(params); }
+export function getAllVentas(params)  { return USE_MOCK ? mockGetAll(params)  : apiGetAll(params); }
 export function getVentaById(id)      { return USE_MOCK ? mockGetById(id)     : apiGetById(id); }
 export function createVenta(payload)  { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
 export function updateVenta(id,data)  { return USE_MOCK ? mockUpdate(id,data) : apiUpdate(id,data); }
 export function deleteVenta(id)       { return USE_MOCK ? mockDelete(id)      : apiDelete(id); }
-*/
-
-export function getAllVentas(params)  { return apiGetAll(params); }
-export function getVentaById(id)      { return apiGetById(id); }
-export function createVenta(payload)  { return apiCreate(payload); }
-export function updateVenta(id,data)  { return apiUpdate(id,data); }
-export function deleteVenta(id)       { return apiDelete(id); }
