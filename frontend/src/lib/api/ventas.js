@@ -6,7 +6,8 @@
 // - list(): usa normalizador para entregar { data, meta } consistente.
 
 // Usar mock SOLO en desarrollo y controlado por su propio flag
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK;
+const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
+console.log("Ventas API - USO DE MOCK:", USE_MOCK);
 import { http, normalizeApiListResponse } from "../http/http";
 
 const PRIMARY = "/Ventas";
