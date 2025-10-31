@@ -43,6 +43,7 @@ export default function ModulePills() {
       { label: 'Descargar Reporte', to: null, disabled: true },
     ],
     personas: [
+      { label: 'Ver Todos', to: '/personas', disabled: false },
       { label: 'Ver Propietarios', to: '/personas?tipo=propietario', disabled: false },
       { label: 'Ver Inquilinos', to: '/personas?tipo=inquilino', disabled: false },
     ],

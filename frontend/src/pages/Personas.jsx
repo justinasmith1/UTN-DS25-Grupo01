@@ -19,6 +19,7 @@ export default function Personas() {
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // Estado de filtros (FilterBarPersonas)
   const [params, setParams] = useState({});
@@ -34,6 +35,22 @@ export default function Personas() {
   const [allPersonas, setAllPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
+
+  useEffect(() => {
+    const tipoParam = searchParams.get('tipo');
+    setParams((prev) => {
+      const hasTipo = Object.prototype.hasOwnProperty.call(prev, 'tipo');
+      if (tipoParam) {
+        if (hasTipo && prev.tipo === tipoParam) return prev;
+        return { ...prev, tipo: tipoParam };
+      }
+      if (hasTipo) {
+        const { tipo, ...rest } = prev;
+        return rest;
+      }
+      return prev;
+    });
+  }, [searchParams]);
 
   // Cargar todas las personas al montar el componente
   useEffect(() => {

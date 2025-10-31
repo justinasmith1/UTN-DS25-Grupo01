@@ -7,8 +7,8 @@ import { Form, Button, Card, InputGroup } from "react-bootstrap";
 import { Eye, EyeOff } from 'lucide-react';
 
 
-const BG_IMAGE = "https://scontent.flpg4-1.fna.fbcdn.net/v/t39.30808-6/480893835_583561564664531_859314170647179816_n.jpg?_nc_cat=110&ccb=1-7&_nc_sid=cc71e4&_nc_eui2=AeGEvXWJEfKO4Fb4apddzIL355abZWXOtYPnlptlZc61gzQ18aadYc15q-DHxa3TnbNDS7aSUQvOcysYVMUTsNi5&_nc_ohc=uVWW53zum4wQ7kNvwHsZE4q&_nc_oc=AdkhqPJf8oATNfq-tQuygNWxz9dkqLQnU88uP_UMKdeZXFI2N7SLjwOn0DIauWnTQuG6nImR8YbAzGZWDETgCIHk&_nc_zt=23&_nc_ht=scontent.flpg4-1.fna&_nc_gid=Gtw6PpxBIai_VMhDdnSKfA&oh=00_Afa5JsDmrKkU1eI0DLGqu8NJCsjYMCJ_JnEszXMUNOHyoA&oe=68DB9302"; // <- poné tu imagen
-const LOGO_IMAGE = null; // opcional: "/ruta/a/tu/logo.png"
+const BG_IMAGE = "src/assets/La-Federala-Club-de-Campo-Lobos-Home-11.jpg"; // opcional: "/ruta/a/tu/fondo.jpg"
+const LOGO_IMAGE = "src/assets/logoCompleto.png"; // opcional: "/ruta/a/tu/logo.png"
 
 export default function Login() {
   const { login } = useAuth();
@@ -141,7 +141,7 @@ const css = `
   color:var(--lf-text);
 }
 
-.lf-logo{ height:48px; object-fit:contain; }
+.lf-logo{ height:96px; object-fit:contain; }
 .lf-wordmark{ line-height:1; text-align:center; }
 .lf-brand{ font-family:Georgia, 'Times New Roman', serif; font-weight:600; font-size:28px; letter-spacing:.3px; }
 .lf-sub{ font-size:12px; opacity:.9; margin-top:4px; }
