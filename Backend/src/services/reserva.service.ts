@@ -146,6 +146,11 @@ export async function updateReserva(
         ...(body.estado !== undefined ? { estado: body.estado } : {}),
       },
     });
+
+    if (body.estado !== undefined && body.estado === EstadoReserva.CANCELADA) {
+      // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
+      await updateLoteState(row.loteId, 'Disponible'); 
+    }
     return row;
   } catch (e) {
     throw mapPrismaError(e);
