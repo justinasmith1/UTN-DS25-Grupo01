@@ -17,6 +17,38 @@ export function visibleModulesForUser(user) {
   return Object.entries(MODULES).filter(([_, perm]) => can(user, perm));
 }
 
+// ----------------------------------------------------
+// 1.1) Permisos requeridos por ruta protegida
+// ----------------------------------------------------
+// Nota: usamos beginsWith para admitir subrutas (/ventas/123, etc.)
+const ROUTE_PERMISSION_MAP = [
+  { test: (path) => path === '/' || path === '/dashboard', permission: null },
+  { test: (path) => path.startsWith('/ventas'), permission: PERMISSIONS.SALE_ACCESS },
+  { test: (path) => path.startsWith('/reservas'), permission: PERMISSIONS.RES_ACCESS },
+  { test: (path) => path.startsWith('/inmobiliarias'), permission: PERMISSIONS.AGENCY_ACCESS },
+  { test: (path) => path.startsWith('/personas'), permission: PERMISSIONS.PEOPLE_ACCESS },
+  { test: (path) => path.startsWith('/reportes'), permission: PERMISSIONS.REPORTS_ACCESS },
+  { test: (path) => path.startsWith('/map'), permission: PERMISSIONS.REPORTS_ACCESS }, // mapa hoy reservado
+];
+
+function normalizePath(path) {
+  if (!path) return '/';
+  const [clean] = path.split(/[?#]/); // quitamos query/hash
+  return clean || '/';
+}
+
+export function requiredPermissionForRoute(pathname) {
+  const normalized = normalizePath(pathname);
+  const found = ROUTE_PERMISSION_MAP.find((entry) => entry.test(normalized));
+  return found ? found.permission : null;
+}
+
+export function userCanAccessRoute(user, pathname) {
+  const perm = requiredPermissionForRoute(pathname);
+  if (!perm) return true; // ruta sin restricción extra (igual requiere sesión)
+  return can(user, perm);
+}
+
 // ======================================================
 // 2) Acciones del tablero de Lotes (botones por fila)
 // ======================================================

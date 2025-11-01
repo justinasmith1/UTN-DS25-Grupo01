@@ -6,6 +6,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { apiLogin } from "../../lib/auth/api";
 import { getAccessToken, clearTokens } from "../../lib/auth/token";
+import { userCanAccessRoute } from "../../lib/auth/rbac.ui";
 
 const AuthCtx = createContext(null);
 
@@ -47,7 +48,8 @@ export function AuthProvider({ children }) {
       localStorage.setItem(USER_KEY, JSON.stringify(me || {}));
 
       const from = location.state?.from || "/";
-      navigate(from, { replace: true });
+      const next = userCanAccessRoute(me, from) ? from : "/";
+      navigate(next, { replace: true });
     } catch (error) {
       // Si el error viene del backend (status 401, 403, etc.), es credenciales incorrectas
       if (error.status && (error.status === 401 || error.status === 403)) {
