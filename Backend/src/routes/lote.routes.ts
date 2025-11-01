@@ -46,9 +46,8 @@ router.put(
 router.delete(
     '/:id',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    authorize('ADMINISTRADOR'),
     validateParams(deleteLoteSchema),
-    checkLoteStatusForTecnico,
     loteController.eliminarLote);
 
 export const loteRoutes = router;
