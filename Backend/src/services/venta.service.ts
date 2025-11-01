@@ -1,12 +1,15 @@
 import prisma from '../config/prisma';
-import { Venta } from '../generated/prisma';
+import { Venta, EstadoReserva } from '../generated/prisma';
 import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
+import { updateLoteState } from './lote.service';
+
 
 export async function getAllVentas(): Promise<Venta[]> {
     const ventas = await prisma.venta.findMany({
         include: { comprador: true }, // Incluir datos del comprador
         orderBy: { id: 'asc' }, // Ordenar por idVenta de forma ascendente
     });
+
     return ventas;
 }
 
@@ -30,10 +33,41 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     const loteExists = await prisma.lote.findUnique({
         where: { id: data.loteId },
     });
+
     if (!loteExists) {
         const error = new Error('Lote no encontrado');
         (error as any).statusCode = 404;
         throw error;
+    }
+    if (loteExists.estado === 'VENDIDO') {
+        const error = new Error('El lote ya está vendido');
+        (error as any).statusCode = 400;
+        throw error;
+    }
+    if (loteExists.estado == 'NO_DISPONIBLE') {
+        const error = new Error('El lote no está disponible para la venta');
+        (error as any).statusCode = 400;
+        throw error;
+    }
+    // Obtener la reserva asociada al lote (si existe y está aceptada)
+    const reserva = await prisma.reserva.findFirst({
+      where: {
+        loteId: data.loteId,
+        estado: EstadoReserva.ACEPTADA,
+      },
+    });
+
+    // Si hay una reserva ACEPTADA, validar los datos
+    if (reserva) {
+        if (reserva.inmobiliariaId) {
+            if (reserva.inmobiliariaId !== data.inmobiliariaId) {
+                throw new Error("La inmobiliaria de la venta no coincide con la de la reserva.");
+            }
+        } 
+      
+      if (reserva.clienteId !== data.compradorId) {
+        throw new Error("El cliente de la venta no coincide con el de la reserva.");
+      }
     }
 
     const compradorExists = await prisma.persona.findUnique({
@@ -59,7 +93,20 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         },
         include: { comprador: true }, // Incluir datos del comprador
     });
-    return newVenta;   
+
+    // Actualizar el estado del lote a "VENDIDO"
+    if (loteExists.estado == 'DISPONIBLE' || loteExists.estado == 'RESERVADO'){
+        await updateLoteState(data.loteId, 'Vendido');
+    }
+    // Asgignar la reservaId si existe una reserva ACEPTADA
+    if (reserva) {
+        await prisma.venta.update({
+        where: { id: newVenta.id },
+        data: { reservaId: reserva.id },
+      });
+    }
+
+    return newVenta;   // En lo que devuelve, no incluye idReserva, cuando vas a buscar una venta, si incluye idReserva.
 }
 
 export async function updateVenta(id: number, updateData: PutVentaRequest): Promise<Venta> {

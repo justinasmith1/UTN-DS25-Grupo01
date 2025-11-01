@@ -217,6 +217,7 @@ export interface PostVentaRequest {
     tipoPago: string;
     compradorId: number;  
     inmobiliariaId?: number;
+    reservaId?: number;
     createdAt?: DateTime;
     updateAt?: DateTime;
 } 

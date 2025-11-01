@@ -1,7 +1,8 @@
 // src/services/reserva.service.ts
 import prisma from '../config/prisma'; 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { EstadoReserva } from '../generated/prisma';
+import { EstadoLote, EstadoReserva } from '../generated/prisma';
+import { updateLoteState } from './lote.service';
 
 // Esto es un mapper de errores de Prisma a errores HTTP para no tenes que hacerlo en cada funcion
 // -------------------------------------
@@ -92,6 +93,14 @@ export async function createReserva(body: {
   sena?: number;                  // Zod ya garantiza >= 0 si viene
 }): Promise<any> {
   try {
+    const lote = await prisma.lote.findUnique({ where: { id: body.loteId } });
+    if (!lote) {
+      throw new Error("Lote no encontrado.");
+    }
+    if (lote.estado !== EstadoLote.DISPONIBLE) {
+      throw new Error("El lote no está disponible para reservar.");
+    }
+
     const row = await prisma.reserva.create({
       data: {
         fechaReserva: new Date(body.fechaReserva), // ISO -> Date
@@ -101,8 +110,10 @@ export async function createReserva(body: {
         // Para Decimal no necesito new Decimal: Prisma acepta number|string
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
-      },
-    });
+      },});
+
+    // Cambiar el estado del lote asociado a "RESERVADO"
+    await updateLoteState (body.loteId, 'Reservado'); 
     return row;
   } catch (e) {
     throw mapPrismaError(e);
@@ -135,6 +146,11 @@ export async function updateReserva(
         ...(body.estado !== undefined ? { estado: body.estado } : {}),
       },
     });
+
+    if (body.estado !== undefined && body.estado === EstadoReserva.CANCELADA) {
+      // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
+      await updateLoteState(row.loteId, 'Disponible'); 
+    }
     return row;
   } catch (e) {
     throw mapPrismaError(e);
