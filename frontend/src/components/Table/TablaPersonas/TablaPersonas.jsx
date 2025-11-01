@@ -126,6 +126,7 @@ const TablaPersonas = ({
       <TablaBase
         rows={personas}
         columns={personasTablePreset.columns}
+        widthFor={personasTablePreset.widthFor}
         renderRowActions={renderRowActions}
         toolbarRight={topActions}
         selected={selectedIds}
