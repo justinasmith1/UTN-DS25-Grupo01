@@ -7,8 +7,17 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarInmobiliarias from "../components/FilterBar/FilterBarInmobiliarias";
 import TablaInmobiliarias from "../components/Table/TablaInmobiliarias/TablaInmobiliarias";
-import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
+import { 
+  getAllInmobiliarias,
+  getInmobiliariaById,
+  updateInmobiliaria,
+  deleteInmobiliaria
+} from "../lib/api/inmobiliarias";
 import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
+
+import InmobiliariaVerCard from "../components/Cards/Inmobiliarias/InmobiliariaVerCard.jsx";
+import InmobiliariaEditarCard from "../components/Cards/Inmobiliarias/InmobiliariaEditarCard.jsx";
+import InmobiliariaEliminarDialog from "../components/Cards/Inmobiliarias/InmobiliariaEliminarDialog.jsx";
 
 export default function Inmobiliarias() {
   const { user } = useAuth();
@@ -34,16 +43,9 @@ export default function Inmobiliarias() {
     (async () => {
       try {
         setLoading(true);
-        console.log('🔍 Cargando inmobiliarias desde API...');
         const res = await getAllInmobiliarias({});
-        console.log('📊 Respuesta completa de API:', res);
-        console.log('📊 Tipo de respuesta:', typeof res);
-        console.log('📊 Keys de respuesta:', Object.keys(res));
         if (alive) { 
           const data = res.data || [];
-          console.log('📋 Datos de inmobiliarias:', data);
-          console.log('📋 Cantidad de inmobiliarias:', data.length);
-          console.log('📋 Primer elemento:', data[0]);
           setAllInmobiliarias(data); 
         }
       } catch (err) {
@@ -64,14 +66,11 @@ export default function Inmobiliarias() {
 
   // Aplicar filtros localmente
   const inmobiliarias = useMemo(() => {
-    console.log('🔄 Aplicando filtros. allInmobiliarias:', allInmobiliarias.length, 'params:', params);
     const hasParams = params && Object.keys(params).length > 0;
     try {
-      const result = hasParams ? applyInmobiliariaFilters(allInmobiliarias, params) : allInmobiliarias;
-      console.log('✅ Resultado filtrado:', result.length, 'inmobiliarias');
-      return result;
+      return hasParams ? applyInmobiliariaFilters(allInmobiliarias, params) : allInmobiliarias;
     } catch (err) {
-      console.error('❌ Error aplicando filtros:', err);
+      console.error('Error aplicando filtros:', err);
       return allInmobiliarias;
     }
   }, [allInmobiliarias, params]);
@@ -79,30 +78,93 @@ export default function Inmobiliarias() {
   // Estado de selección - TablaBase espera array de IDs (strings)
   const [selectedRows, setSelectedRows] = useState([]);
   const handleSelectionChange = useCallback((selection) => {
-    console.log('🔄 Cambio de selección:', selection);
     setSelectedRows(selection);
   }, []);
 
-  // Acciones de la tabla
+  // Modales/cards
+  const [inmobiliariaSel, setInmobiliariaSel] = useState(null);
+  const [openVer, setOpenVer] = useState(false);
+  const [openEditar, setOpenEditar] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Ver: abre con la fila y luego refina con getInmobiliariaById(id) para traer fechas/etc.
+  const handleVerInmobiliaria = useCallback((inmobiliaria) => {
+    if (!inmobiliaria) return;
+    setInmobiliariaSel(inmobiliaria);
+    setOpenVer(true);
+
+    (async () => {
+      try {
+        const resp = await getInmobiliariaById(inmobiliaria.id);
+        const detail = resp?.data ?? resp ?? {};
+        setInmobiliariaSel((prev) => ({ ...(prev || inmobiliaria), ...(detail || {}) }));
+      } catch (e) {
+        console.error("Error obteniendo inmobiliaria por id:", e);
+      }
+    })();
+  }, []);
+
+  // Editar: abre siempre y carga datos completos
+  const handleEditarInmobiliaria = useCallback((inmobiliaria) => {
+    if (!inmobiliaria) return;
+    setInmobiliariaSel(inmobiliaria);
+    setOpenEditar(true);
+
+    // Cargar datos completos
+    (async () => {
+      try {
+        const resp = await getInmobiliariaById(inmobiliaria.id);
+        const detail = resp?.data ?? resp ?? {};
+        setInmobiliariaSel({ ...(inmobiliaria || {}), ...(detail || {}) });
+      } catch (e) {
+        console.error("Error obteniendo inmobiliaria por id para editar:", e);
+      }
+    })();
+  }, []);
+
+  const handleEliminarInmobiliaria = useCallback((inmobiliaria) => {
+    setInmobiliariaSel(inmobiliaria);
+    setOpenEliminar(true);
+  }, []);
+
   const handleAgregarInmobiliaria = useCallback(() => {
     // TODO: Implementar modal de creación
     console.log('Agregar inmobiliaria');
   }, []);
 
-  const handleEditarInmobiliaria = useCallback((inmobiliaria) => {
-    // TODO: Implementar modal de edición
-    console.log('Editar inmobiliaria:', inmobiliaria);
-  }, []);
+  // PUT (Editar) - recibe el objeto actualizado completo del componente
+  const handleSave = useCallback(
+    async (updatedInmobiliaria) => {
+      if (!updatedInmobiliaria?.id) return;
+      try {
+        // La inmobiliaria actualizada ya viene completa del backend
+        // Actualizar la lista con la inmobiliaria actualizada
+        setAllInmobiliarias((prev) => prev.map((i) => (i.id === updatedInmobiliaria.id ? updatedInmobiliaria : i)));
+        setInmobiliariaSel(updatedInmobiliaria);
+      } catch (e) {
+        console.error("Error actualizando inmobiliaria:", e);
+      }
+    },
+    []
+  );
 
-  const handleEliminarInmobiliaria = useCallback((inmobiliaria) => {
-    // TODO: Implementar confirmación y eliminación
-    console.log('Eliminar inmobiliaria:', inmobiliaria);
-  }, []);
-
-  const handleVerInmobiliaria = useCallback((inmobiliaria) => {
-    // TODO: Implementar modal de visualización
-    console.log('Ver inmobiliaria:', inmobiliaria);
-  }, []);
+  // DELETE (Eliminar)
+  const handleDelete = useCallback(async () => {
+    if (!inmobiliariaSel?.id) return;
+    try {
+      setDeleting(true);
+      await deleteInmobiliaria(inmobiliariaSel.id);
+      setAllInmobiliarias((prev) => prev.filter((i) => i.id !== inmobiliariaSel.id));
+      setOpenEliminar(false);
+    } catch (e) {
+      console.error("Error eliminando inmobiliaria:", e);
+      alert(e?.message || "No se pudo eliminar la inmobiliaria.");
+    } finally {
+      setDeleting(false);
+    }
+  }, [inmobiliariaSel]);
 
   // Verificar permisos
   const canView = can(user, PERMISSIONS.AGENCY_VIEW);
@@ -121,9 +183,6 @@ export default function Inmobiliarias() {
       </>
     );
   }
-
-  // Debug logs
-  console.log('🏢 Inmobiliarias render - loading:', loading, 'data length:', inmobiliarias.length, 'user:', user?.role);
 
   // Mostrar loading mientras se cargan los datos
   if (loading) {
@@ -151,9 +210,51 @@ export default function Inmobiliarias() {
         onAgregarInmobiliaria={canCreate ? handleAgregarInmobiliaria : undefined}
         onEditarInmobiliaria={canEdit ? handleEditarInmobiliaria : undefined}
         onEliminarInmobiliaria={canDelete ? handleEliminarInmobiliaria : undefined}
-        onVerInmobiliaria={handleVerInmobiliaria}
+        onVerInmobiliaria={canView ? handleVerInmobiliaria : undefined}
         selectedRows={selectedRows}
         onSelectionChange={handleSelectionChange}
+      />
+
+      {/* Modales */}
+      <InmobiliariaVerCard 
+        open={openVer} 
+        inmobiliaria={inmobiliariaSel} 
+        inmobiliarias={allInmobiliarias}
+        onClose={() => setOpenVer(false)}
+        onEdit={(inmobiliaria) => {
+          setOpenVer(false);
+          // Abrir el modal de editar con la misma inmobiliaria
+          setInmobiliariaSel(inmobiliaria);
+          setOpenEditar(true);
+          
+          // Cargar datos completos
+          (async () => {
+            try {
+              const resp = await getInmobiliariaById(inmobiliaria.id);
+              const detail = resp?.data ?? resp ?? {};
+              setInmobiliariaSel({ ...(inmobiliaria || {}), ...(detail || {}) });
+            } catch (e) {
+              console.error("Error obteniendo inmobiliaria por id para editar:", e);
+            }
+          })();
+        }}
+      />
+
+      <InmobiliariaEditarCard
+        key={inmobiliariaSel?.id} // Forzar re-render cuando cambia la inmobiliaria
+        open={openEditar}
+        inmobiliaria={inmobiliariaSel}
+        inmobiliarias={allInmobiliarias}
+        onCancel={() => setOpenEditar(false)}
+        onSaved={handleSave}
+      />
+
+      <InmobiliariaEliminarDialog
+        open={openEliminar}
+        inmobiliaria={inmobiliariaSel}
+        loading={deleting}
+        onCancel={() => setOpenEliminar(false)}
+        onConfirm={handleDelete}
       />
     </>
   );

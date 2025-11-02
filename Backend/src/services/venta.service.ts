@@ -147,7 +147,11 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
         const updatedVenta = await prisma.venta.update({
             where: { id }, 
             data: updateData,
-            include: { comprador: true }, // Incluir datos del comprador
+            include: { 
+                comprador: true, 
+                lote: { include: { propietario: true } }, 
+                inmobiliaria: true 
+            }, // Incluir todas las relaciones como en getVentaById
         });
         return updatedVenta;
     } catch (e: any) {

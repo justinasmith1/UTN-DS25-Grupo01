@@ -48,7 +48,7 @@
 }
 
 .c-header-danger {
-  background: #fcbdbd;
+  background: #ffdddd;
   border-bottom: 1px solid #f2b1b1;
 }
 
@@ -63,7 +63,6 @@
 /* ========================================================================
    CLOSE (reutilizado del VerCard)
    ======================================================================== */
-.cclose{} /* (placeholder por compatibilidad) */
 
 .cclf-btn-close {
   width: 35px;
@@ -175,6 +174,7 @@
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(40,73,175,.22);
 }
+
 
 /* Outline (Restablecer) */
 .btn-outline {
@@ -349,23 +349,27 @@ select.field-input {
 .ns-item:hover{ background: #f3f4f6; }
 .ns-item.is-active{ background: #e9efff; }
 
-/* NiceSelect: que NO se corte y el menú tenga un ancho cómodo */
-.field-value.p0 { overflow: visible; }
-
 .ns-wrap { position: relative; }
 
 .ns-trigger{
   width:100%;
   min-height:44px;
   display:flex; align-items:center;
-  padding:8px 40px 8px 12px;    /* espacio para el chevron a la derecha */
+  padding:8px 12px;               /* padding uniforme, el chevron va absolutamente */
   border-radius:8px;
   background:#fff; border:none; outline:none;
   cursor:pointer; font:inherit; color:#111827;
   position:relative;
 }
 .ns-trigger svg{
-  position:absolute; right:12px; top:50%; transform:translateY(-50%);
+  position:absolute; right:6px; top:53%; transform:translateY(-50%);
+  pointer-events: none;           /* no interfiere con el click */
+}
+.ns-trigger span{
+  overflow: hidden;               /* evita que el texto sobresalga */
+  text-overflow: ellipsis;        /* ... si es muy largo */
+  white-space: nowrap;            /* no se corta en varias líneas */
+  padding-right: 32px;            /* espacio para el chevron */
 }
 
 .ns-list{
@@ -385,3 +389,37 @@ select.field-input {
 }
 .ns-item:hover{ background:#f3f4f6; }
 .ns-item.is-active{ background:#e9efff; }
+
+/* ========================================================================
+   ANIMACIONES DE ÉXITO (para VentaEditarCard)
+   ======================================================================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+

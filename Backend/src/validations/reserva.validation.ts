@@ -46,9 +46,14 @@ export const updateReservaSchema = z.object({
   loteId: idInt.optional(),                         // FK obligatoria
   clienteId: idInt.optional(),                      // FK obligatoria
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
-  sena: dinero.optional(), 
+  sena: dinero.optional().nullable(), // Permitir null para eliminar la seña
   estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
-  })
+}).refine((data) => {
+  // Asegurar que al menos un campo está presente
+  return Object.keys(data).length > 0;
+}, {
+  message: 'Debes enviar al menos un campo para actualizar',
+});
 
 /*  Parametros comunes (/:idReserva)
   -------------------------------

@@ -23,7 +23,33 @@ function toDateInputValue(v) {
   return `${yyyy}-${mm}-${dd}`;
 }
 function fromDateInputToISO(s) {
-  return s ? new Date(`${s}T00:00:00.000Z`).toISOString() : null;
+  if (!s || !s.trim()) return null;
+  // El backend espera un string ISO válido
+  // Formato de entrada: YYYY-MM-DD (del input type="date")
+  const date = new Date(`${s}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
+}
+
+/* -------------------------- Helper dinero (como VerVentaCard) -------------------------- */
+function fmtMoney(val) {
+  const NA = "Sin información";
+  const isBlank = (v) =>
+    v === null ||
+    v === undefined ||
+    (typeof v === "string" && v.trim().length === 0);
+  
+  if (isBlank(val)) return NA;
+  const n =
+    typeof val === "number"
+      ? val
+      : Number(String(val).replace(/[^\d.-]/g, ""));
+  if (!isFinite(n)) return NA;
+  return n.toLocaleString("es-AR", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
 }
 
 /* ----------------------- Select custom sin librerías ----------------------- */
@@ -92,6 +118,7 @@ export default function VentaEditarCard({
   onCancel,
   onSaved,
   inmobiliarias: propsInmob = [], // opcional
+  entityType = "Venta",    // tipo de entidad para el mensaje de éxito (Venta, Reserva, etc.)
 }) {
   /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
   const [detalle, setDetalle] = useState(venta || null);
@@ -105,43 +132,73 @@ export default function VentaEditarCard({
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
 
-  /* 2) GET de venta al abrir (igual patrón que VerCard) */
+  /* 2) GET de venta al abrir y cuando cambia la prop venta (igual patrón que VerCard) */
   useEffect(() => {
     let abort = false;
     async function run() {
       if (!open) return;
 
-      if (venta) { setDetalle(venta); return; }
+      // Si viene venta por props, usarla (esto se ejecuta también cuando venta cambia)
+      if (venta) { 
+        setDetalle(venta); 
+        return; 
+      }
 
       if (ventaId != null && Array.isArray(ventas)) {
         const found = ventas.find(v => `${v.id}` === `${ventaId}`);
-        if (found) { setDetalle(found); return; }
+        if (found) { 
+          setDetalle(found); 
+          return; 
+        }
       }
 
       if (ventaId != null) {
         try {
-          const full = await getVentaById(ventaId);
-          if (!abort) setDetalle(full);
+          const response = await getVentaById(ventaId);
+          const full = response?.data ?? response;
+          if (!abort && full) setDetalle(full);
         } catch (e) {
-          console.error("getVentaById failed:", e);
+          console.error("Error obteniendo venta por id:", e);
         }
       }
     }
     run();
     return () => { abort = true; };
-  }, [open, ventaId, ventas, venta]);
+  }, [open, ventaId, ventas, venta?.id, venta?.monto]); // Agregar venta?.id y venta?.monto para detectar cambios
 
-  /* 3) GET de inmobiliarias UNA sola vez por apertura */
+  /* 3) Resetear estados cuando el modal se cierra o se abre con otra venta */
+  useEffect(() => {
+    if (!open) {
+      fetchedInmobRef.current = false;
+      setSaving(false);
+      setShowSuccess(false);
+    } else {
+      // Resetear estados al abrir con una nueva venta
+      setSaving(false);
+      setShowSuccess(false);
+    }
+  }, [open, detalle?.id]); // Resetear también cuando cambia la venta (detalle.id)
+
+  /* 4) GET de inmobiliarias UNA sola vez por apertura */
   useEffect(() => {
     let abort = false;
 
     function normalizeList(raw) {
-      // Soporta 2 niveles (data.data) o 1 nivel (data)
-      const list =
-        raw?.data?.data?.inmobiliarias ??
-        raw?.data?.inmobiliarias ??
-        raw?.inmobiliarias ??
-        raw ?? [];
+      // getAllInmobiliarias devuelve { data: [...], meta: {...} }
+      let list = [];
+      
+      if (raw?.data && Array.isArray(raw.data)) {
+        list = raw.data;
+      } else if (Array.isArray(raw)) {
+        list = raw;
+      } else if (raw?.data?.data?.inmobiliarias && Array.isArray(raw.data.data.inmobiliarias)) {
+        list = raw.data.data.inmobiliarias;
+      } else if (raw?.data?.inmobiliarias && Array.isArray(raw.data.inmobiliarias)) {
+        list = raw.data.inmobiliarias;
+      } else if (raw?.inmobiliarias && Array.isArray(raw.inmobiliarias)) {
+        list = raw.inmobiliarias;
+      }
+      
       const arr = Array.isArray(list) ? list : [];
       return arr
         .map(x => ({
@@ -156,20 +213,21 @@ export default function VentaEditarCard({
 
       // si vienen por props y tienen longitud, no llamo API
       if (propsInmob && propsInmob.length) {
-        setInmobiliarias(normalizeList(propsInmob));
+        const norm = normalizeList(propsInmob);
+        setInmobiliarias(norm);
         fetchedInmobRef.current = true;
         return;
       }
 
       try {
-        const data = await getAllInmobiliarias();
-        const norm = normalizeList(data);
+        const response = await getAllInmobiliarias({});
+        const norm = normalizeList(response);
         if (!abort) {
           setInmobiliarias(norm);
           fetchedInmobRef.current = true;
         }
       } catch (e) {
-        console.error("getAllInmobiliarias failed:", e);
+        console.error("Error obteniendo inmobiliarias:", e);
         if (!abort) {
           setInmobiliarias([]);
           fetchedInmobRef.current = true;
@@ -181,12 +239,13 @@ export default function VentaEditarCard({
     // importante: solo depende de "open" para no re-ejecutar en cada render
   }, [open, propsInmob]);
 
-  /* 4) STATES EDITABLES derivados de 'detalle' */
+  /* 5) STATES EDITABLES derivados de 'detalle' */
   // Fechas con todos los posibles nombres que vi en tu back
   const fechaVentaISO =
     detalle?.fechaVenta ?? detalle?.fecha_venta ?? null;
+  // Backend usa updateAt (sin 'd'), mapeamos a updatedAt para consistencia
   const fechaActISO =
-    detalle?.updatedAt ?? detalle?.fechaActualizacion ?? null;
+    detalle?.updatedAt ?? detalle?.updateAt ?? detalle?.fechaActualizacion ?? null;
   const fechaCreISO =
     detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
 
@@ -208,6 +267,7 @@ export default function VentaEditarCard({
   const [fechaVenta, setFechaVenta] = useState(base.fechaVenta);
   const [plazoEscritura, setPlazoEscritura] = useState(base.plazoEscritura);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   // re-sync cuando cambia 'detalle' o se reabre
   useEffect(() => {
@@ -219,9 +279,9 @@ export default function VentaEditarCard({
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id]);
+  }, [open, detalle?.id, detalle?.monto]);
 
-  /* 5) ancho de label como en VerCard */
+  /* 6) ancho de label como en VerCard */
   useEffect(() => {
     const labels = [
       "LOTE N°","MONTO","ESTADO DE VENTA","INMOBILIARIA","COMPRADOR","PROPIETARIO",
@@ -232,7 +292,7 @@ export default function VentaEditarCard({
     setLabelW(computed);
   }, [open, detalle?.id]);
 
-  /* 6) Guardado (PATCH minimal y validado) */
+  /* 7) Guardado (PATCH minimal y validado) */
   function buildPatch() {
     const patch = {};
 
@@ -257,7 +317,10 @@ export default function VentaEditarCard({
 
     const prevPE = toDateInputValue(detalle?.plazoEscritura);
     if (prevPE !== plazoEscritura) {
-      patch.plazoEscritura = plazoEscritura ? fromDateInputToISO(plazoEscritura) : null;
+      // Si el campo está vacío, enviamos null; si tiene valor, lo convertimos a ISO
+      patch.plazoEscritura = plazoEscritura && plazoEscritura.trim() !== "" 
+        ? fromDateInputToISO(plazoEscritura) 
+        : null;
     }
 
     const prevInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
@@ -272,15 +335,30 @@ export default function VentaEditarCard({
     try {
       setSaving(true);
       const patch = buildPatch();
-      if (Object.keys(patch).length === 0) { onCancel?.(); return; }
-      const updated = await updateVenta(detalle.id, patch);
-      onSaved?.(updated);
-      onCancel?.();
+      
+      if (Object.keys(patch).length === 0) { 
+        setSaving(false);
+        onCancel?.(); 
+        return; 
+      }
+      
+      const response = await updateVenta(detalle.id, patch);
+      const updated = response?.data ?? response;
+      
+      // Mostrar animación de éxito
+      setShowSuccess(true);
+      
+      // Esperar un momento para mostrar la animación antes de cerrar
+      setTimeout(() => {
+        setShowSuccess(false);
+        setSaving(false);
+        onSaved?.(updated);
+        onCancel?.();
+      }, 1500);
     } catch (e) {
       console.error("Error guardando venta:", e);
-      alert(e?.message || "No se pudo guardar la venta.");
-    } finally {
       setSaving(false);
+      alert(e?.message || "No se pudo guardar la venta.");
     }
   }
 
@@ -293,7 +371,7 @@ export default function VentaEditarCard({
     setInmobiliariaId(base.inmobiliariaId);
   }
 
-  /* 7) Render */
+  /* 8) Render */
   const NA = "Sin información";
 
   const compradorNombre = (() => {
@@ -329,14 +407,84 @@ export default function VentaEditarCard({
   if (!open || !detalle) return null;
 
   return (
-    <EditarBase
-      open={open}
-      title={`Venta N° ${detalle?.id ?? "—"}`}
-      onCancel={onCancel}
-      onSave={handleSave}
-      onReset={handleReset}
-      saving={saving}
-    >
+    <>
+      {/* Animación de éxito */}
+      {showSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 3000,
+            animation: "fadeIn 0.2s ease-in",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "32px 48px",
+              borderRadius: "12px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "#10b981",
+                display: "grid",
+                placeItems: "center",
+                animation: "checkmark 0.5s ease-in-out",
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "20px",
+                  fontWeight: 600,
+                  color: "#111",
+                }}
+              >
+                ¡{entityType} guardada exitosamente!
+              </h3>
+          </div>
+        </div>
+      )}
+
+      <EditarBase
+        open={open}
+        title={`Venta N° ${detalle?.id ?? "—"}`}
+        onCancel={() => {
+          // Siempre resetear estados antes de cerrar
+          setSaving(false);
+          setShowSuccess(false);
+          onCancel?.();
+        }}
+        onSave={handleSave}
+        onReset={handleReset}
+        saving={saving}
+      >
       {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
       <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
         <h3 className="venta-section-title">Información de la venta</h3>
@@ -351,7 +499,7 @@ export default function VentaEditarCard({
 
             <div className="field-row">
               <div className="field-label">MONTO</div>
-              <div className="field-value p0">
+              <div className="field-value p0" style={{ position: "relative" }}>
                 <input
                   className="field-input"
                   type="number"
@@ -359,7 +507,21 @@ export default function VentaEditarCard({
                   min="0"
                   value={monto}
                   onChange={(e) => setMonto(e.target.value)}
+                  style={{ paddingRight: "50px" }}
                 />
+                {/* Mostrar USD como símbolo al final */}
+                <span style={{ 
+                  position: "absolute", 
+                  right: "12px", 
+                  top: "50%", 
+                  transform: "translateY(-50%)",
+                  color: "#6B7280",
+                  fontSize: "13px",
+                  pointerEvents: "none",
+                  fontWeight: 500
+                }}>
+                  {monto && Number(monto) > 0 ? "USD" : ""}
+                </span>
               </div>
             </div>
 
@@ -450,5 +612,6 @@ export default function VentaEditarCard({
         </div>
       </div>
     </EditarBase>
+    </>
   );
 }

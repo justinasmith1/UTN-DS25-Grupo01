@@ -51,7 +51,7 @@ export default function EditarBase({
               className="btn btn-ghost"
               type="button"
               onClick={onCancel}
-              disabled={saving}
+              // Permitir cancelar incluso si está guardando para evitar que se trabe
             >
               Cancelar
             </button>

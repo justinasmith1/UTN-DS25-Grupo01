@@ -7,8 +7,13 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarReservas from "../components/FilterBar/FilterBarReservas";
 import TablaReservas from "../components/Table/TablaReservas/TablaReservas";
-import { getAllReservas } from "../lib/api/reservas";
+import { getAllReservas, getReservaById, updateReserva, deleteReserva } from "../lib/api/reservas";
+import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
+
+import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
+import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
+import ReservaEliminarDialog from "../components/Cards/Reservas/ReservaEliminarDialog.jsx";
 
 export default function Reservas() {
   const { user } = useAuth();
@@ -17,6 +22,7 @@ export default function Reservas() {
   const [allReservas, setAllReservas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [inmobiliarias, setInmobiliarias] = useState([]);
 
   // Permisos
   const canReservaView = can(user, PERMISSIONS.RES_VIEW);
@@ -40,23 +46,30 @@ export default function Reservas() {
     setParams((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Cargar todas las reservas al montar el componente
+  // Cargar todas las reservas e inmobiliarias al montar el componente
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        console.log('🔍 Cargando reservas desde API...');
-        const res = await getAllReservas({});
+        const [reservasResp, inmosResp] = await Promise.all([
+          getAllReservas({}),
+          getAllInmobiliarias({}),
+        ]);
         
         if (alive) {
-          if (res.success) {
-            setAllReservas(res.data || []);
-            console.log('✅ Reservas cargadas:', res.data?.length || 0);
+          if (reservasResp.success) {
+            const reservasData = reservasResp.data?.reservas ?? reservasResp.data ?? [];
+            setAllReservas(Array.isArray(reservasData) ? reservasData : []);
           } else {
-            error(res.message || 'Error al cargar reservas');
+            error(reservasResp.message || 'Error al cargar reservas');
             setAllReservas([]);
           }
+          
+          // Guardar inmobiliarias para pasarlas a los componentes
+          // getAllInmobiliarias devuelve { data: [...], meta: {...} }
+          const inmosData = inmosResp?.data ?? (Array.isArray(inmosResp) ? inmosResp : []);
+          setInmobiliarias(Array.isArray(inmosData) ? inmosData : []);
         }
       } catch (err) {
         if (alive) {
@@ -79,34 +92,93 @@ export default function Reservas() {
     return applyReservaFilters(allReservas, params);
   }, [allReservas, params]);
 
-  // Acciones
-  const onVer = (reserva) => {
-    // Ver detalle de la reserva
-    console.log('Ver reserva:', reserva.id);
-  };
+  // Modales/cards
+  const [reservaSel, setReservaSel] = useState(null);
+  const [openVer, setOpenVer] = useState(false);
+  const [openEditar, setOpenEditar] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
-  const onEditar = (reserva) => {
-    // Abrir modal de edición o navegar a formulario
-    console.log('Editar reserva:', reserva.id);
-  };
+  // Ver: abre con la fila y luego refina con getReservaById(id) para traer relaciones/fechas
+  const onVer = useCallback((reserva) => {
+    if (!reserva) return;
+    setReservaSel(reserva);
+    setOpenVer(true);
 
-  const onEliminar = (reserva) => {
-    // Confirmar y eliminar
-    if (window.confirm(`¿Eliminar la reserva ${reserva.id}?`)) {
-      // Lógica de eliminación
-      console.log('Eliminar reserva:', reserva.id);
+    (async () => {
+      try {
+        const resp = await getReservaById(reserva.id);
+        const detail = resp?.data ?? resp ?? {};
+        setReservaSel((prev) => ({ ...(prev || reserva), ...(detail || {}) }));
+      } catch (e) {
+        console.error("Error obteniendo reserva por id:", e);
+      }
+    })();
+  }, []);
+
+  // Editar: abre siempre y carga datos completos con relaciones
+  const onEditar = useCallback((reserva) => {
+    if (!reserva) return;
+    setReservaSel(reserva);
+    setOpenEditar(true);
+
+    // Cargar datos completos con relaciones (cliente, lote, inmobiliaria, fechas)
+    (async () => {
+      try {
+        const resp = await getReservaById(reserva.id);
+        const detail = resp?.data ?? resp ?? {};
+        setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+      } catch (e) {
+        console.error("Error obteniendo reserva por id para editar:", e);
+      }
+    })();
+  }, []);
+
+  const onEliminar = useCallback((reserva) => {
+    setReservaSel(reserva);
+    setOpenEliminar(true);
+  }, []);
+
+  const onVerDocumentos = useCallback((reserva) => {
+    console.debug("[DOCS] reserva", reserva?.id);
+  }, []);
+
+  const onAgregarReserva = useCallback(() => {
+    console.debug("[ALTA] reserva");
+  }, []);
+
+  // PUT (Editar) - recibe el objeto actualizado completo del componente
+  const handleSave = useCallback(
+    async (updatedReserva) => {
+      if (!updatedReserva?.id) return;
+      try {
+        // La reserva actualizada ya viene completa del backend con todas las relaciones
+        // Actualizar la lista con la reserva actualizada
+        setAllReservas((prev) => prev.map((r) => (r.id === updatedReserva.id ? updatedReserva : r)));
+        setReservaSel(updatedReserva);
+      } catch (e) {
+        console.error("Error actualizando reserva:", e);
+      }
+    },
+    []
+  );
+
+  // DELETE (Eliminar)
+  const handleDelete = useCallback(async () => {
+    if (!reservaSel?.id) return;
+    try {
+      setDeleting(true);
+      await deleteReserva(reservaSel.id);
+      setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
+      setOpenEliminar(false);
+    } catch (e) {
+      console.error("Error eliminando reserva:", e);
+      alert(e?.message || "No se pudo eliminar la reserva.");
+    } finally {
+      setDeleting(false);
     }
-  };
-
-  const onVerDocumentos = (reserva) => {
-    // Ver documentos asociados a la reserva
-    console.log('Ver documentos de reserva:', reserva.id);
-  };
-
-  const onAgregarReserva = () => {
-    // Navegar a formulario de nueva reserva
-    console.log('Agregar nueva reserva');
-  };
+  }, [reservaSel]);
 
   if (loading) {
     return (
@@ -144,6 +216,49 @@ export default function Reservas() {
         onAgregarReserva={can(user, PERMISSIONS.RES_CREATE) ? onAgregarReserva : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+      />
+
+      {/* Modales */}
+      <ReservaVerCard 
+        open={openVer} 
+        reserva={reservaSel} 
+        reservas={allReservas}
+        onClose={() => setOpenVer(false)}
+        onEdit={(reserva) => {
+          setOpenVer(false);
+          // Abrir el modal de editar con la misma reserva
+          setReservaSel(reserva);
+          setOpenEditar(true);
+          
+          // Cargar datos completos con relaciones
+          (async () => {
+            try {
+              const resp = await getReservaById(reserva.id);
+              const detail = resp?.data ?? resp ?? {};
+              setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+            } catch (e) {
+              console.error("Error obteniendo reserva por id para editar:", e);
+            }
+          })();
+        }}
+      />
+
+      <ReservaEditarCard
+        key={reservaSel?.id} // Forzar re-render cuando cambia la reserva
+        open={openEditar}
+        reserva={reservaSel}
+        reservas={allReservas}
+        inmobiliarias={inmobiliarias}
+        onCancel={() => setOpenEditar(false)}
+        onSaved={handleSave}
+      />
+
+      <ReservaEliminarDialog
+        open={openEliminar}
+        reserva={reservaSel}
+        loading={deleting}
+        onCancel={() => setOpenEliminar(false)}
+        onConfirm={handleDelete}
       />
     </>
   );

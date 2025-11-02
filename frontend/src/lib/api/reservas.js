@@ -2,7 +2,7 @@
 // API adapter para reservas
  
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-import { http, normalizeApiListResponse } from "../http/http";
+import { http, httpJson, normalizeApiListResponse } from "../http/http";
 
 // ===== NORMALIZADORES =====
 const fromApi = (row = {}) => ({
@@ -17,6 +17,7 @@ const fromApi = (row = {}) => ({
     `Cliente ID: ${row.clienteId || 'N/A'}`,
   fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
   seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
+  estado: row.estado ?? null, // Preservar estado para el badge
   inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
   inmobiliariaNombre: row.inmobiliaria?.nombre ?? row.inmobiliariaNombre ?? 
     `Inmobiliaria ID: ${row.inmobiliariaId || 'N/A'}`,
@@ -41,8 +42,9 @@ const toApi = (data = {}) => ({
   loteId: data.loteId,
   clienteId: data.clienteId,
   fechaReserva: data.fechaReserva,
-  seña: data.seña,
-  inmobiliariaId: data.inmobiliariaId
+  sena: data.sena ?? data.seña,
+  inmobiliariaId: data.inmobiliariaId,
+  estado: data.estado,
 });
 
 // ===== MOCK DATA =====
@@ -199,7 +201,7 @@ export const getAllReservas = async (params = {}) => {
   }
 };
 
-export const getReserva = async (id) => {
+export const getReservaById = async (id) => {
   if (USE_MOCK) {
     const reserva = mockReservas.find(r => r.id === parseInt(id));
     return {
@@ -210,24 +212,59 @@ export const getReserva = async (id) => {
   }
 
   try {
-    const response = await http(`/reservas/${id}`, {
+    // Usar httpJson que maneja el parsing de manera segura y consistente
+    const response = await httpJson(`/reservas/${id}`, {
       method: 'GET'
     });
 
+    // El backend devuelve { success: true, data: {...} }
+    // Extraer la reserva de response.data (que es lo que envía el controller)
+    const raw = response?.data ?? response?.reserva ?? response;
+    
+    // Si raw no tiene las relaciones, puede que el backend no las esté incluyendo
+    // Verificar que el backend esté devolviendo correctamente
+    
+    // Normalizar manteniendo relaciones y fechas
+    const normalized = {
+      ...fromApi(raw),
+      // Preservar relaciones completas del backend (si vienen)
+      cliente: raw?.cliente || fromApi(raw).clienteNombre ? {
+        id: raw?.clienteId ?? fromApi(raw).clienteId,
+        nombre: raw?.cliente?.nombre ?? fromApi(raw).clienteNombre,
+        apellido: raw?.cliente?.apellido ?? fromApi(raw).clienteApellido,
+      } : null,
+      inmobiliaria: raw?.inmobiliaria || (raw?.inmobiliariaId ? {
+        id: raw?.inmobiliariaId,
+        nombre: raw?.inmobiliaria?.nombre ?? fromApi(raw).inmobiliariaNombre,
+      } : null),
+      lote: raw?.lote || (raw?.loteId ? {
+        id: raw?.loteId,
+        numero: raw?.lote?.numero ?? raw?.lote?.id ?? raw?.loteId,
+      } : null),
+      // Mapear fechas correctamente
+      createdAt: raw?.createdAt ?? null,
+      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? null,
+      // Preservar también fechaReserva
+      fechaReserva: raw?.fechaReserva ?? fromApi(raw).fechaReserva ?? null,
+      // Preservar estado
+      estado: raw?.estado ?? fromApi(raw).estado ?? null,
+      // Preservar seña/sena
+      seña: raw?.sena ?? raw?.seña ?? fromApi(raw).seña ?? null,
+    };
+
     return {
       success: true,
-      data: response.data || response.reserva,
+      data: normalized,
       message: response.message || 'Reserva obtenida correctamente'
     };
   } catch (error) {
     console.error('❌ Error obteniendo reserva:', error);
-    return {
-      success: false,
-      data: null,
-      message: error.message || 'Error al obtener reserva'
-    };
+    throw new Error(error?.message || 'Error al obtener reserva');
   }
 };
+
+// Alias para compatibilidad
+export const getReserva = getReservaById;
 
 export const createReserva = async (data) => {
   if (USE_MOCK) {
@@ -265,42 +302,100 @@ export const createReserva = async (data) => {
   }
 };
 
-export const updateReserva = async (id, data) => {
-  if (USE_MOCK) {
-    const index = mockReservas.findIndex(r => r.id === parseInt(id));
-    if (index !== -1) {
-      mockReservas[index] = { ...mockReservas[index], ...data, updateAt: new Date().toISOString() };
-      return {
-        success: true,
-        data: mockReservas[index],
-        message: 'Reserva actualizada correctamente (MOCK)'
-      };
+export const updateReserva = async (id, payload) => {
+  // El payload ya viene con los campos correctos del componente (fechaReserva, estado, sena, inmobiliariaId)
+  // Enviar directamente los campos que espera el backend según la validación
+  const body = {};
+  
+  // Mapear campos que pueden venir (todos opcionales para PATCH)
+  // IMPORTANTE: Solo incluir campos que realmente han cambiado
+  if (payload.fechaReserva !== undefined && payload.fechaReserva !== null) {
+    body.fechaReserva = payload.fechaReserva;
+  }
+  if (payload.estado !== undefined && payload.estado !== null && payload.estado !== "") {
+    body.estado = payload.estado;
+  }
+  // Para sena, enviar incluso si es null (para eliminar la seña)
+  if (payload.sena !== undefined) {
+    if (payload.sena === null) {
+      body.sena = null;
+    } else if (payload.sena !== null) {
+      const num = typeof payload.sena === 'number' ? payload.sena : Number(payload.sena);
+      if (Number.isFinite(num) && num >= 0) {
+        body.sena = num;
+      }
     }
-    return {
-      success: false,
-      data: null,
-      message: 'Reserva no encontrada (MOCK)'
-    };
+  } else if (payload.seña !== undefined) {
+    if (payload.seña === null) {
+      body.sena = null;
+    } else if (payload.seña !== null) {
+      const num = typeof payload.seña === 'number' ? payload.seña : Number(payload.seña);
+      if (Number.isFinite(num) && num >= 0) {
+        body.sena = num;
+      }
+    }
+  }
+  // Para inmobiliariaId, enviar incluso si es null (para desasociar)
+  if (payload.inmobiliariaId !== undefined) {
+    body.inmobiliariaId = payload.inmobiliariaId || null;
+  }
+  
+  // Verificar que al menos hay un campo para actualizar
+  if (Object.keys(body).length === 0) {
+    throw new Error('Debes enviar al menos un campo para actualizar');
   }
 
   try {
-    const response = await http(`/reservas/${id}`, {
+    // Usar http que devuelve Response, luego parsear JSON de manera segura
+    // Este patrón es el mismo que usan ventas.js e inmobiliarias.js para mantener seguridad
+    // NOTA: http() ya hace JSON.stringify(body) internamente, no lo hagamos aquí
+    const res = await http(`/reservas/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(toApi(data))
+      body: body
     });
+    
+    // Parsear el JSON de manera segura con .catch() para evitar errores si no es JSON válido
+    // Esto es seguro porque:
+    // 1. El backend siempre devuelve JSON válido (o vacío si hay error)
+    // 2. El .catch() previene excepciones si el JSON está malformado
+    // 3. Validamos res.ok antes de usar los datos
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      // Si hay error, extraer el mensaje de manera segura
+      const errorMsg = data?.message || data?.errors?.[0]?.message || "Error al actualizar reserva";
+      const error = new Error(errorMsg);
+      error.status = res.status;
+      error.errors = data?.errors;
+      throw error;
+    }
+
+    // El backend devuelve { success: true, data: {...}, message: '...' }
+    const raw = data?.data ?? data?.reserva ?? data;
+    
+    // Normalizar manteniendo relaciones y fechas
+    const normalized = {
+      ...fromApi(raw),
+      // Preservar relaciones completas del backend
+      cliente: raw?.cliente || null,
+      inmobiliaria: raw?.inmobiliaria || null,
+      lote: raw?.lote || null,
+      // Mapear fechas correctamente
+      createdAt: raw?.createdAt ?? null,
+      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? null,
+      // Preservar estado del backend (importante para el badge)
+      estado: raw?.estado ?? fromApi(raw).estado ?? null,
+    };
 
     return {
       success: true,
-      data: response.data || response.reserva,
-      message: response.message || 'Reserva actualizada correctamente'
+      data: normalized,
+      message: data.message || 'Reserva actualizada correctamente'
     };
   } catch (error) {
     console.error('❌ Error actualizando reserva:', error);
-    return {
-      success: false,
-      data: null,
-      message: error.message || 'Error al actualizar reserva'
-    };
+    const errorMsg = error?.response?.data?.message || error?.message || 'Error al actualizar reserva';
+    throw new Error(errorMsg);
   }
 };
 

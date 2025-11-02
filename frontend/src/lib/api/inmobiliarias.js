@@ -132,44 +132,38 @@ async function apiGetAll(params = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al cargar inmobiliarias");
 
-  console.log('🔍 API Response raw data:', data);
-  console.log('🔍 API Response data structure:', JSON.stringify(data, null, 2));
-  console.log('🔍 data.data:', data.data);
-  console.log('🔍 typeof data.data:', typeof data.data);
-  console.log('🔍 Array.isArray(data.data):', Array.isArray(data.data));
-  
   // Si data.data es un objeto, intentar extraer el array de inmobiliarias
   let inmobiliariasArray = [];
   if (data.data && typeof data.data === 'object' && !Array.isArray(data.data)) {
-    console.log('🔍 data.data keys:', Object.keys(data.data));
     // Buscar posibles claves que contengan el array
     if (data.data.inmobiliarias && Array.isArray(data.data.inmobiliarias)) {
       inmobiliariasArray = data.data.inmobiliarias;
-      console.log('🔍 Found inmobiliarias array:', inmobiliariasArray);
     } else if (data.data.rows && Array.isArray(data.data.rows)) {
       inmobiliariasArray = data.data.rows;
-      console.log('🔍 Found rows array:', inmobiliariasArray);
     } else {
-      console.log('🔍 No array found in data.data, trying to convert object to array');
       // Si es un objeto con propiedades que parecen inmobiliarias, convertirlo a array
       const values = Object.values(data.data);
       if (values.length > 0 && typeof values[0] === 'object') {
         inmobiliariasArray = values;
-        console.log('🔍 Converted object values to array:', inmobiliariasArray);
       }
     }
   }
   
   const arr = normalizeApiListResponse(data);
-  console.log('🔍 Normalized array:', arr);
-  console.log('🔍 Manual inmobiliarias array:', inmobiliariasArray);
   
   // Usar el array manual si el normalizado está vacío
   const finalArray = arr.length > 0 ? arr : inmobiliariasArray;
-  console.log('🔍 Final array to use:', finalArray);
   
-  const mapped = finalArray.map(fromApi);
-  console.log('🔍 Mapped data:', mapped);
+  const mapped = finalArray.map((row) => {
+    const base = fromApi(row);
+    // Preservar cantidadVentas y fechas si vienen del backend
+    return {
+      ...base,
+      cantidadVentas: row?.cantidadVentas ?? row?._count?.ventas ?? row?.ventas_count ?? base.cantidadVentas ?? 0,
+      createdAt: row?.createdAt ?? row?.created_at ?? base.createdAt ?? null,
+      updatedAt: row?.updateAt ?? row?.updatedAt ?? row?.updated_at ?? base.updateAt ?? null,
+    };
+  });
   
   const meta = data?.meta ?? { total: arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
   return { data: mapped, meta };
@@ -179,7 +173,21 @@ async function apiGetById(id) {
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al obtener inmobiliaria");
-  return ok(fromApi(data?.data ?? data));
+  
+  // El backend devuelve { success: true, data: { inmobiliaria: {...} } }
+  const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
+  
+  // Normalizar manteniendo las fechas y cantidadVentas correctamente mapeadas
+  const normalized = {
+    ...fromApi(raw),
+    // Mapear fechas correctamente (backend usa updateAt sin 'd')
+    createdAt: raw?.createdAt ?? raw?.created_at ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? null,
+    // Incluir cantidadVentas si viene del backend
+    cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? 0,
+  };
+  
+  return ok(normalized);
 }
 
 async function apiCreate(payload) {
@@ -190,10 +198,84 @@ async function apiCreate(payload) {
 }
 
 async function apiUpdate(id, payload) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
+  // El payload ya viene con los campos correctos del componente (nombre, razonSocial, contacto, comxventa)
+  // Construir el body validando que cumpla con el schema del backend
+  const body = {};
+  
+  // Mapear campos que pueden venir (todos opcionales para PATCH)
+  // El schema espera: nombre (string, min 1), razonSocial (string, min 1), contacto (string, max 100, opcional), comxventa (number, 0-100, opcional)
+  if (payload.nombre !== undefined && payload.nombre !== null && String(payload.nombre).trim().length > 0) {
+    const nombreTrim = String(payload.nombre).trim();
+    if (nombreTrim.length > 100) {
+      throw new Error("El nombre es demasiado largo (máximo 100 caracteres)");
+    }
+    body.nombre = nombreTrim;
+  }
+  
+  if (payload.razonSocial !== undefined && payload.razonSocial !== null && String(payload.razonSocial).trim().length > 0) {
+    const razonTrim = String(payload.razonSocial).trim();
+    if (razonTrim.length > 150) {
+      throw new Error("La razón social es demasiado larga (máximo 150 caracteres)");
+    }
+    body.razonSocial = razonTrim;
+  }
+  
+  if (payload.contacto !== undefined && payload.contacto !== null && payload.contacto !== "") {
+    const contactoTrim = String(payload.contacto).trim();
+    if (contactoTrim.length > 100) {
+      throw new Error("El contacto es demasiado largo (máximo 100 caracteres)");
+    }
+    if (contactoTrim.length > 0) {
+      body.contacto = contactoTrim;
+    }
+  }
+  
+  if (payload.comxventa !== undefined && payload.comxventa !== null) {
+    // Asegurar que sea un número válido
+    const num = typeof payload.comxventa === 'number' ? payload.comxventa : Number(payload.comxventa);
+    if (isNaN(num) || !isFinite(num)) {
+      throw new Error("La comisión por venta debe ser un número válido");
+    }
+    if (num < 0) {
+      throw new Error("La comisión por venta no puede ser negativa");
+    }
+    if (num > 100) {
+      throw new Error("La comisión por venta no puede ser mayor a 100");
+    }
+    body.comxventa = num;
+  }
+  
+  // Validar que al menos haya un campo (como requiere el schema: .refine((d) => Object.keys(d).length > 0))
+  if (Object.keys(body).length === 0) {
+    throw new Error("Debe enviar al menos un campo para actualizar");
+  }
+  
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al actualizar inmobiliaria");
-  return ok(fromApi(data?.data ?? data));
+  if (!res.ok) {
+    // Si hay errores de validación, mostrar el mensaje más específico
+    const errorMsg = data?.message || data?.errors?.[0]?.message || "Error al actualizar inmobiliaria";
+    const error = new Error(errorMsg);
+    error.status = res.status;
+    error.errors = data?.errors;
+    throw error;
+  }
+  
+  // El backend devuelve { success: true, data: { inmobiliaria: {...}, message: '...' } }
+  const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
+  
+  // Normalizar manteniendo las fechas y cantidadVentas correctamente mapeadas
+  const base = fromApi(raw);
+  const normalized = {
+    ...base,
+    // Mapear fechas correctamente (backend usa updateAt sin 'd')
+    createdAt: raw?.createdAt ?? raw?.created_at ?? base.createdAt ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? base.updateAt ?? null,
+    // Incluir cantidadVentas si viene del backend
+    cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
+  };
+  
+  return ok(normalized);
 }
 
 async function apiDelete(id) {
