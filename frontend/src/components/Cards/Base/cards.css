@@ -1,4 +1,11 @@
-/* ===== Overlay ===== */
+/* ========================================================================
+   CARDS.CSS
+   ======================================================================== */
+
+
+/* ========================================================================
+   OVERLAY / BACKDROP (sistema .c-*)
+   ======================================================================== */
 .c-backdrop {
   position: fixed;
   inset: 0;
@@ -9,9 +16,13 @@
   padding: 16px;
 }
 
-/* ===== Panel ===== */
+
+/* ========================================================================
+   CARD BASE (sistema .c-*)
+   ======================================================================== */
 .c-card {
-  width: min(1100px, 96vw);
+  /* Antes: min(1100px, 96vw). Lo acortamos a 720px para que no se vea "largo". */
+  width: min(720px, 92vw);
   max-height: 88vh;
   background: #fff;
   color: #111;
@@ -23,7 +34,10 @@
   overflow: hidden;
 }
 
-/* ===== Header ===== */
+
+/* ========================================================================
+   HEADER (sistema .c-*)
+   ======================================================================== */
 .c-header {
   display: grid;
   grid-template-columns: 1fr auto auto; /* título | acción | cerrar */
@@ -34,7 +48,13 @@
   border-bottom: 1px solid rgba(0,0,0,.06);
 }
 
-/* Título levemente más a la derecha */
+/* Variante "danger" para Eliminar (rojo claro tipo Figma) */
+.c-header-danger {
+  background: #fcbdbd;               /* rojo muy claro */
+  border-bottom: 1px solid #f2b1b1;  /* borde suave */
+}
+
+/* Título */
 .c-title {
   margin: 0;
   padding-left: 6px;          /* leve corrimiento */
@@ -42,7 +62,7 @@
   font-weight: 700;
 }
 
-/* CTA ámbar (estética Mapa/Dashboard) */
+/* CTA ámbar (si lo usás en otros headers) */
 .header-cta {
   appearance: none;
   border: 1px solid rgba(0,0,0,.10);
@@ -55,7 +75,12 @@
 }
 .header-cta:hover { filter: brightness(0.98); }
 
-/* Botón cerrar: fondo transparente, borde negro, “×” centrada */
+
+/* ========================================================================
+   BOTÓN CERRAR
+   - Para Eliminar: se reutiliza el del verCard (.cclf-btn-close).
+   - Mantengo tus variantes existentes por compatibilidad.
+   ======================================================================== */
 .c-close {
   appearance: none;
   width: 34px;
@@ -72,21 +97,149 @@
   color: #000;
 }
 
-/* ===== Body ===== */
+/* Botón cerrar del verCard (reutilizado) */
+.cclf-btn-close {
+  width: 35px;
+  height: 35px;
+  border-radius: 999px;
+  background: transparent;
+  border: 2px solid #111;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.cclf-btn-close__x {
+  font-size: 24px;
+  padding-bottom: 3px;
+  line-height: 1;
+  color: #111;
+  transform: translateY(-1px);
+}
+.cclf-btn-close:hover { 
+  background: rgba(0,0,0,.05);
+  transform: translateY(-1px);
+  transition: 100ms ease;
+} 
+
+
+/* ========================================================================
+   BODY (sistema .c-*)
+   ======================================================================== */
 .c-body {
   padding: 20px;
   overflow: auto;
 }
 
-/* Título de sección más grande y alineado con el título principal */
+/* Mensaje inicial (admite saltos de línea si los hubiese) */
+.c-message {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 16px;
+}
+
+/* Bullets para detalles (•) */
+.c-bullets {
+  margin: 10px 0 0 18px; /* deja aire debajo del mensaje */
+  padding: 0;
+  list-style: disc;
+}
+.c-bullets li {
+  margin: 2px 0;
+  padding-left: 4px;
+}
+
+/* Nota fuerte al final */
+.c-note-strong {
+  margin: 12px 0 0 0;
+  font-weight: 700; /* negrita */
+}
+
+/* Divisor: dejamos aire con el cuerpo y con el footer */
+.c-divider {
+  height: 1px;
+  background: #e9e9e9;
+  margin-top: 14px; /* evita que quede pegado al contenido */
+}
+
+
+/* ========================================================================
+   FOOTER / BOTONES GENÉRICOS
+   ======================================================================== */
+.c-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px 20px; /* +20px bottom para que no quede pegado al borde */
+  padding-top: 14px;       /* aire respecto a la línea divisoria */
+}
+
+.btn {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn:disabled { opacity: .7; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid #cfcfcf;
+  color: #111;
+}
+
+.btn-danger {
+  background: #ff0400;
+  border: 1px solid #cd2f2c;
+  color: #fff;
+}
+/* ======================================================================
+   BOTÓN "Eliminar Venta" — fuerza visual + hover
+   - Aumentamos especificidad (c-footer + .btn.btn-danger)
+   - Solo aplica dentro del footer del diálogo
+   ====================================================================== */
+.c-footer .btn.btn-danger {
+  background: #d32f2f;           /* rojo más intenso */
+  border-color: #b71c1c;
+  color: #fff;
+  font-weight: 400;               /* más “fuerza” tipográfica */
+  letter-spacing: .2px;
+  box-shadow: 0 4px 10px rgba(211,47,47,.25);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.c-footer .btn.btn-danger:hover,
+.c-footer .btn.btn-danger:focus-visible {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(85, 5, 5, 0.32);
+}
+
+.c-footer .btn.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(183,28,28,.25);
+}
+
+/* Por si el framework usa reglas con :disabled */
+.c-footer .btn.btn-danger:disabled {
+  opacity: .7;
+  transform: none;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+
+/* ========================================================================
+   TÍTULOS DE SECCIÓN / LAYOUTS EXISTENTES (se mantienen tal cual)
+   ======================================================================== */
 .section-title {
   margin: 0 0 12px 0;
   font-size: 16px;
   font-weight: 700;
 }
 .section-title--aligned {
-  padding-left: 6px;          /* mismo corrimiento leve que el header */
-  font-size: 18px;            /* un poco más grande */
+  padding-left: 6px;
+  font-size: 18px;
 }
 
 /* ===== Grid ===== */
@@ -99,14 +252,12 @@
   .col-6, .col-4 { grid-column: span 12; }
 }
 
-/* ===== Pares label/valor en una sola línea ===== */
+/* ===== Pares label/valor ===== */
 .pair {
   display: grid;
   grid-template-columns: var(--labelW, 170px) 1fr;
   gap: 8px;
 }
-
-/* Label y valor con caja (rectángulos separados) */
 .label-inline, .value-inline {
   border: 1px solid rgba(0,0,0,.12);
   border-radius: 10px;
@@ -115,14 +266,12 @@
   align-items: center;
   padding: 0 12px;
 }
-
 .label-inline {
   background: #f7f8f7;
   font-size: 13px;
   font-weight: 700;
   color: #4a4a4a;
 }
-
 .value-inline {
   background: #ffffff;
   font-size: 15px;
@@ -144,7 +293,11 @@
   text-transform: uppercase;
 }
 
-/* -------- Overlay (oscurecimiento leve) -------- */
+
+/* ========================================================================
+   SEGUNDO SISTEMA DE CARDS (.cclf-*)
+   (se mantiene para verCard y otros)
+   ======================================================================== */
 .cclf-overlay {
   position: fixed;
   inset: 0;
@@ -153,8 +306,6 @@
   place-items: center;
   z-index: 1000;
 }
-
-/* -------- Card base -------- */
 .cclf-card {
   width: min(1120px, 92vw);
   max-height: 86vh;
@@ -166,136 +317,86 @@
   display: grid;
   grid-template-rows: auto 1fr;
 }
-
-/* -------- Header -------- */
 .cclf-card__header {
   position: relative;
-  background: #eaf3ed;              
-  padding: 18px 20px 16px 28px;      
+  background: #eaf3ed;
+  padding: 18px 20px 16px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid rgba(0,0,0,.06);
 }
-
 .cclf-card__title {
   margin: 0;
-  font-size: 22px;                   
-  font-weight: 700;                 
+  font-size: 22px;
+  font-weight: 700;
 }
-
 .cclf-card__actions {
   display: inline-flex;
   align-items: center;
   gap: 12px;
 }
-
-/* Botón “cerrar” circular: borde negro y fondo transparente  */
-.cclf-btn-close {
-  width: 35px;
-  height: 35px;
-  border-radius: 999px;
-  background: transparent;
-  border: 2px solid #111;            
-  display: grid;
-  place-items: center;              
-  cursor: pointer;
-}
-.cclf-btn-close__x {
-  font-size: 24px;
-  padding-bottom: 3px;                 
-  line-height: 1;
-  color: #111;
-  transform: translateY(-1px);       
-}
-.cclf-btn-close:hover { 
-  background: rgba(0,0,0,.05);      
-  transform: translateY(-1px);
-  transition: 100ms ease;
-} 
-
-/* -------- Body -------- */
 .cclf-card__body {
   padding: 22px 26px 26px;
   overflow: auto;
 }
-
-/* -------- Título sección -------- */
 .venta-section-title {
   margin: 0 0 18px -7px;
-  font-size: 20px;                   
+  font-size: 20px;
   font-weight: 700;
-  translate: 8px 0;                  
+  translate: 8px 0;
 }
-
-/* -------- Grid de campos (dos columnas) -------- */
-.venta-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-}
-
+.venta-grid { display: grid; grid-template-columns: 1fr 1fr; }
 .venta-grid{ gap: 22px 36px; }
-.venta-col {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;                
-}
-
-.field-row{
-  display: grid;
-  grid-template-columns: var(--sale-label-w, 180px) 1fr;
-  align-items: center;
-  gap: 12px;
-}
-
+.venta-col { display: flex; flex-direction: column; gap: 18px; }
+.field-row{ display: grid; grid-template-columns: var(--sale-label-w, 180px) 1fr; align-items: center; gap: 12px; }
 .field-label{
   background: #fff;
   border: 1px solid rgba(0,0,0,.18);
   border-radius: 6px;
   padding: 10px 12px;
   padding-top: 11.5px;
-  font-size: 13.5px;           
+  font-size: 13.5px;
   font-weight: 600;
   letter-spacing: .3px;
   box-shadow: 0 3px 8px rgba(0,0,0,.10);
-  text-transform: uppercase; 
-  white-space: nowrap;       
+  text-transform: uppercase;
+  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;   
+  text-overflow: ellipsis;
 }
-
 .field-value{
   background: #ffffff;
   border: 1px solid rgba(0,0,0,.18);
   box-shadow: 0 3px 8px rgba(0,0,0,.10);
   border-radius: 6px;
   padding: 9px 12px;
-  min-height: 34px;          
+  min-height: 34px;
   display: flex;
   align-items: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-
-
 .cclf-tab.thin { font-weight: 500; }
 .cclf-card__actions .cclf-tab.thin {
-  padding: 8px 25px;       
-  margin-right: 20px;        
+  padding: 8px 25px;
+  margin-right: 20px;
   border: 1px solid rgba(0,0,0,.85);
   border-radius: 6px;
-  background: #EBB648;      
-  font-weight: 500;         
+  background: #EBB648;
+  font-weight: 500;
 }
 .cclf-card__actions .cclf-tab.thin:hover {
-  background: #cb9828;      
+  background: #cb9828;
   transform: translateY(-1px);
   transition: 200ms ease;
 }
 
 
-/* Responsivo básico */
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
 @media (max-width: 920px) {
   .venta-grid { grid-template-columns: 1fr; }
 }
