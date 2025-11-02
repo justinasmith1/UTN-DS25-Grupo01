@@ -226,8 +226,6 @@ export default function VentasPage() {
         
         const enriched = enrichVenta(updatedVenta, personasById, inmosById);
         
-        console.log("✅ handleSave: venta actualizada y enriquecida", enriched);
-        
         // Actualizar la lista con la venta enriquecida
         setVentas((prev) => prev.map((v) => (v.id === enriched.id ? enriched : v)));
         setVentaSel(enriched);

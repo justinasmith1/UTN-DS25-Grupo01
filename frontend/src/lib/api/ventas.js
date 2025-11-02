@@ -171,12 +171,9 @@ async function apiUpdate(id, payload) {
   if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
   if (payload.reservaId != null) body.reservaId = payload.reservaId;
   
-  console.log("📤 apiUpdate enviando:", body);
-  
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    console.error("❌ apiUpdate error:", data);
     throw new Error(data?.message || "Error al actualizar la venta");
   }
   
@@ -194,8 +191,6 @@ async function apiUpdate(id, payload) {
     createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? null,
     updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.fechaActualizacion ?? null,
   };
-  
-  console.log("✅ apiUpdate respuesta normalizada:", normalized);
   
   return ok(normalized);
 }

@@ -50,13 +50,26 @@ export async function getAllReservas(): Promise<{ reservas: any[]; total: number
 // Obtener una reserva por ID
 // ==============================
 export async function getReservaById(id: number): Promise<any> {
-  const row = await prisma.reserva.findUnique({ where: { id } });
+  const row = await prisma.reserva.findUnique({ 
+    where: { id },
+    include: {
+      cliente: {
+        select: { id: true, nombre: true, apellido: true },
+      },
+      inmobiliaria: {
+        select: { id: true, nombre: true },
+      },
+      lote: {
+        select: { id: true, precio: true },
+      },
+    },
+  });
   if (!row) {
     const err: any = new Error('La reserva no existe');
     err.status = 404;
     throw err;
   }
-  return row; // devolvemos el registro tal cual viene de Prisma
+  return row; // devolvemos el registro con relaciones incluidas
 }
 
 
@@ -144,6 +157,17 @@ export async function updateReserva(
         ...(body.inmobiliariaId !== undefined ? { inmobiliariaId: body.inmobiliariaId } : {}),
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         ...(body.estado !== undefined ? { estado: body.estado } : {}),
+      },
+      include: {
+        cliente: {
+          select: { id: true, nombre: true, apellido: true },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+        lote: {
+          select: { id: true, precio: true },
+        },
       },
     });
 

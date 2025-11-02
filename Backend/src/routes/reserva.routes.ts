@@ -50,7 +50,8 @@ router.put(
     '/:id', 
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(updateReservaSchema), 
+    validateParams(getReservaParamsSchema),
+    validate(updateReservaSchema), 
     reservaController.updateReservaController);
 
 // DELETE /api/Reservas/:id
