@@ -118,6 +118,7 @@ export default function VentaEditarCard({
   onCancel,
   onSaved,
   inmobiliarias: propsInmob = [], // opcional
+  entityType = "Venta",    // tipo de entidad para el mensaje de éxito (Venta, Reserva, etc.)
 }) {
   /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
   const [detalle, setDetalle] = useState(venta || null);
@@ -139,7 +140,6 @@ export default function VentaEditarCard({
 
       // Si viene venta por props, usarla (esto se ejecuta también cuando venta cambia)
       if (venta) { 
-        console.log("📦 VentaEditarCard: usando venta de props", venta);
         setDetalle(venta); 
         return; 
       }
@@ -147,7 +147,6 @@ export default function VentaEditarCard({
       if (ventaId != null && Array.isArray(ventas)) {
         const found = ventas.find(v => `${v.id}` === `${ventaId}`);
         if (found) { 
-          console.log("📦 VentaEditarCard: usando venta de cache", found);
           setDetalle(found); 
           return; 
         }
@@ -155,21 +154,11 @@ export default function VentaEditarCard({
 
       if (ventaId != null) {
         try {
-          console.log("📦 VentaEditarCard: obteniendo venta por ID", ventaId);
           const response = await getVentaById(ventaId);
-          // getVentaById devuelve { data: {...} }
           const full = response?.data ?? response;
-          console.log("📦 VentaEditarCard: respuesta completa", full);
-          console.log("📦 VentaEditarCard: comprador", full?.comprador);
-          console.log("📦 VentaEditarCard: lote", full?.lote);
-          console.log("📦 VentaEditarCard: lote.propietario", full?.lote?.propietario);
-          console.log("📦 VentaEditarCard: inmobiliaria", full?.inmobiliaria);
-          console.log("📦 VentaEditarCard: createdAt", full?.createdAt);
-          console.log("📦 VentaEditarCard: updatedAt", full?.updatedAt);
-          console.log("📦 VentaEditarCard: updateAt", full?.updateAt);
           if (!abort && full) setDetalle(full);
         } catch (e) {
-          console.error("❌ getVentaById failed:", e);
+          console.error("Error obteniendo venta por id:", e);
         }
       }
     }
@@ -224,26 +213,21 @@ export default function VentaEditarCard({
 
       // si vienen por props y tienen longitud, no llamo API
       if (propsInmob && propsInmob.length) {
-        console.log("📦 VentaEditarCard: usando inmobiliarias de props", propsInmob);
         const norm = normalizeList(propsInmob);
-        console.log("📦 VentaEditarCard: inmobiliarias normalizadas de props", norm);
         setInmobiliarias(norm);
         fetchedInmobRef.current = true;
         return;
       }
 
       try {
-        console.log("📦 VentaEditarCard: obteniendo inmobiliarias de API");
         const response = await getAllInmobiliarias({});
-        console.log("📦 VentaEditarCard: respuesta getAllInmobiliarias", response);
         const norm = normalizeList(response);
-        console.log("📦 VentaEditarCard: inmobiliarias normalizadas", norm);
         if (!abort) {
           setInmobiliarias(norm);
           fetchedInmobRef.current = true;
         }
       } catch (e) {
-        console.error("❌ getAllInmobiliarias failed:", e);
+        console.error("Error obteniendo inmobiliarias:", e);
         if (!abort) {
           setInmobiliarias([]);
           fetchedInmobRef.current = true;
@@ -288,14 +272,6 @@ export default function VentaEditarCard({
   // re-sync cuando cambia 'detalle' o se reabre
   useEffect(() => {
     if (!open || !detalle) return;
-    console.log("📦 VentaEditarCard: sincronizando estados con detalle", {
-      estado: base.estado,
-      monto: base.monto,
-      tipoPago: base.tipoPago,
-      fechaVenta: base.fechaVenta,
-      plazoEscritura: base.plazoEscritura,
-      inmobiliariaId: base.inmobiliariaId,
-    });
     setEstado(base.estado);
     setMonto(base.monto);
     setTipoPago(base.tipoPago);
@@ -303,7 +279,7 @@ export default function VentaEditarCard({
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id, detalle?.monto]); // Agregar detalle?.monto para detectar cambios en el monto
+  }, [open, detalle?.id, detalle?.monto]);
 
   /* 6) ancho de label como en VerCard */
   useEffect(() => {
@@ -359,7 +335,6 @@ export default function VentaEditarCard({
     try {
       setSaving(true);
       const patch = buildPatch();
-      console.log("📤 VentaEditarCard: patch a enviar", patch);
       
       if (Object.keys(patch).length === 0) { 
         setSaving(false);
@@ -369,7 +344,6 @@ export default function VentaEditarCard({
       
       const response = await updateVenta(detalle.id, patch);
       const updated = response?.data ?? response;
-      console.log("✅ VentaEditarCard: venta actualizada", updated);
       
       // Mostrar animación de éxito
       setShowSuccess(true);
@@ -382,7 +356,7 @@ export default function VentaEditarCard({
         onCancel?.();
       }, 1500);
     } catch (e) {
-      console.error("❌ Error guardando venta:", e);
+      console.error("Error guardando venta:", e);
       setSaving(false);
       alert(e?.message || "No se pudo guardar la venta.");
     }
@@ -484,16 +458,16 @@ export default function VentaEditarCard({
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Venta guardada exitosamente!
-            </h3>
+              <h3
+                style={{
+                  margin: 0,
+                  fontSize: "20px",
+                  fontWeight: 600,
+                  color: "#111",
+                }}
+              >
+                ¡{entityType} guardada exitosamente!
+              </h3>
           </div>
         </div>
       )}

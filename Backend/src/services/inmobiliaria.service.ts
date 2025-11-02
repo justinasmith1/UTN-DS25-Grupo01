@@ -14,7 +14,7 @@ import { Inmobiliaria as PrismaInmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
 
-const toInmobiliaria = (i: PrismaInmobiliaria): Inmobiliaria => ({
+const toInmobiliaria = (i: PrismaInmobiliaria & { _count?: { ventas?: number } }): Inmobiliaria => ({
     idInmobiliaria: i.id,
     nombre: i.nombre,
     razonSocial: i.razonSocial,
@@ -28,10 +28,29 @@ const toInmobiliaria = (i: PrismaInmobiliaria): Inmobiliaria => ({
 // Retorna el listado completo de Inmobiliarias junto con el total.
 export async function getAllInmobiliarias(): Promise<GetInmobiliariasResponse> {
   const [rows, total] = await Promise.all([
-    prisma.inmobiliaria.findMany({orderBy: { id: 'asc' } }),
+    prisma.inmobiliaria.findMany({
+      orderBy: { id: 'asc' },
+      include: {
+        _count: {
+          select: { ventas: true }
+        }
+      }
+    }),
     prisma.inmobiliaria.count(),
   ]);
-  return { inmobiliarias: rows.map(toInmobiliaria), total };
+  
+  // Mapear incluyendo el conteo de ventas y las fechas
+  const inmobiliarias = rows.map((i) => {
+    const base = toInmobiliaria(i);
+    return {
+      ...base,
+      cantidadVentas: i._count?.ventas ?? 0,
+      createdAt: i.createdAt,
+      updateAt: i.updateAt,
+    };
+  });
+  
+  return { inmobiliarias, total };
 }
 // ==============================
 // Obtener una Inmobiliaria por ID
@@ -40,8 +59,28 @@ export async function getAllInmobiliarias(): Promise<GetInmobiliariasResponse> {
 // Si no existe, devuelve un mensaje de error.
 export async function getInmobiliariaById(req: GetInmobiliariaRequest): Promise<GetInmobiliariaResponse> {
     const inmobiliaria = await prisma.inmobiliaria.findUnique({
-        where: { id: req.idInmobiliaria },});
-    return inmobiliaria ? { inmobiliaria: toInmobiliaria(inmobiliaria) } : { inmobiliaria: null, message: 'Inmobiliaria no encontrada' };
+        where: { id: req.idInmobiliaria },
+        include: {
+            _count: {
+                select: { ventas: true }
+            }
+        }
+    });
+    
+    if (!inmobiliaria) {
+        return { inmobiliaria: null, message: 'Inmobiliaria no encontrada' };
+    }
+    
+    // Incluir conteo de ventas y fechas
+    const mapped = toInmobiliaria(inmobiliaria);
+    return { 
+        inmobiliaria: {
+            ...mapped,
+            cantidadVentas: inmobiliaria._count?.ventas ?? 0,
+            createdAt: inmobiliaria.createdAt,
+            updateAt: inmobiliaria.updateAt,
+        } as any
+    };
 }
 
 
@@ -97,7 +136,7 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
     }
   }
 
-  await prisma.inmobiliaria.update({
+  const updated = await prisma.inmobiliaria.update({
     where: { id: idActual },
     data: {
       ...(updateData.nombre        !== undefined ? { nombre: updateData.nombre } : {}),
@@ -107,9 +146,24 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
       ...(updateData.userId        !== undefined ? { userId: updateData.userId } : {}),
       updateAt: new Date(), 
     },
+    include: {
+      _count: {
+        select: { ventas: true }
+      }
+    }
   });
 
-  return { message: 'Inmobiliaria actualizada correctamente' };
+  // Incluir conteo de ventas y fechas en la respuesta
+  const mapped = toInmobiliaria(updated);
+  return { 
+    inmobiliaria: {
+      ...mapped,
+      cantidadVentas: updated._count?.ventas ?? 0,
+      createdAt: updated.createdAt,
+      updateAt: updated.updateAt,
+    } as any,
+    message: 'Inmobiliaria actualizada correctamente' 
+  };
 }
 // ==============================
 // Eliminar Inmobiliaria
