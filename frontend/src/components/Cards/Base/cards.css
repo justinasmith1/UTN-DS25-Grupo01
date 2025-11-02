@@ -1,0 +1,387 @@
+/* ========================================================================
+   CARDS.CSS
+   ======================================================================== */
+
+
+/* ========================================================================
+   OVERLAY / BACKDROP (sistema .c-*)
+   ======================================================================== */
+.c-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, .35);
+  z-index: 2000;
+  padding: 16px;
+}
+
+
+/* ========================================================================
+   CARD BASE (sistema .c-*)
+   ======================================================================== */
+.c-card {
+  width: min(720px, 92vw);
+  max-height: 88vh;
+  background: #fff;
+  color: #111;
+  border: 1px solid rgba(0,0,0,.10);
+  border-radius: 12px;
+  box-shadow: 0 18px 42px rgba(0,0,0,.20);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+
+/* ========================================================================
+   HEADER (sistema .c-*)
+   ======================================================================== */
+.c-header {
+  display: grid;
+  grid-template-columns: 1fr auto auto; /* título | badges | cerrar */
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #E6F0E9; /* verde suave */
+  border-bottom: 1px solid rgba(0,0,0,.06);
+}
+
+.c-header-danger {
+  background: #fcbdbd;
+  border-bottom: 1px solid #f2b1b1;
+}
+
+.c-title {
+  margin: 0;
+  padding-left: 6px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+
+/* ========================================================================
+   CLOSE (reutilizado del VerCard)
+   ======================================================================== */
+.cclose{} /* (placeholder por compatibilidad) */
+
+.cclf-btn-close {
+  width: 35px;
+  height: 35px;
+  border-radius: 999px;
+  background: transparent;
+  border: 2px solid #111;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.cclf-btn-close__x {
+  font-size: 24px;
+  padding-bottom: 3px;
+  line-height: 1;
+  color: #111;
+  transform: translateY(-1px);
+}
+.cclf-btn-close:hover {
+  background: rgba(0,0,0,.05);
+  transform: translateY(-1px);
+  transition: 100ms ease;
+}
+
+
+/* ========================================================================
+   BODY
+   ======================================================================== */
+.c-body {
+  padding: 20px;
+  overflow: auto;
+}
+
+.c-message {
+  margin: 0;
+  white-space: pre-line;
+  font-size: 16px;
+}
+
+.c-bullets {
+  margin: 10px 0 0 18px;
+  padding: 0;
+  list-style: disc;
+}
+.c-bullets li {
+  margin: 2px 0;
+  padding-left: 4px;
+}
+.c-note-strong { margin: 12px 0 0 0; font-weight: 700; }
+
+.c-divider { height: 1px; background: #e9e9e9; margin-top: 14px; }
+
+
+/* ========================================================================
+   FOOTER / BUTTONS
+   ======================================================================== */
+.c-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px 20px;
+  padding-top: 14px;
+}
+
+.btn { padding: 10px 16px; border-radius: 10px; font-weight: 600; border: 1px solid transparent; cursor: pointer; }
+.btn:disabled { opacity: .7; cursor: not-allowed; }
+.btn-ghost { background: transparent; border: 1px solid #cfcfcf; color: #111; }
+
+/* Danger reafirmado (Eliminar) */
+.btn-danger { background: #ff0400; border: 1px solid #cd2f2c; color: #fff; }
+/* Especificidad para el card de eliminar */
+.c-footer .btn.btn-danger {
+  background: #d32f2f;
+  border-color: #b71c1c;
+  color: #fff;
+  font-weight: 400;
+  letter-spacing: .2px;
+  box-shadow: 0 4px 10px rgba(211,47,47,.25);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+.c-footer .btn.btn-danger:hover,
+.c-footer .btn.btn-danger:focus-visible {
+  filter: brightness(0.96);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(85, 5, 5, 0.32);
+}
+.c-footer .btn.btn-danger:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(183,28,28,.25);
+}
+
+/* ===================== Primary (Guardar cambios) ===================== */
+:root { --color-action-primary: #2849AF; } 
+.cclf-footer .btn-primary {
+  background: var(--color-action-primary);
+  border-color: #000;                 
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(40,73,175,.22);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+.btn-primary:hover,
+.cclf-footer .btn-primary:focus-visible {
+  filter: brightness(0.98);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(14, 47, 148, 0.28);
+  border-color: #000;
+}
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(40,73,175,.22);
+}
+
+/* Outline (Restablecer) */
+.btn-outline {
+  background: #fff;
+  border: 1px solid #000; /* borde negro suave para consistencia */
+  color: #111;
+}
+.btn-outline:hover,
+.btn-outline:focus-visible {
+  background: #f6f6f6;
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(40,73,175,.22);
+}
+
+.btn-ghost:hover,
+.btn-ghost:focus-visible {
+  background: #f6f6f6;
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(40,73,175,.22);
+}
+
+/* ========================================================================
+   CAMPOS EDITABLES (estética VerCard)
+   ======================================================================== */
+.label { font-size: 13px; font-weight: 700; color: #2f3b2f; margin: 6px 0 6px; }
+.field,
+.value {
+  width: 100%;
+  border: 1px solid rgba(0,0,0,.18);
+  border-radius: 8px;
+  min-height: 36px;
+  padding: 8px 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,.10);
+  background: #fff;
+}
+.value { display: flex; align-items: center; color: #111; }
+
+/* 1) FREEZADOS con leve gris (mínimo) */
+.value.is-readonly {
+  background: #f7f7f7;        /* gris muy suave */
+  color: #333;
+}
+
+/* Select base */
+select.field { appearance: auto; }
+
+/* ========================================================================
+   TÍTULOS / LAYOUTS EXISTENTES (se mantienen)
+   ======================================================================== */
+.section-title { margin: 0 0 12px 0; font-size: 16px; font-weight: 700; }
+.section-title--aligned { padding-left: 6px; font-size: 18px; }
+
+.grid { display: grid; gap: 12px; }
+.grid-12 { grid-template-columns: repeat(12, 1fr); }
+.col-6 { grid-column: span 6; }
+.col-4 { grid-column: span 4; }
+@media (max-width: 800px) { .col-6, .col-4 { grid-column: span 12; } }
+
+/* Reserva mini-card (tal como lo tenías) */
+.reserva-box { margin-top: 16px; padding: 14px; border: 1px solid rgba(0,0,0,.12); border-radius: 12px; background: #FFF3CD; }
+.reserva-title { margin: 0 0 8px 0; font-weight: 700; font-size: 13px; color: #5b4a00; text-transform: uppercase; }
+
+
+/* ========================================================================
+   SEGUNDO SISTEMA (.cclf-*) — VerCard
+   ======================================================================== */
+.cclf-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; z-index: 1000; }
+.cclf-card { width: min(1120px, 92vw); max-height: 86vh; background: #fff; border: 1px solid rgba(0,0,0,.12); border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0,0,0,.18); display: grid; grid-template-rows: auto 1fr; }
+.cclf-card__header { position: relative; background: #eaf3ed; padding: 18px 20px 16px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,.06); }
+.cclf-card__title { margin: 0; font-size: 22px; font-weight: 700; }
+.cclf-card__actions { display: inline-flex; align-items: center; gap: 12px; }
+.cclf-card__body { padding: 22px 26px 26px; overflow: auto; }
+.venta-section-title { margin: 0 0 18px -7px; font-size: 20px; font-weight: 700; translate: 8px 0; }
+.venta-grid { display: grid; grid-template-columns: 1fr 1fr; }
+.venta-grid{ gap: 22px 36px; }
+.venta-col { display: flex; flex-direction: column; gap: 18px; }
+.field-row{ display: grid; grid-template-columns: var(--sale-label-w, 180px) 1fr; align-items: center; gap: 12px; }
+.field-label{ background: #fff; border: 1px solid rgba(0,0,0,.18); border-radius: 6px; padding: 10px 12px; padding-top: 11.5px; font-size: 13.5px; font-weight: 600; letter-spacing: .3px; box-shadow: 0 2px 4px rgba(0,0,0,.10); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.field-value{ background: #ffffff; border: 1px solid rgba(0,0,0,.18); box-shadow: 0 2px 4px rgba(0,0,0,.10); border-radius: 6px; padding: 9px 12px; min-height: 44px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cclf-tab.thin { font-weight: 500; }
+.cclf-card__actions .cclf-tab.thin { padding: 8px 25px; margin-right: 20px; border: 1px solid rgba(0,0,0,.85); border-radius: 6px; background: #EBB648; font-weight: 500; }
+.cclf-card__actions .cclf-tab.thin:hover { background: #cb9828; transform: translateY(-1px); transition: 200ms ease; }
+
+@media (max-width: 920px) { .venta-grid { grid-template-columns: 1fr; } }
+
+
+/* =================== Editar (look VerCard) =================== */
+
+/* Footer dentro del cclf-card, alineado a la derecha */
+.cclf-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+  border-top: 1px solid rgba(0,0,0,.08);
+  padding-top: 14px;
+}
+
+/* Para que el "valor" editable conserve el rectángulo del VerCard */
+.field-value.p0 { padding: 0; }
+
+.field-input {
+  width: 100%;
+  height: 100%;
+  min-height: 34px;
+  border: none;
+  outline: none;
+  background: transparent;
+  padding: 8px 10px;
+  font: inherit;
+  color: #111827;
+  border-radius: 6px;
+}
+select.field-input {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'><polyline points='5,7 10,12 15,7' stroke='%23222' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat;
+  background-size: 14px 14px;
+  background-position: right 120px center; /* 3) más separado del borde */
+  padding-right: 40px;                    /* espacio para el ícono */
+  border-radius: 6px;                      /* 4) redondeado acorde */
+}
+
+/* Badge suave (si alguna vez se usa) */
+.c-badge.c-badge-soft {
+  background: #f0f3ff;
+  border: 1px solid #dbe3ff;
+  color: #2b3d9f;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 13px;
+  margin-right: 12px;
+}
+
+.cclf-card .field-value.is-readonly{
+  background:#f3f4f6;   /* gris leve que sí se nota */
+  color:#374151;
+}
+
+/* ==== NiceSelect ==== */
+.field-value.p0 { overflow: visible; } /* para que la lista pueda sobresalir */
+
+.ns-trigger{
+  width: 100%;
+  min-height: 44px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: none; outline: none;
+  cursor: pointer;
+  font: inherit; color: #111827;
+}
+.ns-trigger:hover{ background: #fafafa; }
+
+.ns-list{
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+  max-height: 260px; overflow:auto;
+  background: #fff;
+  border: 1px solid rgba(0,0,0,.14);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0,0,0,.18);
+  padding: 6px;
+  z-index: 50;
+}
+.ns-item{
+  border-radius: 8px;
+  padding: 10px 10px;
+  cursor: pointer;
+}
+.ns-item:hover{ background: #f3f4f6; }
+.ns-item.is-active{ background: #e9efff; }
+
+/* NiceSelect: que NO se corte y el menú tenga un ancho cómodo */
+.field-value.p0 { overflow: visible; }
+
+.ns-wrap { position: relative; }
+
+.ns-trigger{
+  width:100%;
+  min-height:44px;
+  display:flex; align-items:center;
+  padding:8px 40px 8px 12px;    /* espacio para el chevron a la derecha */
+  border-radius:8px;
+  background:#fff; border:none; outline:none;
+  cursor:pointer; font:inherit; color:#111827;
+  position:relative;
+}
+.ns-trigger svg{
+  position:absolute; right:12px; top:50%; transform:translateY(-50%);
+}
+
+.ns-list{
+  position:absolute; left:0; top:calc(100% + 6px);
+  width:max(100%, 280px);        /* ← no se achica */
+  max-height:260px; overflow:auto;
+  background:#fff;
+  border:1px solid rgba(0,0,0,.14);
+  border-radius:10px;
+  box-shadow:0 12px 28px rgba(0,0,0,.18);
+  padding:6px; z-index:50;
+}
+.ns-item{
+  white-space:nowrap;            /* ← no se corta el texto */
+  border-radius:8px; padding:10px;
+  cursor:pointer;
+}
+.ns-item:hover{ background:#f3f4f6; }
+.ns-item.is-active{ background:#e9efff; }

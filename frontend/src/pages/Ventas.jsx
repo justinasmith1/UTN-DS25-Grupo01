@@ -1,12 +1,16 @@
 // src/pages/Ventas.jsx
-// Objetivo de la pagina: listar ventas, con filtros y acciones según permisos
+// Página de Ventas: lista, filtra y abre modales de Ver / Editar / Eliminar.
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 
-import { getAllVentas } from "../lib/api/ventas";
+import {
+  getAllVentas,
+  getVentaById,          // <-- agregado
+  updateVenta,
+  deleteVenta,
+} from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 
@@ -14,48 +18,77 @@ import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
 import { applyVentaFilters } from "../utils/applyVentaFilters";
 
-/** Busca el primer array “razonable” dentro de una respuesta heterogénea */
+import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
+import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
+import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.jsx";
+
+/* Util: toma el array “correcto” dentro de una respuesta heterogénea */
 const pickArray = (resp, candidates = []) => {
   if (!resp) return [];
   if (Array.isArray(resp)) return resp;
   if (resp.data && Array.isArray(resp.data)) return resp.data;
   if (resp.items && Array.isArray(resp.items)) return resp.items;
 
-  // Buscar por claves conocidas dentro de data o raíz
-  const buckets = [
-    ...(candidates || []),                 // ej: ['personas', 'inmobiliarias']
-    "results",
-    "rows",
-    "list",
-  ];
-
+  const buckets = [...(candidates || []), "results", "rows", "list"];
   for (const key of buckets) {
     if (resp[key] && Array.isArray(resp[key])) return resp[key];
     if (resp.data && resp.data[key] && Array.isArray(resp.data[key])) return resp.data[key];
   }
-
   return [];
 };
 
-/** Construye "Nombre Apellido" desde distintas variantes de campos */
+/* Construye "Nombre Apellido" desde variantes comunes */
 const buildFullName = (p) => {
   if (!p) return null;
-  const nombre =
-    p.nombre ?? p.firstName ?? p.name ?? p.nombrePersona ?? null;
-  const apellido =
-    p.apellido ?? p.lastName ?? p.surname ?? p.apellidoPersona ?? null;
+  const nombre = p.nombre ?? p.firstName ?? p.name ?? p.nombrePersona ?? null;
+  const apellido = p.apellido ?? p.lastName ?? p.surname ?? p.apellidoPersona ?? null;
   const full = [nombre, apellido].filter(Boolean).join(" ").trim();
   return full || p.fullName || p.nombreCompleto || null;
 };
 
+/* Normaliza y enriquece una venta con campos esperados por el card */
+const enrichVenta = (v, personasById = {}, inmosById = {}) => {
+  if (!v) return v;
+  const buyerId = v?.buyerId ?? v?.compradorId ?? null;
+  const comprador =
+    v?.comprador ?? (buyerId != null ? personasById[String(buyerId)] || null : null);
+  const compradorNombreCompleto = buildFullName(comprador);
+
+  const inmoId = v?.inmobiliariaId ?? v?.inmobiliaria_id ?? null;
+  let inmobiliaria = v?.inmobiliaria ?? (inmoId != null ? inmosById[String(inmoId)] || null : null);
+  if (!inmobiliaria) inmobiliaria = { id: null, nombre: "La Federala" };
+
+  const propietario = v?.propietario ?? v?.owner ?? null;
+  const propietarioNombreCompleto = buildFullName(propietario);
+
+  return {
+    ...v,
+    comprador,
+    compradorNombreCompleto,
+    propietario,
+    propietarioNombreCompleto,
+    inmobiliaria,
+    loteId: v.loteId ?? v.lotId,
+    fechaVenta: v.fechaVenta ?? v.date,
+    monto: v.monto ?? v.amount,
+    estado: v.estado ?? v.status,
+    tipoPago: v.tipoPago ?? v.paymentType,
+    // fechas (tolerantes a back distinto)
+    createdAt: v.createdAt ?? v.fechaCreacion ?? v.created_at ?? null,
+    updatedAt: v.updatedAt ?? v.updateAt ?? v.fechaActualizacion ?? v.updated_at ?? null,
+    plazoEscritura: v.plazoEscritura ?? v.plazo_escritura ?? null,
+  };
+};
+
 export default function VentasPage() {
-  const navigate = useNavigate();
   const { user } = useAuth();
 
+  // Datos
   const [ventas, setVentas] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Filtros
   const [filters, setFilters] = useState({
     texto: "",
     tipoPago: [],
@@ -67,13 +100,13 @@ export default function VentasPage() {
     estados: [],
   });
 
+  // Permisos (en esta pantalla Editar abre siempre)
   const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
-  const canSaleEdit = can(user, PERMISSIONS.SALE_UPDATE);
   const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
 
+  // Carga inicial + join con personas/inmobiliarias
   useEffect(() => {
     let alive = true;
-
     (async () => {
       setIsLoading(true);
       try {
@@ -83,45 +116,17 @@ export default function VentasPage() {
           getAllInmobiliarias({}),
         ]);
 
-        // ⬇️ Extrae arrays sin importar el shape
         const ventasApi = pickArray(ventasResp, ["ventas"]);
         const personasApi = pickArray(personasResp, ["personas"]);
         const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
 
-        // 🔒 Mapas por id normalizados a string (evita "3" vs 3)
         const personasById = {};
         for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
 
         const inmosById = {};
         for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
 
-        const enriched = ventasApi.map((v) => {
-          // — Comprador: embebido si viene; si no, por id
-          const buyerId = v?.buyerId ?? v?.compradorId ?? null;
-          const comprador =
-            v?.comprador ?? (buyerId != null ? personasById[String(buyerId)] || null : null);
-
-          const compradorNombreCompleto = buildFullName(comprador);
-
-          // — Inmobiliaria: embebido si viene; si no, por id; si no existe → La Federala
-          const inmoId = v?.inmobiliariaId ?? v?.inmobiliaria_id ?? null;
-          let inmobiliaria =
-            v?.inmobiliaria ?? (inmoId != null ? inmosById[String(inmoId)] || null : null);
-          if (!inmobiliaria) inmobiliaria = { id: null, nombre: "La Federala" };
-
-          // — Alias que ya usás (no romper filtros)
-          return {
-            ...v,
-            comprador,
-            compradorNombreCompleto,
-            inmobiliaria,
-            loteId: v.loteId ?? v.lotId,
-            fechaVenta: v.fechaVenta ?? v.date,
-            monto: v.monto ?? v.amount,
-            estado: v.estado ?? v.status,
-            tipoPago: v.tipoPago ?? v.paymentType,
-          };
-        });
+        const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
 
         if (alive) setVentas(enriched);
       } catch (err) {
@@ -131,25 +136,97 @@ export default function VentasPage() {
         if (alive) setIsLoading(false);
       }
     })();
-
     return () => {
       alive = false;
     };
   }, []);
 
-  const ventasFiltradas = useMemo(() => applyVentaFilters(ventas, filters), [ventas, filters]);
-
-  const onVer = useCallback((venta) => navigate(`/ventas/${venta.id}`), [navigate]);
-  const onEditar = useCallback((venta) => navigate(`/ventas/${venta.id}/editar`), [navigate]);
-  const onEliminar = useCallback((venta) => navigate(`/ventas/${venta.id}/eliminar`), [navigate]);
-  const onVerDocumentos = useCallback(
-    (venta) => navigate(`/ventas/${venta.id}/documentos`),
-    [navigate]
+  // Aplicar filtros
+  const ventasFiltradas = useMemo(
+    () => applyVentaFilters(ventas, filters),
+    [ventas, filters]
   );
-  const onAgregarVenta = useCallback(() => navigate(`/ventas/nueva`), [navigate]);
+
+  // Modales/cards
+  const [ventaSel, setVentaSel] = useState(null);
+  const [openVer, setOpenVer] = useState(false);
+  const [openEditar, setOpenEditar] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Ver: abre con la fila y luego refina con getVentaById(id) para traer propietario/fechas/etc.
+  const onVer = useCallback((venta) => {
+    if (!venta) return;
+    setVentaSel(venta);
+    setOpenVer(true);
+
+    (async () => {
+      try {
+        const resp = await getVentaById(venta.id);
+        const detail = resp?.data ?? resp ?? {};
+        setVentaSel((prev) => enrichVenta({ ...(prev || venta), ...(detail || {}) }));
+      } catch (e) {
+        console.error("Error obteniendo venta por id:", e);
+      }
+    })();
+  }, []);
+
+  // Editar: abre siempre
+  const onEditarAlways = useCallback((venta) => {
+    setVentaSel(venta);
+    setOpenEditar(true);
+  }, []);
+
+  const onEliminar = useCallback((venta) => {
+    setVentaSel(venta);
+    setOpenEliminar(true);
+  }, []);
+
+  const onVerDocumentos = useCallback((venta) => {
+    console.debug("[DOCS] venta", venta?.id);
+  }, []);
+
+  const onAgregarVenta = useCallback(() => {
+    console.debug("[ALTA] venta");
+  }, []);
+
+  // PUT (Editar)
+  const handleSave = useCallback(
+    async (patch) => {
+      if (!ventaSel?.id) return;
+      try {
+        setSaving(true);
+        const { data: updated } = await updateVenta(ventaSel.id, patch);
+        setVentas((prev) => prev.map((v) => (v.id === ventaSel.id ? { ...v, ...updated } : v)));
+        setOpenEditar(false);
+      } catch (e) {
+        console.error("Error actualizando venta:", e);
+      } finally {
+        setSaving(false);
+      }
+    },
+    [ventaSel]
+  );
+
+  // DELETE (Eliminar)
+  const handleDelete = useCallback(async () => {
+    if (!ventaSel?.id) return;
+    try {
+      setDeleting(true);
+      await deleteVenta(ventaSel.id);
+      setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
+      setOpenEliminar(false);
+    } catch (e) {
+      console.error("Error eliminando venta:", e);
+    } finally {
+      setDeleting(false);
+    }
+  }, [ventaSel]);
 
   return (
     <>
+      {/* Filtros */}
       <FilterBarVentas
         value={filters}
         onChange={setFilters}
@@ -170,17 +247,37 @@ export default function VentasPage() {
         }
       />
 
+      {/* Tabla */}
       <TablaVentas
         rows={ventasFiltradas}
         isLoading={isLoading}
         data={ventas}
         onVer={canSaleView ? onVer : null}
-        onEditar={canSaleEdit ? onEditar : null}
+        onEditar={onEditarAlways}
         onEliminar={canSaleDelete ? onEliminar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+      />
+
+      {/* Modales */}
+      <VentaVerCard open={openVer} venta={ventaSel} onClose={() => setOpenVer(false)} />
+
+      <VentaEditarCard
+        open={openEditar}
+        venta={ventaSel}
+        saving={saving}
+        onCancel={() => setOpenEditar(false)}
+        onSave={handleSave}
+      />
+
+      <VentaEliminarDialog
+        open={openEliminar}
+        venta={ventaSel}
+        loading={deleting}
+        onCancel={() => setOpenEliminar(false)}
+        onConfirm={handleDelete}
       />
     </>
   );
