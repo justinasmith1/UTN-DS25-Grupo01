@@ -53,6 +53,24 @@ function stripFieldsForTecnico<T>(lote: T): T {
   return sanitized as T;
 }
 
+function normalizeSuperficie(payload: any) {
+  const frente = payload?.frente;
+  const fondo = payload?.fondo;
+  if (frente != null && fondo != null) {
+    const expected = Number(frente) * Number(fondo);
+    if (payload.superficie == null) {
+      payload.superficie = expected;
+    } else {
+      const superficie = Number(payload.superficie);
+      if (!Number.isFinite(superficie) || Math.abs(superficie - expected) > 0.0001) {
+        const err: any = new Error(`La superficie debe ser igual a frente x fondo (${expected}).`);
+        err.statusCode = 400;
+        throw err;
+      }
+    }
+  }
+}
+
 // Normaliza filtros de query (DTO) a enums Prisma
 function buildWhereFromQueryDTO(query: any, role?: string) {
   const where: any = {};
@@ -123,6 +141,8 @@ export async function createLote(data: any): Promise<Lote> {
     throw error;
   }
 
+  normalizeSuperficie(data);
+
   // Crear lote. `data` tiene la forma del schema de Zod.
   return prisma.lote.create({
     data: {
@@ -170,6 +190,8 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
     payload = filtered;
   }
 
+  normalizeSuperficie(payload);
+
   // La autorización para TECNICO ya fue manejada por el middleware y la lógica en getLoteById.
   // Aquí solo transformamos el DTO para la actualización.
   const dataToUpdate: Prisma.LoteUpdateInput = {};
@@ -216,3 +238,5 @@ export async function updateLoteState(id: number, newState: EstadoLoteDto): Prom
     data: { estado: estadoLoteToPrisma(newState) },
   });
 }
+
+
