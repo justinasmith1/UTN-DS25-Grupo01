@@ -85,6 +85,7 @@ export default function VentasPage() {
 
   // Datos
   const [ventas, setVentas] = useState([]);
+  const [inmobiliarias, setInmobiliarias] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -128,7 +129,10 @@ export default function VentasPage() {
 
         const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
 
-        if (alive) setVentas(enriched);
+        if (alive) {
+          setVentas(enriched);
+          setInmobiliarias(inmosApi); // Guardar inmobiliarias para pasarlas al componente
+        }
       } catch (err) {
         console.error("Error cargando ventas/personas/inmobiliarias:", err);
         if (alive) setVentas([]);
@@ -172,10 +176,24 @@ export default function VentasPage() {
     })();
   }, []);
 
-  // Editar: abre siempre
+  // Editar: abre siempre y carga datos completos con relaciones
   const onEditarAlways = useCallback((venta) => {
+    if (!venta) return;
     setVentaSel(venta);
     setOpenEditar(true);
+
+    // Cargar datos completos con relaciones (comprador, lote.propietario, inmobiliaria, fechas)
+    (async () => {
+      try {
+        const resp = await getVentaById(venta.id);
+        const detail = resp?.data ?? resp ?? {};
+        // Enriquecer con datos completos pero mantener lo que ya teníamos
+        const enriched = enrichVenta({ ...(venta || {}), ...(detail || {}) }, {}, {});
+        setVentaSel(enriched);
+      } catch (e) {
+        console.error("Error obteniendo venta por id para editar:", e);
+      }
+    })();
   }, []);
 
   const onEliminar = useCallback((venta) => {
@@ -191,22 +209,33 @@ export default function VentasPage() {
     console.debug("[ALTA] venta");
   }, []);
 
-  // PUT (Editar)
+  // PUT (Editar) - ahora recibe el objeto actualizado completo del componente
   const handleSave = useCallback(
-    async (patch) => {
-      if (!ventaSel?.id) return;
+    async (updatedVenta) => {
+      if (!updatedVenta?.id) return;
       try {
-        setSaving(true);
-        const { data: updated } = await updateVenta(ventaSel.id, patch);
-        setVentas((prev) => prev.map((v) => (v.id === ventaSel.id ? { ...v, ...updated } : v)));
-        setOpenEditar(false);
+        // La venta actualizada ya viene completa del backend con todas las relaciones
+        // Solo necesitamos enriquecerla con el mismo formato que usamos en la lista
+        const personasById = {};
+        const personasApi = pickArray(await getAllPersonas({}), ["personas"]);
+        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+        
+        const inmosById = {};
+        const inmosApi = pickArray(await getAllInmobiliarias({}), ["inmobiliarias"]);
+        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+        
+        const enriched = enrichVenta(updatedVenta, personasById, inmosById);
+        
+        console.log("✅ handleSave: venta actualizada y enriquecida", enriched);
+        
+        // Actualizar la lista con la venta enriquecida
+        setVentas((prev) => prev.map((v) => (v.id === enriched.id ? enriched : v)));
+        setVentaSel(enriched);
       } catch (e) {
         console.error("Error actualizando venta:", e);
-      } finally {
-        setSaving(false);
       }
     },
-    [ventaSel]
+    []
   );
 
   // DELETE (Eliminar)
@@ -262,14 +291,37 @@ export default function VentasPage() {
       />
 
       {/* Modales */}
-      <VentaVerCard open={openVer} venta={ventaSel} onClose={() => setOpenVer(false)} />
+      <VentaVerCard 
+        open={openVer} 
+        venta={ventaSel} 
+        onClose={() => setOpenVer(false)}
+        onEdit={(venta) => {
+          setOpenVer(false);
+          // Abrir el modal de editar con la misma venta
+          setVentaSel(venta);
+          setOpenEditar(true);
+          
+          // Cargar datos completos con relaciones
+          (async () => {
+            try {
+              const resp = await getVentaById(venta.id);
+              const detail = resp?.data ?? resp ?? {};
+              const enriched = enrichVenta({ ...(venta || {}), ...(detail || {}) }, {}, {});
+              setVentaSel(enriched);
+            } catch (e) {
+              console.error("Error obteniendo venta por id para editar:", e);
+            }
+          })();
+        }}
+      />
 
       <VentaEditarCard
+        key={ventaSel?.id} // Forzar re-render cuando cambia la venta
         open={openEditar}
         venta={ventaSel}
-        saving={saving}
+        inmobiliarias={inmobiliarias}
         onCancel={() => setOpenEditar(false)}
-        onSave={handleSave}
+        onSaved={handleSave}
       />
 
       <VentaEliminarDialog

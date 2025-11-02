@@ -127,7 +127,24 @@ async function apiGetById(id) {
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al obtener la venta");
-  return ok(fromApi(data?.data ?? data));
+  
+  // El backend devuelve { success: true, data: {...} }
+  const raw = data?.data ?? data;
+  
+  // Preservar las relaciones completas que vienen del backend
+  // El backend incluye: comprador, lote (con propietario), inmobiliaria
+  const normalized = {
+    ...fromApi(raw), // Campos planos normalizados
+    // Preservar relaciones completas del backend
+    comprador: raw?.comprador || null,
+    lote: raw?.lote || null,
+    inmobiliaria: raw?.inmobiliaria || null,
+    // Mapear fechas correctamente (backend usa updateAt sin 'd')
+    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.fechaActualizacion ?? null,
+  };
+  
+  return ok(normalized);
 }
 
 async function apiCreate(payload) {
@@ -138,10 +155,49 @@ async function apiCreate(payload) {
 }
 
 async function apiUpdate(id, payload) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body: toApi(payload) });
+  // El payload ya viene con los campos correctos del componente (monto, estado, fechaVenta, etc.)
+  // No usar toApi porque espera otro formato (form.date, form.amount, etc.)
+  // Enviar directamente los campos que espera el backend según la validación
+  const body = {};
+  
+  // Mapear campos que pueden venir
+  if (payload.loteId != null) body.loteId = payload.loteId;
+  if (payload.fechaVenta != null) body.fechaVenta = payload.fechaVenta;
+  if (payload.monto != null) body.monto = payload.monto;
+  if (payload.estado != null) body.estado = payload.estado;
+  if (payload.plazoEscritura != null) body.plazoEscritura = payload.plazoEscritura;
+  if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
+  if (payload.compradorId != null) body.compradorId = payload.compradorId;
+  if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
+  if (payload.reservaId != null) body.reservaId = payload.reservaId;
+  
+  console.log("📤 apiUpdate enviando:", body);
+  
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al actualizar la venta");
-  return ok(fromApi(data?.data ?? data));
+  if (!res.ok) {
+    console.error("❌ apiUpdate error:", data);
+    throw new Error(data?.message || "Error al actualizar la venta");
+  }
+  
+  // El backend devuelve { success: true, data: {...} } con la venta actualizada completa
+  const raw = data?.data ?? data;
+  
+  // Preservar las relaciones completas que vienen del backend (igual que en apiGetById)
+  const normalized = {
+    ...fromApi(raw), // Campos planos normalizados
+    // Preservar relaciones completas del backend
+    comprador: raw?.comprador || null,
+    lote: raw?.lote || null,
+    inmobiliaria: raw?.inmobiliaria || null,
+    // Mapear fechas correctamente (backend usa updateAt sin 'd')
+    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.fechaActualizacion ?? null,
+  };
+  
+  console.log("✅ apiUpdate respuesta normalizada:", normalized);
+  
+  return ok(normalized);
 }
 
 async function apiDelete(id) {

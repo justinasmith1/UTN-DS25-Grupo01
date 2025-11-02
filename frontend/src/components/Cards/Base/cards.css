@@ -48,7 +48,7 @@
 }
 
 .c-header-danger {
-  background: #fcbdbd;
+  background: #ffdddd;
   border-bottom: 1px solid #f2b1b1;
 }
 
@@ -175,6 +175,7 @@
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(40,73,175,.22);
 }
+
 
 /* Outline (Restablecer) */
 .btn-outline {
@@ -385,3 +386,37 @@ select.field-input {
 }
 .ns-item:hover{ background:#f3f4f6; }
 .ns-item.is-active{ background:#e9efff; }
+
+/* ========================================================================
+   ANIMACIONES DE ÉXITO (para VentaEditarCard)
+   ======================================================================== */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes checkmark {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
