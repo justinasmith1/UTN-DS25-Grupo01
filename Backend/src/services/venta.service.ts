@@ -6,7 +6,7 @@ import { updateLoteState } from './lote.service';
 
 export async function getAllVentas(): Promise<Venta[]> {
     const ventas = await prisma.venta.findMany({
-        include: { comprador: true }, // Incluir datos del comprador
+        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true }, 
         orderBy: { id: 'asc' }, // Ordenar por idVenta de forma ascendente
     });
 
@@ -16,7 +16,7 @@ export async function getAllVentas(): Promise<Venta[]> {
 export async function getVentaById(id: number): Promise<Venta> {
     const venta = await prisma.venta.findUnique({
         where: { id },
-        include: { comprador: true }, // Incluir datos del comprador
+        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
     });
 
     if (!venta) {
