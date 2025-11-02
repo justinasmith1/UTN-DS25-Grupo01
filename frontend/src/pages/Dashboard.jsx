@@ -6,7 +6,10 @@ import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
-import { getAllLotes } from "../lib/api/lotes";
+import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
+import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
+import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
+import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 
 /**
  * Dashboard
@@ -27,24 +30,103 @@ export default function Dashboard() {
     userRole,
   ].join(":");
 
+  const [loteSel, setLoteSel] = useState(null);
+  const [openVer, setOpenVer] = useState(false);
+  const [openEditar, setOpenEditar] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   // Callbacks normalizados
   const goRegistrarVenta = (lot) =>
     navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
 
-  const onEditar = (lot) => {
-    // TODO: Implementar modal de edición
-    console.log('Editar lote:', lot);
-  };
-  
-  const onVer = (lot) => {
-    // TODO: Implementar modal de visualización
-    console.log('Ver lote:', lot);
-  };
-  
-  const onEliminar = (lot) => {
-    // TODO: Implementar confirmación y eliminación
-    console.log('Eliminar lote:', lot);
-  };
+  const mergeUpdatedLote = useCallback((updated) => {
+    if (!updated || updated.id == null) return;
+      const idStr = String(updated.id);
+      setAllLotes((prev) =>
+        prev.map((row) =>
+        String(row?.id) === idStr ? { ...row, ...updated } : row
+          )
+        );
+        setLoteSel((prev) =>
+          prev && String(prev.id) === idStr ? { ...prev, ...updated } : prev
+        );
+      }, []);
+    
+  const fetchAndMergeLote = useCallback(
+      async (candidate) => {
+        const id =
+          candidate?.id ?? candidate?.loteId ?? candidate?.idLote ?? null;
+        if (!id) return;
+        try {
+            const resp = await getLoteById(id);
+            const detail = resp?.data ?? resp ?? null;
+            if (detail) mergeUpdatedLote(detail);
+          } catch (err) {
+            console.error("Error obteniendo lote por id:", err);
+            error("No pude obtener el detalle del lote.");
+          }
+        },
+        [mergeUpdatedLote, error]
+      );
+    
+      const onVer = useCallback(
+        (lot) => {
+          if (!lot) return;
+          setLoteSel(lot);
+          setOpenVer(true);
+          fetchAndMergeLote(lot);
+        },
+        [fetchAndMergeLote]
+      );
+    
+      const onEditar = useCallback(
+        (lot) => {
+          if (!lot) return;
+          setLoteSel(lot);
+          setOpenEditar(true);
+          fetchAndMergeLote(lot);
+        },
+        [fetchAndMergeLote]
+      );
+    
+      const onEliminar = useCallback((lot) => {
+        if (!lot) return;
+        setLoteSel(lot);
+        setOpenEliminar(true);
+      }, []);
+    
+      const handleEditSaved = useCallback(
+        (updated) => {
+          if (updated?.id == null) {
+            setOpenEditar(false);
+            return;
+          }
+          mergeUpdatedLote(updated);
+          setOpenEditar(false);
+        },
+        [mergeUpdatedLote]
+      );
+    
+      const handleDelete = useCallback(async () => {
+        if (!loteSel?.id) return;
+        try {
+          setDeleting(true);
+          await deleteLote(loteSel.id);
+          setAllLotes((prev) =>
+            prev.filter((row) => String(row?.id) !== String(loteSel.id))
+          );
+          setOpenEliminar(false);
+          setOpenVer(false);
+          setOpenEditar(false);
+          setLoteSel(null);
+        } catch (err) {
+          console.error("Error eliminando lote:", err);
+          error("No pude eliminar el lote.");
+        } finally {
+          setDeleting(false);
+        }
+      }, [loteSel, error]);
 
   // Estado de filtros (FilterBarLotes)
   const [params, setParams] = useState({});
@@ -153,6 +235,38 @@ export default function Dashboard() {
         // onVerEnMapa={(ids) => ...} 
         // onAddLot={() => ...}
       />
+
+      <LoteVerCard
+        open={openVer}
+        lote={loteSel}
+        lotes={allLotes}
+        onClose={() => setOpenVer(false)}
+        onEdit={(lot) => {
+          setOpenVer(false);
+          onEditar(lot);
+        }}
+        onReserve={goRegistrarVenta}
+        onUpdated={mergeUpdatedLote}
+      />
+
+      <LoteEditarCard
+        key={loteSel?.id ?? "lote-editar"}
+        open={openEditar}
+        lote={loteSel}
+        loteId={loteSel?.id}
+        lotes={allLotes}
+        onCancel={() => setOpenEditar(false)}
+        onSaved={handleEditSaved}
+      />
+
+      <LoteEliminarDialog
+        open={openEliminar}
+        lote={loteSel}
+        loading={deleting}
+        onCancel={() => setOpenEliminar(false)}
+        onConfirm={handleDelete}
+      />
+
     </>
   );
 }
