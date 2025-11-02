@@ -241,7 +241,7 @@ select.field { appearance: auto; }
 /* ========================================================================
    SEGUNDO SISTEMA (.cclf-*) — VerCard
    ======================================================================== */
-.cclf-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; z-index: 1000; }
+.cclf-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.35); display: grid; place-items: center; z-index: 2600; place-items: center; padding: 32px 16px;}
 .cclf-card { width: min(1120px, 92vw); max-height: 86vh; background: #fff; border: 1px solid rgba(0,0,0,.12); border-radius: 14px; overflow: hidden; box-shadow: 0 14px 34px rgba(0,0,0,.18); display: grid; grid-template-rows: auto 1fr; }
 .cclf-card__header { position: relative; background: #eaf3ed; padding: 18px 20px 16px 28px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(0,0,0,.06); }
 .cclf-card__title { margin: 0; font-size: 22px; font-weight: 700; }
@@ -259,6 +259,268 @@ select.field { appearance: auto; }
 .cclf-card__actions .cclf-tab.thin:hover { background: #cb9828; transform: translateY(-1px); transition: 200ms ease; }
 
 @media (max-width: 920px) { .venta-grid { grid-template-columns: 1fr; } }
+
+
+/* ========================================================================
+   LOTE VER CARD
+   ======================================================================== */
+.lote-info-title {
+  margin: 0 0 18px -6px;
+  font-size: 20px;
+  font-weight: 700;
+  color: #134e31;
+  letter-spacing: .4px;
+}
+
+.lote-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 1.05fr) minmax(320px, 1fr);
+  gap: 24px 36px;
+}
+
+.lote-data-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lote-media-col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lote-carousel {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(0,0,0,.16);
+  box-shadow: 0 8px 26px rgba(0,0,0,.18);
+  background: #0f172a;
+  min-height: 260px;
+}
+
+.lote-carousel__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lote-carousel__nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,.45);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: background .15s ease, transform .15s ease;
+}
+
+.lote-carousel__nav:hover {
+  background: rgba(0,0,0,.65);
+  transform: translateY(-50%) scale(1.03);
+}
+
+.lote-carousel__nav--prev { left: 14px; }
+.lote-carousel__nav--next { right: 14px; }
+
+.lote-carousel__indicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+}
+
+.lote-carousel__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,.55);
+}
+
+.lote-carousel__dot.is-active {
+  background: #fff;
+}
+
+.lote-description {
+  border: 1px solid rgba(0,0,0,.12);
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(0,0,0,.12);
+  padding: 18px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lote-description__icon {
+  font-size: 22px;
+  color: #0b3d23;
+  line-height: 1;
+  translate: 0 2px;
+}
+
+.lote-description__body {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.45;
+}
+
+.lote-doc-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lote-doc-button {
+  border: 1px solid rgba(0,0,0,.85);
+  background: #EBB648;
+  color: #111;
+  font-weight: 600;
+  letter-spacing: .3px;
+  padding: 10px 18px;
+  min-width: 140px;
+  border-radius: 9px;
+  box-shadow: 0 3px 10px rgba(0,0,0,.18);
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.lote-doc-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0,0,0,.22);
+}
+
+.lote-doc-button:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.lote-header-actions .cclf-tab.thin {
+  padding-inline: 24px;
+  margin-right: 14px;
+}
+
+.lote-header-actions .cclf-tab.thin.reserve {
+  background: #0b8b67;
+  border-color: #0b8b67;
+  color: #fff;
+}
+
+.lote-header-actions .cclf-tab.thin.reserve:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 980px) {
+  .lote-grid {
+    grid-template-columns: 1fr;
+  }
+  .lote-media-col {
+    order: -1;
+  }
+}
+
+.field-value textarea.field-input {
+  background: transparent;
+  border: none;
+  padding: 0;
+  min-height: 110px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.boolean-value {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
+.boolean-value input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #0b3d23;
+}
+
+.lote-image-manager {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lote-image-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.lote-image-actions input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+  border: 1px solid rgba(0,0,0,.18);
+  border-radius: 8px;
+  padding: 9px 12px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.08);
+}
+
+.lote-image-actions button.lote-add-btn {
+  border: 1px solid #0b3d23;
+  background: #0b3d23;
+  color: #fff;
+  border-radius: 9px;
+  padding: 9px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+
+.lote-image-actions button.lote-add-btn:hover {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+
+.lote-image-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lote-image-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #eef0f4;
+  color: #1f2937;
+  font-size: 12.5px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.12);
+}
+
+.lote-image-chip button {
+  border: none;
+  background: transparent;
+  color: #d12a2a;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.lote-image-chip button:hover {
+  color: #a30f0f;
+}
 
 
 /* =================== Editar (look VerCard) =================== */
