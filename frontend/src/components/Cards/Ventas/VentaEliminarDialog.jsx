@@ -18,7 +18,7 @@ export default function VentaEliminarDialog({
   const title = `Eliminar Venta N° ${venta?.id ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la venta #${venta?.id ?? "—"}?`;
+  const message = `¿Seguro que deseas eliminar la venta #${venta?.id ?? "—"}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [
@@ -39,7 +39,7 @@ export default function VentaEliminarDialog({
       confirmLabel="Eliminar Venta"
       loading={loading}
       onCancel={onCancel}
-      onConfirm={onConfirm} // aquí disparás el DELETE real del service
+      onConfirm={onConfirm} 
     />
   );
 }

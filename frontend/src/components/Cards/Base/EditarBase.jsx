@@ -1,55 +1,83 @@
 import "./cards.css";
 
 /**
- * EditarBase: igual estructura que VerBase, pero “editable”.
- * El submit/validaciones los hace el wrapper según tu service.
+ * EditarBase (versión VerCard-style):
+ * - Usa el MISMO contenedor que VentaVerCard: .cclf-overlay + .cclf-card
+ * - Header igual al VerCard, SIN el botón "Editar Venta" (solo título + close)
+ * - Footer abajo a la derecha con acciones (Cancelar, Restablecer?, Guardar cambios)
  */
 export default function EditarBase({
-  open, title, badges = [],
-  tabs = [], activeTab, onTabChange,
-  onCancel, onSave, saving = false,
+  open,
+  title,
+  onCancel,
+  onSave,
+  onReset,         // opcional: restablecer cambios locales
+  saving = false,  // deshabilita acciones durante el guardado
   children,
+  headerRight,     // opcional (badge/estado)
 }) {
   if (!open) return null;
 
   return (
-    <div className="c-backdrop">
-      <section className="c-card" role="dialog" aria-modal="true" aria-labelledby="card-title">
-        <header className="c-header">
-          <h2 id="card-title">{title}</h2>
-          <div className="c-badges">
-            {badges.map((b,i)=>(
-              <span key={i} className={`c-badge c-badge-${b.tone || "info"}`}>{b.label}</span>
-            ))}
+    <div className="cclf-overlay" onClick={!saving ? onCancel : undefined}>
+      <div
+        className="cclf-card"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header (idéntico a VerCard, sin el botón Editar) */}
+        <div className="cclf-card__header">
+          <h2 className="cclf-card__title">{title}</h2>
+
+          <div className="cclf-card__actions">
+            {headerRight}
+            <button
+              type="button"
+              className="cclf-btn-close"
+              onClick={onCancel}
+              aria-label="Cerrar"
+              disabled={saving}
+            >
+              <span className="cclf-btn-close__x">×</span>
+            </button>
           </div>
-          <button className="c-close" onClick={onCancel} aria-label="Cerrar" disabled={saving}>×</button>
-        </header>
-
-        {tabs.length > 0 && (
-          <nav className="c-tabs" aria-label="Secciones">
-            {tabs.map(t => (
-              <button
-                key={t.id}
-                className={`c-tab ${activeTab === t.id ? "is-active" : ""}`}
-                onClick={() => onTabChange?.(t.id)}
-                type="button"
-                disabled={saving}
-              >{t.label}</button>
-            ))}
-          </nav>
-        )}
-
-        <div className="c-body">
-          {children}
         </div>
 
-        <footer className="c-footer">
-          <button className="btn btn-ghost" onClick={onCancel} disabled={saving}>Cancelar</button>
-          <button className="btn btn-primary" onClick={onSave} disabled={saving}>
-            {saving ? "Guardando…" : "Guardar cambios"}
-          </button>
-        </footer>
-      </section>
+        {/* Body + Footer (footer pegado abajo, alineado a la derecha) */}
+        <div className="cclf-card__body">
+          {children}
+
+          <div className="cclf-footer">
+            <button
+              className="btn btn-ghost"
+              type="button"
+              onClick={onCancel}
+              disabled={saving}
+            >
+              Cancelar
+            </button>
+
+            {onReset && (
+              <button
+                className="btn btn-outline"
+                type="button"
+                onClick={onReset}
+                disabled={saving}
+              >
+                Restablecer
+              </button>
+            )}
+
+            <button
+              className="btn btn-primary"
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+            >
+              {saving ? "Guardando…" : "Guardar cambios"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

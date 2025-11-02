@@ -1,18 +1,18 @@
-// Card de edición de Venta (solo Admin/Gestor).
-// Reglas simples:
-// - Campos inmutables siempre: id, loteId, compradorId, inmobiliariaId, createdAt, updateAt, reservaId
-// - Si estado es FINALIZADA o CANCELADA => todo read-only
-// - Si existe reservaId => monto y tipoPago quedan read-only
-// - Transiciones de estado válidas: INICIADA → {CON_BOLETO, CANCELADA}, CON_BOLETO → {FINALIZADA, CANCELADA}
-// - Validaciones mínimas: monto >= 0, fechas válidas, patch minimal
-
-import { useEffect, useMemo, useState } from "react";
+// src/components/Ventas/VentaEditarCard.jsx
+import { useEffect, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
+import { updateVenta, getVentaById } from "../../../lib/api/ventas.js";
+import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 
-const ESTADOS = ["INICIADA", "CON_BOLETO", "FINALIZADA", "CANCELADA"];
-const TIPOS_PAGO = ["Contado", "Transferencia", "Cuotas", "Financiado", "Otro"];
+/** Estados: value técnico + label Title Case */
+const ESTADOS = [
+  { value: "INICIADA",   label: "Iniciada" },
+  { value: "CON_BOLETO", label: "Con Boleto" },
+  { value: "FINALIZADA", label: "Finalizada" },
+  { value: "CANCELADA",  label: "Cancelada" },
+];
 
-// Helpers fecha para input[type="date"]
+/* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
   if (!v) return "";
   const d = new Date(v);
@@ -22,260 +22,431 @@ function toDateInputValue(v) {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
-function fromDateInputToISO(dateStr) {
-  if (!dateStr) return null;
-  return new Date(`${dateStr}T00:00:00.000Z`).toISOString();
+function fromDateInputToISO(s) {
+  return s ? new Date(`${s}T00:00:00.000Z`).toISOString() : null;
 }
 
-// Transiciones de estado sin rollback
-function isValidTransition(from, to) {
-  if (from === to) return true;
-  if (from === "INICIADA") return to === "CON_BOLETO" || to === "CANCELADA";
-  if (from === "CON_BOLETO") return to === "FINALIZADA" || to === "CANCELADA";
-  return false;
-}
+/* ----------------------- Select custom sin librerías ----------------------- */
+function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const listRef = useRef(null);
 
-// Reglas de edición por campo (sin roles)
-function canEditField({ estadoActual, field, hasReserva }) {
-  // Campos inmutables por diseño
-  const roAlways = ["id", "loteId", "compradorId", "inmobiliariaId", "createdAt", "updateAt", "reservaId"];
-  if (roAlways.includes(field)) return false;
-
-  // Estado final/cancelado: bloqueo global
-  if (estadoActual === "FINALIZADA" || estadoActual === "CANCELADA") return false;
-
-  // Si hay reserva asociada, monto y tipoPago quedan fijos
-  if (hasReserva && (field === "monto" || field === "tipoPago")) return false;
-
-  // Resto editable en estados abiertos
-  if (["estado", "monto", "tipoPago", "fechaVenta", "plazoEscritura"].includes(field)) return true;
-
-  return false;
-}
-
-export default function VentaEditarCard({ open, venta, saving = false, onCancel, onSave }) {
-  if (!open || !venta) return null;
-
-  const estadoActual = String(venta?.estado ?? "INICIADA");
-  const hasReserva = Boolean(venta?.reservaId);
-
-  // Estado local del formulario
-  const [estado, setEstado] = useState(estadoActual);
-  const [monto, setMonto] = useState(venta?.monto != null ? String(venta.monto) : "");
-  const [tipoPago, setTipoPago] = useState(venta?.tipoPago ?? "");
-  const [fechaVenta, setFechaVenta] = useState(toDateInputValue(venta?.fechaVenta));
-  const [plazoEscritura, setPlazoEscritura] = useState(toDateInputValue(venta?.plazoEscritura));
-
-  // Re-sincronizar al abrir
   useEffect(() => {
-    if (!open || !venta) return;
-    const est = String(venta?.estado ?? "INICIADA");
-    setEstado(est);
-    setMonto(venta?.monto != null ? String(venta.monto) : "");
-    setTipoPago(venta?.tipoPago ?? "");
-    setFechaVenta(toDateInputValue(venta?.fechaVenta));
-    setPlazoEscritura(toDateInputValue(venta?.plazoEscritura));
-  }, [open, venta]);
+    function onDoc(e) {
+      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
 
-  // Badge de estado
-  const badges = useMemo(() => {
-    const tone =
-      estado === "CON_BOLETO" ? "warning" :
-      estado === "INICIADA"   ? "info"    :
-      estado === "CANCELADA"  ? "danger"  :
-      "success";
-    return [{ label: estado || "—", tone }];
-  }, [estado]);
+  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
 
-  // Validaciones mínimas
-  function validateMonto(v) {
-    if (v === "" || v === null || v === undefined) return null;
-    const n = Number(v);
-    if (!Number.isFinite(n) || n < 0) return "El monto debe ser un número mayor o igual a 0.";
-    return null;
-  }
-  function validateFecha(str) {
-    if (!str) return null;
-    const d = new Date(str);
-    if (Number.isNaN(d.getTime())) return "La fecha no es válida.";
-    return null;
-  }
+  return (
+    <div className="ns-wrap" style={{ position: "relative" }}>
+      <button
+        type="button"
+        ref={btnRef}
+        className="ns-trigger"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
+          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
 
-  // Construcción de patch minimal respetando reglas
+      {open && (
+        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
+          {[{ value: "", label: placeholder }, ...options].map(opt => (
+            <li
+              key={`${opt.value}::${opt.label}`}
+              role="option"
+              aria-selected={`${opt.value}` === `${value}`}
+              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
+              onClick={() => {
+                onChange?.(opt.value || "");
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/* ========================================================================== */
+
+export default function VentaEditarCard({
+  open,
+  venta,                   // opcional: si viene completa, se usa
+  ventaId,                 // opcional: si viene id, se hace GET
+  ventas,                  // opcional: lista cache para buscar por id
+  onCancel,
+  onSaved,
+  inmobiliarias: propsInmob = [], // opcional
+}) {
+  /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
+  const [detalle, setDetalle] = useState(venta || null);
+  const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
+  const [saving, setSaving] = useState(false);
+
+  // evita múltiples llamados a inmobiliarias
+  const fetchedInmobRef = useRef(false);
+
+  // ancho de label como en VerCard
+  const [labelW, setLabelW] = useState(180);
+  const containerRef = useRef(null);
+
+  /* 2) GET de venta al abrir (igual patrón que VerCard) */
+  useEffect(() => {
+    let abort = false;
+    async function run() {
+      if (!open) return;
+
+      if (venta) { setDetalle(venta); return; }
+
+      if (ventaId != null && Array.isArray(ventas)) {
+        const found = ventas.find(v => `${v.id}` === `${ventaId}`);
+        if (found) { setDetalle(found); return; }
+      }
+
+      if (ventaId != null) {
+        try {
+          const full = await getVentaById(ventaId);
+          if (!abort) setDetalle(full);
+        } catch (e) {
+          console.error("getVentaById failed:", e);
+        }
+      }
+    }
+    run();
+    return () => { abort = true; };
+  }, [open, ventaId, ventas, venta]);
+
+  /* 3) GET de inmobiliarias UNA sola vez por apertura */
+  useEffect(() => {
+    let abort = false;
+
+    function normalizeList(raw) {
+      // Soporta 2 niveles (data.data) o 1 nivel (data)
+      const list =
+        raw?.data?.data?.inmobiliarias ??
+        raw?.data?.inmobiliarias ??
+        raw?.inmobiliarias ??
+        raw ?? [];
+      const arr = Array.isArray(list) ? list : [];
+      return arr
+        .map(x => ({
+          id: x.id ?? x.idInmobiliaria ?? x._id ?? "",
+          nombre: x.nombre ?? x.razonSocial ?? "Sin información",
+        }))
+        .filter(i => i.id);
+    }
+
+    async function run() {
+      if (!open || fetchedInmobRef.current) return;
+
+      // si vienen por props y tienen longitud, no llamo API
+      if (propsInmob && propsInmob.length) {
+        setInmobiliarias(normalizeList(propsInmob));
+        fetchedInmobRef.current = true;
+        return;
+      }
+
+      try {
+        const data = await getAllInmobiliarias();
+        const norm = normalizeList(data);
+        if (!abort) {
+          setInmobiliarias(norm);
+          fetchedInmobRef.current = true;
+        }
+      } catch (e) {
+        console.error("getAllInmobiliarias failed:", e);
+        if (!abort) {
+          setInmobiliarias([]);
+          fetchedInmobRef.current = true;
+        }
+      }
+    }
+    run();
+    return () => { abort = true; };
+    // importante: solo depende de "open" para no re-ejecutar en cada render
+  }, [open, propsInmob]);
+
+  /* 4) STATES EDITABLES derivados de 'detalle' */
+  // Fechas con todos los posibles nombres que vi en tu back
+  const fechaVentaISO =
+    detalle?.fechaVenta ?? detalle?.fecha_venta ?? null;
+  const fechaActISO =
+    detalle?.updatedAt ?? detalle?.fechaActualizacion ?? null;
+  const fechaCreISO =
+    detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
+
+  const initialInmobId =
+    detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
+
+  const base = {
+    estado: String(detalle?.estado ?? "INICIADA"),
+    monto: detalle?.monto != null ? String(detalle.monto) : "",
+    tipoPago: detalle?.tipoPago ?? "",
+    fechaVenta: toDateInputValue(fechaVentaISO),
+    plazoEscritura: toDateInputValue(detalle?.plazoEscritura),
+    inmobiliariaId: initialInmobId,
+  };
+
+  const [estado, setEstado] = useState(base.estado);
+  const [monto, setMonto] = useState(base.monto);
+  const [tipoPago, setTipoPago] = useState(base.tipoPago);
+  const [fechaVenta, setFechaVenta] = useState(base.fechaVenta);
+  const [plazoEscritura, setPlazoEscritura] = useState(base.plazoEscritura);
+  const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
+
+  // re-sync cuando cambia 'detalle' o se reabre
+  useEffect(() => {
+    if (!open || !detalle) return;
+    setEstado(base.estado);
+    setMonto(base.monto);
+    setTipoPago(base.tipoPago);
+    setFechaVenta(base.fechaVenta);
+    setPlazoEscritura(base.plazoEscritura);
+    setInmobiliariaId(base.inmobiliariaId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, detalle?.id]);
+
+  /* 5) ancho de label como en VerCard */
+  useEffect(() => {
+    const labels = [
+      "LOTE N°","MONTO","ESTADO DE VENTA","INMOBILIARIA","COMPRADOR","PROPIETARIO",
+      "FECHA VENTA","TIPO DE PAGO","PLAZO ESCRITURA","FECHA DE ACTUALIZACIÓN","FECHA DE CREACIÓN"
+    ];
+    const longest = Math.max(...labels.map(s => s.length));
+    const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
+    setLabelW(computed);
+  }, [open, detalle?.id]);
+
+  /* 6) Guardado (PATCH minimal y validado) */
   function buildPatch() {
     const patch = {};
 
-    // estado (con validación de transición)
-    if (canEditField({ estadoActual, field: "estado", hasReserva })) {
-      if (isValidTransition(estadoActual, estado) && String(estadoActual) !== String(estado)) {
-        patch.estado = estado;
+    if (estado !== (detalle?.estado ?? "")) patch.estado = estado;
+
+    if (monto !== (detalle?.monto != null ? String(detalle.monto) : "")) {
+      const n = Number(monto);
+      if (!(monto === "" || (Number.isFinite(n) && n >= 0))) {
+        throw new Error("El monto debe ser un número ≥ 0.");
       }
+      patch.monto = monto === "" ? null : n;
     }
 
-    // monto
-    if (canEditField({ estadoActual, field: "monto", hasReserva })) {
-      const err = validateMonto(monto);
-      if (err) throw new Error(err);
-      const prev = venta?.monto ?? null;
-      const next = monto === "" ? null : Number(monto);
-      if ((prev ?? null) !== (next ?? null)) patch.monto = next;
+    if ((detalle?.tipoPago ?? "") !== (tipoPago ?? "")) {
+      patch.tipoPago = tipoPago || null;
     }
 
-    // tipoPago
-    if (canEditField({ estadoActual, field: "tipoPago", hasReserva })) {
-      const prev = venta?.tipoPago ?? "";
-      const next = tipoPago ?? "";
-      if (String(prev) !== String(next)) patch.tipoPago = next || null;
+    const prevFV = toDateInputValue(fechaVentaISO);
+    if (prevFV !== fechaVenta) {
+      patch.fechaVenta = fechaVenta ? fromDateInputToISO(fechaVenta) : null;
     }
 
-    // fechaVenta
-    if (canEditField({ estadoActual, field: "fechaVenta", hasReserva })) {
-      if (fechaVenta) {
-        const err = validateFecha(fechaVenta);
-        if (err) throw new Error(err);
-      }
-      const prevISO = venta?.fechaVenta ? toDateInputValue(venta.fechaVenta) : "";
-      if (prevISO !== fechaVenta) {
-        patch.fechaVenta = fechaVenta ? fromDateInputToISO(fechaVenta) : null;
-      }
+    const prevPE = toDateInputValue(detalle?.plazoEscritura);
+    if (prevPE !== plazoEscritura) {
+      patch.plazoEscritura = plazoEscritura ? fromDateInputToISO(plazoEscritura) : null;
     }
 
-    // plazoEscritura
-    if (canEditField({ estadoActual, field: "plazoEscritura", hasReserva })) {
-      if (plazoEscritura) {
-        const err = validateFecha(plazoEscritura);
-        if (err) throw new Error(err);
-      }
-      const prevISO = venta?.plazoEscritura ? toDateInputValue(venta.plazoEscritura) : "";
-      if (prevISO !== plazoEscritura) {
-        patch.plazoEscritura = plazoEscritura ? fromDateInputToISO(plazoEscritura) : null;
-      }
+    const prevInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
+    if (prevInmob !== (inmobiliariaId ?? "")) {
+      patch.inmobiliariaId = inmobiliariaId || null;
     }
 
     return patch;
   }
 
-  function handleSave() {
+  async function handleSave() {
     try {
+      setSaving(true);
       const patch = buildPatch();
-      if (Object.keys(patch).length === 0) {
-        onCancel?.(); // No hay cambios, cierro.
-        return;
-      }
-      onSave?.(patch);
+      if (Object.keys(patch).length === 0) { onCancel?.(); return; }
+      const updated = await updateVenta(detalle.id, patch);
+      onSaved?.(updated);
+      onCancel?.();
     } catch (e) {
-      console.error("Validación de formulario:", e?.message || e);
-      alert(e?.message || "Revisá los datos ingresados.");
+      console.error("Error guardando venta:", e);
+      alert(e?.message || "No se pudo guardar la venta.");
+    } finally {
+      setSaving(false);
     }
   }
 
-  // Helpers de readonly para inputs
-  const ro = {
-    estado: !canEditField({ estadoActual, field: "estado", hasReserva }) || saving,
-    monto: !canEditField({ estadoActual, field: "monto", hasReserva }) || saving,
-    tipoPago: !canEditField({ estadoActual, field: "tipoPago", hasReserva }) || saving,
-    fechaVenta: !canEditField({ estadoActual, field: "fechaVenta", hasReserva }) || saving,
-    plazoEscritura: !canEditField({ estadoActual, field: "plazoEscritura", hasReserva }) || saving,
-  };
+  function handleReset() {
+    setEstado(base.estado);
+    setMonto(base.monto);
+    setTipoPago(base.tipoPago);
+    setFechaVenta(base.fechaVenta);
+    setPlazoEscritura(base.plazoEscritura);
+    setInmobiliariaId(base.inmobiliariaId);
+  }
+
+  /* 7) Render */
+  const NA = "Sin información";
+
+  const compradorNombre = (() => {
+    const n = detalle?.comprador?.nombre, a = detalle?.comprador?.apellido;
+    const j = [n, a].filter(Boolean).join(" ");
+    return j || NA;
+  })();
+
+  const propietarioNombre = (() => {
+    // 1) propietario directo
+    const p1 = detalle?.propietario;
+    // 2) propietario del lote (fallback)
+    const p2 = detalle?.lote?.propietario;
+    // 3) nombre plano opcional
+    const nombrePlano = detalle?.propietarioNombre;
+    const p = p1 || p2;
+
+    if (p) {
+      const n = p?.nombre, a = p?.apellido;
+      const j = [n, a].filter(Boolean).join(" ");
+      return j || NA;
+    }
+    return nombrePlano || NA;
+  })();
+
+  const fechaAct = fechaActISO
+    ? new Date(fechaActISO).toLocaleDateString("es-AR")
+    : NA;
+  const fechaCre = fechaCreISO
+    ? new Date(fechaCreISO).toLocaleDateString("es-AR")
+    : NA;
+
+  if (!open || !detalle) return null;
 
   return (
     <EditarBase
       open={open}
-      title={`Editar Venta #${venta?.id ?? "—"}`}
-      badges={badges}
-      tabs={[]}
-      activeTab={undefined}
-      onTabChange={undefined}
+      title={`Venta N° ${detalle?.id ?? "—"}`}
       onCancel={onCancel}
       onSave={handleSave}
+      onReset={handleReset}
       saving={saving}
     >
-      <div className="grid grid-12">
-        {/* Estado */}
-        <div className="col-6">
-          <div className="label">Estado</div>
-          <select
-            className="field"
-            value={estado}
-            onChange={(e) => setEstado(e.target.value)}
-            disabled={ro.estado}
-          >
-            {ESTADOS.map(op => <option key={op} value={op}>{op}</option>)}
-          </select>
-        </div>
+      {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
+      <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
+        <h3 className="venta-section-title">Información de la venta</h3>
 
-        {/* Monto */}
-        <div className="col-6">
-          <div className="label">Monto</div>
-          <input
-            className="field"
-            type="number"
-            inputMode="decimal"
-            min="0"
-            value={monto}
-            onChange={(e) => setMonto(e.target.value)}
-            disabled={ro.monto}
-          />
-        </div>
+        <div className="venta-grid" ref={containerRef}>
+          {/* Columna izquierda */}
+          <div className="venta-col">
+            <div className="field-row">
+              <div className="field-label">LOTE N°</div>
+              <div className="field-value is-readonly">{detalle?.loteId ?? NA}</div>
+            </div>
 
-        {/* Tipo de pago */}
-        <div className="col-6">
-          <div className="label">Tipo de pago</div>
-          <select
-            className="field"
-            value={tipoPago}
-            onChange={(e) => setTipoPago(e.target.value)}
-            disabled={ro.tipoPago}
-          >
-            <option value="">—</option>
-            {TIPOS_PAGO.map(op => <option key={op} value={op}>{op}</option>)}
-          </select>
-        </div>
+            <div className="field-row">
+              <div className="field-label">MONTO</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                />
+              </div>
+            </div>
 
-        {/* Plazo de escritura */}
-        <div className="col-6">
-          <div className="label">Plazo escritura</div>
-          <input
-            className="field"
-            type="date"
-            value={plazoEscritura}
-            onChange={(e) => setPlazoEscritura(e.target.value)}
-            disabled={ro.plazoEscritura}
-          />
-        </div>
+            <div className="field-row">
+              <div className="field-label">ESTADO DE VENTA</div>
+              <div className="field-value p0">
+                <NiceSelect
+                  value={estado}
+                  options={ESTADOS}
+                  placeholder="Sin información"
+                  onChange={setEstado}
+                />
+              </div>
+            </div>
 
-        {/* Fecha de venta */}
-        <div className="col-6">
-          <div className="label">Fecha de venta</div>
-          <input
-            className="field"
-            type="date"
-            value={fechaVenta}
-            onChange={(e) => setFechaVenta(e.target.value)}
-            disabled={ro.fechaVenta}
-          />
-        </div>
+            <div className="field-row">
+              <div className="field-label">INMOBILIARIA</div>
+              <div className="field-value p0">
+                <NiceSelect
+                  value={inmobiliariaId || ""}
+                  options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+                  placeholder="Sin información"
+                  onChange={setInmobiliariaId}
+                />
+              </div>
+            </div>
 
-        {/* Contexto solo lectura */}
-        <div className="col-6">
-          <div className="label">Comprador</div>
-          <div className="value">
-            {venta?.comprador?.nombre
-              ? `${venta.comprador.nombre} ${venta.comprador.apellido ?? ""}`.trim()
-              : "—"}
+            <div className="field-row">
+              <div className="field-label">COMPRADOR</div>
+              <div className="field-value is-readonly">{compradorNombre}</div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">PROPIETARIO</div>
+              <div className="field-value is-readonly">{propietarioNombre}</div>
+            </div>
           </div>
-        </div>
 
-        <div className="col-6">
-          <div className="label">Inmobiliaria</div>
-          <div className="value">
-            {venta?.inmobiliaria?.nombre ?? "La Federala"}
+          {/* Columna derecha */}
+          <div className="venta-col">
+            <div className="field-row">
+              <div className="field-label">FECHA VENTA</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="date"
+                  value={fechaVenta}
+                  onChange={(e) => setFechaVenta(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">TIPO DE PAGO</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="text"
+                  value={tipoPago}
+                  onChange={(e) => setTipoPago(e.target.value)}
+                  placeholder="Contado, Transferencia, Cuotas…"
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">PLAZO ESCRITURA</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="date"
+                  value={plazoEscritura}
+                  onChange={(e) => setPlazoEscritura(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">FECHA DE ACTUALIZACIÓN</div>
+              <div className="field-value is-readonly">{fechaAct}</div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">FECHA DE CREACIÓN</div>
+              <div className="field-value is-readonly">{fechaCre}</div>
+            </div>
           </div>
-        </div>
-
-        <div className="col-6">
-          <div className="label">ID Lote</div>
-          <div className="value">{venta?.loteId ?? "—"}</div>
         </div>
       </div>
     </EditarBase>
