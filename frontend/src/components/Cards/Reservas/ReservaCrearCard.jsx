@@ -123,9 +123,11 @@ export default function ReservaCrearCard({
         const resp = await getAllLotes({});
         const lotesData = resp?.data || [];
         // Normalizar lotes para el select - solo DISPONIBLE
+        // Asegurar que solo se incluyan lotes con estado DISPONIBLE (no RESERVADO, VENDIDO, ALQUILADO, etc.)
         const lotesNormalizados = lotesData
           .filter(l => {
-            const estado = (l.estado || l.status || "").toUpperCase();
+            const estado = String(l.estado || l.status || "").trim().toUpperCase();
+            // Solo permitir lotes DISPONIBLES
             return estado === "DISPONIBLE";
           })
           .map(l => {
@@ -519,9 +521,9 @@ export default function ReservaCrearCard({
                 </div>
               </div>
 
-              <div className="field-row">
-                <div className="field-label">LOTE ASOCIADO</div>
-                <div className="field-value p0" style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch" }}>
+              <div className="field-row" style={{ alignItems: "flex-start" }}>
+                <div className="field-label" style={{ alignSelf: "flex-start", paddingTop: "11.5px" }}>LOTE ASOCIADO</div>
+                <div className="field-value p0" style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", alignSelf: "stretch" }}>
                   <div style={{ position: "relative", width: "100%" }}>
                     <input
                       type="text"
