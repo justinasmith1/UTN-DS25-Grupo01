@@ -31,7 +31,7 @@ function fromDateInputToISO(s) {
 }
 
 /* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
+function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const listRef = useRef(null);
@@ -66,7 +66,7 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
 
       {open && (
         <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {[{ value: "", label: placeholder }, ...options].map(opt => (
+          {(showPlaceholderOption ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
             <li
               key={`${opt.value}::${opt.label}`}
               role="option"
@@ -471,7 +471,8 @@ export default function ReservaEditarCard({
                   <NiceSelect
                     value={inmobiliariaId || ""}
                     options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                    placeholder="Sin información"
+                    placeholder=""
+                    showPlaceholderOption={false}
                     onChange={setInmobiliariaId}
                   />
                 </div>
@@ -483,7 +484,8 @@ export default function ReservaEditarCard({
                   <NiceSelect
                     value={estado}
                     options={ESTADOS_RESERVA}
-                    placeholder="Sin información"
+                    placeholder=""
+                    showPlaceholderOption={false}
                     onChange={setEstado}
                   />
                 </div>

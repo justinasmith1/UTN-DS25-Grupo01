@@ -9,7 +9,10 @@ import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
 import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
 import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
 import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
+import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
+import { getAllReservas, getReservaById } from "../lib/api/reservas";
+import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 
 /**
  * Dashboard
@@ -34,12 +37,52 @@ export default function Dashboard() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openReservaCrear, setOpenReservaCrear] = useState(false);
+  const [openReservaVer, setOpenReservaVer] = useState(false);
+  const [reservaSel, setReservaSel] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
 
   // Callbacks normalizados
   const goRegistrarVenta = (lot) =>
     navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
+
+  const handleReservarLote = useCallback(async (lot) => {
+    if (!lot) return;
+    setLoteSel(lot);
+    setOpenVer(false);
+    
+    // Verificar si el lote está RESERVADO
+    const estadoUpper = String(lot?.estado || "").toUpperCase();
+    if (estadoUpper === "RESERVADO") {
+      // Buscar la reserva ACTIVA para este lote
+      try {
+        const reservasResp = await getAllReservas({});
+        const allReservas = reservasResp?.data || [];
+        const reservaActiva = allReservas.find(
+          (r) => 
+            (r.loteId || r.lote?.id) === lot.id &&
+            String(r.estado || "").toUpperCase() === "ACTIVA"
+        );
+        
+        if (reservaActiva) {
+          // Abrir el modal de ver reserva
+          setReservaSel(reservaActiva);
+          setOpenReservaVer(true);
+        } else {
+          // Si no hay reserva activa, permitir crear (caso edge)
+          setOpenReservaCrear(true);
+        }
+      } catch (err) {
+        console.error("Error buscando reserva:", err);
+        // En caso de error, abrir crear
+        setOpenReservaCrear(true);
+      }
+    } else {
+      // Si no está reservado, abrir crear
+      setOpenReservaCrear(true);
+    }
+  }, []);
 
   const mergeUpdatedLote = useCallback((updated) => {
     if (!updated || updated.id == null) return;
@@ -193,6 +236,21 @@ export default function Dashboard() {
   const [allLotes, setAllLotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Cargar datos completos de la reserva cuando se abre el modal
+  useEffect(() => {
+    if (openReservaVer && reservaSel?.id) {
+      (async () => {
+        try {
+          const resp = await getReservaById(reservaSel.id);
+          const detail = resp?.data ?? resp ?? {};
+          setReservaSel((prev) => ({ ...(prev || reservaSel), ...(detail || {}) }));
+        } catch (e) {
+          console.error("Error obteniendo reserva por id:", e);
+        }
+      })();
+    }
+  }, [openReservaVer, reservaSel?.id]);
+
   // Cargar todos los lotes al montar el componente
   useEffect(() => {
     let alive = true;
@@ -296,7 +354,7 @@ export default function Dashboard() {
           setOpenVer(false);
           onEditar(lot);
         }}
-        onReserve={goRegistrarVenta}
+        onReserve={handleReservarLote}
         onUpdated={mergeUpdatedLote}
       />
 
@@ -316,6 +374,35 @@ export default function Dashboard() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <ReservaVerCard
+        open={openReservaVer}
+        reserva={reservaSel}
+        reservas={[]}
+        onClose={() => {
+          setOpenReservaVer(false);
+          setReservaSel(null);
+        }}
+        onEdit={(reserva) => {
+          setOpenReservaVer(false);
+          // Redirigir a la página de reservas para editar
+          navigate(`/reservas`);
+        }}
+      />
+
+      <ReservaCrearCard
+        open={openReservaCrear}
+        onCancel={() => {
+          setOpenReservaCrear(false);
+          setLoteSel(null);
+        }}
+        onCreated={(newReserva) => {
+          setOpenReservaCrear(false);
+          setLoteSel(null);
+          // Opcional: mostrar mensaje de éxito o actualizar lista
+        }}
+        loteIdPreSeleccionado={loteSel?.id}
       />
 
       {/* Animación de éxito al eliminar */}

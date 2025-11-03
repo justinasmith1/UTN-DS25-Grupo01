@@ -23,6 +23,7 @@ import { applyVentaFilters } from "../utils/applyVentaFilters";
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
 import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.jsx";
+import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
 
@@ -87,6 +88,7 @@ const enrichVenta = (v, personasById = {}, inmosById = {}) => {
 export default function VentasPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const crearParam = searchParams.get('crear') === 'true';
   const searchParamsString = searchParams.toString();
   const selectedInmobiliariaParam = useMemo(() => {
     const params = new URLSearchParams(searchParamsString);
@@ -243,6 +245,20 @@ export default function VentasPage() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openCrear, setOpenCrear] = useState(false);
+  
+  // Abrir modal de crear cuando el parámetro crear=true
+  useEffect(() => {
+    if (crearParam) {
+      setOpenCrear(true);
+      // Limpiar el parámetro de la URL
+      setSearchParams((prev) => {
+        const newParams = new URLSearchParams(prev);
+        newParams.delete('crear');
+        return newParams;
+      });
+    }
+  }, [crearParam, setSearchParams]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -453,6 +469,13 @@ export default function VentasPage() {
         onConfirm={handleDelete}
       />
 
+      <VentaCrearCard
+        open={openCrear}
+        onCancel={() => setOpenCrear(false)}
+        onCreated={() => setOpenCrear(false)}
+        loteIdPreSeleccionado={new URLSearchParams(searchParamsString).get("lotId")}
+      />
+
       {/* Dropdown de documentos */}
       <DocumentoDropdown
         open={openDocumentoDropdown}
@@ -466,6 +489,10 @@ export default function VentasPage() {
       <DocumentoVerCard
         open={openDocumentoVer}
         onClose={handleCerrarDocumentoVer}
+        onVolverAtras={() => {
+          setOpenDocumentoVer(false);
+          setOpenDocumentoDropdown(true);
+        }}
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
         loteNumero={ventaSel?.loteId || ventaSel?.lote?.id}

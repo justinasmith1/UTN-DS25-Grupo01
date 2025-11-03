@@ -28,15 +28,15 @@ export default function ModulePills() {
   const MENU = useMemo(() => ({
     ventas: [
       { label: 'Ver Ventas', to: '/ventas', disabled: false },
-      { label: 'Registrar Ventas', to: null, disabled: true },
+      { label: 'Registrar Venta', to: '/ventas?crear=true', disabled: false },
     ],
     inmobiliarias: [
       { label: 'Ver Inmobiliarias', to: '/inmobiliarias', disabled: false },
-      { label: 'Registrar Inmobiliaria', to: null, disabled: true },
+      { label: 'Registrar Inmobiliaria', to: '/inmobiliarias?crear=true', disabled: false },
     ],
     reservas: [
       { label: 'Ver Reservas', to: '/reservas', disabled: false },
-      { label: 'Registrar Reserva', to: null, disabled: true },
+      { label: 'Registrar Reserva', to: '/reservas?crear=true', disabled: false },
     ],
     reportes: [
       { label: 'Ver Reportes', to: '/reportes', disabled: false },
