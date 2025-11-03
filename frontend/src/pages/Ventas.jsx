@@ -1,13 +1,15 @@
 // src/pages/Ventas.jsx
 // Página de Ventas: lista, filtra y abre modales de Ver / Editar / Eliminar.
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 
 import {
   getAllVentas,
   getVentaById,          // <-- agregado
+  getVentasByInmobiliaria,
   updateVenta,
   deleteVenta,
 } from "../lib/api/ventas";
@@ -82,6 +84,24 @@ const enrichVenta = (v, personasById = {}, inmosById = {}) => {
 
 export default function VentasPage() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParamsString = searchParams.toString();
+  const selectedInmobiliariaParam = useMemo(() => {
+    const params = new URLSearchParams(searchParamsString);
+    const raw = params.get("inmobiliariaId");
+    if (raw == null) return null;
+    const trimmed = raw.trim();
+    return trimmed.length ? trimmed : null;
+  }, [searchParamsString]);
+  const selectedInmobiliariaRequest = useMemo(() => {
+    if (selectedInmobiliariaParam == null) return null;
+    const parsed = Number(selectedInmobiliariaParam);
+    return Number.isFinite(parsed) ? parsed : selectedInmobiliariaParam;
+  }, [selectedInmobiliariaParam]);
+  const selectedInmobiliariaKey =
+    selectedInmobiliariaParam != null ? selectedInmobiliariaParam : null;
+  const lastAppliedInmoRef = useRef(null);
+  const hasSyncedInitialInmoRef = useRef(false);
 
   // Datos
   const [ventas, setVentas] = useState([]);
@@ -93,7 +113,7 @@ export default function VentasPage() {
   const [filters, setFilters] = useState({
     texto: "",
     tipoPago: [],
-    inmobiliarias: [],
+    inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
     fechaVentaMin: null,
     fechaVentaMax: null,
     montoMin: null,
@@ -111,8 +131,12 @@ export default function VentasPage() {
     (async () => {
       setIsLoading(true);
       try {
+        const ventasRequest =
+          selectedInmobiliariaRequest != null
+            ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
+            : getAllVentas({});
         const [ventasResp, personasResp, inmosResp] = await Promise.all([
-          getAllVentas({}),
+          ventasRequest,
           getAllPersonas({}),
           getAllInmobiliarias({}),
         ]);
@@ -143,7 +167,68 @@ export default function VentasPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest]);
+
+  useEffect(() => {
+    const target = selectedInmobiliariaKey;
+    if (target) {
+      if (lastAppliedInmoRef.current === target) return;
+      setFilters((prev) => {
+        const prevIds = Array.isArray(prev.inmobiliarias)
+          ? prev.inmobiliarias.map(String)
+          : [];
+        if (prevIds.length === 1 && prevIds[0] === target) return prev;
+        return { ...prev, inmobiliarias: [target] };
+      });
+      lastAppliedInmoRef.current = target;
+      hasSyncedInitialInmoRef.current = true;
+      return;
+    }
+
+    if (!lastAppliedInmoRef.current) return;
+    const lastId = lastAppliedInmoRef.current;
+    lastAppliedInmoRef.current = null;
+    hasSyncedInitialInmoRef.current = true;
+    setFilters((prev) => {
+      const prevIds = Array.isArray(prev.inmobiliarias)
+        ? prev.inmobiliarias.map(String)
+        : [];
+      if (prevIds.length === 1 && prevIds[0] === lastId) {
+        return { ...prev, inmobiliarias: [] };
+      }
+      return prev;
+    });
+  }, [selectedInmobiliariaKey]);
+
+  useEffect(() => {
+    if (!hasSyncedInitialInmoRef.current) return;
+    const currentIds = Array.isArray(filters.inmobiliarias)
+      ? filters.inmobiliarias.map(String)
+      : [];
+    const currentMatchesParam =
+      selectedInmobiliariaKey != null
+        ? currentIds.includes(selectedInmobiliariaKey)
+        : currentIds.length === 0;
+
+    if (currentMatchesParam) return;
+
+    const next = new URLSearchParams(searchParamsString);
+    if (selectedInmobiliariaKey == null) {
+      if (next.has("inmobiliariaId")) {
+        next.delete("inmobiliariaId");
+        setSearchParams(next, { replace: true });
+      }
+      return;
+    }
+
+    next.set("inmobiliariaId", selectedInmobiliariaKey);
+    setSearchParams(next, { replace: true });
+  }, [
+    filters.inmobiliarias,
+    selectedInmobiliariaKey,
+    searchParamsString,
+    setSearchParams,
+  ]);
 
   // Aplicar filtros
   const ventasFiltradas = useMemo(

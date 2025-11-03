@@ -111,6 +111,9 @@ async function mockGetById(id)        { ensureSeed(); return ok(VENTAS.find((v) 
 async function mockCreate(payload)     { ensureSeed(); const row = fromApi({ ...toApi(payload), id: nextId() }); VENTAS.unshift(row); return ok(row); }
 async function mockUpdate(id, payload) { ensureSeed(); const idx = VENTAS.findIndex((v) => String(v.id) === String(id)); if (idx < 0) throw new Error("Venta no encontrada"); const row = { ...VENTAS[idx], ...fromApi(toApi(payload)) }; VENTAS[idx] = row; return ok(row); }
 async function mockDelete(id)          { ensureSeed(); const i = VENTAS.findIndex((v) => String(v.id) === String(id)); if (i < 0) throw new Error("Venta no encontrada"); VENTAS.splice(i, 1); return ok(true); }
+async function mockGetByInmobiliaria(inmobiliariaId, params = {}) {
+  return mockGetAll({ ...params, inmobiliariaId });
+}
 
 /* ------------------------------ MODO API ------------------------------ */
 async function apiGetAll(params = {}) {
@@ -145,6 +148,44 @@ async function apiGetById(id) {
   };
   
   return ok(normalized);
+}
+
+async function apiGetByInmobiliaria(inmobiliariaId, params = {}) {
+  const res = await fetchWithFallback(
+    `${PRIMARY}/inmobiliaria/${inmobiliariaId}${qs(params)}`,
+    { method: "GET" }
+  );
+  const data = await res.json().catch(() => ({}));
+
+  if (res.status === 404) {
+    return {
+      data: [],
+      meta: {
+        total: 0,
+        page: Number(params.page || 1),
+        pageSize: Number(params.pageSize || 0),
+      },
+      message: data?.message,
+    };
+  }
+
+  if (!res.ok) {
+    throw new Error(
+      data?.message || "Error al cargar ventas de la inmobiliaria"
+    );
+  }
+
+  const arr = normalizeApiListResponse(data);
+  const mapped = arr.map(fromApi);
+
+  return {
+    data: mapped,
+    meta: {
+      total: Number(data?.total ?? mapped.length) || mapped.length,
+      page: Number(params.page || 1),
+      pageSize: Number(params.pageSize || mapped.length),
+    },
+  };
 }
 
 async function apiCreate(payload) {
@@ -210,3 +251,6 @@ export function getVentaById(id)      { return USE_MOCK ? mockGetById(id)     : 
 export function createVenta(payload)  { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
 export function updateVenta(id,data)  { return USE_MOCK ? mockUpdate(id,data) : apiUpdate(id,data); }
 export function deleteVenta(id)       { return USE_MOCK ? mockDelete(id)      : apiDelete(id); }
+export function getVentasByInmobiliaria(id, params) {
+  return USE_MOCK ? mockGetByInmobiliaria(id, params) : apiGetByInmobiliaria(id, params);
+}
