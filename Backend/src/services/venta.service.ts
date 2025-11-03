@@ -29,6 +29,20 @@ export async function getVentaById(id: number): Promise<Venta> {
 
 }
 
+export async function getVentasByInmobiliaria(inmobiliariaId: number): Promise<Venta[]> {
+    const ventas = await prisma.venta.findMany({
+        where: { inmobiliariaId },
+        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        orderBy: { fechaVenta: 'desc' },
+    });
+    if (ventas.length === 0) {
+        const error = new Error('No se registran ventas para la inmobiliaria indicada') as any;
+        error.statusCode = 404;
+        throw error;
+    }
+    return ventas;
+}
+
 export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     const loteExists = await prisma.lote.findUnique({
         where: { id: data.loteId },

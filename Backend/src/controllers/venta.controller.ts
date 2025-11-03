@@ -17,6 +17,20 @@ export async function obtenerTodos(req: Request, res: Response, next: NextFuncti
 }
 
 // ========================
+// Obtener ventas por inmobiliaria
+// ========================
+
+export async function obtenerVentasPorInmobiliaria(req: Request, res: Response, next: NextFunction) {
+    try {
+        const inmobiliariaId = parseInt(req.params.id);
+        const result = await ventaService.getVentasByInmobiliaria(inmobiliariaId);
+        res.json({ success: true, data: result });
+    } catch (error) {
+        next(error);
+    }
+}
+
+// ========================
 // Obtener venta por ID
 // ========================
 
