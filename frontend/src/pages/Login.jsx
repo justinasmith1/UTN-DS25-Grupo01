@@ -5,10 +5,8 @@ import { useState } from "react";
 import { useAuth } from "../app/providers/AuthProvider";
 import { Form, Button, Card, InputGroup } from "react-bootstrap";
 import { Eye, EyeOff } from 'lucide-react';
-
-
-const BG_IMAGE = "src/assets/La-Federala-Club-de-Campo-Lobos-Home-11.jpg"; // opcional: "/ruta/a/tu/fondo.jpg"
-const LOGO_IMAGE = "src/assets/logoCompleto.png"; // opcional: "/ruta/a/tu/logo.png"
+import BG_IMAGE from "../assets/La-Federala-Club-de-Campo-Lobos-Home-11.jpg";
+import LOGO_IMAGE from "../assets/logoCompleto.png";
 
 export default function Login() {
   const { login } = useAuth();
