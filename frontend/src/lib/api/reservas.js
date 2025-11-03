@@ -42,9 +42,9 @@ const toApi = (data = {}) => ({
   loteId: data.loteId,
   clienteId: data.clienteId,
   fechaReserva: data.fechaReserva,
-  sena: data.sena ?? data.seña,
-  inmobiliariaId: data.inmobiliariaId,
-  estado: data.estado,
+  sena: data.sena ?? data.seña ?? null,
+  inmobiliariaId: data.inmobiliariaId ?? null,
+  // estado no se envía en create, se asigna automáticamente como ACTIVA en el backend
 });
 
 // ===== MOCK DATA =====
@@ -282,23 +282,30 @@ export const createReserva = async (data) => {
   }
 
   try {
+    const body = toApi(data);
     const response = await http('/reservas', {
       method: 'POST',
-      body: JSON.stringify(toApi(data))
+      body: body
     });
 
+    // Parsear respuesta JSON de manera segura
+    const resData = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = resData?.message || resData?.errors?.[0]?.message || "Error al crear reserva";
+      throw new Error(errorMsg);
+    }
+
+    const raw = resData?.data ?? resData?.reserva ?? resData;
+    
     return {
       success: true,
-      data: response.data || response.reserva,
-      message: response.message || 'Reserva creada correctamente'
+      data: raw,
+      message: resData?.message || 'Reserva creada correctamente'
     };
   } catch (error) {
     console.error('❌ Error creando reserva:', error);
-    return {
-      success: false,
-      data: null,
-      message: error.message || 'Error al crear reserva'
-    };
+    throw error; // Lanzar error para que el componente lo maneje
   }
 };
 

@@ -1,6 +1,63 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
+import { getAllFracciones } from "../../../lib/api/fracciones.js";
+
+/* ----------------------- Select custom sin librerías ----------------------- */
+function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
+
+  return (
+    <div className="ns-wrap" style={{ position: "relative" }}>
+      <button
+        type="button"
+        ref={btnRef}
+        className="ns-trigger"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
+          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
+          {(placeholder ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
+            <li
+              key={`${opt.value}::${opt.label}`}
+              role="option"
+              aria-selected={`${opt.value}` === `${value}`}
+              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
+              onClick={() => {
+                onChange?.(opt.value || "");
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 const TIPOS = [
   { value: "Lote Venta", label: "Lote Venta" },
@@ -117,6 +174,32 @@ const buildInitialForm = (lot) => {
 
   const images = Array.isArray(lot?.images) ? lot.images : [];
 
+  // Calcular superficie si hay frente y fondo
+  const frente = lot?.frente ?? "";
+  const fondo = lot?.fondo ?? "";
+  let superficie = lot?.superficie ?? lot?.surface ?? "";
+  
+  // Si tenemos frente y fondo pero no superficie, calcularla
+  if (frente && fondo && !superficie) {
+    const f = Number(frente);
+    const fo = Number(fondo);
+    if (!isNaN(f) && !isNaN(fo) && f >= 0 && fo >= 0) {
+      superficie = String(f * fo);
+    }
+  } else if (frente && fondo) {
+    // Validar que la superficie coincida con frente × fondo
+    const f = Number(frente);
+    const fo = Number(fondo);
+    const sup = Number(superficie);
+    if (!isNaN(f) && !isNaN(fo) && !isNaN(sup) && f >= 0 && fo >= 0 && sup >= 0) {
+      const calculated = f * fo;
+      // Si la superficie no coincide, recalcularla
+      if (Math.abs(sup - calculated) > 0.01) {
+        superficie = String(calculated);
+      }
+    }
+  }
+
   return {
     id: lot.id ?? "",
     tipo: toFriendly(lot?.tipo),
@@ -127,9 +210,9 @@ const buildInitialForm = (lot) => {
     fraccionNumero,
     propietarioId: lot?.propietarioId ?? propietario?.id ?? "",
     propietarioNombre: propietarioNombre || lot?.owner || "",
-    superficie: lot?.superficie ?? lot?.surface ?? "",
-    frente: lot?.frente ?? "",
-    fondo: lot?.fondo ?? "",
+    superficie,
+    frente: String(frente),
+    fondo: String(fondo),
     precio: lot?.precio ?? lot?.price ?? "",
     alquiler: Boolean(lot?.alquiler),
     deuda: Boolean(lot?.deuda),
@@ -151,6 +234,7 @@ export default function LoteEditarCard({
   lote,
   loteId,
   lotes,
+  entityType = "Lote", // tipo de entidad para el mensaje de éxito
 }) {
   const [detalle, setDetalle] = useState(lote || null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
@@ -158,6 +242,29 @@ export default function LoteEditarCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [newImageUrl, setNewImageUrl] = useState("");
+  const [fracciones, setFracciones] = useState([]);
+  const [loadingFracciones, setLoadingFracciones] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  // Cargar fracciones al montar o abrir
+  useEffect(() => {
+    if (!open) return;
+    if (fracciones.length > 0) return; // Ya están cargadas
+    
+    setLoadingFracciones(true);
+    (async () => {
+      try {
+        const resp = await getAllFracciones();
+        if (resp.success && resp.data?.fracciones) {
+          setFracciones(resp.data.fracciones);
+        }
+      } catch (err) {
+        console.error("Error cargando fracciones:", err);
+      } finally {
+        setLoadingFracciones(false);
+      }
+    })();
+  }, [open, fracciones.length]);
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
@@ -197,14 +304,48 @@ export default function LoteEditarCard({
   }, [open, detalle, loteId, loadingDetalle]);
 
   useEffect(() => {
+    if (!open) {
+      setShowSuccess(false);
+      setSaving(false);
+      return;
+    }
     if (!detalle) return;
     setForm(buildInitialForm(detalle));
     setNewImageUrl("");
     setError(null);
+    setShowSuccess(false);
   }, [detalle, open]);
 
+  // Resetear estados cuando el modal se cierra o se abre con otro lote
+  useEffect(() => {
+    if (!open) {
+      setSaving(false);
+      setShowSuccess(false);
+    } else {
+      // Resetear estados al abrir con un nuevo lote
+      setSaving(false);
+      setShowSuccess(false);
+    }
+  }, [open, detalle?.id]);
+
   const updateForm = (patch) => {
-    setForm((prev) => ({ ...prev, ...patch }));
+    setForm((prev) => {
+      const updated = { ...prev, ...patch };
+      
+      // Calcular superficie automáticamente cuando cambian frente o fondo
+      if ('frente' in patch || 'fondo' in patch) {
+        const frente = toNumberOrNull(updated.frente);
+        const fondo = toNumberOrNull(updated.fondo);
+        if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
+          updated.superficie = String(frente * fondo);
+        } else {
+          // Si falta alguno, limpiar superficie
+          updated.superficie = "";
+        }
+      }
+      
+      return updated;
+    });
   };
 
   const handleReset = () => {
@@ -266,13 +407,22 @@ export default function LoteEditarCard({
     const numPartido = toNumberOrNull(form.numPartido);
     if (numPartido != null) payload.numPartido = numPartido;
 
-    const superficie = toNumberOrNull(form.superficie);
-    if (superficie != null) payload.superficie = superficie;
-
+    // Calcular superficie automáticamente si hay frente y fondo
     const frente = toNumberOrNull(form.frente);
-    if (frente != null) payload.frente = frente;
-
     const fondo = toNumberOrNull(form.fondo);
+    let superficie = toNumberOrNull(form.superficie);
+    
+    // Si tenemos frente y fondo, calcular superficie automáticamente
+    if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
+      superficie = frente * fondo;
+    }
+    
+    // Solo enviar superficie si tiene un valor válido
+    if (superficie != null && superficie >= 0) {
+      payload.superficie = superficie;
+    }
+
+    if (frente != null) payload.frente = frente;
     if (fondo != null) payload.fondo = fondo;
 
     const precio = toNumberOrNull(form.precio);
@@ -322,33 +472,115 @@ export default function LoteEditarCard({
 
       setDetalle(enriched);
       onSaved?.(enriched);
+      
+      // Mostrar animación de éxito
+      setShowSuccess(true);
+      
+      // Esperar un momento para mostrar la animación antes de cerrar
+      setTimeout(() => {
+        setShowSuccess(false);
+        setSaving(false);
+        onCancel?.();
+      }, 1500);
     } catch (err) {
       console.error("Error guardando lote:", err);
       setError(
         err?.message ||
           "No se pudo guardar el lote. Intenta nuevamente."
       );
-    } finally {
       setSaving(false);
     }
   };
 
-  if (!open) return null;
+  // Renderizar animación incluso si el modal se está cerrando
+  if (!open && !showSuccess) return null;
 
   return (
-    <EditarBase
-      open={open}
-      title={`Editar Lote Nº ${form.id || ""}`}
-      onCancel={onCancel}
-      onSave={handleSave}
-      onReset={detalle ? handleReset : undefined}
-      saving={saving}
-      headerRight={
-        loadingDetalle ? (
-          <span className="badge bg-warning text-dark">Cargando...</span>
-        ) : null
-      }
-    >
+    <>
+      {/* Animación de éxito - se muestra incluso si open es false */}
+      {showSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 10000,
+            animation: "fadeIn 0.2s ease-in",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "32px 48px",
+              borderRadius: "12px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "#10b981",
+                display: "grid",
+                placeItems: "center",
+                animation: "checkmark 0.5s ease-in-out",
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "20px",
+                fontWeight: 600,
+                color: "#111",
+              }}
+            >
+              ¡{entityType} guardado exitosamente!
+            </h3>
+          </div>
+        </div>
+      )}
+
+      <EditarBase
+        open={open}
+        title={`Editar Lote Nº ${form.id || ""}`}
+        onCancel={() => {
+          // Si está mostrando éxito, no cerrar hasta que termine
+          if (showSuccess) return;
+          setSaving(false);
+          setShowSuccess(false);
+          onCancel?.();
+        }}
+        onSave={handleSave}
+        onReset={detalle ? handleReset : undefined}
+        saving={saving}
+        headerRight={
+          loadingDetalle ? (
+            <span className="badge bg-warning text-dark">Cargando...</span>
+          ) : null
+        }
+      >
       {!detalle && (
         <div style={{ padding: "30px 10px" }}>
           <p style={{ margin: 0, color: "#6B7280" }}>
@@ -387,68 +619,60 @@ export default function LoteEditarCard({
             <div className="field-row">
               <div className="field-label">Tipo</div>
               <div className="field-value p0">
-                <select
-                  className="field-input"
+                <NiceSelect
                   value={form.tipo}
-                  onChange={(e) => updateForm({ tipo: e.target.value })}
-                >
-                  <option value="">Seleccionar tipo</option>
-                  {TIPOS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  options={TIPOS}
+                  placeholder=""
+                  onChange={(value) => updateForm({ tipo: value })}
+                />
               </div>
             </div>
 
             <div className="field-row">
               <div className="field-label">Estado</div>
               <div className="field-value p0">
-                <select
-                  className="field-input"
+                <NiceSelect
                   value={form.estado}
-                  onChange={(e) => updateForm({ estado: e.target.value })}
-                >
-                  <option value="">Seleccionar estado</option>
-                  {ESTADOS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  options={ESTADOS}
+                  placeholder=""
+                  onChange={(value) => updateForm({ estado: value })}
+                />
               </div>
             </div>
 
             <div className="field-row">
               <div className="field-label">Sub-Estado</div>
               <div className="field-value p0">
-                <select
-                  className="field-input"
+                <NiceSelect
                   value={form.subestado}
-                  onChange={(e) => updateForm({ subestado: e.target.value })}
-                >
-                  <option value="">Seleccionar sub-estado</option>
-                  {SUBESTADOS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                  options={SUBESTADOS}
+                  placeholder=""
+                  onChange={(value) => updateForm({ subestado: value })}
+                />
               </div>
             </div>
 
             <div className="field-row">
               <div className="field-label">Fracción</div>
               <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="text"
-                  value={form.fraccionNumero ?? ""}
-                  onChange={(e) =>
-                    updateForm({ fraccionNumero: e.target.value })
-                  }
-                  placeholder="Número fracción"
+                <NiceSelect
+                  value={form.fraccionId ? String(form.fraccionId) : ""}
+                  options={fracciones.map(f => {
+                    const id = f.idFraccion ?? f.id ?? "";
+                    const numero = f.numero ?? id;
+                    return { 
+                      value: String(id), 
+                      label: `Fracción ${numero}` 
+                    };
+                  })}
+                  placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"}
+                  onChange={(value) => {
+                    const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value);
+                    updateForm({ 
+                      fraccionId: value ? Number(value) : "",
+                      fraccionNumero: fraccion?.numero ?? ""
+                    });
+                  }}
                 />
               </div>
             </div>
@@ -457,12 +681,13 @@ export default function LoteEditarCard({
               <div className="field-label">Superficie</div>
               <div className="field-value p0">
                 <input
-                  className="field-input"
+                  className="field-input is-readonly"
                   type="number"
                   inputMode="decimal"
                   value={form.superficie ?? ""}
-                  onChange={(e) => updateForm({ superficie: e.target.value })}
-                  placeholder="Metros cuadrados"
+                  readOnly
+                  placeholder="Se calcula automáticamente"
+                  title="La superficie se calcula automáticamente como frente × fondo"
                 />
               </div>
             </div>
@@ -508,9 +733,7 @@ export default function LoteEditarCard({
                 />
               </div>
             </div>
-          </div>
 
-          <div className="lote-media-col">
             <div className="field-row">
               <div className="field-label">Propietario</div>
               <div className="field-value is-readonly">
@@ -554,21 +777,9 @@ export default function LoteEditarCard({
                 <span>{form.deuda ? "Sí" : "No"}</span>
               </div>
             </div>
+          </div>
 
-            <div className="field-row">
-              <div className="field-label">Descripción</div>
-              <div className="field-value p0">
-                <textarea
-                  className="field-input"
-                  rows={4}
-                  value={form.descripcion ?? ""}
-                  onChange={(e) =>
-                    updateForm({ descripcion: e.target.value })
-                  }
-                  placeholder="Notas relevantes del lote…"
-                />
-              </div>
-            </div>
+          <div className="lote-media-col">
 
             <div className="lote-image-manager">
               <div className="lote-carousel">
@@ -615,6 +826,12 @@ export default function LoteEditarCard({
                   type="text"
                   value={newImageUrl}
                   onChange={(e) => setNewImageUrl(e.target.value)}
+                  onPaste={(e) => {
+                    // Permitir el comportamiento por defecto del paste
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    e.preventDefault(); // Prevenir el paste por defecto para controlar el valor
+                    setNewImageUrl(pastedText);
+                  }}
                   placeholder="URL de nueva imagen"
                 />
                 <button
@@ -666,14 +883,39 @@ export default function LoteEditarCard({
               )}
             </div>
 
-            <div className="lote-doc-buttons">
-              <button type="button" className="lote-doc-button" disabled>
+            <div className="lote-description">
+              <span className="lote-description__icon">ℹ️</span>
+              <div className="lote-description__body">
+                <strong>Descripción</strong>
+                <textarea
+                  style={{ 
+                    margin: "8px 0 0", 
+                    width: "100%", 
+                    minHeight: "80px",
+                    padding: "8px",
+                    border: "1px solid #d1d5db",
+                    borderRadius: "6px",
+                    fontSize: "14px",
+                    fontFamily: "inherit",
+                    resize: "vertical"
+                  }}
+                  value={form.descripcion ?? ""}
+                  onChange={(e) =>
+                    updateForm({ descripcion: e.target.value })
+                  }
+                  placeholder="Notas relevantes del lote…"
+                />
+              </div>
+            </div>
+
+            <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 100%" }}>
                 Escritura
               </button>
-              <button type="button" className="lote-doc-button" disabled>
+              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
                 Boleto CompraVenta
               </button>
-              <button type="button" className="lote-doc-button" disabled>
+              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
                 Planos
               </button>
             </div>
@@ -696,5 +938,6 @@ export default function LoteEditarCard({
         </div>
       )}
     </EditarBase>
+    </>
   );
 }

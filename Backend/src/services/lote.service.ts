@@ -195,7 +195,7 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
   // La autorización para TECNICO ya fue manejada por el middleware y la lógica en getLoteById.
   // Aquí solo transformamos el DTO para la actualización.
   const dataToUpdate: Prisma.LoteUpdateInput = {};
-  const { estado, subestado, tipo, propietarioId, ubicacionId, fraccionId, ...rest } = payload;
+  const { estado, subestado, tipo, propietarioId, ubicacionId, fraccionId, superficie, frente, fondo, ...rest } = payload;
 
   if (estado) dataToUpdate.estado = estadoLoteToPrisma(estado);
   if (subestado) dataToUpdate.subestado = subestadoLoteToPrisma(subestado);
@@ -203,6 +203,32 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
   if (propietarioId) dataToUpdate.propietario = { connect: { id: propietarioId } };
   if (ubicacionId) dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
   if (fraccionId) dataToUpdate.fraccion = { connect: { id: fraccionId } };
+
+  // Manejar frente y fondo
+  if (frente !== undefined) dataToUpdate.frente = frente;
+  if (fondo !== undefined) dataToUpdate.fondo = fondo;
+  
+  // Calcular superficie automáticamente si vienen frente y fondo pero no superficie
+  // O si se está actualizando frente/fondo, recalcular superficie
+  if (frente !== undefined || fondo !== undefined) {
+    let frenteVal: number | null = frente !== undefined ? Number(frente) : null;
+    let fondoVal: number | null = fondo !== undefined ? Number(fondo) : null;
+    
+    // Obtener valores actuales del lote si no vienen en el payload
+    if (frenteVal === null || fondoVal === null) {
+      const currentLote = await prisma.lote.findUnique({ where: { id }, select: { frente: true, fondo: true } });
+      if (frenteVal === null && currentLote?.frente) frenteVal = Number(currentLote.frente);
+      if (fondoVal === null && currentLote?.fondo) fondoVal = Number(currentLote.fondo);
+    }
+    
+    // Calcular superficie si tenemos ambos valores
+    if (frenteVal != null && fondoVal != null && frenteVal >= 0 && fondoVal >= 0) {
+      dataToUpdate.superficie = frenteVal * fondoVal;
+    }
+  } else if (superficie !== undefined) {
+    // Si se envía superficie explícitamente, usarla (para casos especiales)
+    dataToUpdate.superficie = superficie;
+  }
 
   // Asignar el resto de los campos
   Object.assign(dataToUpdate, rest);

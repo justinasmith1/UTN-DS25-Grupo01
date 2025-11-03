@@ -15,6 +15,7 @@ export default function EditarBase({
   saving = false,  // deshabilita acciones durante el guardado
   children,
   headerRight,     // opcional (badge/estado)
+  saveButtonText,  // opcional: texto personalizado del botón (por defecto "Guardar cambios")
 }) {
   if (!open) return null;
 
@@ -73,7 +74,7 @@ export default function EditarBase({
               onClick={onSave}
               disabled={saving}
             >
-              {saving ? "Guardando…" : "Guardar cambios"}
+              {saving ? "Guardando…" : (saveButtonText || "Guardar cambios")}
             </button>
           </div>
         </div>

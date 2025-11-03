@@ -2,6 +2,87 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
 
+/* ----------------------- Select custom sin librerías ----------------------- */
+function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const listRef = useRef(null);
+
+  useEffect(() => {
+    function onDoc(e) {
+      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
+
+  if (disabled) {
+    return (
+      <div className="ns-wrap" style={{ position: "relative" }}>
+        <div className="ns-trigger" style={{ opacity: 1, cursor: "default", pointerEvents: "none" }}>
+          <span>{label}</span>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ns-wrap" style={{ position: "relative" }}>
+      <button
+        type="button"
+        ref={btnRef}
+        className="ns-trigger"
+        onClick={() => setOpen(o => !o)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <span>{label}</span>
+        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
+          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+
+      {open && (
+        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
+          {[{ value: "", label: placeholder }, ...options].map(opt => (
+            <li
+              key={`${opt.value}::${opt.label}`}
+              role="option"
+              aria-selected={`${opt.value}` === `${value}`}
+              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
+              onClick={() => {
+                onChange?.(opt.value || "");
+                setOpen(false);
+              }}
+            >
+              {opt.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const ESTADOS_LOTE = [
+  { value: "DISPONIBLE", label: "Disponible" },
+  { value: "RESERVADO", label: "Reservado" },
+  { value: "VENDIDO", label: "Vendido" },
+  { value: "NO_DISPONIBLE", label: "No Disponible" },
+  { value: "ALQUILADO", label: "Alquilado" },
+  { value: "EN_PROMOCION", label: "En Promoción" },
+];
+
+const SUBESTADOS_LOTE = [
+  { value: "NO_CONSTRUIDO", label: "No Construido" },
+  { value: "EN_CONSTRUCCION", label: "En Construcción" },
+  { value: "CONSTRUIDO", label: "Construido" },
+];
+
 const FALLBACK_IMAGE =
   "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
@@ -135,16 +216,23 @@ export default function LoteVerCard({
       lot?.fraccion
   );
 
+    // Función helper para obtener el valor del estado/subestado en formato que coincida con las opciones
+    const getEstadoValue = (estado) => {
+      if (!estado) return "";
+      const normalized = String(estado).toUpperCase().replace(/\s+/g, "_");
+      return normalized;
+    };
+
     const leftPairs = [
-    ["ID", safe(lot?.id)],
-    ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
-    ["NUMERO FRACCION", fraccion],
-    ["TIPO", titleCase(lot?.tipo)],
-    ["ESTADO", titleCase(lot?.estado ?? lot?.status)],
-    ["SUB-ESTADO", titleCase(lot?.subestado ?? lot?.subStatus)],
-    ["PROPIETARIO", ownerName],
-    ["UBICACION", ubicacion],
-  ];
+      ["ID", safe(lot?.id)],
+      ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
+      ["NUMERO FRACCION", fraccion],
+      ["TIPO", titleCase(lot?.tipo)],
+      ["ESTADO", getEstadoValue(lot?.estado ?? lot?.status)],
+      ["SUB-ESTADO", getEstadoValue(lot?.subestado ?? lot?.subStatus)],
+      ["PROPIETARIO", ownerName],
+      ["UBICACION", ubicacion],
+    ];
 
   const rightPairs = [
     ["SUPERFICIE", fmtSurface(lot?.superficie ?? lot?.surface)],
@@ -293,14 +381,48 @@ export default function LoteVerCard({
             style={{ ["--sale-label-w"]: `${labelWidth}px` }}
           >
             <div className="lote-data-col">
-              {infoPairs.map(([label, value]) => (
-                <div className="field-row" key={label}>
-                  <div className="field-label">{label}</div>
-                  <div className="field-value" style={valueStyle(value)}>
-                    {value}
+              {infoPairs.map(([label, value]) => {
+                // Si es ESTADO o SUB-ESTADO, usar NiceSelect disabled pero con estilo normal (sin gris)
+                if (label === "ESTADO") {
+                  return (
+                    <div className="field-row" key={label}>
+                      <div className="field-label">{label}</div>
+                      <div className="field-value p0">
+                        <NiceSelect
+                          value={value}
+                          options={ESTADOS_LOTE}
+                          placeholder="Sin información"
+                          disabled={true}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                if (label === "SUB-ESTADO") {
+                  return (
+                    <div className="field-row" key={label}>
+                      <div className="field-label">{label}</div>
+                      <div className="field-value p0">
+                        <NiceSelect
+                          value={value}
+                          options={SUBESTADOS_LOTE}
+                          placeholder="Sin información"
+                          disabled={true}
+                        />
+                      </div>
+                    </div>
+                  );
+                }
+                // Para otros campos, mostrar texto normal
+                return (
+                  <div className="field-row" key={label}>
+                    <div className="field-label">{label}</div>
+                    <div className="field-value" style={valueStyle(value)}>
+                      {value}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <div className="lote-media-col">
@@ -355,18 +477,26 @@ export default function LoteVerCard({
                 </div>
               </div>
 
-              <div className="lote-doc-buttons">
-                {docButtons.map(({ label, type, file }) => (
-                  <button
-                    key={type}
-                    type="button"
-                    className="lote-doc-button"
-                    disabled={!file}
-                    onClick={() => file && handleOpenDocument(type, file)}
-                  >
-                    {label}
-                  </button>
-                ))}
+              <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                {docButtons.map(({ label, type, file }, index) => {
+                  // Escritura ocupa toda la primera fila, luego Boleto y Planos comparten la segunda fila
+                  const flexStyle = index === 0 
+                    ? { flex: "1 1 100%" } 
+                    : { flex: "1 1 calc(50% - 4px)" };
+                  
+                  return (
+                    <button
+                      key={type}
+                      type="button"
+                      className="lote-doc-button"
+                      disabled={!file}
+                      onClick={() => file && handleOpenDocument(type, file)}
+                      style={flexStyle}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>

@@ -128,19 +128,28 @@ export const getPersonaByCuil = async (cuil) => {
  */
 export const createPersona = async (personaData) => {
   try {
-    const apiData = toApi(personaData);
+    // El backend espera identificador como objeto { tipo, valor }
+    // No usar toApi que espera identificador como string
+    const body = {
+      nombre: personaData.nombre?.trim() || '',
+      apellido: personaData.apellido?.trim() || '',
+      identificador: personaData.identificador || null, // Ya viene como { tipo, valor }
+      ...(personaData.telefono !== null && personaData.telefono !== undefined ? { telefono: personaData.telefono } : {}),
+      ...(personaData.email && personaData.email.trim ? { email: personaData.email.trim() } : (personaData.email ? { email: personaData.email } : {}))
+    };
+
     const response = await http('/personas', { 
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiData)
+      body
     });
     const data = await response.json().catch(() => ({}));
     
     if (!response.ok) {
-      throw new Error(data?.message || 'Error al crear persona');
+      const errorMsg = data?.message || data?.errors?.[0]?.message || 'Error al crear persona';
+      throw new Error(errorMsg);
     }
     
-    return fromApi(data.persona);
+    return fromApi(data.persona || data);
   } catch (error) {
     console.error('Error al crear persona:', error);
     throw error;
