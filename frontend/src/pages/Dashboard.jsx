@@ -135,7 +135,53 @@ export default function Dashboard() {
       setParams({}); 
       return; 
     }
-    setParams((prev) => ({ ...prev, ...patch }));
+    
+    // Convertir objetos de rango ({ min, max }) a parámetros planos (frenteMin, frenteMax, etc.)
+    const convertedParams = { ...patch };
+    
+    // Convertir rangos a formato plano que espera applyLoteFilters
+    if (patch.frente && (patch.frente.min !== null || patch.frente.max !== null)) {
+      convertedParams.frenteMin = patch.frente.min !== null ? patch.frente.min : undefined;
+      convertedParams.frenteMax = patch.frente.max !== null ? patch.frente.max : undefined;
+      delete convertedParams.frente;
+    }
+    
+    if (patch.fondo && (patch.fondo.min !== null || patch.fondo.max !== null)) {
+      convertedParams.fondoMin = patch.fondo.min !== null ? patch.fondo.min : undefined;
+      convertedParams.fondoMax = patch.fondo.max !== null ? patch.fondo.max : undefined;
+      delete convertedParams.fondo;
+    }
+    
+    if (patch.sup && (patch.sup.min !== null || patch.sup.max !== null)) {
+      convertedParams.supMin = patch.sup.min !== null ? patch.sup.min : undefined;
+      convertedParams.supMax = patch.sup.max !== null ? patch.sup.max : undefined;
+      delete convertedParams.sup;
+    }
+    
+    if (patch.precio && (patch.precio.min !== null || patch.precio.max !== null)) {
+      convertedParams.priceMin = patch.precio.min !== null ? patch.precio.min : undefined;
+      convertedParams.priceMax = patch.precio.max !== null ? patch.precio.max : undefined;
+      delete convertedParams.precio;
+    }
+    
+    setParams((prev) => {
+      // Limpiar parámetros de rango antiguos si existen
+      const cleaned = { ...prev };
+      delete cleaned.frente;
+      delete cleaned.fondo;
+      delete cleaned.sup;
+      delete cleaned.precio;
+      delete cleaned.frenteMin;
+      delete cleaned.frenteMax;
+      delete cleaned.fondoMin;
+      delete cleaned.fondoMax;
+      delete cleaned.supMin;
+      delete cleaned.supMax;
+      delete cleaned.priceMin;
+      delete cleaned.priceMax;
+      
+      return { ...cleaned, ...convertedParams };
+    });
   }, []);
 
   // Dataset base: obtenemos todos los lotes desde la API una sola vez

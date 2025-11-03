@@ -13,6 +13,7 @@ import { applyReservaFilters } from "../utils/applyReservaFilters";
 
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
+import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import ReservaEliminarDialog from "../components/Cards/Reservas/ReservaEliminarDialog.jsx";
 
 export default function Reservas() {
@@ -96,6 +97,7 @@ export default function Reservas() {
   const [reservaSel, setReservaSel] = useState(null);
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
+  const [openCrear, setOpenCrear] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -145,7 +147,7 @@ export default function Reservas() {
   }, []);
 
   const onAgregarReserva = useCallback(() => {
-    console.debug("[ALTA] reserva");
+    setOpenCrear(true);
   }, []);
 
   // PUT (Editar) - recibe el objeto actualizado completo del componente
@@ -157,11 +159,33 @@ export default function Reservas() {
         // Actualizar la lista con la reserva actualizada
         setAllReservas((prev) => prev.map((r) => (r.id === updatedReserva.id ? updatedReserva : r)));
         setReservaSel(updatedReserva);
+        success("Reserva actualizada correctamente");
       } catch (e) {
         console.error("Error actualizando reserva:", e);
+        error(e?.message || "Error al actualizar reserva");
       }
     },
-    []
+    [success, error]
+  );
+
+  // POST (Crear) - recibe la nueva reserva creada
+  const handleCreated = useCallback(
+    async (newReserva) => {
+      if (!newReserva?.id) return;
+      try {
+        // Agregar la nueva reserva a la lista (obtener datos completos)
+        const resp = await getReservaById(newReserva.id);
+        const detail = resp?.data ?? resp ?? newReserva;
+        setAllReservas((prev) => [detail, ...prev]);
+        success("Reserva creada correctamente");
+      } catch (e) {
+        console.error("Error obteniendo reserva creada:", e);
+        // Aún así agregar la reserva que viene del create
+        setAllReservas((prev) => [newReserva, ...prev]);
+        success("Reserva creada correctamente");
+      }
+    },
+    [success]
   );
 
   // DELETE (Eliminar)
@@ -251,6 +275,12 @@ export default function Reservas() {
         inmobiliarias={inmobiliarias}
         onCancel={() => setOpenEditar(false)}
         onSaved={handleSave}
+      />
+
+      <ReservaCrearCard
+        open={openCrear}
+        onCancel={() => setOpenCrear(false)}
+        onCreated={handleCreated}
       />
 
       <ReservaEliminarDialog

@@ -251,6 +251,16 @@ export default function VentasPage() {
     }
   }, [ventaSel]);
 
+  // Mostrar loading mientras se cargan los datos
+  if (isLoading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: "40vh" }}>
+        <div className="spinner-border" role="status" />
+        <span className="ms-2">Cargando ventas…</span>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* Filtros */}
