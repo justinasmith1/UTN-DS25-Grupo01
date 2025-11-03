@@ -18,12 +18,12 @@ const calleEnum = z.enum([
 
 export const createUbicacionSchema = z.object({
   calle: calleEnum,
-  numero: z.string().min(1, "El número de ubicación es requerido").max(50, "El número de ubicación no puede tener más de 50 caracteres"),
+  numero: z.coerce.number().int().min(1, "El número de ubicación es requerido")
 });
 
 export const updateUbicacionSchema = z.object({
   calle: calleEnum.optional(),
-  numero: z.string().min(1, "El número de ubicación es requerido").max(50, "El número de ubicación no puede tener más de 50 caracteres").optional(),
+  numero: z.coerce.number().int().min(1, "El número de ubicación es requerido").optional(),
 });
 
 export const getUbicacionSchema = z.object({
