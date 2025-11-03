@@ -2,6 +2,7 @@
 // Página de reservas usando la arquitectura genérica
 
 import { useEffect, useMemo, useState, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
@@ -21,6 +22,8 @@ import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.js
 export default function Reservas() {
   const { user } = useAuth();
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const crearParam = searchParams.get('crear') === 'true';
   const [params, setParams] = useState({});
   const [allReservas, setAllReservas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +106,19 @@ export default function Reservas() {
   const [openEliminar, setOpenEliminar] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Abrir el card de crear cuando viene desde el ModulePills (?crear=true)
+  useEffect(() => {
+    if (crearParam) {
+      setOpenCrear(true);
+      // limpiar el query param para no reabrir en navegaciones
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('crear');
+        return next;
+      }, { replace: true });
+    }
+  }, [crearParam, setSearchParams]);
 
   // Ver: abre con la fila y luego refina con getReservaById(id) para traer relaciones/fechas
   const onVer = useCallback((reserva) => {
@@ -332,6 +348,10 @@ export default function Reservas() {
       <DocumentoVerCard
         open={openDocumentoVer}
         onClose={handleCerrarDocumentoVer}
+        onVolverAtras={() => {
+          setOpenDocumentoVer(false);
+          setOpenDocumentoDropdown(true);
+        }}
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
         loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}

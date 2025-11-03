@@ -360,7 +360,7 @@ export default function LoteVerCard({
               className="cclf-tab thin reserve"
               onClick={() => lot && onReserve?.(lot)}
             >
-              Reservar
+              {lot?.estado === "RESERVADO" || String(lot?.estado || "").toUpperCase() === "RESERVADO" ? "Ver Reserva" : "Reservar"}
             </button>
             <button
               type="button"

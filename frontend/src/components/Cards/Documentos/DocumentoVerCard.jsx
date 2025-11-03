@@ -1,5 +1,6 @@
 // src/components/Cards/Documentos/DocumentoVerCard.jsx
 import { useState, useEffect } from "react";
+import "../../../styles/tokens.css";
 import "../Base/cards.css";
 import { getArchivosByLote } from "../../../lib/api/archivos";
 
@@ -14,21 +15,22 @@ const PLACEHOLDER_URLS = {
 const DOC_INFO = {
   BOLETO: {
     title: "Boleto de Compraventa",
-    description: "Por aquí acá si es que necesitan algún tipo de info fiscal o lo que sea se podría poner, de quién es el abogado asociado, etc.",
+    description: "", // Sin texto descriptivo, solo el título
   },
   ESCRITURA: {
     title: "Escritura",
-    description: "Por aquí acá si es que necesitan algún tipo de info fiscal o lo que sea se podría poner, de quién es el abogado asociado, etc.",
+    description: "", // Sin texto descriptivo, solo el título
   },
   PLANOS: {
     title: "Planos",
-    description: "Por aquí acá si es que necesitan algún tipo de info fiscal o lo que sea se podría poner, de quién es el técnico asociado, etc.",
+    description: "", // Sin texto descriptivo, solo el título
   },
 };
 
 export default function DocumentoVerCard({
   open,
   onClose,
+  onVolverAtras, // Nueva prop para volver al dropdown
   tipoDocumento,
   loteId,
   loteNumero,
@@ -168,18 +170,20 @@ export default function DocumentoVerCard({
           </button>
         </header>
 
-        <div className="c-body" style={{ padding: "24px", display: "flex", gap: "24px", overflow: "hidden", flexDirection: "row" }}>
-          {/* Columna izquierda: Preview del documento */}
-          <div
-            style={{
-              flex: "2",
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-              overflow: "hidden",
-              minWidth: 0,
-            }}
-          >
+        <div className="c-body" style={{ padding: "24px", display: "flex", flexDirection: "column", gap: "24px", overflow: "hidden", minHeight: 0 }}>
+          {/* Contenedor principal: Preview + Info */}
+          <div style={{ display: "flex", gap: "24px", flex: "1", minHeight: 0, overflow: "hidden" }}>
+            {/* Columna izquierda: Preview del documento */}
+            <div
+              style={{
+                flex: "2",
+                display: "flex",
+                flexDirection: "column",
+                gap: "16px",
+                overflow: "hidden",
+                minWidth: 0,
+              }}
+            >
             <div
               style={{
                 flex: "1",
@@ -191,7 +195,7 @@ export default function DocumentoVerCard({
                 alignItems: "center",
                 justifyContent: "center",
                 minHeight: "500px",
-                maxHeight: "calc(90vh - 200px)",
+                maxHeight: "calc(90vh - 300px)",
               }}
             >
               {isEditingImage ? (
@@ -279,100 +283,112 @@ export default function DocumentoVerCard({
             </div>
           </div>
 
-          {/* Columna derecha: Información y botones */}
+          {/* Columna derecha: Información + Botones */}
           <div
             style={{
               flex: "1",
               display: "flex",
               flexDirection: "column",
-              gap: "20px",
               minWidth: "280px",
+              gap: "20px",
             }}
           >
-            {/* Caja informativa - solo se muestra si hay documento */}
-            {documentoActual && (
-              <div
-                style={{
-                  backgroundColor: "#f3f4f6",
-                  border: "1px solid rgba(0,0,0,.1)",
-                  borderRadius: "8px",
-                  padding: "16px",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
-                  <div
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      borderRadius: "50%",
-                      backgroundColor: "#6b7280",
-                      color: "white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      flexShrink: 0,
-                    }}
-                  >
-                    i
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ margin: "0 0 8px 0", fontSize: "16px", fontWeight: 600 }}>
-                      {info.title}
-                    </h3>
-                    <p style={{ margin: 0, fontSize: "14px", color: "#4b5563", lineHeight: "1.5" }}>
-                      {info.description}
-                    </p>
-                  </div>
+            {/* Caja informativa - siempre visible, arriba */}
+            <div
+              style={{
+                backgroundColor: "#f3f4f6",
+                border: "1px solid rgba(0,0,0,.1)",
+                borderRadius: "8px",
+                padding: "16px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "24px",
+                    height: "24px",
+                    borderRadius: "50%",
+                    backgroundColor: "#6b7280",
+                    color: "white",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "14px",
+                    fontWeight: "bold",
+                    flexShrink: 0,
+                  }}
+                >
+                  i
+                </div>
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>
+                    {info.title}
+                  </h3>
                 </div>
               </div>
-            )}
-
-            {/* Botones de acción */}
-            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleModificar}
-                disabled={!documentoActual && !isEditingImage}
-                style={{ width: "100%" }}
-              >
-                {isEditingImage ? "Guardar Cambios" : "Modificar"}
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleDescargar}
-                disabled={!documentoActual || !currentImageUrl}
-                style={{ width: "100%" }}
-              >
-                Descargar
-              </button>
-
-              <button
-                type="button"
-                className="btn"
-                onClick={onClose}
-                style={{
-                  width: "100%",
-                  backgroundColor: "#065f46",
-                  color: "white",
-                  borderColor: "#065f46",
-                  fontSize: "15px",
-                  padding: "12px 16px",
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.backgroundColor = "#054d37";
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.backgroundColor = "#065f46";
-                }}
-              >
-                Volver Atrás
-              </button>
             </div>
+
+            {/* Botones de acción - Abajo a la derecha dentro de la columna */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "auto" }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {}}
+              disabled={!documentoActual && !isEditingImage}
+              style={{
+                minWidth: "120px",
+                background: "#2849AF",
+                border: "1px solid #000",
+                color: "#fff",
+                boxShadow: "0 4px 10px rgba(40,73,175,.22)"
+              }}
+            >
+              Modificar
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {}}
+              disabled={!documentoActual || !currentImageUrl}
+              style={{
+                minWidth: "120px",
+                background: "#2849AF",
+                border: "1px solid #000",
+                color: "#fff",
+                boxShadow: "0 4px 10px rgba(40,73,175,.22)"
+              }}
+            >
+              Descargar
+            </button>
+
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                if (onVolverAtras) {
+                  onVolverAtras();
+                } else {
+                  onClose?.();
+                }
+              }}
+              style={{
+                backgroundColor: "#065f46",
+                color: "white",
+                borderColor: "#065f46",
+                minWidth: "120px"
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = "#054d37";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = "#065f46";
+              }}
+            >
+              Volver Atrás
+            </button>
+            </div>
+          </div>
           </div>
         </div>
       </div>

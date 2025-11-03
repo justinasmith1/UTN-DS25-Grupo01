@@ -18,10 +18,15 @@ import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
 import InmobiliariaVerCard from "../components/Cards/Inmobiliarias/InmobiliariaVerCard.jsx";
 import InmobiliariaEditarCard from "../components/Cards/Inmobiliarias/InmobiliariaEditarCard.jsx";
 import InmobiliariaEliminarDialog from "../components/Cards/Inmobiliarias/InmobiliariaEliminarDialog.jsx";
+import InmobiliariaCrearCard from "../components/Cards/Inmobiliarias/InmobiliariaCrearCard.jsx";
+
+import { useSearchParams } from "react-router-dom";
 
 export default function Inmobiliarias() {
   const { user } = useAuth();
   const { success, error } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const crearParam = searchParams.get('crear') === 'true';
   
   // Estado de filtros
   const [params, setParams] = useState({});
@@ -86,6 +91,7 @@ export default function Inmobiliarias() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openCrear, setOpenCrear] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -130,9 +136,20 @@ export default function Inmobiliarias() {
   }, []);
 
   const handleAgregarInmobiliaria = useCallback(() => {
-    // TODO: Implementar modal de creación
-    console.log('Agregar inmobiliaria');
+    setOpenCrear(true);
   }, []);
+
+  // Abrir al ingresar con ?crear=true
+  useEffect(() => {
+    if (crearParam) {
+      setOpenCrear(true);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('crear');
+        return next;
+      }, { replace: true });
+    }
+  }, [crearParam, setSearchParams]);
 
   // PUT (Editar) - recibe el objeto actualizado completo del componente
   const handleSave = useCallback(
@@ -260,6 +277,12 @@ export default function Inmobiliarias() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <InmobiliariaCrearCard
+        open={openCrear}
+        onCancel={() => setOpenCrear(false)}
+        onCreated={() => setOpenCrear(false)}
       />
 
       {/* Animación de éxito al eliminar */}

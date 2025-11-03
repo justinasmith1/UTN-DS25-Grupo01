@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
+import { getAllReservas } from "../../../lib/api/reservas.js";
+import { getAllVentas } from "../../../lib/api/ventas.js";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -265,6 +267,34 @@ export default function LoteEditarCard({
       }
     })();
   }, [open, fracciones.length]);
+
+  // Cargar reservas y ventas del lote para validaciones
+  useEffect(() => {
+    if (!open || !detalle?.id) return;
+    
+    (async () => {
+      try {
+        // Cargar reservas
+        const reservasResp = await getAllReservas({});
+        const allReservas = reservasResp?.data || [];
+        const reservasDelLote = allReservas.filter(
+          (r) => (r.loteId || r.lote?.id) === detalle.id
+        );
+        setReservasLote(reservasDelLote);
+
+        // Cargar ventas
+        const ventasResp = await getAllVentas({});
+        const allVentas = Array.isArray(ventasResp?.data) ? ventasResp.data : 
+                         Array.isArray(ventasResp) ? ventasResp : [];
+        const ventasDelLote = allVentas.filter(
+          (v) => (v.loteId || v.lote?.id) === detalle.id
+        );
+        setVentasLote(ventasDelLote);
+      } catch (err) {
+        console.error("Error cargando reservas/ventas del lote:", err);
+      }
+    })();
+  }, [open, detalle?.id]);
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
@@ -451,6 +481,31 @@ export default function LoteEditarCard({
     setError(null);
     try {
       const payload = buildPayload();
+      
+      // Validaciones de estado vs reservas/ventas
+      const nuevoEstado = payload.estado || form.estado;
+      const estadoUpper = String(nuevoEstado || "").toUpperCase();
+      
+      if (estadoUpper === "RESERVADO") {
+        // Verificar que haya una reserva ACTIVA para este lote
+        const tieneReservaActiva = reservasLote.some(
+          (r) => String(r.estado || "").toUpperCase() === "ACTIVA"
+        );
+        if (!tieneReservaActiva) {
+          setError("No se puede establecer el estado RESERVADO sin una reserva ACTIVA para este lote.");
+          setSaving(false);
+          return;
+        }
+      }
+      
+      if (estadoUpper === "VENDIDO") {
+        // Verificar que haya una venta para este lote
+        if (ventasLote.length === 0) {
+          setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
+          setSaving(false);
+          return;
+        }
+      }
       const resp = await updateLote(detalle.id, payload);
       const updated = resp?.data ?? resp ?? {};
       const enriched = {
@@ -471,6 +526,8 @@ export default function LoteEditarCard({
       };
 
       setDetalle(enriched);
+      
+      // Actualizar estado del padre inmediatamente
       onSaved?.(enriched);
       
       // Mostrar animación de éxito
@@ -572,6 +629,7 @@ export default function LoteEditarCard({
           setShowSuccess(false);
           onCancel?.();
         }}
+        saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}
         onReset={detalle ? handleReset : undefined}
         saving={saving}
@@ -937,7 +995,7 @@ export default function LoteEditarCard({
           {error}
         </div>
       )}
-    </EditarBase>
+      </EditarBase>
     </>
   );
 }

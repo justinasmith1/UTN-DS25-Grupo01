@@ -171,9 +171,17 @@ export async function updateReserva(
       },
     });
 
-    if (body.estado !== undefined && body.estado === EstadoReserva.CANCELADA) {
-      // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
-      await updateLoteState(row.loteId, 'Disponible'); 
+    // Sincronizar estado del lote con el estado de la reserva
+    if (body.estado !== undefined) {
+      if (body.estado === EstadoReserva.CANCELADA) {
+        // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
+        await updateLoteState(row.loteId, 'Disponible'); 
+      } else if (body.estado === EstadoReserva.ACTIVA) {
+        // Si la reserva se establece como ACTIVA, cambiar el estado del lote a "RESERVADO"
+        await updateLoteState(row.loteId, 'Reservado');
+      }
+      // Si es ACEPTADA, no cambiamos automáticamente el estado del lote
+      // porque podría estar VENDIDO (la reserva aceptada puede derivar en venta)
     }
     return row;
   } catch (e) {
