@@ -13,6 +13,14 @@ router.get(
     authorize('ADMINISTRADOR', 'GESTOR'),
     ventaController.obtenerTodos);
 
+// GET /api/Ventas/inmobiliaria/:id
+router.get(
+    '/inmobiliaria/:id',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(getVentaSchema),
+    ventaController.obtenerVentasPorInmobiliaria);
+
 // GET /api/Ventas/:id
 router.get(
     '/:id',
