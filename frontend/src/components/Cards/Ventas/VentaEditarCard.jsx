@@ -53,7 +53,7 @@ function fmtMoney(val) {
 }
 
 /* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
+function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const listRef = useRef(null);
@@ -69,6 +69,11 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
   }, []);
 
   const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
+
+  // Solo incluir placeholder como opción si showPlaceholderOption es true
+  const optionsToShow = showPlaceholderOption && placeholder 
+    ? [{ value: "", label: placeholder }, ...options]
+    : options;
 
   return (
     <div className="ns-wrap" style={{ position: "relative" }}>
@@ -88,7 +93,7 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
 
       {open && (
         <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {[{ value: "", label: placeholder }, ...options].map(opt => (
+          {optionsToShow.map(opt => (
             <li
               key={`${opt.value}::${opt.label}`}
               role="option"
@@ -345,6 +350,9 @@ export default function VentaEditarCard({
       const response = await updateVenta(detalle.id, patch);
       const updated = response?.data ?? response;
       
+      // Actualizar estado del padre inmediatamente
+      onSaved?.(updated);
+      
       // Mostrar animación de éxito
       setShowSuccess(true);
       
@@ -352,7 +360,6 @@ export default function VentaEditarCard({
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
-        onSaved?.(updated);
         onCancel?.();
       }, 1500);
     } catch (e) {
@@ -404,7 +411,7 @@ export default function VentaEditarCard({
     ? new Date(fechaCreISO).toLocaleDateString("es-AR")
     : NA;
 
-  if (!open || !detalle) return null;
+  if (!open && !showSuccess) return null;
 
   return (
     <>
@@ -417,8 +424,9 @@ export default function VentaEditarCard({
             background: "rgba(0, 0, 0, 0.5)",
             display: "grid",
             placeItems: "center",
-            zIndex: 3000,
+            zIndex: 10000,
             animation: "fadeIn 0.2s ease-in",
+            pointerEvents: "auto",
           }}
         >
           <div
@@ -531,8 +539,9 @@ export default function VentaEditarCard({
                 <NiceSelect
                   value={estado}
                   options={ESTADOS}
-                  placeholder="Sin información"
+                  placeholder="Seleccionar estado"
                   onChange={setEstado}
+                  showPlaceholderOption={false}
                 />
               </div>
             </div>
