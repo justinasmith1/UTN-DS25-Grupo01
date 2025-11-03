@@ -21,6 +21,8 @@ import { applyVentaFilters } from "../utils/applyVentaFilters";
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
 import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.jsx";
+import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
+import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
 
 /* Util: toma el array “correcto” dentro de una respuesta heterogénea */
 const pickArray = (resp, candidates = []) => {
@@ -201,8 +203,29 @@ export default function VentasPage() {
     setOpenEliminar(true);
   }, []);
 
+  // Estados para documentos
+  const [openDocumentoDropdown, setOpenDocumentoDropdown] = useState(false);
+  const [openDocumentoVer, setOpenDocumentoVer] = useState(false);
+  const [tipoDocumentoSeleccionado, setTipoDocumentoSeleccionado] = useState(null);
+  const [labelDocumentoSeleccionado, setLabelDocumentoSeleccionado] = useState(null);
+
   const onVerDocumentos = useCallback((venta) => {
-    console.debug("[DOCS] venta", venta?.id);
+    if (!venta) return;
+    setVentaSel(venta);
+    setOpenDocumentoDropdown(true);
+  }, []);
+
+  const handleSelectTipoDocumento = useCallback((tipo, label) => {
+    setTipoDocumentoSeleccionado(tipo);
+    setLabelDocumentoSeleccionado(label);
+    setOpenDocumentoDropdown(false);
+    setOpenDocumentoVer(true);
+  }, []);
+
+  const handleCerrarDocumentoVer = useCallback(() => {
+    setOpenDocumentoVer(false);
+    setTipoDocumentoSeleccionado(null);
+    setLabelDocumentoSeleccionado(null);
   }, []);
 
   const onAgregarVenta = useCallback(() => {
@@ -343,6 +366,31 @@ export default function VentasPage() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      {/* Dropdown de documentos */}
+      <DocumentoDropdown
+        open={openDocumentoDropdown}
+        onClose={() => setOpenDocumentoDropdown(false)}
+        onSelectTipo={handleSelectTipoDocumento}
+        loteId={ventaSel?.loteId || ventaSel?.lote?.id}
+        loteNumero={ventaSel?.loteId || ventaSel?.lote?.id}
+      />
+
+      {/* Modal de visualización de documento */}
+      <DocumentoVerCard
+        open={openDocumentoVer}
+        onClose={handleCerrarDocumentoVer}
+        tipoDocumento={tipoDocumentoSeleccionado}
+        loteId={ventaSel?.loteId || ventaSel?.lote?.id}
+        loteNumero={ventaSel?.loteId || ventaSel?.lote?.id}
+        documentoUrl={null}
+        onModificar={(url) => {
+          console.log("Modificar documento:", url);
+        }}
+        onDescargar={(url) => {
+          console.log("Descargar documento:", url);
+        }}
       />
 
       {/* Animación de éxito al eliminar */}

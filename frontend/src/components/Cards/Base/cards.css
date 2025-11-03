@@ -156,6 +156,13 @@
 
 /* ===================== Primary (Guardar cambios) ===================== */
 :root { --color-action-primary: #2849AF; } 
+.btn-primary {
+  background: var(--color-action-primary);
+  border-color: #000;                 
+  color: #fff;
+  box-shadow: 0 4px 10px rgba(40,73,175,.22);
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
 .cclf-footer .btn-primary {
   background: var(--color-action-primary);
   border-color: #000;                 
@@ -164,13 +171,16 @@
   transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 .btn-primary:hover,
+.btn-primary:focus-visible,
+.cclf-footer .btn-primary:hover,
 .cclf-footer .btn-primary:focus-visible {
   filter: brightness(0.98);
   transform: translateY(-1px);
   box-shadow: 0 6px 14px rgba(14, 47, 148, 0.28);
   border-color: #000;
 }
-.btn-primary:active {
+.btn-primary:active,
+.cclf-footer .btn-primary:active {
   transform: translateY(0);
   box-shadow: 0 2px 6px rgba(40,73,175,.22);
 }

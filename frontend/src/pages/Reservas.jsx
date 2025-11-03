@@ -15,6 +15,8 @@ import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import ReservaEliminarDialog from "../components/Cards/Reservas/ReservaEliminarDialog.jsx";
+import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
+import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
 
 export default function Reservas() {
   const { user } = useAuth();
@@ -142,8 +144,29 @@ export default function Reservas() {
     setOpenEliminar(true);
   }, []);
 
+  // Estados para documentos
+  const [openDocumentoDropdown, setOpenDocumentoDropdown] = useState(false);
+  const [openDocumentoVer, setOpenDocumentoVer] = useState(false);
+  const [tipoDocumentoSeleccionado, setTipoDocumentoSeleccionado] = useState(null);
+  const [labelDocumentoSeleccionado, setLabelDocumentoSeleccionado] = useState(null);
+
   const onVerDocumentos = useCallback((reserva) => {
-    console.debug("[DOCS] reserva", reserva?.id);
+    if (!reserva) return;
+    setReservaSel(reserva);
+    setOpenDocumentoDropdown(true);
+  }, []);
+
+  const handleSelectTipoDocumento = useCallback((tipo, label) => {
+    setTipoDocumentoSeleccionado(tipo);
+    setLabelDocumentoSeleccionado(label);
+    setOpenDocumentoDropdown(false);
+    setOpenDocumentoVer(true);
+  }, []);
+
+  const handleCerrarDocumentoVer = useCallback(() => {
+    setOpenDocumentoVer(false);
+    setTipoDocumentoSeleccionado(null);
+    setLabelDocumentoSeleccionado(null);
   }, []);
 
   const onAgregarReserva = useCallback(() => {
@@ -294,6 +317,31 @@ export default function Reservas() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      {/* Dropdown de documentos */}
+      <DocumentoDropdown
+        open={openDocumentoDropdown}
+        onClose={() => setOpenDocumentoDropdown(false)}
+        onSelectTipo={handleSelectTipoDocumento}
+        loteId={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+      />
+
+      {/* Modal de visualización de documento */}
+      <DocumentoVerCard
+        open={openDocumentoVer}
+        onClose={handleCerrarDocumentoVer}
+        tipoDocumento={tipoDocumentoSeleccionado}
+        loteId={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+        documentoUrl={null}
+        onModificar={(url) => {
+          console.log("Modificar documento:", url);
+        }}
+        onDescargar={(url) => {
+          console.log("Descargar documento:", url);
+        }}
       />
 
       {/* Animación de éxito al eliminar */}
