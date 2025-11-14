@@ -9,6 +9,7 @@ import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
 import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
 import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
 import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
+import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 import { getAllReservas, getReservaById } from "../lib/api/reservas";
@@ -37,6 +38,7 @@ export default function Dashboard() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openCrear, setOpenCrear] = useState(false);
   const [openReservaCrear, setOpenReservaCrear] = useState(false);
   const [openReservaVer, setOpenReservaVer] = useState(false);
   const [reservaSel, setReservaSel] = useState(null);
@@ -139,6 +141,10 @@ export default function Dashboard() {
         setLoteSel(lot);
         setOpenEliminar(true);
       }, []);
+
+      const onAgregarLote = useCallback(() => {
+        setOpenCrear(true);
+      }, []);
     
       const handleEditSaved = useCallback(
         (updated) => {
@@ -175,6 +181,24 @@ export default function Dashboard() {
           setDeleting(false);
         }
       }, [loteSel, error]);
+
+      const handleCreated = useCallback(
+        async (newLote) => {
+          if (!newLote?.id) return;
+          try {
+            // Obtener el lote completo desde la API
+            const resp = await getLoteById(newLote.id);
+            const detail = resp?.data ?? resp ?? newLote;
+            // Agregar al inicio de la lista
+            setAllLotes((prev) => [detail, ...prev]);
+          } catch (err) {
+            console.error("Error obteniendo lote creado:", err);
+            // Aún así agregar el lote que viene del create
+            setAllLotes((prev) => [newLote, ...prev]);
+          }
+        },
+        []
+      );
 
   // Estado de filtros (FilterBarLotes)
   const [params, setParams] = useState({});
@@ -341,8 +365,8 @@ export default function Dashboard() {
         onDelete={onEliminar}
         onRegistrarVenta={goRegistrarVenta}
         onRegisterSale={goRegistrarVenta}
-        // onVerEnMapa={(ids) => ...} 
-        // onAddLot={() => ...}
+        onAgregarLote={onAgregarLote}
+        // onVerEnMapa={(ids) => ...}
       />
 
       <LoteVerCard
@@ -374,6 +398,12 @@ export default function Dashboard() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <LoteCrearCard
+        open={openCrear}
+        onCancel={() => setOpenCrear(false)}
+        onCreated={handleCreated}
       />
 
       <ReservaVerCard

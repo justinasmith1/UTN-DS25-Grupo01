@@ -148,6 +148,8 @@ const buildInitialForm = (lot) => {
       ubicacionId: "",
       ubicacionCalle: "",
       ubicacionNumero: "",
+      nombreEspacioComun: "",
+      capacidad: "",
       images: [],
     };
   }
@@ -225,6 +227,8 @@ const buildInitialForm = (lot) => {
       "",
     ubicacionCalle: ubicacion?.calle ?? ubicacion?.nombre ?? "",
     ubicacionNumero: ubicacion?.numero ?? "",
+    nombreEspacioComun: lot?.nombreEspacioComun ?? "",
+    capacidad: lot?.capacidad ?? "",
     images,
   };
 };
@@ -472,6 +476,17 @@ export default function LoteEditarCard({
     const ubicacionId = toNumberOrNull(form.ubicacionId);
     if (ubicacionId) payload.ubicacionId = ubicacionId;
 
+    // Campos específicos para Espacio Comun
+    if (form.tipo === "Espacio Comun") {
+      if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
+        payload.nombreEspacioComun = form.nombreEspacioComun.trim();
+      }
+      const capacidad = toNumberOrNull(form.capacidad);
+      if (capacidad != null && capacidad >= 0) {
+        payload.capacidad = capacidad;
+      }
+    }
+
     return payload;
   };
 
@@ -681,10 +696,48 @@ export default function LoteEditarCard({
                   value={form.tipo}
                   options={TIPOS}
                   placeholder=""
-                  onChange={(value) => updateForm({ tipo: value })}
+                  onChange={(value) => {
+                    // Limpiar campos de espacio común si se cambia a otro tipo
+                    updateForm({ 
+                      tipo: value,
+                      nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "",
+                      capacidad: value === "Espacio Comun" ? form.capacidad : ""
+                    });
+                  }}
                 />
               </div>
             </div>
+
+            {form.tipo === "Espacio Comun" && (
+              <>
+                <div className="field-row">
+                  <div className="field-label">Nombre del Espacio Común</div>
+                  <div className="field-value p0">
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={form.nombreEspacioComun ?? ""}
+                      onChange={(e) => updateForm({ nombreEspacioComun: e.target.value })}
+                      placeholder="Ej. Piscina"
+                    />
+                  </div>
+                </div>
+
+                <div className="field-row">
+                  <div className="field-label">Capacidad</div>
+                  <div className="field-value p0">
+                    <input
+                      className="field-input"
+                      type="number"
+                      inputMode="numeric"
+                      value={form.capacidad ?? ""}
+                      onChange={(e) => updateForm({ capacidad: e.target.value })}
+                      placeholder="Ej. 100"
+                    />
+                  </div>
+                </div>
+              </>
+            )}
 
             <div className="field-row">
               <div className="field-label">Estado</div>
