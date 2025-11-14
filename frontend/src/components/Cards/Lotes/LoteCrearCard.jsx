@@ -214,7 +214,7 @@ export default function LoteCrearCard({
         fileInputRef.current.value = "";
       }
     }
-  }, [open, form.images]);
+  }, [open]);
 
   const updateForm = (patch) => {
     setForm((prev) => {
@@ -899,7 +899,7 @@ export default function LoteCrearCard({
                     textAlign: "center",
                   }}
                 >
-                  📷 Seleccionar imágenes
+                  Seleccionar imágenes
                 </label>
                 <input
                   ref={fileInputRef}
