@@ -538,60 +538,71 @@ export default function ReservaCrearCard({
                 <div className="field-label" style={{ alignSelf: "flex-start", paddingTop: "11.5px" }}>LOTE ASOCIADO</div>
                 <div className="field-value p0" style={{ display: "flex", flexDirection: "column", gap: "8px", alignItems: "stretch", alignSelf: "stretch" }}>
                   <div style={{ position: "relative", width: "100%" }}>
-                    <input
-                      type="text"
-                      placeholder={loteId ? lotes.find(l => l.value === loteId)?.label || loteId : "Buscar lote por número..."}
-                      value={busquedaLote}
-                      onChange={(e) => {
-                        const valor = e.target.value;
-                        setBusquedaLote(valor);
-                        // Si se borra todo, limpiar también la selección
-                        if (!valor.trim()) {
-                          setLoteId("");
-                        }
-                      }}
-                      onFocus={() => {
-                        // Si hay un lote seleccionado, mostrar su info en la búsqueda
-                        if (loteId && !busquedaLote.trim()) {
-                          const loteSeleccionado = lotes.find(l => l.value === loteId);
-                          if (loteSeleccionado) {
-                            setBusquedaLote(loteSeleccionado.label);
-                          }
-                        }
-                      }}
-                      style={{
-                        width: "100%",
+                    {loteIdPreSeleccionado ? (
+                      <div style={{
                         padding: "10px 12px",
-                        paddingLeft: "40px",
-                        border: "1px solid rgba(0,0,0,.18)",
-                        borderRadius: "6px",
-                        fontSize: "13.5px",
-                        boxShadow: "0 2px 4px rgba(0,0,0,.10)"
-                      }}
-                    />
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      style={{
-                        position: "absolute",
-                        left: "12px",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        color: "#6B7280",
-                        pointerEvents: "none"
-                      }}
-                    >
-                      <circle cx="11" cy="11" r="8"></circle>
-                      <path d="m21 21-4.35-4.35"></path>
-                    </svg>
+                        background: "#e0f2fe",
+                        border: "1px solid #60a5fa",
+                      }}>
+                        {lotes.find(l => l.value === String(loteIdPreSeleccionado))?.label || `Lote ${loteIdPreSeleccionado}`}
+                      </div>
+                    ) : (
+                      <><input
+                          type="text"
+                          placeholder={loteId ? lotes.find(l => l.value === loteId)?.label || loteId : "Buscar lote por número..."}
+                          value={busquedaLote}
+                          onChange={(e) => {
+                            const valor = e.target.value;
+                            setBusquedaLote(valor);
+                            // Si se borra todo, limpiar también la selección
+                            if (!valor.trim()) {
+                              setLoteId("");
+                            }
+                          } }
+                          onFocus={() => {
+                            // Si hay un lote seleccionado, mostrar su info en la búsqueda
+                            if (loteId && !busquedaLote.trim()) {
+                              const loteSeleccionado = lotes.find(l => l.value === loteId);
+                              if (loteSeleccionado) {
+                                setBusquedaLote(loteSeleccionado.label);
+                              }
+                            }
+                          } }
+                          style={{
+                            width: "100%",
+                            padding: "10px 12px",
+                            paddingLeft: "40px",
+                            border: "1px solid rgba(0,0,0,.18)",
+                            borderRadius: "6px",
+                            fontSize: "13.5px",
+                            boxShadow: "0 2px 4px rgba(0,0,0,.10)"
+                          }} /><svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            style={{
+                              position: "absolute",
+                              left: "12px",
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              color: "#6B7280",
+                              pointerEvents: "none"
+                            }}
+                          >
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <path d="m21 21-4.35-4.35"></path>
+                          </svg></>
+                      
+                    )}
                   </div>
-                  {busquedaLote.trim() && lotesFiltrados.length > 0 && (
+
+                  {/* Solo mostrar búsqueda / resultados / confirmación si NO viene preseleccionado */}
+                  {!loteIdPreSeleccionado && busquedaLote.trim() && lotesFiltrados.length > 0 && (
                     <div style={{ 
                       maxHeight: "200px", 
                       overflowY: "auto", 
@@ -630,7 +641,8 @@ export default function ReservaCrearCard({
                       ))}
                     </div>
                   )}
-                  {busquedaLote.trim() && lotesFiltrados.length === 0 && (
+
+                  {!loteIdPreSeleccionado && busquedaLote.trim() && lotesFiltrados.length === 0 && (
                     <div style={{
                       padding: "12px",
                       background: "#fef2f2",
@@ -643,7 +655,8 @@ export default function ReservaCrearCard({
                       No se encontraron lotes
                     </div>
                   )}
-                  {loteId && !busquedaLote.trim() && (
+
+                  {!loteIdPreSeleccionado && loteId && !busquedaLote.trim() && (
                     <div style={{
                       padding: "10px 12px",
                       background: "#eaf3ed",
