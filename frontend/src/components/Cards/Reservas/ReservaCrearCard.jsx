@@ -95,6 +95,7 @@ export default function ReservaCrearCard({
   const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
   const [clienteId, setClienteId] = useState("");
   const [inmobiliariaId, setInmobiliariaId] = useState("");
+  const [plazoReserva, setPlazoReserva] = useState(toDateInputValue(new Date()));
   const [sena, setSena] = useState("");
   
   // Estados de datos
@@ -203,6 +204,7 @@ export default function ReservaCrearCard({
       setLoteId(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
       setClienteId("");
       setInmobiliariaId("");
+      setPlazoReserva(toDateInputValue(new Date()));
       setSena("");
       setError(null);
       setShowSuccess(false);
@@ -487,8 +489,13 @@ export default function ReservaCrearCard({
 
               <div className="field-row">
                 <div className="field-label">PLAZO RESERVA</div>
-                <div className="field-value is-readonly">
-                  Sin información
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={plazoReserva}
+                    onChange={(e) => setPlazoReserva(e.target.value)}
+                  />
                 </div>
               </div>
 
@@ -500,8 +507,14 @@ export default function ReservaCrearCard({
                     type="number"
                     inputMode="numeric"
                     step="100"
+                    min="0"
                     value={sena}
-                    onChange={(e) => setSena(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === "" || Number(value) >= 0) {
+                        setSena(value);
+                      }
+                    }}
                     placeholder="0"
                     style={{ flex: 1, paddingRight: "50px" }}
                   />
