@@ -70,3 +70,66 @@ export async function getArchivoById(id) {
   }
 }
 
+/**
+ * Sube un archivo al backend
+ * @param {File} file - Archivo a subir
+ * @param {number} idLoteAsociado - ID del lote asociado
+ * @param {string} tipo - Tipo de archivo: 'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN'
+ * @returns {Promise<Object>} Archivo subido con metadata
+ */
+export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
+  if (!file) {
+    throw new Error("No se proporcionó ningún archivo");
+  }
+  if (!idLoteAsociado) {
+    throw new Error("Se requiere el ID del lote asociado");
+  }
+
+  try {
+    // Crear FormData para multipart/form-data
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('idLoteAsociado', String(idLoteAsociado));
+    formData.append('tipo', tipo);
+
+    // Obtener token de acceso
+    const { getAccessToken } = await import('../auth/token');
+    const access = getAccessToken();
+
+    // Construir URL
+    const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "/api";
+    const url = `${API_BASE}${PRIMARY}`;
+
+    // Hacer la petición con FormData (sin Content-Type header, el navegador lo agrega automáticamente)
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        ...(access ? { Authorization: `Bearer ${access}` } : {}),
+      },
+      credentials: 'include',
+      body: formData, // No serializar, enviar FormData directamente
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(data?.message || "Error al subir archivo");
+    }
+
+    const archivo = data?.data || data?.archivo || data;
+    
+    return {
+      id: archivo.id,
+      filename: archivo.filename || archivo.nombreArchivo,
+      url: archivo.url || archivo.linkArchivo,
+      tipo: archivo.tipo,
+      uploadedAt: archivo.uploadedAt || archivo.createdAt,
+      uploadedBy: archivo.uploadedBy,
+      idLoteAsociado: archivo.idLoteAsociado,
+    };
+  } catch (error) {
+    console.error("Error subiendo archivo:", error);
+    throw error;
+  }
+}
+

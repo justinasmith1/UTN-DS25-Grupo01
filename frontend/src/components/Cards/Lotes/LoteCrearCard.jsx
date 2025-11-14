@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
-import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
+import { createLote } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
-import { getAllReservas } from "../../../lib/api/reservas.js";
-import { getAllVentas } from "../../../lib/api/ventas.js";
+import { getAllPersonas } from "../../../lib/api/personas.js";
+import { uploadArchivo } from "../../../lib/api/archivos.js";
+import { useToast } from "../../../app/providers/ToastProvider.jsx";
+import { req, positive, normNum } from "../../../lib/forms/validate.js";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -85,7 +87,6 @@ const FALLBACK_IMAGE =
   "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
 const LABELS = [
-  "ID",
   "NÚMERO PARTIDA",
   "TIPO",
   "ESTADO",
@@ -95,272 +96,125 @@ const LABELS = [
   "FRENTE",
   "FONDO",
   "PRECIO",
-  "PROPIETARIO",
-  "UBICACIÓN",
-  "ALQUILER",
-  "DEUDA",
   "DESCRIPCIÓN",
 ];
-const FROM_PRISMA_MAP = {
-  LOTE_VENTA: "Lote Venta",
-  ESPACIO_COMUN: "Espacio Comun",
-  DISPONIBLE: "Disponible",
-  RESERVADO: "Reservado",
-  VENDIDO: "Vendido",
-  NO_DISPONIBLE: "No Disponible",
-  ALQUILADO: "Alquilado",
-  EN_PROMOCION: "En Promoción",
-  EN_CONSTRUCCION: "En Construccion",
-  NO_CONSTRUIDO: "No Construido",
-  CONSTRUIDO: "Construido",
-};
 
-const toFriendly = (value) => {
-  if (value == null) return "";
-  return FROM_PRISMA_MAP[value] || value;
-};
-
-const toNumberOrNull = (val) => {
-  if (val === "" || val === null || val === undefined) return null;
-  const n = Number(val);
-  return Number.isFinite(n) ? n : null;
-};
-
-const buildInitialForm = (lot) => {
-  if (!lot) {
-    return {
-      id: "",
-      tipo: "",
-      estado: "",
-      subestado: "",
-      numPartido: "",
-      fraccionId: "",
-      fraccionNumero: "",
-      propietarioId: lot?.propietarioId ?? "",
-      propietarioNombre: "",
-      superficie: "",
-      frente: "",
-      fondo: "",
-      precio: "",
-      alquiler: false,
-      deuda: false,
-      descripcion: "",
-      ubicacionId: "",
-      ubicacionCalle: "",
-      ubicacionNumero: "",
-      nombreEspacioComun: "",
-      capacidad: "",
-      images: [],
-    };
-  }
-
-  const propietario =
-    lot?.propietario ||
-    lot?.owner ||
-    lot?.Propietario ||
-    {};
-  const propietarioNombre = [propietario.nombre || propietario.firstName, propietario.apellido || propietario.lastName]
-    .filter(Boolean)
-    .join(" ");
-
-  const fraccionId =
-    lot?.fraccionId ??
-    lot?.fraccion?.id ??
-    "";
-
-  const fraccionNumero =
-    lot?.fraccion?.numero ??
-    lot?.fraccionNumero ??
-    lot?.fraccion ??
-    "";
-
-  const ubicacion = lot?.ubicacion ?? {};
-
-  const images = Array.isArray(lot?.images) ? lot.images : [];
-
-  // Calcular superficie si hay frente y fondo
-  const frente = lot?.frente ?? "";
-  const fondo = lot?.fondo ?? "";
-  let superficie = lot?.superficie ?? lot?.surface ?? "";
-  
-  // Si tenemos frente y fondo pero no superficie, calcularla
-  if (frente && fondo && !superficie) {
-    const f = Number(frente);
-    const fo = Number(fondo);
-    if (!isNaN(f) && !isNaN(fo) && f >= 0 && fo >= 0) {
-      superficie = String(f * fo);
-    }
-  } else if (frente && fondo) {
-    // Validar que la superficie coincida con frente × fondo
-    const f = Number(frente);
-    const fo = Number(fondo);
-    const sup = Number(superficie);
-    if (!isNaN(f) && !isNaN(fo) && !isNaN(sup) && f >= 0 && fo >= 0 && sup >= 0) {
-      const calculated = f * fo;
-      // Si la superficie no coincide, recalcularla
-      if (Math.abs(sup - calculated) > 0.01) {
-        superficie = String(calculated);
-      }
-    }
-  }
-
+const buildInitialForm = () => {
   return {
-    id: lot.id ?? "",
-    tipo: toFriendly(lot?.tipo),
-    estado: toFriendly(lot?.estado ?? lot?.status),
-    subestado: toFriendly(lot?.subestado ?? lot?.subStatus),
-    numPartido: lot?.numPartido ?? lot?.numeroPartida ?? "",
-    fraccionId,
-    fraccionNumero,
-    propietarioId: lot?.propietarioId ?? propietario?.id ?? "",
-    propietarioNombre: propietarioNombre || lot?.owner || "",
-    superficie,
-    frente: String(frente),
-    fondo: String(fondo),
-    precio: lot?.precio ?? lot?.price ?? "",
-    alquiler: Boolean(lot?.alquiler),
-    deuda: Boolean(lot?.deuda),
-    descripcion: lot?.descripcion ?? lot?.description ?? "",
-    ubicacionId:
-      lot?.ubicacionId ??
-      ubicacion?.id ??
-      "",
-    ubicacionCalle: ubicacion?.calle ?? ubicacion?.nombre ?? "",
-    ubicacionNumero: ubicacion?.numero ?? "",
-    nombreEspacioComun: lot?.nombreEspacioComun ?? "",
-    capacidad: lot?.capacidad ?? "",
-    images,
+    tipo: "",
+    estado: "",
+    subestado: "",
+    numPartido: "",
+    fraccionId: "",
+    fraccionNumero: "",
+    propietarioId: "",
+    superficie: "",
+    frente: "",
+    fondo: "",
+    precio: "",
+    descripcion: "",
+    nombreEspacioComun: "",
+    capacidad: "",
+    images: [],
   };
 };
 
-export default function LoteEditarCard({
+export default function LoteCrearCard({
   open,
   onCancel,
-  onSaved,
-  lote,
-  loteId,
-  lotes,
-  entityType = "Lote", // tipo de entidad para el mensaje de éxito
+  onCreated,
 }) {
-  const [detalle, setDetalle] = useState(lote || null);
-  const [loadingDetalle, setLoadingDetalle] = useState(false);
-  const [form, setForm] = useState(buildInitialForm(lote));
+  const { success, error: showError } = useToast();
+  const [form, setForm] = useState(buildInitialForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [newImageUrl, setNewImageUrl] = useState("");
   const [fracciones, setFracciones] = useState([]);
   const [loadingFracciones, setLoadingFracciones] = useState(false);
+  const [personas, setPersonas] = useState([]);
+  const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
+  const fileInputRef = useRef(null);
 
-  // Cargar fracciones al montar o abrir
+  // Cargar fracciones y personas al abrir
   useEffect(() => {
     if (!open) return;
-    if (fracciones.length > 0) return; // Ya están cargadas
     
-    setLoadingFracciones(true);
-    (async () => {
-      try {
-        const resp = await getAllFracciones();
-        if (resp.success && resp.data?.fracciones) {
-          setFracciones(resp.data.fracciones);
+    // Cargar fracciones
+    if (fracciones.length === 0) {
+      setLoadingFracciones(true);
+      (async () => {
+        try {
+          const resp = await getAllFracciones();
+          if (resp.success && resp.data?.fracciones) {
+            setFracciones(resp.data.fracciones);
+          }
+        } catch (err) {
+          console.error("Error cargando fracciones:", err);
+        } finally {
+          setLoadingFracciones(false);
         }
-      } catch (err) {
-        console.error("Error cargando fracciones:", err);
-      } finally {
-        setLoadingFracciones(false);
-      }
-    })();
-  }, [open, fracciones.length]);
+      })();
+    }
 
-  // Cargar reservas y ventas del lote para validaciones
-  useEffect(() => {
-    if (!open || !detalle?.id) return;
-    
-    (async () => {
-      try {
-        // Cargar reservas
-        const reservasResp = await getAllReservas({});
-        const allReservas = reservasResp?.data || [];
-        const reservasDelLote = allReservas.filter(
-          (r) => (r.loteId || r.lote?.id) === detalle.id
-        );
-        setReservasLote(reservasDelLote);
+    // Cargar personas
+    if (personas.length === 0) {
+      setLoadingPersonas(true);
+      (async () => {
+        try {
+          const resp = await getAllPersonas({});
+          // getAllPersonas devuelve { personas: [...], total: ... }
+          const personasData = resp?.personas ?? (Array.isArray(resp) ? resp : []);
+          setPersonas(Array.isArray(personasData) ? personasData : []);
+          console.log("✅ Personas cargadas:", personasData.length);
+        } catch (err) {
+          console.error("❌ Error cargando personas:", err);
+          setPersonas([]);
+        } finally {
+          setLoadingPersonas(false);
+        }
+      })();
+    }
+  }, [open, fracciones.length, personas.length]);
 
-        // Cargar ventas
-        const ventasResp = await getAllVentas({});
-        const allVentas = Array.isArray(ventasResp?.data) ? ventasResp.data : 
-                         Array.isArray(ventasResp) ? ventasResp : [];
-        const ventasDelLote = allVentas.filter(
-          (v) => (v.loteId || v.lote?.id) === detalle.id
-        );
-        setVentasLote(ventasDelLote);
-      } catch (err) {
-        console.error("Error cargando reservas/ventas del lote:", err);
-      }
-    })();
-  }, [open, detalle?.id]);
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
   }, []);
 
-  const fallbackDetalle = useMemo(() => {
-    if (lote) return lote;
-    if (loteId != null && Array.isArray(lotes)) {
-      return lotes.find((l) => `${l.id}` === `${loteId}`) || null;
-    }
-    return null;
-  }, [lote, loteId, lotes]);
+  // Opciones de personas para el selector
+  const personaOpts = useMemo(() => {
+    return personas.map((p) => {
+      const id = p.id ?? p.idPersona ?? "";
+      const nombre = p.nombre ?? p.firstName ?? "";
+      const apellido = p.apellido ?? p.lastName ?? "";
+      const nombreCompleto = p.nombreCompleto ?? (`${nombre} ${apellido}`.trim() || `Persona ${id}`);
+      return {
+        value: String(id),
+        label: nombreCompleto
+      };
+    });
+  }, [personas]);
 
+  // Resetear formulario al abrir/cerrar
   useEffect(() => {
-    if (fallbackDetalle) {
-      setDetalle(fallbackDetalle);
-    }
-  }, [fallbackDetalle]);
-
-  useEffect(() => {
-    if (!open) return;
-    if (!detalle && loteId != null && !loadingDetalle) {
-      setLoadingDetalle(true);
-      (async () => {
-        try {
-          const resp = await getLoteById(loteId);
-          const lot = resp?.data ?? resp ?? null;
-          setDetalle(lot);
-        } catch (err) {
-          console.error("Error obteniendo lote por id:", err);
-          setError("No se pudo cargar el lote seleccionado.");
-        } finally {
-          setLoadingDetalle(false);
+    if (!open) {
+      // Liberar todas las URLs de objeto antes de resetear
+      form.images.forEach((img) => {
+        if (img instanceof File && img.objectURL) {
+          URL.revokeObjectURL(img.objectURL);
         }
-      })();
-    }
-  }, [open, detalle, loteId, loadingDetalle]);
-
-  useEffect(() => {
-    if (!open) {
+      });
+      setForm(buildInitialForm());
+      setError(null);
+      setFieldErrors({});
       setShowSuccess(false);
       setSaving(false);
-      return;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
-    if (!detalle) return;
-    setForm(buildInitialForm(detalle));
-    setNewImageUrl("");
-    setError(null);
-    setShowSuccess(false);
-  }, [detalle, open]);
-
-  // Resetear estados cuando el modal se cierra o se abre con otro lote
-  useEffect(() => {
-    if (!open) {
-      setSaving(false);
-      setShowSuccess(false);
-    } else {
-      // Resetear estados al abrir con un nuevo lote
-      setSaving(false);
-      setShowSuccess(false);
-    }
-  }, [open, detalle?.id]);
+  }, [open, form.images]);
 
   const updateForm = (patch) => {
     setForm((prev) => {
@@ -368,28 +222,46 @@ export default function LoteEditarCard({
       
       // Calcular superficie automáticamente cuando cambian frente o fondo
       if ('frente' in patch || 'fondo' in patch) {
-        const frente = toNumberOrNull(updated.frente);
-        const fondo = toNumberOrNull(updated.fondo);
+        const frente = normNum(updated.frente);
+        const fondo = normNum(updated.fondo);
         if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
           updated.superficie = String(frente * fondo);
         } else {
-          // Si falta alguno, limpiar superficie
           updated.superficie = "";
         }
       }
       
       return updated;
     });
+    // Limpiar error del campo cuando se modifica
+    if (patch && Object.keys(patch).length > 0) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        Object.keys(patch).forEach((key) => {
+          delete next[key];
+        });
+        return next;
+      });
+    }
   };
 
   const handleReset = () => {
-    setForm(buildInitialForm(detalle));
-    setNewImageUrl("");
+    setForm(buildInitialForm());
     setError(null);
+    setFieldErrors({});
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const handleRemoveImage = (index) => {
     setForm((prev) => {
+      // Liberar URL de objeto de la imagen que se está eliminando
+      const imgToRemove = prev.images[index];
+      if (imgToRemove instanceof File && imgToRemove.objectURL) {
+        URL.revokeObjectURL(imgToRemove.objectURL);
+      }
+      
       const nextImages = prev.images.filter((_, idx) => idx !== index);
       setCurrentImage((curr) => {
         if (nextImages.length === 0) return 0;
@@ -400,14 +272,33 @@ export default function LoteEditarCard({
     });
   };
 
-  const handleAddImage = () => {
-    const url = newImageUrl.trim();
-    if (!url) return;
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Validar que sean imágenes
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length !== files.length) {
+      showError("Solo se pueden subir archivos de imagen");
+      return;
+    }
+
+    // Crear URLs de objeto para preview y agregar a cada File
+    const filesWithPreview = imageFiles.map((file) => {
+      const fileWithPreview = file;
+      fileWithPreview.objectURL = URL.createObjectURL(file);
+      return fileWithPreview;
+    });
+
     setForm((prev) => ({
       ...prev,
-      images: [...prev.images, url],
+      images: [...prev.images, ...filesWithPreview],
     }));
-    setNewImageUrl("");
+
+    // Limpiar el input para permitir seleccionar el mismo archivo nuevamente
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
   };
 
   const [currentImage, setCurrentImage] = useState(0);
@@ -415,8 +306,30 @@ export default function LoteEditarCard({
     setCurrentImage(0);
   }, [form.images, open]);
 
-  const displayImages =
-    form.images.length > 0 ? form.images : [FALLBACK_IMAGE];
+  // Limpiar URLs de objeto al desmontar o cambiar imágenes
+  useEffect(() => {
+    const currentImages = form.images;
+    return () => {
+      currentImages.forEach((img) => {
+        if (img instanceof File && img.objectURL) {
+          URL.revokeObjectURL(img.objectURL);
+        }
+      });
+    };
+  }, [form.images]);
+
+  // Obtener URLs para mostrar previews
+  const displayImages = useMemo(() => {
+    if (form.images.length === 0) return [FALLBACK_IMAGE];
+    return form.images.map((img) => {
+      if (img instanceof File && img.objectURL) {
+        return img.objectURL;
+      }
+      // Fallback para URLs (por si acaso)
+      return typeof img === "string" ? img : FALLBACK_IMAGE;
+    });
+  }, [form.images]);
+
   const showCarouselControls = form.images.length > 1;
 
   const handlePrev = () => {
@@ -434,24 +347,24 @@ export default function LoteEditarCard({
   const buildPayload = () => {
     const payload = {};
 
+    // Campos obligatorios
     if (form.tipo) payload.tipo = form.tipo;
     if (form.estado) payload.estado = form.estado;
     if (form.subestado) payload.subestado = form.subestado;
 
-    const numPartido = toNumberOrNull(form.numPartido);
-    if (numPartido != null) payload.numPartido = numPartido;
+    // numPartido: si no se proporciona, usar default del backend (62)
+    const numPartido = normNum(form.numPartido);
+    payload.numPartido = numPartido != null ? numPartido : 62;
 
     // Calcular superficie automáticamente si hay frente y fondo
-    const frente = toNumberOrNull(form.frente);
-    const fondo = toNumberOrNull(form.fondo);
-    let superficie = toNumberOrNull(form.superficie);
+    const frente = normNum(form.frente);
+    const fondo = normNum(form.fondo);
+    let superficie = normNum(form.superficie);
     
-    // Si tenemos frente y fondo, calcular superficie automáticamente
     if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
       superficie = frente * fondo;
     }
     
-    // Solo enviar superficie si tiene un valor válido
     if (superficie != null && superficie >= 0) {
       payload.superficie = superficie;
     }
@@ -459,29 +372,28 @@ export default function LoteEditarCard({
     if (frente != null) payload.frente = frente;
     if (fondo != null) payload.fondo = fondo;
 
-    const precio = toNumberOrNull(form.precio);
+    const precio = normNum(form.precio);
     if (precio != null) payload.precio = precio;
 
-    if (form.descripcion != null) payload.descripcion = form.descripcion;
+    if (form.descripcion != null && form.descripcion.trim()) {
+      payload.descripcion = form.descripcion.trim();
+    }
 
-    payload.alquiler = Boolean(form.alquiler);
-    payload.deuda = Boolean(form.deuda);
-
-    const fraccionId = toNumberOrNull(form.fraccionId);
+    const fraccionId = normNum(form.fraccionId);
     if (fraccionId) payload.fraccionId = fraccionId;
 
-    const propietarioId = toNumberOrNull(form.propietarioId);
+    // Propietario es obligatorio
+    const propietarioId = normNum(form.propietarioId);
     if (propietarioId) payload.propietarioId = propietarioId;
 
-    const ubicacionId = toNumberOrNull(form.ubicacionId);
-    if (ubicacionId) payload.ubicacionId = ubicacionId;
+    // NO incluir imágenes en el payload - se subirán después de crear el lote
 
     // Campos específicos para Espacio Comun
     if (form.tipo === "Espacio Comun") {
       if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
         payload.nombreEspacioComun = form.nombreEspacioComun.trim();
       }
-      const capacidad = toNumberOrNull(form.capacidad);
+      const capacidad = normNum(form.capacidad);
       if (capacidad != null && capacidad >= 0) {
         payload.capacidad = capacidad;
       }
@@ -490,76 +402,107 @@ export default function LoteEditarCard({
     return payload;
   };
 
-  const handleSave = async () => {
-    if (!detalle?.id) return;
-    setSaving(true);
-    setError(null);
-    try {
-      const payload = buildPayload();
-      
-      // Validaciones de estado vs reservas/ventas
-      const nuevoEstado = payload.estado || form.estado;
-      const estadoUpper = String(nuevoEstado || "").toUpperCase();
-      
-      if (estadoUpper === "RESERVADO") {
-        // Verificar que haya una reserva ACTIVA para este lote
-        const tieneReservaActiva = reservasLote.some(
-          (r) => String(r.estado || "").toUpperCase() === "ACTIVA"
-        );
-        if (!tieneReservaActiva) {
-          setError("No se puede establecer el estado RESERVADO sin una reserva ACTIVA para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-      
-      if (estadoUpper === "VENDIDO") {
-        // Verificar que haya una venta para este lote
-        if (ventasLote.length === 0) {
-          setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-      const resp = await updateLote(detalle.id, payload);
-      const updated = resp?.data ?? resp ?? {};
-      const enriched = {
-        ...(detalle || {}),
-        ...(updated || {}),
-        images: [...form.images],
-        descripcion: form.descripcion,
-        alquiler: payload.alquiler,
-        deuda: payload.deuda,
-        estado: payload.estado ?? updated?.estado ?? detalle?.estado,
-        subestado: payload.subestado ?? updated?.subestado ?? detalle?.subestado,
-        tipo: payload.tipo ?? updated?.tipo ?? detalle?.tipo,
-        numPartido: payload.numPartido ?? updated?.numPartido ?? detalle?.numPartido,
-        superficie: payload.superficie ?? updated?.superficie ?? detalle?.superficie,
-        frente: payload.frente ?? updated?.frente ?? detalle?.frente,
-        fondo: payload.fondo ?? updated?.fondo ?? detalle?.fondo,
-        precio: payload.precio ?? updated?.precio ?? detalle?.precio,
-      };
+  const validateForm = () => {
+    const rules = {
+      numPartido: [req("El número de partida es obligatorio"), positive("El número de partida debe ser un número positivo")],
+      tipo: [req("El tipo es obligatorio")],
+      estado: [req("El estado es obligatorio")],
+      subestado: [req("El sub-estado es obligatorio")],
+      fraccionId: [req("La fracción es obligatoria")],
+      propietarioId: [req("El propietario es obligatorio"), positive("El propietario debe ser válido")],
+    };
 
-      setDetalle(enriched);
+    const errors = {};
+    for (const [field, validators] of Object.entries(rules)) {
+      for (const validate of validators) {
+        const err = validate(form[field]);
+        if (err) {
+          errors[field] = err;
+          break;
+        }
+      }
+    }
+
+    // Validar que frente y fondo sean positivos si están presentes
+    const frente = normNum(form.frente);
+    const fondo = normNum(form.fondo);
+    if (frente != null && frente < 0) {
+      errors.frente = "El frente debe ser un número positivo";
+    }
+    if (fondo != null && fondo < 0) {
+      errors.fondo = "El fondo debe ser un número positivo";
+    }
+
+    // Validar nombreEspacioComun si el tipo es "Espacio Comun"
+    if (form.tipo === "Espacio Comun") {
+      if (!form.nombreEspacioComun || !form.nombreEspacioComun.trim()) {
+        errors.nombreEspacioComun = "El nombre del espacio común es obligatorio";
+      }
+    }
+
+    // Validar capacidad si está presente (debe ser positiva)
+    const capacidad = normNum(form.capacidad);
+    if (capacidad != null && capacidad < 0) {
+      errors.capacidad = "La capacidad debe ser un número positivo";
+    }
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleSave = async () => {
+    setError(null);
+    setFieldErrors({});
+
+    if (!validateForm()) {
+      setError("Por favor, completa todos los campos obligatorios correctamente.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      // 1. Crear el lote primero
+      const payload = buildPayload();
+      console.log("📤 Payload a enviar:", payload);
+      const resp = await createLote(payload);
+      const created = resp?.data ?? resp ?? {};
       
-      // Actualizar estado del padre inmediatamente
-      onSaved?.(enriched);
+      if (!created?.id) {
+        throw new Error("El lote se creó pero no se obtuvo el ID");
+      }
+
+      // 2. Subir las imágenes si hay
+      if (form.images.length > 0) {
+        try {
+          const uploadPromises = form.images
+            .filter((img) => img instanceof File)
+            .map((file) => uploadArchivo(file, created.id, "IMAGEN"));
+          
+          await Promise.all(uploadPromises);
+          console.log("✅ Imágenes subidas exitosamente");
+        } catch (uploadErr) {
+          console.error("⚠️ Error subiendo imágenes:", uploadErr);
+          // No fallar la creación del lote si falla la subida de imágenes
+          showError("Lote creado, pero hubo un error al subir algunas imágenes");
+        }
+      }
       
       // Mostrar animación de éxito
       setShowSuccess(true);
+      success("Lote creado exitosamente");
       
       // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
+        onCreated?.(created);
         onCancel?.();
       }, 1500);
     } catch (err) {
-      console.error("Error guardando lote:", err);
-      setError(
-        err?.message ||
-          "No se pudo guardar el lote. Intenta nuevamente."
-      );
+      console.error("Error creando lote:", err);
+      const errorMsg = err?.message || "No se pudo crear el lote. Intenta nuevamente.";
+      setError(errorMsg);
+      showError(errorMsg);
       setSaving(false);
     }
   };
@@ -628,7 +571,7 @@ export default function LoteEditarCard({
                 color: "#111",
               }}
             >
-              ¡{entityType} guardado exitosamente!
+              ¡Lote creado exitosamente!
             </h3>
           </div>
         </div>
@@ -636,66 +579,49 @@ export default function LoteEditarCard({
 
       <EditarBase
         open={open}
-        title={`Editar Lote Nº ${form.id || ""}`}
+        title="Crear Nuevo Lote"
         onCancel={() => {
-          // Si está mostrando éxito, no cerrar hasta que termine
           if (showSuccess) return;
           setSaving(false);
           setShowSuccess(false);
           onCancel?.();
         }}
-        saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
+        saveButtonText={saving ? "Creando..." : "Crear Lote"}
         onSave={handleSave}
-        onReset={detalle ? handleReset : undefined}
+        onReset={handleReset}
         saving={saving}
-        headerRight={
-          loadingDetalle ? (
-            <span className="badge bg-warning text-dark">Cargando...</span>
-          ) : null
-        }
       >
-      {!detalle && (
-        <div style={{ padding: "30px 10px" }}>
-          <p style={{ margin: 0, color: "#6B7280" }}>
-            {loadingDetalle
-              ? "Cargando información del lote..."
-              : "No se encontró información del lote."}
-          </p>
-        </div>
-      )}
-
-      {detalle && (
         <div
           className="lote-grid"
           style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}
         >
           <div className="lote-data-col">
             <div className="field-row">
-              <div className="field-label">ID</div>
-              <div className="field-value is-readonly">{form.id || "—"}</div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Número Partida</div>
+              <div className="field-label">Número Partida *</div>
               <div className="field-value p0">
                 <input
-                  className="field-input"
+                  className={`field-input ${fieldErrors.numPartido ? "is-invalid" : ""}`}
                   type="number"
                   inputMode="numeric"
                   value={form.numPartido ?? ""}
                   onChange={(e) => updateForm({ numPartido: e.target.value })}
                   placeholder="Número de partida"
                 />
+                {fieldErrors.numPartido && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.numPartido}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="field-row">
-              <div className="field-label">Tipo</div>
+              <div className="field-label">Tipo *</div>
               <div className="field-value p0">
                 <NiceSelect
                   value={form.tipo}
                   options={TIPOS}
-                  placeholder=""
+                  placeholder="Seleccionar tipo"
                   onChange={(value) => {
                     // Limpiar campos de espacio común si se cambia a otro tipo
                     updateForm({ 
@@ -703,23 +629,42 @@ export default function LoteEditarCard({
                       nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "",
                       capacidad: value === "Espacio Comun" ? form.capacidad : ""
                     });
+                    // Limpiar errores de validación de estos campos
+                    if (value !== "Espacio Comun") {
+                      setFieldErrors((prev) => {
+                        const next = { ...prev };
+                        delete next.nombreEspacioComun;
+                        delete next.capacidad;
+                        return next;
+                      });
+                    }
                   }}
                 />
+                {fieldErrors.tipo && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.tipo}
+                  </div>
+                )}
               </div>
             </div>
 
             {form.tipo === "Espacio Comun" && (
               <>
                 <div className="field-row">
-                  <div className="field-label">Nombre del Espacio Común</div>
+                  <div className="field-label">Nombre del Espacio Común *</div>
                   <div className="field-value p0">
                     <input
-                      className="field-input"
+                      className={`field-input ${fieldErrors.nombreEspacioComun ? "is-invalid" : ""}`}
                       type="text"
                       value={form.nombreEspacioComun ?? ""}
                       onChange={(e) => updateForm({ nombreEspacioComun: e.target.value })}
                       placeholder="Ej. Piscina"
                     />
+                    {fieldErrors.nombreEspacioComun && (
+                      <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                        {fieldErrors.nombreEspacioComun}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -727,44 +672,59 @@ export default function LoteEditarCard({
                   <div className="field-label">Capacidad</div>
                   <div className="field-value p0">
                     <input
-                      className="field-input"
+                      className={`field-input ${fieldErrors.capacidad ? "is-invalid" : ""}`}
                       type="number"
                       inputMode="numeric"
                       value={form.capacidad ?? ""}
                       onChange={(e) => updateForm({ capacidad: e.target.value })}
                       placeholder="Ej. 100"
                     />
+                    {fieldErrors.capacidad && (
+                      <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                        {fieldErrors.capacidad}
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
             )}
 
             <div className="field-row">
-              <div className="field-label">Estado</div>
+              <div className="field-label">Estado *</div>
               <div className="field-value p0">
                 <NiceSelect
                   value={form.estado}
                   options={ESTADOS}
-                  placeholder=""
+                  placeholder="Seleccionar estado"
                   onChange={(value) => updateForm({ estado: value })}
                 />
+                {fieldErrors.estado && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.estado}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="field-row">
-              <div className="field-label">Sub-Estado</div>
+              <div className="field-label">Sub-Estado *</div>
               <div className="field-value p0">
                 <NiceSelect
                   value={form.subestado}
                   options={SUBESTADOS}
-                  placeholder=""
+                  placeholder="Seleccionar sub-estado"
                   onChange={(value) => updateForm({ subestado: value })}
                 />
+                {fieldErrors.subestado && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.subestado}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="field-row">
-              <div className="field-label">Fracción</div>
+              <div className="field-label">Fracción *</div>
               <div className="field-value p0">
                 <NiceSelect
                   value={form.fraccionId ? String(form.fraccionId) : ""}
@@ -785,6 +745,32 @@ export default function LoteEditarCard({
                     });
                   }}
                 />
+                {fieldErrors.fraccionId && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.fraccionId}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">Propietario *</div>
+              <div className="field-value p0">
+                <NiceSelect
+                  value={form.propietarioId ? String(form.propietarioId) : ""}
+                  options={personaOpts}
+                  placeholder={loadingPersonas ? "Cargando..." : "Seleccionar propietario"}
+                  onChange={(value) => {
+                    updateForm({ 
+                      propietarioId: value ? Number(value) : ""
+                    });
+                  }}
+                />
+                {fieldErrors.propietarioId && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.propietarioId}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -807,13 +793,18 @@ export default function LoteEditarCard({
               <div className="field-label">Frente</div>
               <div className="field-value p0">
                 <input
-                  className="field-input"
+                  className={`field-input ${fieldErrors.frente ? "is-invalid" : ""}`}
                   type="number"
                   inputMode="decimal"
                   value={form.frente ?? ""}
                   onChange={(e) => updateForm({ frente: e.target.value })}
                   placeholder="Metros"
                 />
+                {fieldErrors.frente && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.frente}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -821,13 +812,18 @@ export default function LoteEditarCard({
               <div className="field-label">Fondo</div>
               <div className="field-value p0">
                 <input
-                  className="field-input"
+                  className={`field-input ${fieldErrors.fondo ? "is-invalid" : ""}`}
                   type="number"
                   inputMode="decimal"
                   value={form.fondo ?? ""}
                   onChange={(e) => updateForm({ fondo: e.target.value })}
                   placeholder="Metros"
                 />
+                {fieldErrors.fondo && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.fondo}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -844,59 +840,14 @@ export default function LoteEditarCard({
                 />
               </div>
             </div>
-
-            <div className="field-row">
-              <div className="field-label">Propietario</div>
-              <div className="field-value is-readonly">
-                {form.propietarioNombre || "—"}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Ubicación</div>
-              <div className="field-value is-readonly">
-                {form.ubicacionCalle
-                  ? `Calle ${form.ubicacionCalle} ${
-                      form.ubicacionNumero
-                        ? `Nº ${form.ubicacionNumero}`
-                        : ""
-                    }`
-                  : "—"}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Alquiler</div>
-              <div className="field-value boolean-value">
-                <input
-                  type="checkbox"
-                  checked={form.alquiler}
-                  onChange={(e) => updateForm({ alquiler: e.target.checked })}
-                />
-                <span>{form.alquiler ? "Sí" : "No"}</span>
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Deuda</div>
-              <div className="field-value boolean-value">
-                <input
-                  type="checkbox"
-                  checked={form.deuda}
-                  onChange={(e) => updateForm({ deuda: e.target.checked })}
-                />
-                <span>{form.deuda ? "Sí" : "No"}</span>
-              </div>
-            </div>
           </div>
 
           <div className="lote-media-col">
-
             <div className="lote-image-manager">
               <div className="lote-carousel">
                 <img
                   src={displayImages[currentImage]}
-                  alt={`Imagen lote ${form.id} ${currentImage + 1}`}
+                  alt={`Imagen lote ${currentImage + 1}`}
                   className="lote-carousel__image"
                 />
 
@@ -933,25 +884,32 @@ export default function LoteEditarCard({
               </div>
 
               <div className="lote-image-actions">
-                <input
-                  type="text"
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  onPaste={(e) => {
-                    // Permitir el comportamiento por defecto del paste
-                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-                    e.preventDefault(); // Prevenir el paste por defecto para controlar el valor
-                    setNewImageUrl(pastedText);
+                <label
+                  htmlFor="file-input-lote-crear"
+                  style={{
+                    display: "inline-block",
+                    padding: "8px 16px",
+                    background: "#2563eb",
+                    color: "white",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                    border: "none",
+                    textAlign: "center",
                   }}
-                  placeholder="URL de nueva imagen"
-                />
-                <button
-                  type="button"
-                  className="lote-add-btn"
-                  onClick={handleAddImage}
                 >
-                  Agregar imagen
-                </button>
+                  📷 Seleccionar imágenes
+                </label>
+                <input
+                  ref={fileInputRef}
+                  id="file-input-lote-crear"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  style={{ display: "none" }}
+                />
                 {form.images.length > 0 && (
                   <button
                     type="button"
@@ -962,34 +920,47 @@ export default function LoteEditarCard({
                     Quitar imagen actual
                   </button>
                 )}
+                {form.images.length > 0 && (
+                  <div style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>
+                    {form.images.length} imagen{form.images.length !== 1 ? "es" : ""} seleccionada{form.images.length !== 1 ? "s" : ""}
+                  </div>
+                )}
               </div>
 
               {form.images.length > 0 && (
                 <div className="lote-image-list">
-                  {form.images.map((img, idx) => (
-                    <div key={idx} className="lote-image-chip">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentImage(idx)}
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          color: "#1f2937",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                        }}
-                      >
-                        Imagen {idx + 1}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(idx)}
-                        aria-label={`Eliminar imagen ${idx + 1}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
+                  {form.images.map((img, idx) => {
+                    const fileName = img instanceof File ? img.name : `Imagen ${idx + 1}`;
+                    return (
+                      <div key={idx} className="lote-image-chip">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentImage(idx)}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            color: "#1f2937",
+                            cursor: "pointer",
+                            fontSize: "13px",
+                            maxWidth: "200px",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
+                          title={fileName}
+                        >
+                          {fileName}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(idx)}
+                          aria-label={`Eliminar ${fileName}`}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1018,37 +989,25 @@ export default function LoteEditarCard({
                 />
               </div>
             </div>
-
-            <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 100%" }}>
-                Escritura
-              </button>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
-                Boleto CompraVenta
-              </button>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
-                Planos
-              </button>
-            </div>
           </div>
         </div>
-      )}
 
-      {error && (
-        <div
-          style={{
-            marginTop: 18,
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: "#fee2e2",
-            color: "#991b1b",
-            fontSize: 13.5,
-          }}
-        >
-          {error}
-        </div>
-      )}
+        {error && (
+          <div
+            style={{
+              marginTop: 18,
+              padding: "10px 14px",
+              borderRadius: 10,
+              background: "#fee2e2",
+              color: "#991b1b",
+              fontSize: 13.5,
+            }}
+          >
+            {error}
+          </div>
+        )}
       </EditarBase>
     </>
   );
 }
+

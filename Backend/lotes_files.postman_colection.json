@@ -1,0 +1,99 @@
+{
+  "info": {
+    "name": "Lotes API - Archivos",
+    "_postman_id": "abcd1234-5678-90ef-1234-567890abcdef",
+    "description": "Colección para probar endpoints de archivos (upload, list, signedUrl).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Subir archivo",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file" 
+            },
+            {
+              "key": "idLoteAsociado",
+              "value": "1",
+              "type": "text"
+            },
+            {
+              "key": "tipo",
+              "value": "ESCRITURA",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:3000/api/files",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "files"]
+        }
+      }
+    },
+    {
+      "name": "Listar archivos por lote",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/api/files/lote/1",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "files", "lote", "1"]
+        }
+      }
+    },
+    {
+      "name": "Obtener signed URL",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{JWT_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:3000/files/{{FILE_ID}}/url",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "3000",
+          "path": ["api", "files", "{{FILE_ID}}", "url"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "JWT_TOKEN",
+      "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjksImVtYWlsIjoidXN1YXJpbzJAZ21haWwuY29tIiwicm9sZSI6IkFETUlOSVNUUkFET1IiLCJpYXQiOjE3NTg5ODE2MDUsImV4cCI6MTc1ODk4ODgwNX0.w-5pMUQjwVgWvSDwvKb4iBJ6BZgHPFJAdP9vUSQNh_o"
+    },
+    {
+      "key": "FILE_ID",
+      "value": ""
+    }
+  ]
+}
