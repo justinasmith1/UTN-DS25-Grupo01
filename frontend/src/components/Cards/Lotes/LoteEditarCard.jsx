@@ -4,6 +4,8 @@ import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
+import { uploadArchivo, getArchivosByLote, deleteArchivo } from "../../../lib/api/archivos.js";
+import { useToast } from "../../../app/providers/ToastProvider.jsx";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -81,8 +83,7 @@ const SUBESTADOS = [
   { value: "Construido", label: "Construido" },
 ];
 
-const FALLBACK_IMAGE =
-  "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
+const FALLBACK_IMAGE = "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
 const LABELS = [
   "ID",
@@ -101,6 +102,7 @@ const LABELS = [
   "DEUDA",
   "DESCRIPCIÓN",
 ];
+
 const FROM_PRISMA_MAP = {
   LOTE_VENTA: "Lote Venta",
   ESPACIO_COMUN: "Espacio Comun",
@@ -136,7 +138,7 @@ const buildInitialForm = (lot) => {
       numPartido: "",
       fraccionId: "",
       fraccionNumero: "",
-      propietarioId: lot?.propietarioId ?? "",
+      propietarioId: "",
       propietarioNombre: "",
       superficie: "",
       frente: "",
@@ -154,36 +156,20 @@ const buildInitialForm = (lot) => {
     };
   }
 
-  const propietario =
-    lot?.propietario ||
-    lot?.owner ||
-    lot?.Propietario ||
-    {};
+  const propietario = lot?.propietario || lot?.owner || lot?.Propietario || {};
   const propietarioNombre = [propietario.nombre || propietario.firstName, propietario.apellido || propietario.lastName]
     .filter(Boolean)
     .join(" ");
 
-  const fraccionId =
-    lot?.fraccionId ??
-    lot?.fraccion?.id ??
-    "";
-
-  const fraccionNumero =
-    lot?.fraccion?.numero ??
-    lot?.fraccionNumero ??
-    lot?.fraccion ??
-    "";
-
+  const fraccionId = lot?.fraccionId ?? lot?.fraccion?.id ?? "";
+  const fraccionNumero = lot?.fraccion?.numero ?? lot?.fraccionNumero ?? lot?.fraccion ?? "";
   const ubicacion = lot?.ubicacion ?? {};
-
   const images = Array.isArray(lot?.images) ? lot.images : [];
 
-  // Calcular superficie si hay frente y fondo
   const frente = lot?.frente ?? "";
   const fondo = lot?.fondo ?? "";
   let superficie = lot?.superficie ?? lot?.surface ?? "";
-  
-  // Si tenemos frente y fondo pero no superficie, calcularla
+
   if (frente && fondo && !superficie) {
     const f = Number(frente);
     const fo = Number(fondo);
@@ -191,13 +177,11 @@ const buildInitialForm = (lot) => {
       superficie = String(f * fo);
     }
   } else if (frente && fondo) {
-    // Validar que la superficie coincida con frente × fondo
     const f = Number(frente);
     const fo = Number(fondo);
     const sup = Number(superficie);
     if (!isNaN(f) && !isNaN(fo) && !isNaN(sup) && f >= 0 && fo >= 0 && sup >= 0) {
       const calculated = f * fo;
-      // Si la superficie no coincide, recalcularla
       if (Math.abs(sup - calculated) > 0.01) {
         superficie = String(calculated);
       }
@@ -221,10 +205,7 @@ const buildInitialForm = (lot) => {
     alquiler: Boolean(lot?.alquiler),
     deuda: Boolean(lot?.deuda),
     descripcion: lot?.descripcion ?? lot?.description ?? "",
-    ubicacionId:
-      lot?.ubicacionId ??
-      ubicacion?.id ??
-      "",
+    ubicacionId: lot?.ubicacionId ?? ubicacion?.id ?? "",
     ubicacionCalle: ubicacion?.calle ?? ubicacion?.nombre ?? "",
     ubicacionNumero: ubicacion?.numero ?? "",
     nombreEspacioComun: lot?.nombreEspacioComun ?? "",
@@ -240,23 +221,26 @@ export default function LoteEditarCard({
   lote,
   loteId,
   lotes,
-  entityType = "Lote", // tipo de entidad para el mensaje de éxito
+  entityType = "Lote",
 }) {
+  const { success, error: showError } = useToast();
   const [detalle, setDetalle] = useState(lote || null);
   const [loadingDetalle, setLoadingDetalle] = useState(false);
   const [form, setForm] = useState(buildInitialForm(lote));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const [newImageUrl, setNewImageUrl] = useState("");
   const [fracciones, setFracciones] = useState([]);
   const [loadingFracciones, setLoadingFracciones] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [reservasLote, setReservasLote] = useState([]);
+  const [ventasLote, setVentasLote] = useState([]);
+  const [archivosParaBorrar, setArchivosParaBorrar] = useState([]);
+  const fileInputRef = useRef(null);
 
-  // Cargar fracciones al montar o abrir
+  // Cargar fracciones
   useEffect(() => {
     if (!open) return;
-    if (fracciones.length > 0) return; // Ya están cargadas
-    
+    if (fracciones.length > 0) return;
     setLoadingFracciones(true);
     (async () => {
       try {
@@ -272,33 +256,6 @@ export default function LoteEditarCard({
     })();
   }, [open, fracciones.length]);
 
-  // Cargar reservas y ventas del lote para validaciones
-  useEffect(() => {
-    if (!open || !detalle?.id) return;
-    
-    (async () => {
-      try {
-        // Cargar reservas
-        const reservasResp = await getAllReservas({});
-        const allReservas = reservasResp?.data || [];
-        const reservasDelLote = allReservas.filter(
-          (r) => (r.loteId || r.lote?.id) === detalle.id
-        );
-        setReservasLote(reservasDelLote);
-
-        // Cargar ventas
-        const ventasResp = await getAllVentas({});
-        const allVentas = Array.isArray(ventasResp?.data) ? ventasResp.data : 
-                         Array.isArray(ventasResp) ? ventasResp : [];
-        const ventasDelLote = allVentas.filter(
-          (v) => (v.loteId || v.lote?.id) === detalle.id
-        );
-        setVentasLote(ventasDelLote);
-      } catch (err) {
-        console.error("Error cargando reservas/ventas del lote:", err);
-      }
-    })();
-  }, [open, detalle?.id]);
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
@@ -313,9 +270,7 @@ export default function LoteEditarCard({
   }, [lote, loteId, lotes]);
 
   useEffect(() => {
-    if (fallbackDetalle) {
-      setDetalle(fallbackDetalle);
-    }
+    if (fallbackDetalle) setDetalle(fallbackDetalle);
   }, [fallbackDetalle]);
 
   useEffect(() => {
@@ -337,157 +292,190 @@ export default function LoteEditarCard({
     }
   }, [open, detalle, loteId, loadingDetalle]);
 
+  // Inicializar formulario y cargar archivos asociados
   useEffect(() => {
-    if (!open) {
-      setShowSuccess(false);
-      setSaving(false);
-      return;
-    }
+    if (!open) return;
     if (!detalle) return;
+
     setForm(buildInitialForm(detalle));
-    setNewImageUrl("");
+    setArchivosParaBorrar([]);
     setError(null);
     setShowSuccess(false);
+
+    // Cargar archivos (imágenes) del lote
+    (async () => {
+      try {
+        if (!detalle?.id) return;
+        const resp = await getArchivosByLote(detalle.id);
+        const archivos = resp?.data?.archivos ?? resp?.archivos ?? resp ?? [];
+        const archivosForm = (Array.isArray(archivos) ? archivos : []).map(a => {
+          const url = a.url ?? a.publicUrl ?? a.link ?? a.path ?? a.path_public ?? "";
+          return { id: a.id ?? a.idArchivo ?? null, url };
+        }).filter(a => a.url);
+        setForm(prev => ({ ...prev, images: archivosForm }));
+      } catch (err) {
+        console.error("Error cargando archivos del lote:", err);
+      }
+    })();
   }, [detalle, open]);
 
-  // Resetear estados cuando el modal se cierra o se abre con otro lote
+  // Cargar reservas/ventas
   useEffect(() => {
-    if (!open) {
-      setSaving(false);
-      setShowSuccess(false);
-    } else {
-      // Resetear estados al abrir con un nuevo lote
-      setSaving(false);
-      setShowSuccess(false);
-    }
+    if (!open || !detalle?.id) return;
+    (async () => {
+      try {
+        const reservasResp = await getAllReservas({});
+        const allReservas = reservasResp?.data ?? [];
+        const reservasDelLote = allReservas.filter(r => (r.loteId || r.lote?.id) === detalle.id);
+        setReservasLote(reservasDelLote);
+
+        const ventasResp = await getAllVentas({});
+        const allVentas = ventasResp?.data ?? [];
+        const ventasDelLote = allVentas.filter(v => (v.loteId || v.lote?.id) === detalle.id);
+        setVentasLote(ventasDelLote);
+      } catch (err) {
+        console.error("Error cargando reservas/ventas del lote:", err);
+      }
+    })();
   }, [open, detalle?.id]);
 
   const updateForm = (patch) => {
-    setForm((prev) => {
+    setForm(prev => {
       const updated = { ...prev, ...patch };
-      
-      // Calcular superficie automáticamente cuando cambian frente o fondo
       if ('frente' in patch || 'fondo' in patch) {
         const frente = toNumberOrNull(updated.frente);
         const fondo = toNumberOrNull(updated.fondo);
         if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
           updated.superficie = String(frente * fondo);
         } else {
-          // Si falta alguno, limpiar superficie
           updated.superficie = "";
         }
       }
-      
       return updated;
     });
   };
 
   const handleReset = () => {
     setForm(buildInitialForm(detalle));
-    setNewImageUrl("");
     setError(null);
+    setArchivosParaBorrar([]);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // Gestión de imágenes
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (imageFiles.length !== files.length) {
+      showError("Solo se pueden subir archivos de imagen");
+      return;
+    }
+
+    const filesWithPreview = imageFiles.map((file) => {
+      const fw = file;
+      fw.objectURL = URL.createObjectURL(file);
+      return fw;
+    });
+
+    setForm(prev => ({ ...prev, images: [...(prev.images || []), ...filesWithPreview] }));
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleRemoveImage = (index) => {
-    setForm((prev) => {
-      const nextImages = prev.images.filter((_, idx) => idx !== index);
-      setCurrentImage((curr) => {
-        if (nextImages.length === 0) return 0;
-        if (curr >= nextImages.length) return nextImages.length - 1;
-        return curr;
-      });
-      return { ...prev, images: nextImages };
+    setForm(prev => {
+      if (!prev.images || !Array.isArray(prev.images)) return prev;
+      const img = prev.images[index];
+      if (img instanceof File && img.objectURL) {
+        try {
+          URL.revokeObjectURL(img.objectURL);
+        } catch (e) {
+          console.error("Error liberando objectURL:", e);
+        }
+      }
+      if (img && img.id) {
+        setArchivosParaBorrar(prevIds => [...prevIds, img.id]);
+      }
+      const next = prev.images.filter((_, i) => i !== index);
+      return { ...prev, images: next };
     });
   };
 
-  const handleAddImage = () => {
-    const url = newImageUrl.trim();
-    if (!url) return;
-    setForm((prev) => ({
-      ...prev,
-      images: [...prev.images, url],
-    }));
-    setNewImageUrl("");
-  };
+  useEffect(() => {
+    const current = form.images;
+    return () => {
+      (current || []).forEach(img => {
+        if (img instanceof File && img.objectURL) URL.revokeObjectURL(img.objectURL);
+      });
+    };
+  }, [form.images]);
+
+  const displayImages = useMemo(() => {
+    if (!form.images || form.images.length === 0) return [FALLBACK_IMAGE];
+    return form.images.map(img => {
+      if (img instanceof File && img.objectURL) return img.objectURL;
+      if (typeof img === "string") return img;
+      if (img && img.url) return img.url;
+      return FALLBACK_IMAGE;
+    });
+  }, [form.images]);
 
   const [currentImage, setCurrentImage] = useState(0);
-  useEffect(() => {
-    setCurrentImage(0);
-  }, [form.images, open]);
+  useEffect(() => setCurrentImage(0), [form.images, open]);
+  const showCarouselControls = (form.images || []).length > 1;
+  const handlePrev = () => setCurrentImage(i => (i === 0 ? displayImages.length - 1 : i - 1));
+  const handleNext = () => setCurrentImage(i => (i === displayImages.length - 1 ? 0 : i + 1));
 
-  const displayImages =
-    form.images.length > 0 ? form.images : [FALLBACK_IMAGE];
-  const showCarouselControls = form.images.length > 1;
-
-  const handlePrev = () => {
-    setCurrentImage((idx) =>
-      idx === 0 ? displayImages.length - 1 : idx - 1
-    );
-  };
-
-  const handleNext = () => {
-    setCurrentImage((idx) =>
-      idx === displayImages.length - 1 ? 0 : idx + 1
-    );
-  };
-
+  // Agregar try-catch en el buildPayload
   const buildPayload = () => {
-    const payload = {};
+    try {
+      const payload = {};
+      if (form.tipo) payload.tipo = form.tipo;
+      if (form.estado) payload.estado = form.estado;
+      if (form.subestado) payload.subestado = form.subestado;
 
-    if (form.tipo) payload.tipo = form.tipo;
-    if (form.estado) payload.estado = form.estado;
-    if (form.subestado) payload.subestado = form.subestado;
+      const numPartido = toNumberOrNull(form.numPartido);
+      if (numPartido != null) payload.numPartido = numPartido;
 
-    const numPartido = toNumberOrNull(form.numPartido);
-    if (numPartido != null) payload.numPartido = numPartido;
+      const frente = toNumberOrNull(form.frente);
+      const fondo = toNumberOrNull(form.fondo);
+      let superficie = toNumberOrNull(form.superficie);
 
-    // Calcular superficie automáticamente si hay frente y fondo
-    const frente = toNumberOrNull(form.frente);
-    const fondo = toNumberOrNull(form.fondo);
-    let superficie = toNumberOrNull(form.superficie);
-    
-    // Si tenemos frente y fondo, calcular superficie automáticamente
-    if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
-      superficie = frente * fondo;
-    }
-    
-    // Solo enviar superficie si tiene un valor válido
-    if (superficie != null && superficie >= 0) {
-      payload.superficie = superficie;
-    }
-
-    if (frente != null) payload.frente = frente;
-    if (fondo != null) payload.fondo = fondo;
-
-    const precio = toNumberOrNull(form.precio);
-    if (precio != null) payload.precio = precio;
-
-    if (form.descripcion != null) payload.descripcion = form.descripcion;
-
-    payload.alquiler = Boolean(form.alquiler);
-    payload.deuda = Boolean(form.deuda);
-
-    const fraccionId = toNumberOrNull(form.fraccionId);
-    if (fraccionId) payload.fraccionId = fraccionId;
-
-    const propietarioId = toNumberOrNull(form.propietarioId);
-    if (propietarioId) payload.propietarioId = propietarioId;
-
-    const ubicacionId = toNumberOrNull(form.ubicacionId);
-    if (ubicacionId) payload.ubicacionId = ubicacionId;
-
-    // Campos específicos para Espacio Comun
-    if (form.tipo === "Espacio Comun") {
-      if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
-        payload.nombreEspacioComun = form.nombreEspacioComun.trim();
+      if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
+        superficie = frente * fondo;
       }
-      const capacidad = toNumberOrNull(form.capacidad);
-      if (capacidad != null && capacidad >= 0) {
-        payload.capacidad = capacidad;
-      }
-    }
 
-    return payload;
+      if (superficie != null && superficie >= 0) payload.superficie = superficie;
+      if (frente != null) payload.frente = frente;
+      if (fondo != null) payload.fondo = fondo;
+
+      const precio = toNumberOrNull(form.precio);
+      if (precio != null) payload.precio = precio;
+
+      if (form.descripcion != null) payload.descripcion = form.descripcion;
+      payload.alquiler = Boolean(form.alquiler);
+      payload.deuda = Boolean(form.deuda);
+
+      const fraccionId = toNumberOrNull(form.fraccionId);
+      if (fraccionId) payload.fraccionId = fraccionId;
+
+      const propietarioId = toNumberOrNull(form.propietarioId);
+      if (propietarioId) payload.propietarioId = propietarioId;
+
+      if (form.tipo === "Espacio Comun") {
+        if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
+          payload.nombreEspacioComun = form.nombreEspacioComun.trim();
+        }
+        const capacidad = toNumberOrNull(form.capacidad);
+        if (capacidad != null && capacidad >= 0) payload.capacidad = capacidad;
+      }
+
+      return payload;
+    } catch (err) {
+      console.error("Error en buildPayload:", err);
+      return {};
+    }
   };
 
   const handleSave = async () => {
@@ -496,59 +484,62 @@ export default function LoteEditarCard({
     setError(null);
     try {
       const payload = buildPayload();
-      
-      // Validaciones de estado vs reservas/ventas
       const nuevoEstado = payload.estado || form.estado;
       const estadoUpper = String(nuevoEstado || "").toUpperCase();
-      
+
       if (estadoUpper === "RESERVADO") {
-        // Verificar que haya una reserva ACTIVA para este lote
-        const tieneReservaActiva = reservasLote.some(
-          (r) => String(r.estado || "").toUpperCase() === "ACTIVA"
-        );
+        const tieneReservaActiva = reservasLote.some(r => String(r.estado || "").toUpperCase() === "ACTIVA");
         if (!tieneReservaActiva) {
           setError("No se puede establecer el estado RESERVADO sin una reserva ACTIVA para este lote.");
           setSaving(false);
           return;
         }
       }
-      
+
       if (estadoUpper === "VENDIDO") {
-        // Verificar que haya una venta para este lote
         if (ventasLote.length === 0) {
           setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
           setSaving(false);
           return;
         }
       }
+
       const resp = await updateLote(detalle.id, payload);
       const updated = resp?.data ?? resp ?? {};
+
+      // Subir nuevos archivos
+      const newFiles = (form.images || []).filter(img => img instanceof File);
+      if (newFiles.length > 0) {
+        try {
+          await Promise.all(newFiles.map(file => uploadArchivo(file, detalle.id, "IMAGEN")));
+        } catch (uploadErr) {
+          console.error("Error subiendo imágenes:", uploadErr);
+          showError("Se actualizaron datos del lote, pero hubo un error subiendo algunas imágenes");
+        }
+      }
+
+      // Borrar archivos marcados
+      if (archivosParaBorrar.length > 0) {
+        try {
+          await Promise.all(archivosParaBorrar.map(id => deleteArchivo(id)));
+        } catch (delErr) {
+          console.error("Error borrando archivos:", delErr);
+        }
+      }
+
       const enriched = {
         ...(detalle || {}),
         ...(updated || {}),
-        images: [...form.images],
+        images: [...(form.images || [])],
         descripcion: form.descripcion,
         alquiler: payload.alquiler,
         deuda: payload.deuda,
         estado: payload.estado ?? updated?.estado ?? detalle?.estado,
-        subestado: payload.subestado ?? updated?.subestado ?? detalle?.subestado,
-        tipo: payload.tipo ?? updated?.tipo ?? detalle?.tipo,
-        numPartido: payload.numPartido ?? updated?.numPartido ?? detalle?.numPartido,
-        superficie: payload.superficie ?? updated?.superficie ?? detalle?.superficie,
-        frente: payload.frente ?? updated?.frente ?? detalle?.frente,
-        fondo: payload.fondo ?? updated?.fondo ?? detalle?.fondo,
-        precio: payload.precio ?? updated?.precio ?? detalle?.precio,
       };
 
       setDetalle(enriched);
-      
-      // Actualizar estado del padre inmediatamente
       onSaved?.(enriched);
-      
-      // Mostrar animación de éxito
       setShowSuccess(true);
-      
-      // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
@@ -556,10 +547,7 @@ export default function LoteEditarCard({
       }, 1500);
     } catch (err) {
       console.error("Error guardando lote:", err);
-      setError(
-        err?.message ||
-          "No se pudo guardar el lote. Intenta nuevamente."
-      );
+      setError(err?.message || "No se pudo guardar el lote. Intenta nuevamente.");
       setSaving(false);
     }
   };
@@ -637,417 +625,115 @@ export default function LoteEditarCard({
       <EditarBase
         open={open}
         title={`Editar Lote Nº ${form.id || ""}`}
-        onCancel={() => {
-          // Si está mostrando éxito, no cerrar hasta que termine
-          if (showSuccess) return;
-          setSaving(false);
-          setShowSuccess(false);
-          onCancel?.();
-        }}
+        onCancel={() => { if (showSuccess) return; setSaving(false); setShowSuccess(false); onCancel?.(); }}
         saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}
         onReset={detalle ? handleReset : undefined}
         saving={saving}
-        headerRight={
-          loadingDetalle ? (
-            <span className="badge bg-warning text-dark">Cargando...</span>
-          ) : null
-        }
+        headerRight={loadingDetalle ? <span className="badge bg-warning text-dark">Cargando...</span> : null}
       >
-      {!detalle && (
-        <div style={{ padding: "30px 10px" }}>
-          <p style={{ margin: 0, color: "#6B7280" }}>
-            {loadingDetalle
-              ? "Cargando información del lote..."
-              : "No se encontró información del lote."}
-          </p>
-        </div>
-      )}
-
-      {detalle && (
-        <div
-          className="lote-grid"
-          style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}
-        >
-          <div className="lote-data-col">
-            <div className="field-row">
-              <div className="field-label">ID</div>
-              <div className="field-value is-readonly">{form.id || "—"}</div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Número Partida</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="number"
-                  inputMode="numeric"
-                  value={form.numPartido ?? ""}
-                  onChange={(e) => updateForm({ numPartido: e.target.value })}
-                  placeholder="Número de partida"
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Tipo</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.tipo}
-                  options={TIPOS}
-                  placeholder=""
-                  onChange={(value) => {
-                    // Limpiar campos de espacio común si se cambia a otro tipo
-                    updateForm({ 
-                      tipo: value,
-                      nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "",
-                      capacidad: value === "Espacio Comun" ? form.capacidad : ""
-                    });
-                  }}
-                />
-              </div>
-            </div>
-
-            {form.tipo === "Espacio Comun" && (
-              <>
-                <div className="field-row">
-                  <div className="field-label">Nombre del Espacio Común</div>
-                  <div className="field-value p0">
-                    <input
-                      className="field-input"
-                      type="text"
-                      value={form.nombreEspacioComun ?? ""}
-                      onChange={(e) => updateForm({ nombreEspacioComun: e.target.value })}
-                      placeholder="Ej. Piscina"
-                    />
-                  </div>
-                </div>
-
-                <div className="field-row">
-                  <div className="field-label">Capacidad</div>
-                  <div className="field-value p0">
-                    <input
-                      className="field-input"
-                      type="number"
-                      inputMode="numeric"
-                      value={form.capacidad ?? ""}
-                      onChange={(e) => updateForm({ capacidad: e.target.value })}
-                      placeholder="Ej. 100"
-                    />
-                  </div>
-                </div>
-              </>
-            )}
-
-            <div className="field-row">
-              <div className="field-label">Estado</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.estado}
-                  options={ESTADOS}
-                  placeholder=""
-                  onChange={(value) => updateForm({ estado: value })}
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Sub-Estado</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.subestado}
-                  options={SUBESTADOS}
-                  placeholder=""
-                  onChange={(value) => updateForm({ subestado: value })}
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Fracción</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.fraccionId ? String(form.fraccionId) : ""}
-                  options={fracciones.map(f => {
-                    const id = f.idFraccion ?? f.id ?? "";
-                    const numero = f.numero ?? id;
-                    return { 
-                      value: String(id), 
-                      label: `Fracción ${numero}` 
-                    };
-                  })}
-                  placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"}
-                  onChange={(value) => {
-                    const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value);
-                    updateForm({ 
-                      fraccionId: value ? Number(value) : "",
-                      fraccionNumero: fraccion?.numero ?? ""
-                    });
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Superficie</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input is-readonly"
-                  type="number"
-                  inputMode="decimal"
-                  value={form.superficie ?? ""}
-                  readOnly
-                  placeholder="Se calcula automáticamente"
-                  title="La superficie se calcula automáticamente como frente × fondo"
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Frente</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="number"
-                  inputMode="decimal"
-                  value={form.frente ?? ""}
-                  onChange={(e) => updateForm({ frente: e.target.value })}
-                  placeholder="Metros"
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Fondo</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="number"
-                  inputMode="decimal"
-                  value={form.fondo ?? ""}
-                  onChange={(e) => updateForm({ fondo: e.target.value })}
-                  placeholder="Metros"
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Precio</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="number"
-                  inputMode="decimal"
-                  value={form.precio ?? ""}
-                  onChange={(e) => updateForm({ precio: e.target.value })}
-                  placeholder="USD"
-                />
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Propietario</div>
-              <div className="field-value is-readonly">
-                {form.propietarioNombre || "—"}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Ubicación</div>
-              <div className="field-value is-readonly">
-                {form.ubicacionCalle
-                  ? `Calle ${form.ubicacionCalle} ${
-                      form.ubicacionNumero
-                        ? `Nº ${form.ubicacionNumero}`
-                        : ""
-                    }`
-                  : "—"}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Alquiler</div>
-              <div className="field-value boolean-value">
-                <input
-                  type="checkbox"
-                  checked={form.alquiler}
-                  onChange={(e) => updateForm({ alquiler: e.target.checked })}
-                />
-                <span>{form.alquiler ? "Sí" : "No"}</span>
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Deuda</div>
-              <div className="field-value boolean-value">
-                <input
-                  type="checkbox"
-                  checked={form.deuda}
-                  onChange={(e) => updateForm({ deuda: e.target.checked })}
-                />
-                <span>{form.deuda ? "Sí" : "No"}</span>
-              </div>
-            </div>
+        {!detalle && (
+          <div style={{ padding: "30px 10px" }}>
+            <p style={{ margin: 0, color: "#6B7280" }}>
+              {loadingDetalle ? "Cargando información del lote..." : "No se encontró información del lote."}
+            </p>
           </div>
+        )}
 
-          <div className="lote-media-col">
+        {detalle && (
+          <div className="lote-grid" style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}>
+            <div className="lote-data-col">
+              <div className="field-row"><div className="field-label">ID</div><div className="field-value is-readonly">{form.id || "—"}</div></div>
+              <div className="field-row"><div className="field-label">Número Partida</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.numPartido ?? ""} onChange={(e) => updateForm({ numPartido: e.target.value })} placeholder="Número de partida" /></div></div>
+              <div className="field-row"><div className="field-label">Tipo</div><div className="field-value p0"><NiceSelect value={form.tipo} options={TIPOS} placeholder="" onChange={(value) => updateForm({ tipo: value, nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "", capacidad: value === "Espacio Comun" ? form.capacidad : "" })} /></div></div>
 
-            <div className="lote-image-manager">
-              <div className="lote-carousel">
-                <img
-                  src={displayImages[currentImage]}
-                  alt={`Imagen lote ${form.id} ${currentImage + 1}`}
-                  className="lote-carousel__image"
-                />
-
-                {showCarouselControls && (
-                  <>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--prev"
-                      onClick={handlePrev}
-                      aria-label="Imagen anterior"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--next"
-                      onClick={handleNext}
-                      aria-label="Imagen siguiente"
-                    >
-                      ›
-                    </button>
-                    <div className="lote-carousel__indicator">
-                      {displayImages.map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`lote-carousel__dot ${
-                            idx === currentImage ? "is-active" : ""
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="lote-image-actions">
-                <input
-                  type="text"
-                  value={newImageUrl}
-                  onChange={(e) => setNewImageUrl(e.target.value)}
-                  onPaste={(e) => {
-                    // Permitir el comportamiento por defecto del paste
-                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
-                    e.preventDefault(); // Prevenir el paste por defecto para controlar el valor
-                    setNewImageUrl(pastedText);
-                  }}
-                  placeholder="URL de nueva imagen"
-                />
-                <button
-                  type="button"
-                  className="lote-add-btn"
-                  onClick={handleAddImage}
-                >
-                  Agregar imagen
-                </button>
-                {form.images.length > 0 && (
-                  <button
-                    type="button"
-                    className="lote-add-btn"
-                    style={{ background: "#b91c1c", borderColor: "#b91c1c" }}
-                    onClick={() => handleRemoveImage(currentImage)}
-                  >
-                    Quitar imagen actual
-                  </button>
-                )}
-              </div>
-
-              {form.images.length > 0 && (
-                <div className="lote-image-list">
-                  {form.images.map((img, idx) => (
-                    <div key={idx} className="lote-image-chip">
-                      <button
-                        type="button"
-                        onClick={() => setCurrentImage(idx)}
-                        style={{
-                          border: "none",
-                          background: "transparent",
-                          color: "#1f2937",
-                          cursor: "pointer",
-                          fontSize: "13px",
-                        }}
-                      >
-                        Imagen {idx + 1}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveImage(idx)}
-                        aria-label={`Eliminar imagen ${idx + 1}`}
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
+              {form.tipo === "Espacio Comun" && (
+                <>
+                  <div className="field-row"><div className="field-label">Nombre del Espacio Común</div><div className="field-value p0"><input className="field-input" type="text" value={form.nombreEspacioComun ?? ""} onChange={(e) => updateForm({ nombreEspacioComun: e.target.value })} placeholder="Ej. Piscina" /></div></div>
+                  <div className="field-row"><div className="field-label">Capacidad</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.capacidad ?? ""} onChange={(e) => updateForm({ capacidad: e.target.value })} placeholder="Ej. 100" /></div></div>
+                </>
               )}
+
+              <div className="field-row"><div className="field-label">Estado</div><div className="field-value p0"><NiceSelect value={form.estado} options={ESTADOS} placeholder="" onChange={(value) => updateForm({ estado: value })} /></div></div>
+              <div className="field-row"><div className="field-label">Sub-Estado</div><div className="field-value p0"><NiceSelect value={form.subestado} options={SUBESTADOS} placeholder="" onChange={(value) => updateForm({ subestado: value })} /></div></div>
+              <div className="field-row"><div className="field-label">Fracción</div><div className="field-value p0"><NiceSelect value={form.fraccionId ? String(form.fraccionId) : ""} options={fracciones.map(f => ({ value: String(f.idFraccion ?? f.id ?? ""), label: `Fracción ${f.numero ?? f.id}` }))} placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"} onChange={(value) => { const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value); updateForm({ fraccionId: value ? Number(value) : "", fraccionNumero: fraccion?.numero ?? "" }); }} /></div></div>
+              <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input is-readonly" type="number" inputMode="decimal" value={form.superficie ?? ""} readOnly placeholder="Se calcula automáticamente" title="La superficie se calcula automáticamente como frente × fondo" /></div></div>
+              <div className="field-row"><div className="field-label">Frente</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.frente ?? ""} onChange={(e) => updateForm({ frente: e.target.value })} placeholder="Metros" /></div></div>
+              <div className="field-row"><div className="field-label">Fondo</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.fondo ?? ""} onChange={(e) => updateForm({ fondo: e.target.value })} placeholder="Metros" /></div></div>
+              <div className="field-row"><div className="field-label">Precio</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.precio ?? ""} onChange={(e) => updateForm({ precio: e.target.value })} placeholder="USD" /></div></div>
+              <div className="field-row"><div className="field-label">Propietario</div><div className="field-value is-readonly">{form.propietarioNombre || "—"}</div></div>
+              <div className="field-row"><div className="field-label">Ubicación</div><div className="field-value is-readonly">{form.ubicacionCalle ? `Calle ${form.ubicacionCalle} ${form.ubicacionNumero ? `Nº ${form.ubicacionNumero}` : ""}` : "—"}</div></div>
+              <div className="field-row"><div className="field-label">Alquiler</div><div className="field-value boolean-value"><input type="checkbox" checked={form.alquiler} onChange={(e) => updateForm({ alquiler: e.target.checked })} /><span>{form.alquiler ? "Sí" : "No"}</span></div></div>
+              <div className="field-row"><div className="field-label">Deuda</div><div className="field-value boolean-value"><input type="checkbox" checked={form.deuda} onChange={(e) => updateForm({ deuda: e.target.checked })} /><span>{form.deuda ? "Sí" : "No"}</span></div></div>
             </div>
 
-            <div className="lote-description">
-              <span className="lote-description__icon">ℹ️</span>
-              <div className="lote-description__body">
-                <strong>Descripción</strong>
-                <textarea
-                  style={{ 
-                    margin: "8px 0 0", 
-                    width: "100%", 
-                    minHeight: "80px",
-                    padding: "8px",
-                    border: "1px solid #d1d5db",
-                    borderRadius: "6px",
-                    fontSize: "14px",
-                    fontFamily: "inherit",
-                    resize: "vertical"
-                  }}
-                  value={form.descripcion ?? ""}
-                  onChange={(e) =>
-                    updateForm({ descripcion: e.target.value })
-                  }
-                  placeholder="Notas relevantes del lote…"
-                />
+            <div className="lote-media-col">
+              <div className="lote-image-manager">
+                <div className="lote-carousel">
+                  <img src={displayImages[currentImage]} alt={`Imagen lote ${currentImage + 1}`} className="lote-carousel__image" />
+                  {showCarouselControls && (
+                    <>
+                      <button type="button" className="lote-carousel__nav lote-carousel__nav--prev" onClick={handlePrev} aria-label="Imagen anterior">‹</button>
+                      <button type="button" className="lote-carousel__nav lote-carousel__nav--next" onClick={handleNext} aria-label="Imagen siguiente">›</button>
+                      <div className="lote-carousel__indicator">{displayImages.map((_, idx) => (<span key={idx} className={`lote-carousel__dot ${idx === currentImage ? "is-active" : ""}`} />))}</div>
+                    </>
+                  )}
+                </div>
+
+                <div className="lote-image-actions">
+                  <label htmlFor="file-input-lote-editar" style={{ display: "inline-block", padding: "8px 16px", background: "#2563eb", color: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "500", border: "none" }}>Seleccionar imágenes</label>
+                  <input ref={fileInputRef} id="file-input-lote-editar" type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: "none" }} />
+                  {form.images.length > 0 && <button type="button" className="lote-add-btn" style={{ background: "#b91c1c", borderColor: "#b91c1c" }} onClick={() => handleRemoveImage(currentImage)}>Quitar imagen actual</button>}
+                  {form.images.length > 0 && <div style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>{form.images.length} imagen{form.images.length !== 1 ? "es" : ""} seleccionada{form.images.length !== 1 ? "s" : ""}</div>}
+                </div>
+
+                {form.images.length > 0 && (
+                  <div className="lote-image-list">
+                    {form.images.map((img, idx) => {
+                      let fileName = `Imagen ${idx + 1}`;
+                      if (img instanceof File) {
+                        fileName = img.name;
+                      } else if (img && img.url) {
+                        try {
+                          const url = new URL(img.url);
+                          const pathName = url.pathname.split("/").pop();
+                          if (pathName && pathName.trim()) {
+                            fileName = pathName;
+                          }
+                        } catch (e) {
+                          console.error("URL inválida:", img.url, e);
+                          fileName = `Imagen ${idx + 1}`;
+                        }
+                      }
+                      return (
+                        <div key={idx} className="lote-image-chip">
+                          <button type="button" onClick={() => setCurrentImage(idx)} style={{ border: "none", background: "transparent", color: "#1f2937", cursor: "pointer", fontSize: "13px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={fileName}>{fileName}</button>
+                          <button type="button" onClick={() => handleRemoveImage(idx)} aria-label={`Eliminar ${fileName}`}>×</button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div className="lote-description">
+                <span className="lote-description__icon">ℹ️</span>
+                <div className="lote-description__body">
+                  <strong>Descripción</strong>
+                  <textarea style={{ margin: "8px 0 0", width: "100%", minHeight: "80px", padding: "8px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "14px", fontFamily: "inherit", resize: "vertical" }} value={form.descripcion ?? ""} onChange={(e) => updateForm({ descripcion: e.target.value })} placeholder="Notas relevantes del lote…" />
+                </div>
+              </div>
+
+              <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 100%" }}>Escritura</button>
+                <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>Boleto CompraVenta</button>
+                <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>Planos</button>
               </div>
             </div>
-
-            <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 100%" }}>
-                Escritura
-              </button>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
-                Boleto CompraVenta
-              </button>
-              <button type="button" className="lote-doc-button" disabled style={{ flex: "1 1 calc(50% - 4px)" }}>
-                Planos
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {error && (
-        <div
-          style={{
-            marginTop: 18,
-            padding: "10px 14px",
-            borderRadius: 10,
-            background: "#fee2e2",
-            color: "#991b1b",
-            fontSize: 13.5,
-          }}
-        >
-          {error}
-        </div>
-      )}
+        {error && <div style={{ marginTop: 18, padding: "10px 14px", borderRadius: 10, background: "#fee2e2", color: "#991b1b", fontSize: 13.5 }}>{error}</div>}
       </EditarBase>
     </>
   );

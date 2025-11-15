@@ -133,3 +133,17 @@ export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
   }
 }
 
+// Delete Archivo
+export async function deleteArchivo(id) {
+  try {
+    const res = await http(`${PRIMARY}/${id}`, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));  
+    if (!res.ok) {
+      throw new Error(data?.message || "Error al eliminar archivo");
+    }
+    return true;
+  } catch (error) {
+    console.error("Error eliminando archivo:", error);
+    throw error;
+  }
+}
