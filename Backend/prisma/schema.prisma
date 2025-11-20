@@ -145,6 +145,8 @@ model Reserva {
 // LOTE
 model Lote {
   id          Int           @id @default(autoincrement())
+  numero      Int?
+  mapId       String?       @unique
   tipo        TipoLote
   descripcion String?
   estado      EstadoLote    @default(DISPONIBLE)
