@@ -5,12 +5,21 @@ const badge = (label, variant = 'muted') => (
   <span className={`tl-badge tl-badge--${variant}`}>{label}</span>
 );
 
-const fmtEstado = (s) =>
-  !s ? '—'
-     : String(s).toLowerCase().replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase());
+/**
+ * Normaliza un estado de lote:
+ *  - null/undefined → '—'
+ *  - 'EN_PROMOCION' → 'En promocion'
+ */
+export const fmtEstadoLote = (s) =>
+  !s
+    ? '—'
+    : String(s)
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/^\w/, (c) => c.toUpperCase());
 
-export default function StatusBadge({ value }) {
-  const s = fmtEstado(value).toUpperCase();
+export const getEstadoVariant = (raw) => {
+  const s = fmtEstadoLote(raw).toUpperCase(); // DISPO / EN PROMOCION / etc.
   const map = {
     'DISPONIBLE': 'success',
     'EN PROMOCION': 'warn',
@@ -19,7 +28,13 @@ export default function StatusBadge({ value }) {
     'VENDIDO': 'success',
     'NO DISPONIBLE': 'danger',
   };
-  return badge(s, map[s] || 'muted');
+  return map[s] || 'muted';
+};
+
+export default function StatusBadge({ value }) {
+  const label = fmtEstadoLote(value).toUpperCase();
+  const variant = getEstadoVariant(value);
+  return badge(label, variant);
 }
 
 // helper para compatibilidad con la función antigua
