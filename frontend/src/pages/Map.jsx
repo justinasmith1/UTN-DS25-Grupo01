@@ -5,7 +5,11 @@ import { useAuth } from "../app/providers/AuthProvider";
 
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
+import MapaInteractivo from "../components/Mapa/MapaInteractivo";
 
+// 🎯 Componente de mapa principal. 
+// Muestra el filtro + el SVG interactivo y conecta el click en un lote
+// con los datos reales (lots/allLots) y el SidePanel del Layout.
 const customStyles = `
   .map-container { 
     height: 600px; 
@@ -52,23 +56,72 @@ const customStyles = `
 `;
 
 export default function Map() {
+  // 🔹 Recibimos del Layout todo el contexto común (lotes, handlers, etc.)
   const ctx = useOutletContext() || {};
+
+  // Lotes de la API: allLots = todos, lots = versión filtrada que usamos localmente
   const allLots = ctx.allLots || ctx.lots || [];
 
+  // Handler que viene de Layout.jsx y abre el SidePanel:
+  // const handleOpenPanel = (lotId) => { setSelectedLotId(lotId); setShowPanel(true); };
   const { openSidePanel } = ctx;
-  const { user } = useAuth()
-  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase()
 
+  const { user } = useAuth();
+  const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
+
+  // Filtros propios del mapa (independientes de los filtros globales del Layout)
   const [params, setParams] = useState({});
   const lots = useMemo(() => applyLoteFilters(allLots, params), [allLots, params]);
 
-  const positions = (idx) => ({
-    top: `${20 + (idx % 6) * 12}%`,
-    left: `${25 + (idx % 8) * 8}%`,
-  });
+  /**
+   * 🧠 handleLoteClick:
+   * - Lo llama MapaInteractivo cuando el usuario hace click en un polígono del SVG.
+   * - mapId = id del elemento en el SVG (ej: "Lote16-3").
+   * - Buscamos el lote real por mapId y, si existe, abrimos el SidePanel
+   *   usando openSidePanel(lote.id) que viene del Layout.
+   */
+  const handleLoteClick = (mapId) => {
+    if (!mapId) return;
+
+    console.log("[Map.jsx] handleLoteClick → mapId:", mapId);
+
+    // Busco primero entre los lotes filtrados del mapa; si no está, en todos
+    const lote =
+      lots.find((l) => l.mapId === mapId) ||
+      allLots.find((l) => l.mapId === mapId);
+
+    if (!lote) {
+      console.warn(
+        "[Map.jsx] No se encontró un lote con mapId =",
+        mapId,
+        "Revisar que el mapId del SVG y el de la BD coincidan."
+      );
+      return;
+    }
+
+    console.log("[Map.jsx] Lote encontrado por mapId:", { mapId, lote });
+
+    if (typeof openSidePanel === "function") {
+      // 🚪 Conectamos con el Layout: abre el SidePanel para ese lote.
+      // Firma real en Layout: handleOpenPanel(lotId)
+      openSidePanel(lote.id);
+    } else {
+      console.warn(
+        "[Map.jsx] openSidePanel NO es una función. Revisar que se pase en el Outlet context del Layout."
+      );
+    }
+  };
+
+  // La función positions anterior ya no se usa (los polígonos los maneja el SVG)
+  // La dejo comentada por si más adelante querés overlays adicionales.
+  // const positions = (idx) => ({
+  //   top: `${20 + (idx % 6) * 12}%`,
+  //   left: `${25 + (idx % 8) * 8}%`,
+  // });
 
   return (
     <>
+      {/* Estilos propios de la vista de mapa */}
       <style>{customStyles}</style>
 
       {/* FilterBarLotes con padding y offset propios del Mapa */}
@@ -76,27 +129,20 @@ export default function Map() {
 
       <Container fluid className="py-4">
         <div className="text-muted mb-2">
+          {/* Mantengo el contador de lotes filtrados vs totales */}
           Lotes en mapa: {lots.length} de {allLots.length}
         </div>
 
         <div className="map-container">
-          <img
-            src="https://lafederalaclub.com/contenidos/uploads/2025/04/Plano-con-Vendidos.jpg"
-            alt="Mapa del Club de Campo La Federala"
-            className="img-fluid w-100 h-100"
-            style={{ objectFit: "contain" }}
-          />
-
-          {lots.map((lot, index) => (
-            <div
-              key={lot.id}
-              className="parcel-overlay"
-              style={positions(index)}
-              onClick={() => openSidePanel?.(lot.id)}
-            >
-              <div className="parcel-label">{lot.id}</div>
-            </div>
-          ))}
+          {/*
+            Reemplazo la imagen estática + overlays falsos 
+            por el mapa SVG interactivo.
+            Ahora el mapa:
+              - Detecta el lote clickeado en el SVG
+              - Llama a handleLoteClick(mapId)
+              - Que a su vez abre el SidePanel del Layout con ese lote
+          */}
+          <MapaInteractivo onLoteClick={handleLoteClick} />
         </div>
       </Container>
     </>
