@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Container } from "react-bootstrap";
 import { useOutletContext } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
@@ -93,6 +93,61 @@ export default function Map() {
 
   // Estado local de filtros (misma idea que en el dashboard)
   const [params, setParams] = useState({});
+  
+  // Handler para convertir filtros BAR de formato anidado a plano
+  const handleParamsChange = useCallback((patch) => {
+    if (!patch || Object.keys(patch).length === 0) { 
+      setParams({}); 
+      return; 
+    }
+    
+    // Convertir objetos de rango ({ min, max }) a parámetros planos (frenteMin, frenteMax, etc.)
+    const convertedParams = { ...patch };
+    
+    // Convertir rangos a formato plano que espera applyLoteFilters
+    if (patch.frente && (patch.frente.min !== null || patch.frente.max !== null)) {
+      convertedParams.frenteMin = patch.frente.min !== null ? patch.frente.min : undefined;
+      convertedParams.frenteMax = patch.frente.max !== null ? patch.frente.max : undefined;
+      delete convertedParams.frente;
+    }
+    
+    if (patch.fondo && (patch.fondo.min !== null || patch.fondo.max !== null)) {
+      convertedParams.fondoMin = patch.fondo.min !== null ? patch.fondo.min : undefined;
+      convertedParams.fondoMax = patch.fondo.max !== null ? patch.fondo.max : undefined;
+      delete convertedParams.fondo;
+    }
+    
+    if (patch.sup && (patch.sup.min !== null || patch.sup.max !== null)) {
+      convertedParams.supMin = patch.sup.min !== null ? patch.sup.min : undefined;
+      convertedParams.supMax = patch.sup.max !== null ? patch.sup.max : undefined;
+      delete convertedParams.sup;
+    }
+    
+    if (patch.precio && (patch.precio.min !== null || patch.precio.max !== null)) {
+      convertedParams.priceMin = patch.precio.min !== null ? patch.precio.min : undefined;
+      convertedParams.priceMax = patch.precio.max !== null ? patch.precio.max : undefined;
+      delete convertedParams.precio;
+    }
+    
+    setParams((prev) => {
+      // Limpiar parámetros de rango antiguos si existen
+      const cleaned = { ...prev };
+      delete cleaned.frente;
+      delete cleaned.fondo;
+      delete cleaned.sup;
+      delete cleaned.precio;
+      delete cleaned.frenteMin;
+      delete cleaned.frenteMax;
+      delete cleaned.fondoMin;
+      delete cleaned.fondoMax;
+      delete cleaned.supMin;
+      delete cleaned.supMax;
+      delete cleaned.priceMin;
+      delete cleaned.priceMax;
+      
+      return { ...cleaned, ...convertedParams };
+    });
+  }, []);
 
   // Lotes filtrados usando la utilidad que ya tenés
   const filteredLots = useMemo(
@@ -151,7 +206,7 @@ export default function Map() {
       <FilterBarLotes
         variant="map"
         userRole={userRole}
-        onParamsChange={setParams}
+        onParamsChange={handleParamsChange}
       />
 
       <Container fluid className="py-4">

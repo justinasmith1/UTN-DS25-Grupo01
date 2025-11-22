@@ -255,16 +255,82 @@ function MapaInteractivo({
       defs.appendChild(textShadowFilter);
     }
 
+    // Filtro de glow celeste uniforme para hover
+    let strokeGlowFilter = svgRoot.querySelector("#lot-stroke-glow");
+    if (strokeGlowFilter) {
+      strokeGlowFilter.remove();
+    }
+    strokeGlowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    strokeGlowFilter.setAttribute("id", "lot-stroke-glow");
+    strokeGlowFilter.setAttribute("x", "-50%");
+    strokeGlowFilter.setAttribute("y", "-50%");
+    strokeGlowFilter.setAttribute("width", "200%");
+    strokeGlowFilter.setAttribute("height", "200%");
+
+    // Blur sobre el alpha del lote (solo la forma, no el color)
+    const feGaussianBlurGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurGlow.setAttribute("in", "SourceAlpha");
+    feGaussianBlurGlow.setAttribute("stdDeviation", "3");
+    feGaussianBlurGlow.setAttribute("result", "alphaBlur");
+
+    // Color celeste fijo para el glow
+    const feFloodGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodGlow.setAttribute("flood-color", "#38BDF8");
+    feFloodGlow.setAttribute("flood-opacity", "0.8");
+    feFloodGlow.setAttribute("result", "celesteGlow");
+
+    // Combinar el blur del alpha con el color celeste
+    const feCompositeGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeGlow.setAttribute("in", "celesteGlow");
+    feCompositeGlow.setAttribute("in2", "alphaBlur");
+    feCompositeGlow.setAttribute("operator", "in");
+    feCompositeGlow.setAttribute("result", "coloredGlow");
+
+    // Combinar el glow celeste con el lote original
+    const feMergeGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeGlow1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeGlow1.setAttribute("in", "coloredGlow");
+    const feMergeNodeGlow2 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeGlow2.setAttribute("in", "SourceGraphic");
+
+    feMergeGlow.appendChild(feMergeNodeGlow1);
+    feMergeGlow.appendChild(feMergeNodeGlow2);
+
+    strokeGlowFilter.appendChild(feGaussianBlurGlow);
+    strokeGlowFilter.appendChild(feFloodGlow);
+    strokeGlowFilter.appendChild(feCompositeGlow);
+    strokeGlowFilter.appendChild(feMergeGlow);
+    defs.appendChild(strokeGlowFilter);
+
     const allLotes = svgRoot.querySelectorAll("[id^='Lote']");
     if (allLotes.length === 0) return;
 
-    // Limpiar overlays, textos y filtros de glow anteriores
+    // Limpiar overlays y textos anteriores
     svgRoot.querySelectorAll("[data-overlay-for]").forEach((el) => el.remove());
     svgRoot
       .querySelectorAll("text[data-label-for]")
       .forEach((el) => el.remove());
-    // Limpiar filtros de glow anteriores
-    defs.querySelectorAll("filter[id^='lot-hover-glow-']").forEach((filter) => filter.remove());
 
     const activeSet = new Set((activeMapIds || []).filter(Boolean));
 
@@ -272,12 +338,17 @@ function MapaInteractivo({
       const id = el.id;
       if (!/^Lote[0-9]/.test(id)) return;
 
-      const isActive = activeSet.size === 0 || activeSet.has(id);
+      // Solo es activo si está en activeMapIds (sin caso especial de "vacío = todos activos")
+      const isActive = activeSet.has(id);
       const variant = variantByMapId[id];
       const label = labelByMapId[id];
 
       // ---------- ESTILO BASE DEL LOTE ----------
       const hasVariant = Boolean(variant);
+      
+      // Colores para lotes no activos (gris muted consistente)
+      const DISABLED_FILL = "#9CA3AF";
+      const DISABLED_STROKE = "#6B7280";
       
       // Determinar colores según si está activo o no
       let fillColor, borderColor, strokeWidth, filter, opacity;
@@ -298,12 +369,12 @@ function MapaInteractivo({
         }
         opacity = "1";
       } else {
-        // Lote no activo: gris oscuro para tapar el fondo, bordes difuminados suaves
-        fillColor = "#6B7280"; // gris oscuro para tapar completamente el fondo
-        borderColor = "rgba(80, 80, 80, 0.3)"; // gris oscuro muy difuminado (menos negro)
-        strokeWidth = "3"; // borde más grueso para efecto más difuminado
+        // Lote no activo: siempre gris muted sólido, sin importar variant
+        fillColor = DISABLED_FILL;
+        borderColor = DISABLED_STROKE;
+        strokeWidth = "1.6";
         filter = "url(#lot-shadow)";
-        opacity = "1"; // opacidad completa para tapar el fondo
+        opacity = "1"; // opacidad completa para bloque sólido (sin transparencia)
       }
 
       el.style.fill = fillColor;
@@ -318,114 +389,24 @@ function MapaInteractivo({
       el.setAttribute("stroke-width", strokeWidth);
 
       el.setAttribute("filter", filter);
-      // Guardar el filtro original (baseFilter) para poder restaurarlo después del hover
+      // Guardar el filtro base para restaurarlo después del hover
       const baseFilter = filter;
-      el._originalFilter = filter;
-      // Guardar baseFilter en el elemento para acceso en hoverLeave
-      el._baseFilter = baseFilter;
 
-      // Calcular color del glow para lotes activos
-      let glowColor;
-      if (isActive) {
-        if (hasVariant) {
-          // Si tiene variant, usar el mismo fillColor como base del glow
-          glowColor = fillColor;
-        } else {
-          // Si no tiene variant, usar celeste por defecto
-          glowColor = "#38BDF8";
-        }
-        
-        // Crear filtro de glow personalizado para este lote en los defs
-        const glowFilterId = `lot-hover-glow-${id}`;
-        let existingGlowFilter = defs.querySelector(`#${glowFilterId}`);
-        if (existingGlowFilter) {
-          existingGlowFilter.remove();
-        }
-        
-        const glowFilter = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "filter"
-        );
-        glowFilter.setAttribute("id", glowFilterId);
-        glowFilter.setAttribute("x", "-100%");
-        glowFilter.setAttribute("y", "-100%");
-        glowFilter.setAttribute("width", "300%");
-        glowFilter.setAttribute("height", "300%");
+      // Agregar atributo data-active para controlar clicks
+      el.setAttribute("data-active", isActive ? "true" : "false");
 
-        // Glow que usa el color del lote
-        const feGaussianBlurGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feGaussianBlur"
-        );
-        feGaussianBlurGlow.setAttribute("in", "SourceGraphic");
-        feGaussianBlurGlow.setAttribute("stdDeviation", "5");
-        feGaussianBlurGlow.setAttribute("result", "glowBlurred");
-
-        // Color del glow fluorescente (usando el color del lote)
-        const feFloodGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feFlood"
-        );
-        feFloodGlow.setAttribute("flood-color", glowColor);
-        feFloodGlow.setAttribute("flood-opacity", "0.7");
-        feFloodGlow.setAttribute("result", "glowColor");
-
-        // Combinar color con blur
-        const feCompositeGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feComposite"
-        );
-        feCompositeGlow.setAttribute("in", "glowColor");
-        feCompositeGlow.setAttribute("in2", "glowBlurred");
-        feCompositeGlow.setAttribute("operator", "in");
-        feCompositeGlow.setAttribute("result", "glowColored");
-
-        // Combinar glow con el elemento original
-        const feMergeGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMerge"
-        );
-        const feMergeNodeGlow1 = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMergeNode"
-        );
-        feMergeNodeGlow1.setAttribute("in", "glowColored");
-        const feMergeNodeGlow2 = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMergeNode"
-        );
-        feMergeNodeGlow2.setAttribute("in", "SourceGraphic");
-        feMergeGlow.appendChild(feMergeNodeGlow1);
-        feMergeGlow.appendChild(feMergeNodeGlow2);
-
-        glowFilter.appendChild(feGaussianBlurGlow);
-        glowFilter.appendChild(feFloodGlow);
-        glowFilter.appendChild(feCompositeGlow);
-        glowFilter.appendChild(feMergeGlow);
-        defs.appendChild(glowFilter);
-      }
-
-      // Interactividad / opacidad
-      el.style.pointerEvents = isActive ? "auto" : "none";
+      // Interactividad: pointerEvents siempre "auto" para que el hover funcione en todos los lotes
+      el.style.pointerEvents = "auto";
       el.style.cursor = isActive ? "pointer" : "default";
       el.style.opacity = opacity;
 
       // ---------- TRANSICIONES Y ORIGEN DE TRANSFORM ----------
-      // Optimización: solo animar transform (GPU-accelerated) para mejor rendimiento
       el.style.transformBox = "fill-box";
       el.style.transformOrigin = "50% 50%";
-      // Configurar valores iniciales para GSAP - solo scale (sin movimiento)
-      gsap.set(el, {
-        scale: 1,
-        transformOrigin: "50% 50%",
-      });
-      // Asegurar que el transform inicial esté limpio y centrado
-      el.style.transform = "translate3d(0, 0, 0) scale(1)";
+      el.style.transform = "translateY(0px) scale(1)";
       el.style.backfaceVisibility = "hidden";
       el.style.perspective = "1000px";
-      // Optimización: usar contain para mejorar el rendimiento de renderizado
       el.style.contain = "layout style paint";
-      // willChange solo se activa durante hover para mejor rendimiento
       el.style.willChange = "auto";
 
       // ---------- NÚMERO DEL LOTE (crear antes de configurar hover) ----------
@@ -466,6 +447,9 @@ function MapaInteractivo({
             textEl.setAttribute("stroke", "none");
             textEl.setAttribute("filter", "url(#text-shadow)");
             textEl.setAttribute("pointer-events", "none");
+            // Opacidad siempre 1 para que el texto sea claramente legible en todos los casos
+            textEl.setAttribute("opacity", "1");
+            textEl.style.opacity = "1";
             textEl.textContent = label;
             
             // Configurar la misma animación que el fondo del lote
@@ -520,6 +504,9 @@ function MapaInteractivo({
             textEl.setAttribute("letter-spacing", "0.05em");
             textEl.setAttribute("fill", "#ffffff");
             textEl.setAttribute("filter", "url(#text-shadow)");
+            // Opacidad siempre 1 para que el texto sea claramente legible en todos los casos
+            textEl.setAttribute("opacity", "1");
+            textEl.style.opacity = "1";
             textEl.style.transformOrigin = "50% 50%";
             textEl.style.transition = "transform 50ms cubic-bezier(0.4, 0, 0.2, 1), font-size 50ms cubic-bezier(0.4, 0, 0.2, 1)";
             textEl.style.transform = "translate3d(0, 0, 0) scale(1)";
@@ -541,7 +528,7 @@ function MapaInteractivo({
         delete el._textElement;
       }
 
-      // ---------- HOVER (solo para lotes activos) ----------
+      // ---------- HOVER (para todos los lotes, activos y desactivados) ----------
       // Primero limpio handlers anteriores para no duplicar listeners
       if (el._hoverEnterHandler) {
         el.removeEventListener("mouseenter", el._hoverEnterHandler);
@@ -550,69 +537,46 @@ function MapaInteractivo({
         el.removeEventListener("mouseleave", el._hoverLeaveHandler);
       }
 
-      if (isActive) {
-        const hoverEnter = () => {
-          const glowFilterId = `url(#lot-hover-glow-${id})`;
-          gsap.killTweensOf(el);
-          // Aplicar filtro de glow inmediatamente
-          el.setAttribute("filter", glowFilterId);
-          // Animar con GSAP - solo scale como la animación anterior (1.10)
-          gsap.to(el, {
-            scale: 1.10,
-            duration: 0.22,
-            ease: "power2.out",
-            force3D: true,
-          });
-          
-          // Aplicar animación al número - aumentar font-size directamente
-          const textEl = el._textElement || svgRoot.querySelector(`text[data-label-for="${id}"]`);
-          if (textEl) {
-            // Guardar el tamaño original si no está guardado
-            if (!textEl._originalFontSize) {
-              const currentSize = parseFloat(textEl.getAttribute("font-size"));
-              textEl._originalFontSize = currentSize || parseFloat(window.getComputedStyle(textEl).fontSize) || 12;
-            }
-            
-            const scaleValue = 1.12;
-            const newFontSize = textEl._originalFontSize * scaleValue;
-            
-            // Aplicar el nuevo tamaño directamente
-            textEl.setAttribute("font-size", newFontSize.toString());
-            textEl.style.fontSize = newFontSize + "px";
-          }
-        };
+      // Hover funciona para todos los lotes (activos y desactivados)
+      const hoverEnter = () => {
+        gsap.killTweensOf(el);
+        el.style.willChange = "transform, filter";
+        
+        // Aplicar filtro de glow celeste uniforme
+        el.setAttribute("filter", "url(#lot-stroke-glow)");
+        
+        // Animar con GSAP - más fluido con mejor ease y duración
+        gsap.to(el, {
+          scale: 1.04,
+          y: -2,
+          duration: 0.25,
+          ease: "power2.out",
+          force3D: true,
+        });
+      };
 
-        const hoverLeave = () => {
-          gsap.killTweensOf(el);
-          const baseFilterForLeave = el._baseFilter || baseFilter;
-          gsap.to(el, {
-            scale: 1,
-            duration: 0.18,
-            ease: "power2.out",
-            force3D: true,
-            onComplete: () => {
-              el.setAttribute("filter", baseFilterForLeave);
-            },
-          });
-          
-          // Restaurar el tamaño original del número
-          const textEl = el._textElement || svgRoot.querySelector(`text[data-label-for="${id}"]`);
-          if (textEl && textEl._originalFontSize) {
-            textEl.setAttribute("font-size", textEl._originalFontSize.toString());
-            textEl.style.fontSize = textEl._originalFontSize + "px";
-          }
-        };
+      const hoverLeave = () => {
+        gsap.killTweensOf(el);
+        
+        gsap.to(el, {
+          scale: 1,
+          y: 0,
+          duration: 0.2,
+          ease: "power2.out",
+          force3D: true,
+          onComplete: () => {
+            // Restaurar el filtro base
+            el.setAttribute("filter", baseFilter);
+            el.style.willChange = "auto";
+          },
+        });
+      };
 
-        el.addEventListener("mouseenter", hoverEnter);
-        el.addEventListener("mouseleave", hoverLeave);
+      el.addEventListener("mouseenter", hoverEnter);
+      el.addEventListener("mouseleave", hoverLeave);
 
-        // guardo refs en la propia etiqueta para poder quitarlos en el próximo render
-        el._hoverEnterHandler = hoverEnter;
-        el._hoverLeaveHandler = hoverLeave;
-      } else {
-        delete el._hoverEnterHandler;
-        delete el._hoverLeaveHandler;
-      }
+      el._hoverEnterHandler = hoverEnter;
+      el._hoverLeaveHandler = hoverLeave;
     });
   }, [svgInjected, variantByMapId, activeMapIds, labelByMapId]);
 
@@ -620,6 +584,13 @@ function MapaInteractivo({
   const handleSvgClick = (event) => {
     const loteElement = event.target.closest("[id^='Lote']");
     if (!loteElement) return;
+
+    // Verificar si el lote está activo antes de permitir el click
+    const isActive = loteElement.getAttribute("data-active") === "true";
+    if (!isActive) {
+      // Lote desactivado: no ejecutar click, pero permitir hover
+      return;
+    }
 
     const mapId = loteElement.id;
     if (typeof onLoteClick === "function") {
