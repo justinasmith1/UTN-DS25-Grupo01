@@ -16,6 +16,10 @@ const customStyles = `
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    /* Optimizaciones de rendimiento */
+    contain: layout style paint;
+    transform: translateZ(0);
+    isolation: isolate;
   }
 
   .mapa-svg-wrapper {
@@ -24,6 +28,12 @@ const customStyles = `
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Optimizaciones de rendimiento */
+    contain: layout style paint;
+    transform: translateZ(0);
+    will-change: contents;
+    backface-visibility: hidden;
+    -webkit-font-smoothing: antialiased;
   }
 
   .mapa-svg-wrapper svg {
@@ -32,6 +42,9 @@ const customStyles = `
     max-width: 100%;
     max-height: 100%;
     display: block;
+    /* Optimizaciones de renderizado SVG */
+    shape-rendering: geometricPrecision;
+    text-rendering: optimizeLegibility;
   }
 `;
 
