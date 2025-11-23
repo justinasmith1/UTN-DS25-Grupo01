@@ -6,20 +6,39 @@ import { useAuth } from "../app/providers/AuthProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import MapaInteractivo from "../components/Mapa/MapaInteractivo";
+import LoteLegend from "../components/Mapa/LoteLegend";
 
 // Estilos específicos para la vista de mapa
 const customStyles = `
   .map-container { 
     height: 600px; 
     position: relative; 
-    background-color: #e6efe9;
+    background-color: #ffffff;
     border-radius: 12px;
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
     /* Optimizaciones de rendimiento */
     contain: layout style paint;
     transform: translateZ(0);
     isolation: isolate;
+  }
+  
+  .map-container__header {
+    position: relative;
+    z-index: 1;
+  }
+  
+  .map-container .mapa-svg-wrapper {
+    flex: 1;
+    background-color: #e6efe9;
+  }
+  
+  @media (max-width: 768px) {
+    .map-container .lote-legend {
+      width: 100%;
+    }
   }
 
   .mapa-svg-wrapper {
@@ -209,9 +228,37 @@ export default function Map() {
         onParamsChange={handleParamsChange}
       />
 
-      <Container fluid className="py-4">
+      <Container fluid style={{ paddingTop: "0.5rem", paddingBottom: "1.5rem" }}>
         {/* Contenedor del mapa interactivo */}
         <div className="map-container">
+          {/* Barra superior con título y leyenda */}
+          <div
+            className="map-container__header"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "1rem 1.5rem",
+              backgroundColor: "#f9fafb",
+              borderBottom: "1px solid #e5e7eb",
+              flexWrap: "wrap",
+              gap: "1rem",
+            }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "1.125rem",
+                fontWeight: 600,
+                color: "#111827",
+              }}
+            >
+              Mapa Interactivo de Lotes
+            </h3>
+            <LoteLegend />
+          </div>
+          
+          {/* Mapa */}
           <MapaInteractivo
             onLoteClick={handleLoteClick}
             variantByMapId={variantByMapId}

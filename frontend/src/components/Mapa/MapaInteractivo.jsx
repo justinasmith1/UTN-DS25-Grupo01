@@ -578,6 +578,94 @@ function MapaInteractivo({
       el._hoverEnterHandler = hoverEnter;
       el._hoverLeaveHandler = hoverLeave;
     });
+
+    // ---------- ZONAS COMUNES (espacios comunes: transparentes por defecto, glow en hover) ----------
+    const zonasComunesGroup = svgRoot.querySelector("g[id='Espacios Comunes']");
+    if (zonasComunesGroup) {
+      const zonasComunes = zonasComunesGroup.querySelectorAll("path");
+      
+      zonasComunes.forEach((zona) => {
+        // Estilo base: transparente para que se vea la imagen de fondo
+        zona.style.fill = "transparent";
+        zona.setAttribute("fill", "transparent");
+        zona.style.stroke = "none";
+        zona.setAttribute("stroke", "none");
+        zona.style.opacity = "1";
+        zona.style.cursor = "pointer";
+        zona.style.pointerEvents = "auto";
+        
+        // Sin filtro por defecto (invisible)
+        zona.removeAttribute("filter");
+        
+        // Transformaciones para hover
+        zona.style.transformBox = "fill-box";
+        zona.style.transformOrigin = "50% 50%";
+        zona.style.transform = "translateY(0px) scale(1)";
+        zona.style.backfaceVisibility = "hidden";
+        
+        // Handlers de hover: mostrar glow alrededor del contorno
+        const zonaHoverEnter = () => {
+          gsap.killTweensOf(zona);
+          zona.style.willChange = "transform, filter";
+          
+          // Aplicar stroke visible y opaco (el filtro necesita algo visible para SourceAlpha)
+          zona.setAttribute("stroke", "#38BDF8");
+          zona.setAttribute("stroke-width", "4");
+          zona.setAttribute("stroke-opacity", "1");
+          
+          // Asegurar que el fill permanezca transparente
+          zona.style.fill = "transparent";
+          zona.setAttribute("fill", "transparent");
+          
+          // Aplicar filtro de glow (SourceAlpha detectará el stroke)
+          zona.setAttribute("filter", "url(#lot-stroke-glow)");
+          
+          // Animación suave
+          gsap.to(zona, {
+            scale: 1.01,
+            duration: 0.2,
+            ease: "power2.out",
+            force3D: true,
+          });
+        };
+        
+        const zonaHoverLeave = () => {
+          gsap.killTweensOf(zona);
+          
+          gsap.to(zona, {
+            scale: 1,
+            duration: 0.15,
+            ease: "power2.out",
+            force3D: true,
+            onComplete: () => {
+              // Volver a estado invisible
+              zona.setAttribute("stroke", "none");
+              zona.removeAttribute("stroke-width");
+              zona.removeAttribute("stroke-opacity");
+              zona.style.strokeOpacity = "1";
+              zona.removeAttribute("filter");
+              zona.style.fill = "transparent";
+              zona.setAttribute("fill", "transparent");
+              zona.style.willChange = "auto";
+            },
+          });
+        };
+        
+        // Limpiar handlers anteriores si existen
+        if (zona._hoverEnterHandler) {
+          zona.removeEventListener("mouseenter", zona._hoverEnterHandler);
+        }
+        if (zona._hoverLeaveHandler) {
+          zona.removeEventListener("mouseleave", zona._hoverLeaveHandler);
+        }
+        
+        zona.addEventListener("mouseenter", zonaHoverEnter);
+        zona.addEventListener("mouseleave", zonaHoverLeave);
+        
+        zona._hoverEnterHandler = zonaHoverEnter;
+        zona._hoverLeaveHandler = zonaHoverLeave;
+      });
+    }
   }, [svgInjected, variantByMapId, activeMapIds, labelByMapId]);
 
   // Click en el SVG: busco el shape base cuyo id empieza con "Lote"
