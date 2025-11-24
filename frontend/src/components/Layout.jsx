@@ -11,7 +11,7 @@ import ModulePills from "./ModulePills";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
-import SidePanel from "./SidePanel";
+import LoteSidePanel from "./Mapa/LoteSidePanel";
 
 export default function Layout() {
   const { success, error, info } = useToast();
@@ -149,14 +149,12 @@ export default function Layout() {
         }}
       />
 
-      <SidePanel
+      <LoteSidePanel
         show={showPanel}
         onHide={handleClosePanel}
         selectedLotId={selectedLotId}
         onViewDetail={handleViewDetail}
         lots={filteredLots}
-        abrirModalEditar={abrirModalEditar}
-        abrirModalEliminar={abrirModalEliminar}
       />
 
       <User show={showUserModal} onHide={() => setShowUserModal(false)} user={mockUser} />
