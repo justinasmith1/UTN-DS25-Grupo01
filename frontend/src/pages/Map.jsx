@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Container } from "react-bootstrap";
 import { useOutletContext } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
@@ -6,84 +6,20 @@ import { useAuth } from "../app/providers/AuthProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import MapaInteractivo from "../components/Mapa/MapaInteractivo";
+import LoteLegend from "../components/Mapa/LoteLegend";
+import {
+  normalizeEstadoKey,
+  getEstadoVariant,
+  getEstadoFromLote,
+} from "../utils/mapaUtils";
 
-// Estilos específicos para la vista de mapa
-const customStyles = `
-  .map-container { 
-    height: 600px; 
-    position: relative; 
-    background-color: #e6efe9;
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-    /* Optimizaciones de rendimiento */
-    contain: layout style paint;
-    transform: translateZ(0);
-    isolation: isolate;
-  }
-
-  .mapa-svg-wrapper {
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Optimizaciones de rendimiento */
-    contain: layout style paint;
-    transform: translateZ(0);
-    will-change: contents;
-    backface-visibility: hidden;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .mapa-svg-wrapper svg {
-    width: 100%;
-    height: 100%;
-    max-width: 100%;
-    max-height: 100%;
-    display: block;
-    /* Optimizaciones de renderizado SVG */
-    shape-rendering: geometricPrecision;
-    text-rendering: optimizeLegibility;
-  }
-`;
-
-// Normalizo el estado para poder mapearlo a un "variant" visual
-const normalizeEstadoKey = (value) => {
-  if (!value) return "";
-  return String(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .replace(/_/g, " ")
-    .trim()
-    .toUpperCase(); // ej: "EN_PROMOCION" -> "EN PROMOCION"
-};
-
-// De un estado (ALQUILADO, DISPONIBLE, etc.) saco un "variant" visual
-const getEstadoVariant = (estadoRaw) => {
-  const key = normalizeEstadoKey(estadoRaw);
-
-  const map = {
-    DISPONIBLE: "success",
-    "EN PROMOCION": "warn",
-    RESERVADO: "info",
-    ALQUILADO: "indigo",
-    VENDIDO: "success",
-    "NO DISPONIBLE": "danger",
-  };
-
-  return map[key] || "muted";
-};
-
-// De un lote tomo el estado como hace applyLoteFilters (status || estado)
-const getEstadoFromLote = (lote) => lote?.status || lote?.estado || "";
+import "../components/Mapa/Map.css";
 
 export default function Map() {
   // Tomo del Layout los lotes y el handler para abrir el side panel
   const ctx = useOutletContext() || {};
   const allLots = ctx.allLots || ctx.lotes || ctx.lots || [];
-  const { openSidePanel } = ctx;
+  const { openSidePanel, selectedLotId, showPanel } = ctx;
 
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN")
@@ -93,6 +29,61 @@ export default function Map() {
 
   // Estado local de filtros (misma idea que en el dashboard)
   const [params, setParams] = useState({});
+  
+  // Handler para convertir filtros BAR de formato anidado a plano
+  const handleParamsChange = useCallback((patch) => {
+    if (!patch || Object.keys(patch).length === 0) { 
+      setParams({}); 
+      return; 
+    }
+    
+    // Convertir objetos de rango ({ min, max }) a parámetros planos (frenteMin, frenteMax, etc.)
+    const convertedParams = { ...patch };
+    
+    // Convertir rangos a formato plano que espera applyLoteFilters
+    if (patch.frente && (patch.frente.min !== null || patch.frente.max !== null)) {
+      convertedParams.frenteMin = patch.frente.min !== null ? patch.frente.min : undefined;
+      convertedParams.frenteMax = patch.frente.max !== null ? patch.frente.max : undefined;
+      delete convertedParams.frente;
+    }
+    
+    if (patch.fondo && (patch.fondo.min !== null || patch.fondo.max !== null)) {
+      convertedParams.fondoMin = patch.fondo.min !== null ? patch.fondo.min : undefined;
+      convertedParams.fondoMax = patch.fondo.max !== null ? patch.fondo.max : undefined;
+      delete convertedParams.fondo;
+    }
+    
+    if (patch.sup && (patch.sup.min !== null || patch.sup.max !== null)) {
+      convertedParams.supMin = patch.sup.min !== null ? patch.sup.min : undefined;
+      convertedParams.supMax = patch.sup.max !== null ? patch.sup.max : undefined;
+      delete convertedParams.sup;
+    }
+    
+    if (patch.precio && (patch.precio.min !== null || patch.precio.max !== null)) {
+      convertedParams.priceMin = patch.precio.min !== null ? patch.precio.min : undefined;
+      convertedParams.priceMax = patch.precio.max !== null ? patch.precio.max : undefined;
+      delete convertedParams.precio;
+    }
+    
+    setParams((prev) => {
+      // Limpiar parámetros de rango antiguos si existen
+      const cleaned = { ...prev };
+      delete cleaned.frente;
+      delete cleaned.fondo;
+      delete cleaned.sup;
+      delete cleaned.precio;
+      delete cleaned.frenteMin;
+      delete cleaned.frenteMax;
+      delete cleaned.fondoMin;
+      delete cleaned.fondoMax;
+      delete cleaned.supMin;
+      delete cleaned.supMax;
+      delete cleaned.priceMin;
+      delete cleaned.priceMax;
+      
+      return { ...cleaned, ...convertedParams };
+    });
+  }, []);
 
   // Lotes filtrados usando la utilidad que ya tenés
   const filteredLots = useMemo(
@@ -107,6 +98,17 @@ export default function Map() {
       if (!lote?.mapId) return;
       const estadoRaw = getEstadoFromLote(lote);
       map[lote.mapId] = getEstadoVariant(estadoRaw);
+    });
+    return map;
+  }, [allLots]);
+
+  // Para cada lote, guardo su estado (para usar colores especiales como VENDIDO)
+  const estadoByMapId = useMemo(() => {
+    const map = {};
+    (allLots || []).forEach((lote) => {
+      if (!lote?.mapId) return;
+      const estadoRaw = getEstadoFromLote(lote);
+      map[lote.mapId] = normalizeEstadoKey(estadoRaw);
     });
     return map;
   }, [allLots]);
@@ -127,6 +129,13 @@ export default function Map() {
     [filteredLots]
   );
 
+  // Obtener el mapId del lote seleccionado (para destacarlo en el mapa)
+  const selectedMapId = useMemo(() => {
+    if (!selectedLotId || !showPanel) return null;
+    const lote = allLots.find((l) => l.id === selectedLotId);
+    return lote?.mapId || null;
+  }, [selectedLotId, showPanel, allLots]);
+
   // Cuando clickeo un lote en el mapa, abro el side panel del lote correspondiente
   const handleLoteClick = (mapId) => {
     if (!mapId) return;
@@ -144,25 +153,45 @@ export default function Map() {
 
   return (
     <>
-      {/* Estilos locales para esta página */}
-      <style>{customStyles}</style>
+      {/* Título y leyenda */}
+      <div className="map-header">
+        <div className="map-header-left">
+          <h3>Mapa Interactivo de Lotes</h3>
+          <div className="map-info-messages">
+            {filteredLots.length > 0 ? (
+              <span className="map-info-count">
+                {filteredLots.length} {filteredLots.length === 1 ? "Lote mostrado" : "Lotes mostrados"}
+              </span>
+            ) : (
+              <span className="map-info-empty">No hay lotes que coincidan con este filtro</span>
+            )}
+          </div>
+        </div>
+        <LoteLegend />
+      </div>
 
-      {/* Barra de filtros igual que en el dashboard, pero aplicada al mapa */}
+      {/* Barra de filtros */}
       <FilterBarLotes
         variant="map"
         userRole={userRole}
-        onParamsChange={setParams}
+        onParamsChange={handleParamsChange}
       />
 
-      <Container fluid className="py-4">
+      <Container fluid className="map-container-wrapper">
         {/* Contenedor del mapa interactivo */}
         <div className="map-container">
-          <MapaInteractivo
-            onLoteClick={handleLoteClick}
-            variantByMapId={variantByMapId}
-            activeMapIds={activeMapIds}
-            labelByMapId={labelByMapId}
-          />
+          
+          {/* Mapa */}
+          <div className="mapa-wrapper">
+            <MapaInteractivo
+              onLoteClick={handleLoteClick}
+              variantByMapId={variantByMapId}
+              activeMapIds={activeMapIds}
+              labelByMapId={labelByMapId}
+              estadoByMapId={estadoByMapId}
+              selectedMapId={selectedMapId}
+            />
+          </div>
         </div>
       </Container>
     </>

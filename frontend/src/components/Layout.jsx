@@ -11,7 +11,7 @@ import ModulePills from "./ModulePills";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
-import SidePanel from "./SidePanel";
+import LoteSidePanel from "./Mapa/LoteSidePanel";
 
 export default function Layout() {
   const { success, error, info } = useToast();
@@ -21,22 +21,33 @@ export default function Layout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
 
+  const loadLotes = async () => {
+    try {
+      setLoadingLots(true);
+      const res = await getAllLotes();
+      setLotsData(res.data || []);
+    } catch (err) {
+      console.error(err);
+      error("No pude cargar los lotes");
+    } finally {
+      setLoadingLots(false);
+    }
+  };
+
   useEffect(() => {
     let alive = true;
-    (async () => {
-      try {
-        setLoadingLots(true);
-        const res = await getAllLotes();
-        if (alive) setLotsData(res.data || []);
-      } catch (err) {
-        console.error(err);
-        error("No pude cargar los lotes");
-      } finally {
-        if (alive) setLoadingLots(false);
-      }
-    })();
+    loadLotes().then(() => {
+      if (!alive) return;
+    });
     return () => { alive = false; };
   }, []);
+
+  // Recargar lotes cuando se navega al mapa para asegurar datos actualizados
+  useEffect(() => {
+    if (location.pathname === "/mapa" || location.pathname === "/map") {
+      loadLotes();
+    }
+  }, [location.pathname]);
 
   const [filters, setFilters] = useState({
     search: "", owner: [], location: [], status: [], subStatus: [],
@@ -146,17 +157,23 @@ export default function Layout() {
           abrirModalEditar,
           abrirModalEliminar,
           openSidePanel: handleOpenPanel,
+          selectedLotId,
+          showPanel,
         }}
       />
 
-      <SidePanel
+      <LoteSidePanel
         show={showPanel}
         onHide={handleClosePanel}
         selectedLotId={selectedLotId}
         onViewDetail={handleViewDetail}
         lots={filteredLots}
-        abrirModalEditar={abrirModalEditar}
-        abrirModalEliminar={abrirModalEliminar}
+        onLoteUpdated={(updatedLot) => {
+          // Actualizar el estado del Layout cuando se edita un lote desde el SidePanel
+          if (updatedLot?.id) {
+            setLotsData((prev) => prev.map((l) => (l.id === updatedLot.id ? updatedLot : l)));
+          }
+        }}
       />
 
       <User show={showUserModal} onHide={() => setShowUserModal(false)} user={mockUser} />

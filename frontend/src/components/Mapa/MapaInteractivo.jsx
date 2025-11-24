@@ -2,40 +2,21 @@
 import React, { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import mapaSvg from "../../assets/Mapa La Federala - Interactivo.svg?raw";
+import {
+  getColorForVariant,
+  getBorderColorForVariant,
+} from "../../utils/mapaUtils";
 
 function MapaInteractivo({
   onLoteClick,
   variantByMapId = {},
   activeMapIds = [],
   labelByMapId = {},
+  estadoByMapId = {},
+  selectedMapId = null,
 }) {
   const wrapperRef = useRef(null);
   const [svgInjected, setSvgInjected] = useState(false);
-
-  // Paleta de colores por "variant" visual
-  const getColorForVariant = (variant) => {
-    const colors = {
-      success: "#10B981",
-      warn: "#F59E0B",
-      info: "#3B82F6",
-      indigo: "#6366F1",
-      danger: "#EF4444",
-      muted: "#6B7280",
-    };
-    return colors[variant] || colors.muted;
-  };
-
-  const getBorderColorForVariant = (variant) => {
-    const colors = {
-      success: "#059669",
-      warn: "#D97706",
-      info: "#2563EB",
-      indigo: "#4F46E5",
-      danger: "#DC2626",
-      muted: "#4B5563",
-    };
-    return colors[variant] || colors.muted;
-  };
 
   // Inyectar SVG solo una vez
   useEffect(() => {
@@ -55,6 +36,15 @@ function MapaInteractivo({
 
     const svgRoot = root.querySelector("svg");
     if (!svgRoot) return;
+    
+    // Hacer que el SVG tenga fondo transparente
+    svgRoot.style.backgroundColor = "transparent";
+    
+    // Eliminar el rect de fondo verde completo si existe
+    const fondoVerdeRect = svgRoot.querySelector("rect[data-fondo-verde-completo]");
+    if (fondoVerdeRect) {
+      fondoVerdeRect.remove();
+    }
 
     // ---------- DEFINICIÓN DE FILTROS (sombras) ----------
 
@@ -255,16 +245,344 @@ function MapaInteractivo({
       defs.appendChild(textShadowFilter);
     }
 
+    // Filtro de glow celeste uniforme para hover
+    let strokeGlowFilter = svgRoot.querySelector("#lot-stroke-glow");
+    if (strokeGlowFilter) {
+      strokeGlowFilter.remove();
+    }
+    strokeGlowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    strokeGlowFilter.setAttribute("id", "lot-stroke-glow");
+    strokeGlowFilter.setAttribute("x", "-50%");
+    strokeGlowFilter.setAttribute("y", "-50%");
+    strokeGlowFilter.setAttribute("width", "200%");
+    strokeGlowFilter.setAttribute("height", "200%");
+
+    // Blur sobre el alpha del lote (solo la forma, no el color)
+    const feGaussianBlurGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurGlow.setAttribute("in", "SourceAlpha");
+    feGaussianBlurGlow.setAttribute("stdDeviation", "3");
+    feGaussianBlurGlow.setAttribute("result", "alphaBlur");
+
+    // Color celeste fijo para el glow
+    const feFloodGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodGlow.setAttribute("flood-color", "#38BDF8");
+    feFloodGlow.setAttribute("flood-opacity", "0.8");
+    feFloodGlow.setAttribute("result", "celesteGlow");
+
+    // Combinar el blur del alpha con el color celeste
+    const feCompositeGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeGlow.setAttribute("in", "celesteGlow");
+    feCompositeGlow.setAttribute("in2", "alphaBlur");
+    feCompositeGlow.setAttribute("operator", "in");
+    feCompositeGlow.setAttribute("result", "coloredGlow");
+
+    // Combinar el glow celeste con el lote original
+    const feMergeGlow = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeGlow1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeGlow1.setAttribute("in", "coloredGlow");
+    const feMergeNodeGlow2 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeGlow2.setAttribute("in", "SourceGraphic");
+
+    feMergeGlow.appendChild(feMergeNodeGlow1);
+    feMergeGlow.appendChild(feMergeNodeGlow2);
+
+    strokeGlowFilter.appendChild(feGaussianBlurGlow);
+    strokeGlowFilter.appendChild(feFloodGlow);
+    strokeGlowFilter.appendChild(feCompositeGlow);
+    strokeGlowFilter.appendChild(feMergeGlow);
+    defs.appendChild(strokeGlowFilter);
+
+    // Filtro específico para zonas comunes: estela/glow suave, sin línea visible
+    // Usa SourceAlpha como el filtro que funciona, pero sin incluir SourceGraphic en el merge
+    let commonAreaGlowFilter = svgRoot.querySelector("#common-area-glow");
+    if (commonAreaGlowFilter) {
+      commonAreaGlowFilter.remove();
+    }
+    commonAreaGlowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    commonAreaGlowFilter.setAttribute("id", "common-area-glow");
+    commonAreaGlowFilter.setAttribute("x", "-100%");
+    commonAreaGlowFilter.setAttribute("y", "-100%");
+    commonAreaGlowFilter.setAttribute("width", "300%");
+    commonAreaGlowFilter.setAttribute("height", "300%");
+
+    // Blur grande para el glow suave exterior - reducido para menos difusión
+    const feGaussianBlurCommon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurCommon.setAttribute("in", "SourceAlpha");
+    feGaussianBlurCommon.setAttribute("stdDeviation", "8");
+    feGaussianBlurCommon.setAttribute("result", "alphaBlur");
+
+    // Blur pequeño para brillo concentrado en los bordes
+    const feGaussianBlurBorder = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurBorder.setAttribute("in", "SourceAlpha");
+    feGaussianBlurBorder.setAttribute("stdDeviation", "4");
+    feGaussianBlurBorder.setAttribute("result", "alphaBlurBorder");
+
+    // Color celeste para el glow exterior - más suave y sutil
+    const feFloodCommon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodCommon.setAttribute("flood-color", "#38BDF8");
+    feFloodCommon.setAttribute("flood-opacity", "0.3");
+    feFloodCommon.setAttribute("result", "celesteColor");
+
+    // Color celeste para los bordes - sutil pero más visible que el exterior
+    const feFloodBorder = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodBorder.setAttribute("flood-color", "#38BDF8");
+    feFloodBorder.setAttribute("flood-opacity", "0.5");
+    feFloodBorder.setAttribute("result", "celesteBorder");
+
+    // Combinar el blur grande con el color celeste suave
+    const feCompositeCommon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeCommon.setAttribute("in", "celesteColor");
+    feCompositeCommon.setAttribute("in2", "alphaBlur");
+    feCompositeCommon.setAttribute("operator", "in");
+    feCompositeCommon.setAttribute("result", "coloredGlow");
+
+    // Combinar el blur pequeño con el color celeste brillante (bordes)
+    const feCompositeBorder = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeBorder.setAttribute("in", "celesteBorder");
+    feCompositeBorder.setAttribute("in2", "alphaBlurBorder");
+    feCompositeBorder.setAttribute("operator", "in");
+    feCompositeBorder.setAttribute("result", "coloredBorder");
+
+    // Combinar el glow brillante de bordes sobre el glow suave
+    const feCompositeCombine = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeCombine.setAttribute("in", "coloredBorder");
+    feCompositeCombine.setAttribute("in2", "coloredGlow");
+    feCompositeCombine.setAttribute("operator", "over");
+    feCompositeCombine.setAttribute("result", "finalGlow");
+
+    // Solo mostrar el glow combinado, NO incluir SourceGraphic (así no se ve la línea del stroke ni el fill)
+    const feMergeCommon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeCommon1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeCommon1.setAttribute("in", "finalGlow");
+
+    feMergeCommon.appendChild(feMergeNodeCommon1);
+
+    commonAreaGlowFilter.appendChild(feGaussianBlurCommon);
+    commonAreaGlowFilter.appendChild(feGaussianBlurBorder);
+    commonAreaGlowFilter.appendChild(feFloodCommon);
+    commonAreaGlowFilter.appendChild(feFloodBorder);
+    commonAreaGlowFilter.appendChild(feCompositeCommon);
+    commonAreaGlowFilter.appendChild(feCompositeBorder);
+    commonAreaGlowFilter.appendChild(feCompositeCombine);
+    commonAreaGlowFilter.appendChild(feMergeCommon);
+    defs.appendChild(commonAreaGlowFilter);
+
+    // Crear filtro de sombra para el rect de fondo del mapa
+    let mapaShadowFilter = svgRoot.querySelector("#mapa-shadow-filter");
+    if (mapaShadowFilter) {
+      mapaShadowFilter.remove();
+    }
+    mapaShadowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    mapaShadowFilter.setAttribute("id", "mapa-shadow-filter");
+    mapaShadowFilter.setAttribute("x", "-50%");
+    mapaShadowFilter.setAttribute("y", "-50%");
+    mapaShadowFilter.setAttribute("width", "200%");
+    mapaShadowFilter.setAttribute("height", "200%");
+
+    const feGaussianBlurMapa = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurMapa.setAttribute("in", "SourceAlpha");
+    feGaussianBlurMapa.setAttribute("stdDeviation", "8");
+    feGaussianBlurMapa.setAttribute("result", "blur");
+
+    const feOffsetMapa = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feOffset"
+    );
+    feOffsetMapa.setAttribute("in", "blur");
+    feOffsetMapa.setAttribute("dx", "0");
+    feOffsetMapa.setAttribute("dy", "3");
+    feOffsetMapa.setAttribute("result", "offsetBlur");
+
+    const feFloodMapa = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodMapa.setAttribute("flood-color", "#0D3730");
+    feFloodMapa.setAttribute("flood-opacity", "0.5");
+    feFloodMapa.setAttribute("result", "floodColor");
+
+    const feCompositeMapa = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeMapa.setAttribute("in", "floodColor");
+    feCompositeMapa.setAttribute("in2", "offsetBlur");
+    feCompositeMapa.setAttribute("operator", "in");
+    feCompositeMapa.setAttribute("result", "coloredShadow");
+
+    const feMergeMapa = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeMapa1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeMapa1.setAttribute("in", "coloredShadow");
+    const feMergeNodeMapa2 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeMapa2.setAttribute("in", "SourceGraphic");
+
+    feMergeMapa.appendChild(feMergeNodeMapa1);
+    feMergeMapa.appendChild(feMergeNodeMapa2);
+    mapaShadowFilter.appendChild(feGaussianBlurMapa);
+    mapaShadowFilter.appendChild(feOffsetMapa);
+    mapaShadowFilter.appendChild(feFloodMapa);
+    mapaShadowFilter.appendChild(feCompositeMapa);
+    mapaShadowFilter.appendChild(feMergeMapa);
+    defs.appendChild(mapaShadowFilter);
+
+    // Filtro de glow más fuerte para el lote seleccionado
+    let selectedGlowFilter = svgRoot.querySelector("#lot-selected-glow");
+    if (selectedGlowFilter) {
+      selectedGlowFilter.remove();
+    }
+    selectedGlowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    selectedGlowFilter.setAttribute("id", "lot-selected-glow");
+    selectedGlowFilter.setAttribute("x", "-100%");
+    selectedGlowFilter.setAttribute("y", "-100%");
+    selectedGlowFilter.setAttribute("width", "300%");
+    selectedGlowFilter.setAttribute("height", "300%");
+
+    const feGaussianBlurSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurSelected.setAttribute("in", "SourceAlpha");
+    feGaussianBlurSelected.setAttribute("stdDeviation", "5");
+    feGaussianBlurSelected.setAttribute("result", "alphaBlur");
+
+    const feFloodSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodSelected.setAttribute("flood-color", "#38BDF8");
+    feFloodSelected.setAttribute("flood-opacity", "1");
+    feFloodSelected.setAttribute("result", "celesteGlow");
+
+    const feCompositeSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeSelected.setAttribute("in", "celesteGlow");
+    feCompositeSelected.setAttribute("in2", "alphaBlur");
+    feCompositeSelected.setAttribute("operator", "in");
+    feCompositeSelected.setAttribute("result", "coloredGlow");
+
+    const feMergeSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeSelected1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeSelected1.setAttribute("in", "coloredGlow");
+    const feMergeNodeSelected2 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeSelected2.setAttribute("in", "SourceGraphic");
+
+    feMergeSelected.appendChild(feMergeNodeSelected1);
+    feMergeSelected.appendChild(feMergeNodeSelected2);
+
+    selectedGlowFilter.appendChild(feGaussianBlurSelected);
+    selectedGlowFilter.appendChild(feFloodSelected);
+    selectedGlowFilter.appendChild(feCompositeSelected);
+    selectedGlowFilter.appendChild(feMergeSelected);
+    defs.appendChild(selectedGlowFilter);
+
+    // Aplicar la sombra directamente al rect de fondo del mapa (segundo nivel)
+    const fondoMapaGroup = svgRoot.querySelector("g[id='Mapa - Fondo (Imagen)']");
+    if (fondoMapaGroup) {
+      // Remover el atributo filter antiguo que aplica la sombra global
+      fondoMapaGroup.removeAttribute("filter");
+      fondoMapaGroup.style.filter = "none";
+      
+      // Aplicar el nuevo filtro de sombra directamente al rect de fondo
+      const fondoRect = fondoMapaGroup.querySelector("rect");
+      if (fondoRect) {
+        fondoRect.setAttribute("filter", "url(#mapa-shadow-filter)");
+      }
+    }
+    
+    // Eliminar el rect de fondo verde si existe (ya no es necesario)
+    const fondoVerde = svgRoot.querySelector("rect[data-fondo-verde]");
+    if (fondoVerde) {
+      fondoVerde.remove();
+    }
+
     const allLotes = svgRoot.querySelectorAll("[id^='Lote']");
     if (allLotes.length === 0) return;
 
-    // Limpiar overlays, textos y filtros de glow anteriores
+    // Limpiar overlays y textos anteriores
     svgRoot.querySelectorAll("[data-overlay-for]").forEach((el) => el.remove());
     svgRoot
       .querySelectorAll("text[data-label-for]")
       .forEach((el) => el.remove());
-    // Limpiar filtros de glow anteriores
-    defs.querySelectorAll("filter[id^='lot-hover-glow-']").forEach((filter) => filter.remove());
 
     const activeSet = new Set((activeMapIds || []).filter(Boolean));
 
@@ -272,12 +590,18 @@ function MapaInteractivo({
       const id = el.id;
       if (!/^Lote[0-9]/.test(id)) return;
 
-      const isActive = activeSet.size === 0 || activeSet.has(id);
+      // Solo es activo si está en activeMapIds (sin caso especial de "vacío = todos activos")
+      const isActive = activeSet.has(id);
       const variant = variantByMapId[id];
       const label = labelByMapId[id];
+      const estado = estadoByMapId[id];
 
       // ---------- ESTILO BASE DEL LOTE ----------
       const hasVariant = Boolean(variant);
+      
+      // Colores para lotes no activos (gris muted consistente)
+      const DISABLED_FILL = "#9CA3AF";
+      const DISABLED_STROKE = "#6B7280";
       
       // Determinar colores según si está activo o no
       let fillColor, borderColor, strokeWidth, filter, opacity;
@@ -285,8 +609,8 @@ function MapaInteractivo({
       if (isActive) {
         // Lote activo: usar colores según tenga variant o no
         if (hasVariant) {
-          fillColor = getColorForVariant(variant);
-          borderColor = getBorderColorForVariant(variant);
+          fillColor = getColorForVariant(variant, estado);
+          borderColor = getBorderColorForVariant(variant, estado);
           strokeWidth = "1.6";
           filter = "url(#lot-shadow-active)";
         } else {
@@ -298,12 +622,12 @@ function MapaInteractivo({
         }
         opacity = "1";
       } else {
-        // Lote no activo: gris oscuro para tapar el fondo, bordes difuminados suaves
-        fillColor = "#6B7280"; // gris oscuro para tapar completamente el fondo
-        borderColor = "rgba(80, 80, 80, 0.3)"; // gris oscuro muy difuminado (menos negro)
-        strokeWidth = "3"; // borde más grueso para efecto más difuminado
+        // Lote no activo: siempre gris muted sólido, sin importar variant
+        fillColor = DISABLED_FILL;
+        borderColor = DISABLED_STROKE;
+        strokeWidth = "1.6";
         filter = "url(#lot-shadow)";
-        opacity = "1"; // opacidad completa para tapar el fondo
+        opacity = "1"; // opacidad completa para bloque sólido (sin transparencia)
       }
 
       el.style.fill = fillColor;
@@ -317,115 +641,36 @@ function MapaInteractivo({
       el.style.strokeWidth = strokeWidth;
       el.setAttribute("stroke-width", strokeWidth);
 
-      el.setAttribute("filter", filter);
-      // Guardar el filtro original (baseFilter) para poder restaurarlo después del hover
-      const baseFilter = filter;
-      el._originalFilter = filter;
-      // Guardar baseFilter en el elemento para acceso en hoverLeave
-      el._baseFilter = baseFilter;
-
-      // Calcular color del glow para lotes activos
-      let glowColor;
-      if (isActive) {
-        if (hasVariant) {
-          // Si tiene variant, usar el mismo fillColor como base del glow
-          glowColor = fillColor;
-        } else {
-          // Si no tiene variant, usar celeste por defecto
-          glowColor = "#38BDF8";
-        }
-        
-        // Crear filtro de glow personalizado para este lote en los defs
-        const glowFilterId = `lot-hover-glow-${id}`;
-        let existingGlowFilter = defs.querySelector(`#${glowFilterId}`);
-        if (existingGlowFilter) {
-          existingGlowFilter.remove();
-        }
-        
-        const glowFilter = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "filter"
-        );
-        glowFilter.setAttribute("id", glowFilterId);
-        glowFilter.setAttribute("x", "-100%");
-        glowFilter.setAttribute("y", "-100%");
-        glowFilter.setAttribute("width", "300%");
-        glowFilter.setAttribute("height", "300%");
-
-        // Glow que usa el color del lote
-        const feGaussianBlurGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feGaussianBlur"
-        );
-        feGaussianBlurGlow.setAttribute("in", "SourceGraphic");
-        feGaussianBlurGlow.setAttribute("stdDeviation", "5");
-        feGaussianBlurGlow.setAttribute("result", "glowBlurred");
-
-        // Color del glow fluorescente (usando el color del lote)
-        const feFloodGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feFlood"
-        );
-        feFloodGlow.setAttribute("flood-color", glowColor);
-        feFloodGlow.setAttribute("flood-opacity", "0.7");
-        feFloodGlow.setAttribute("result", "glowColor");
-
-        // Combinar color con blur
-        const feCompositeGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feComposite"
-        );
-        feCompositeGlow.setAttribute("in", "glowColor");
-        feCompositeGlow.setAttribute("in2", "glowBlurred");
-        feCompositeGlow.setAttribute("operator", "in");
-        feCompositeGlow.setAttribute("result", "glowColored");
-
-        // Combinar glow con el elemento original
-        const feMergeGlow = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMerge"
-        );
-        const feMergeNodeGlow1 = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMergeNode"
-        );
-        feMergeNodeGlow1.setAttribute("in", "glowColored");
-        const feMergeNodeGlow2 = document.createElementNS(
-          "http://www.w3.org/2000/svg",
-          "feMergeNode"
-        );
-        feMergeNodeGlow2.setAttribute("in", "SourceGraphic");
-        feMergeGlow.appendChild(feMergeNodeGlow1);
-        feMergeGlow.appendChild(feMergeNodeGlow2);
-
-        glowFilter.appendChild(feGaussianBlurGlow);
-        glowFilter.appendChild(feFloodGlow);
-        glowFilter.appendChild(feCompositeGlow);
-        glowFilter.appendChild(feMergeGlow);
-        defs.appendChild(glowFilter);
+      // Si este lote está seleccionado y el panel está abierto, usar glow más fuerte
+      const isSelected = selectedMapId === id;
+      const finalFilter = isSelected ? "url(#lot-selected-glow)" : filter;
+      
+      el.setAttribute("filter", finalFilter);
+      // Guardar el filtro base para restaurarlo después del hover
+      const baseFilter = finalFilter;
+      
+      // Si está seleccionado, aumentar el grosor del borde
+      if (isSelected) {
+        const currentStrokeWidth = parseFloat(strokeWidth) || 1.6;
+        el.style.strokeWidth = (currentStrokeWidth + 1).toString();
+        el.setAttribute("stroke-width", (currentStrokeWidth + 1).toString());
       }
 
-      // Interactividad / opacidad
-      el.style.pointerEvents = isActive ? "auto" : "none";
+      // Agregar atributo data-active para controlar clicks
+      el.setAttribute("data-active", isActive ? "true" : "false");
+
+      // Interactividad: pointerEvents siempre "auto" para que el hover funcione en todos los lotes
+      el.style.pointerEvents = "auto";
       el.style.cursor = isActive ? "pointer" : "default";
       el.style.opacity = opacity;
 
       // ---------- TRANSICIONES Y ORIGEN DE TRANSFORM ----------
-      // Optimización: solo animar transform (GPU-accelerated) para mejor rendimiento
       el.style.transformBox = "fill-box";
       el.style.transformOrigin = "50% 50%";
-      // Configurar valores iniciales para GSAP - solo scale (sin movimiento)
-      gsap.set(el, {
-        scale: 1,
-        transformOrigin: "50% 50%",
-      });
-      // Asegurar que el transform inicial esté limpio y centrado
-      el.style.transform = "translate3d(0, 0, 0) scale(1)";
+      el.style.transform = "translateY(0px) scale(1)";
       el.style.backfaceVisibility = "hidden";
       el.style.perspective = "1000px";
-      // Optimización: usar contain para mejorar el rendimiento de renderizado
       el.style.contain = "layout style paint";
-      // willChange solo se activa durante hover para mejor rendimiento
       el.style.willChange = "auto";
 
       // ---------- NÚMERO DEL LOTE (crear antes de configurar hover) ----------
@@ -436,37 +681,40 @@ function MapaInteractivo({
         try {
           // Si el texto no existe, crearlo
           if (!textEl) {
-            const bbox = el.getBBox();
+          const bbox = el.getBBox();
 
-            const cx = bbox.x + bbox.width / 2;
-            const cy = bbox.y + bbox.height / 2;
+          const cx = bbox.x + bbox.width / 2;
+          const cy = bbox.y + bbox.height / 2;
 
-            const minDimension = Math.min(bbox.width, bbox.height);
-            const fontSize = Math.max(10, Math.min(16, minDimension * 0.28));
+          const minDimension = Math.min(bbox.width, bbox.height);
+          const fontSize = Math.max(10, Math.min(16, minDimension * 0.28));
 
             textEl = document.createElementNS(
-              "http://www.w3.org/2000/svg",
-              "text"
-            );
-            textEl.setAttribute("x", cx.toString());
-            textEl.setAttribute("y", cy.toString());
-            textEl.setAttribute("text-anchor", "middle");
-            textEl.setAttribute("dominant-baseline", "middle");
-            textEl.setAttribute("data-label-for", id);
-            textEl.setAttribute("font-size", fontSize.toString());
+            "http://www.w3.org/2000/svg",
+            "text"
+          );
+          textEl.setAttribute("x", cx.toString());
+          textEl.setAttribute("y", cy.toString());
+          textEl.setAttribute("text-anchor", "middle");
+          textEl.setAttribute("dominant-baseline", "middle");
+          textEl.setAttribute("data-label-for", id);
+          textEl.setAttribute("font-size", fontSize.toString());
             // Guardar el tamaño original para poder restaurarlo después
             textEl._originalFontSize = fontSize;
-            textEl.setAttribute(
-              "font-family",
+          textEl.setAttribute(
+            "font-family",
               'Manrope, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif'
-            );
+          );
             textEl.setAttribute("font-weight", "700");
             textEl.setAttribute("letter-spacing", "0.05em");
-            textEl.setAttribute("fill", "#ffffff");
-            textEl.setAttribute("stroke", "none");
-            textEl.setAttribute("filter", "url(#text-shadow)");
-            textEl.setAttribute("pointer-events", "none");
-            textEl.textContent = label;
+          textEl.setAttribute("fill", "#ffffff");
+          textEl.setAttribute("stroke", "none");
+          textEl.setAttribute("filter", "url(#text-shadow)");
+          textEl.setAttribute("pointer-events", "none");
+            // Opacidad siempre 1 para que el texto sea claramente legible en todos los casos
+            textEl.setAttribute("opacity", "1");
+            textEl.style.opacity = "1";
+          textEl.textContent = label;
             
             // Configurar la misma animación que el fondo del lote
             textEl.style.transformOrigin = "50% 50%";
@@ -476,33 +724,33 @@ function MapaInteractivo({
             textEl.style.perspective = "1000px";
             textEl.style.willChange = "auto";
 
-            if (el.parentNode) {
-              el.parentNode.appendChild(textEl);
-            } else {
-              svgRoot.appendChild(textEl);
+          if (el.parentNode) {
+            el.parentNode.appendChild(textEl);
+          } else {
+            svgRoot.appendChild(textEl);
+          }
+
+          // Ajuste fino de centrado después de renderizar
+          requestAnimationFrame(() => {
+            try {
+              const textBBox = textEl.getBBox();
+              const textCenterX = textBBox.x + textBBox.width / 2;
+              const textCenterY = textBBox.y + textBBox.height / 2;
+
+              const offsetX = cx - textCenterX;
+              const offsetY = cy - textCenterY;
+
+              const adjustedX =
+                parseFloat(textEl.getAttribute("x") || "0") + offsetX;
+              const adjustedY =
+                parseFloat(textEl.getAttribute("y") || "0") + offsetY;
+
+              textEl.setAttribute("x", adjustedX.toString());
+              textEl.setAttribute("y", adjustedY.toString());
+            } catch {
+              // si falla el ajuste, dejamos la posición original
             }
-
-            // Ajuste fino de centrado después de renderizar
-            requestAnimationFrame(() => {
-              try {
-                const textBBox = textEl.getBBox();
-                const textCenterX = textBBox.x + textBBox.width / 2;
-                const textCenterY = textBBox.y + textBBox.height / 2;
-
-                const offsetX = cx - textCenterX;
-                const offsetY = cy - textCenterY;
-
-                const adjustedX =
-                  parseFloat(textEl.getAttribute("x") || "0") + offsetX;
-                const adjustedY =
-                  parseFloat(textEl.getAttribute("y") || "0") + offsetY;
-
-                textEl.setAttribute("x", adjustedX.toString());
-                textEl.setAttribute("y", adjustedY.toString());
-              } catch {
-                // si falla el ajuste, dejamos la posición original
-              }
-            });
+          });
           } else {
             // Si ya existe, actualizar el contenido y asegurar que tenga las propiedades de animación
             textEl.textContent = label;
@@ -520,6 +768,9 @@ function MapaInteractivo({
             textEl.setAttribute("letter-spacing", "0.05em");
             textEl.setAttribute("fill", "#ffffff");
             textEl.setAttribute("filter", "url(#text-shadow)");
+            // Opacidad siempre 1 para que el texto sea claramente legible en todos los casos
+            textEl.setAttribute("opacity", "1");
+            textEl.style.opacity = "1";
             textEl.style.transformOrigin = "50% 50%";
             textEl.style.transition = "transform 50ms cubic-bezier(0.4, 0, 0.2, 1), font-size 50ms cubic-bezier(0.4, 0, 0.2, 1)";
             textEl.style.transform = "translate3d(0, 0, 0) scale(1)";
@@ -541,7 +792,7 @@ function MapaInteractivo({
         delete el._textElement;
       }
 
-      // ---------- HOVER (solo para lotes activos) ----------
+      // ---------- HOVER (para todos los lotes, activos y desactivados) ----------
       // Primero limpio handlers anteriores para no duplicar listeners
       if (el._hoverEnterHandler) {
         el.removeEventListener("mouseenter", el._hoverEnterHandler);
@@ -550,76 +801,164 @@ function MapaInteractivo({
         el.removeEventListener("mouseleave", el._hoverLeaveHandler);
       }
 
-      if (isActive) {
-        const hoverEnter = () => {
-          const glowFilterId = `url(#lot-hover-glow-${id})`;
-          gsap.killTweensOf(el);
-          // Aplicar filtro de glow inmediatamente
-          el.setAttribute("filter", glowFilterId);
-          // Animar con GSAP - solo scale como la animación anterior (1.10)
-          gsap.to(el, {
-            scale: 1.10,
-            duration: 0.22,
+      // Hover funciona para todos los lotes (activos y desactivados)
+      const hoverEnter = () => {
+        gsap.killTweensOf(el);
+        el.style.willChange = "transform, filter";
+        
+        // Si está seleccionado, mantener el filtro de selección pero con hover adicional
+        if (isSelected) {
+          // Usar un filtro combinado o mantener el selected glow más intenso
+          el.setAttribute("filter", "url(#lot-selected-glow)");
+        } else {
+          // Aplicar filtro de glow celeste uniforme
+          el.setAttribute("filter", "url(#lot-stroke-glow)");
+        }
+        
+        // Animar con GSAP - más fluido con mejor ease y duración
+        gsap.to(el, {
+          scale: 1.04,
+          y: -2,
+          duration: 0.25,
+          ease: "power2.out",
+          force3D: true,
+        });
+      };
+
+      const hoverLeave = () => {
+        gsap.killTweensOf(el);
+        
+        gsap.to(el, {
+          scale: 1,
+          y: 0,
+          duration: 0.2,
+          ease: "power2.out",
+          force3D: true,
+          onComplete: () => {
+            // Restaurar el filtro base (puede ser el selected o el normal)
+            el.setAttribute("filter", baseFilter);
+            el.style.willChange = "auto";
+          },
+        });
+      };
+
+      el.addEventListener("mouseenter", hoverEnter);
+      el.addEventListener("mouseleave", hoverLeave);
+
+      el._hoverEnterHandler = hoverEnter;
+      el._hoverLeaveHandler = hoverLeave;
+    });
+
+    // ---------- ZONAS COMUNES (espacios comunes: transparentes por defecto, glow en hover) ----------
+    const zonasComunesGroup = svgRoot.querySelector("g[id='Espacios Comunes']");
+    if (zonasComunesGroup) {
+      const zonasComunes = zonasComunesGroup.querySelectorAll("path");
+      
+      zonasComunes.forEach((zona) => {
+        // Estilo base: transparente para que se vea la imagen de fondo
+        zona.style.fill = "transparent";
+        zona.setAttribute("fill", "transparent");
+        zona.style.stroke = "none";
+        zona.setAttribute("stroke", "none");
+        zona.style.opacity = "1";
+        zona.style.cursor = "pointer";
+        zona.style.pointerEvents = "auto";
+        
+        // Sin filtro por defecto (invisible)
+        zona.removeAttribute("filter");
+        
+        // Transformaciones para hover
+        zona.style.transformBox = "fill-box";
+        zona.style.transformOrigin = "50% 50%";
+        zona.style.transform = "translateY(0px) scale(1)";
+        zona.style.backfaceVisibility = "hidden";
+        
+        // Handlers de hover: mostrar solo estela/glow (sin línea visible)
+        const zonaHoverEnter = () => {
+          gsap.killTweensOf(zona);
+          zona.style.willChange = "transform, filter";
+          
+          // IMPORTANTE: Para que SourceAlpha capture el elemento, necesitamos:
+          // 1. Stroke visible (para que SourceAlpha lo capture) - un poco más grueso para mejor definición
+          zona.setAttribute("stroke", "#38BDF8");
+          zona.setAttribute("stroke-width", "4");
+          zona.setAttribute("stroke-opacity", "1");
+          zona.style.stroke = "#38BDF8";
+          
+          // 2. Fill con alpha muy bajo (casi invisible pero presente para SourceAlpha)
+          // SourceAlpha necesita que haya alpha, así que usamos fill con opacity muy baja
+          zona.setAttribute("fill", "#38BDF8");
+          zona.setAttribute("fill-opacity", "0.001"); // Casi invisible pero presente para SourceAlpha
+          zona.style.fill = "#38BDF8";
+          zona.style.fillOpacity = "0.001";
+          
+          // Aplicar el filtro - solo mostrará el glow blurizado
+          // El fill casi transparente no se verá, pero permite que SourceAlpha funcione
+          zona.setAttribute("filter", "url(#common-area-glow)");
+          zona.style.filter = "url(#common-area-glow)";
+          
+          // Animación suave
+          gsap.to(zona, {
+            scale: 1.01,
+            duration: 0.2,
             ease: "power2.out",
             force3D: true,
           });
-          
-          // Aplicar animación al número - aumentar font-size directamente
-          const textEl = el._textElement || svgRoot.querySelector(`text[data-label-for="${id}"]`);
-          if (textEl) {
-            // Guardar el tamaño original si no está guardado
-            if (!textEl._originalFontSize) {
-              const currentSize = parseFloat(textEl.getAttribute("font-size"));
-              textEl._originalFontSize = currentSize || parseFloat(window.getComputedStyle(textEl).fontSize) || 12;
-            }
-            
-            const scaleValue = 1.12;
-            const newFontSize = textEl._originalFontSize * scaleValue;
-            
-            // Aplicar el nuevo tamaño directamente
-            textEl.setAttribute("font-size", newFontSize.toString());
-            textEl.style.fontSize = newFontSize + "px";
-          }
         };
-
-        const hoverLeave = () => {
-          gsap.killTweensOf(el);
-          const baseFilterForLeave = el._baseFilter || baseFilter;
-          gsap.to(el, {
+        
+        const zonaHoverLeave = () => {
+          gsap.killTweensOf(zona);
+          
+          gsap.to(zona, {
             scale: 1,
-            duration: 0.18,
+            duration: 0.15,
             ease: "power2.out",
             force3D: true,
             onComplete: () => {
-              el.setAttribute("filter", baseFilterForLeave);
+              // Volver a estado invisible
+              zona.setAttribute("stroke", "none");
+              zona.style.stroke = "none";
+              zona.removeAttribute("stroke-width");
+              zona.removeAttribute("stroke-opacity");
+              zona.removeAttribute("filter");
+              zona.style.filter = "none";
+              zona.style.fill = "transparent";
+              zona.setAttribute("fill", "transparent");
+              zona.setAttribute("fill-opacity", "0");
+              zona.style.fillOpacity = "0";
+              zona.style.willChange = "auto";
             },
           });
-          
-          // Restaurar el tamaño original del número
-          const textEl = el._textElement || svgRoot.querySelector(`text[data-label-for="${id}"]`);
-          if (textEl && textEl._originalFontSize) {
-            textEl.setAttribute("font-size", textEl._originalFontSize.toString());
-            textEl.style.fontSize = textEl._originalFontSize + "px";
-          }
         };
-
-        el.addEventListener("mouseenter", hoverEnter);
-        el.addEventListener("mouseleave", hoverLeave);
-
-        // guardo refs en la propia etiqueta para poder quitarlos en el próximo render
-        el._hoverEnterHandler = hoverEnter;
-        el._hoverLeaveHandler = hoverLeave;
-      } else {
-        delete el._hoverEnterHandler;
-        delete el._hoverLeaveHandler;
-      }
-    });
-  }, [svgInjected, variantByMapId, activeMapIds, labelByMapId]);
+        
+        // Limpiar handlers anteriores si existen
+        if (zona._hoverEnterHandler) {
+          zona.removeEventListener("mouseenter", zona._hoverEnterHandler);
+        }
+        if (zona._hoverLeaveHandler) {
+          zona.removeEventListener("mouseleave", zona._hoverLeaveHandler);
+        }
+        
+        zona.addEventListener("mouseenter", zonaHoverEnter);
+        zona.addEventListener("mouseleave", zonaHoverLeave);
+        
+        zona._hoverEnterHandler = zonaHoverEnter;
+        zona._hoverLeaveHandler = zonaHoverLeave;
+      });
+    }
+  }, [svgInjected, variantByMapId, activeMapIds, labelByMapId, selectedMapId]);
 
   // Click en el SVG: busco el shape base cuyo id empieza con "Lote"
   const handleSvgClick = (event) => {
     const loteElement = event.target.closest("[id^='Lote']");
     if (!loteElement) return;
+
+    // Verificar si el lote está activo antes de permitir el click
+    const isActive = loteElement.getAttribute("data-active") === "true";
+    if (!isActive) {
+      // Lote desactivado: no ejecutar click, pero permitir hover
+      return;
+    }
 
     const mapId = loteElement.id;
     if (typeof onLoteClick === "function") {

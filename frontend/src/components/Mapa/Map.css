@@ -1,0 +1,149 @@
+/* Estilos para la página del mapa */
+
+/* Centrar verticalmente la barra de filtros */
+.fb-map {
+  padding: 16px 24px 16px 30px !important;
+}
+
+.map-container {
+  min-height: 600px;
+  position: relative;
+  background-color: #ffffff;
+  border-radius: 12px;
+  overflow: visible;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  /* Optimizaciones de rendimiento */
+  transform: translateZ(0);
+  isolation: isolate;
+}
+
+.map-container .mapa-svg-wrapper {
+  flex: 1;
+  min-height: 600px;
+  background-color: transparent;
+  overflow: visible;
+}
+
+.map-container__header {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .map-container .lote-legend {
+    width: 100%;
+  }
+}
+
+.mapa-svg-wrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Optimizaciones de rendimiento */
+  transform: translateZ(0);
+  will-change: contents;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mapa-svg-wrapper svg {
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  display: block;
+  /* Optimizaciones de renderizado SVG */
+  shape-rendering: geometricPrecision;
+  text-rendering: optimizeLegibility;
+}
+
+/* Wrapper premium con sombra sutil para el mapa */
+.mapa-wrapper {
+  padding: 0;
+  max-width: 98%;
+  margin: 0.75rem auto 0 auto;
+  background: #f9fafb; /* Color de fondo de la página */
+}
+
+.mapa-wrapper .mapa-svg-wrapper {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  background: #f9fafb; /* Alineado con el fondo de la página */
+}
+
+.mapa-wrapper svg,
+.mapa-wrapper img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Header del mapa */
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1.5rem;
+  background-color: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-top: -0.2rem;
+  padding-bottom: 1rem;
+}
+
+.map-header h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  padding-left: 0.55rem;
+}
+
+/* Container del mapa */
+.map-container-wrapper {
+  padding-top: 0;
+  padding-bottom: 1.5rem;
+  padding-left: 0;
+  padding-right: 0;
+  overflow: visible;
+}
+
+/* Header del mapa - layout mejorado */
+.map-header-left {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.map-info-messages {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.map-info-count {
+  font-size: 0.875rem;
+  color: #03270c;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  background: #eefff5;
+  border-radius: 6px;
+  border: 1px solid #e5e7eb;
+}
+
+.map-info-empty {
+  font-size: 0.875rem;
+  color: #dc2626;
+  font-weight: 500;
+  padding: 0.25rem 0.75rem;
+  background: #fee2e2;
+  border-radius: 6px;
+  border: 1px solid #fecaca;
+}
+
