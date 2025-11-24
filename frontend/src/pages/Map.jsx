@@ -10,29 +10,36 @@ import LoteLegend from "../components/Mapa/LoteLegend";
 
 // Estilos específicos para la vista de mapa
 const customStyles = `
+  /* Centrar verticalmente la barra de filtros */
+  .fb-map {
+    padding: 16px 24px 16px 30px !important;
+  }
+
   .map-container { 
-    height: 600px; 
+    min-height: 600px; 
     position: relative; 
     background-color: #ffffff;
     border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    overflow: visible;
+    box-shadow: none;
     display: flex;
     flex-direction: column;
     /* Optimizaciones de rendimiento */
-    contain: layout style paint;
     transform: translateZ(0);
     isolation: isolate;
+  }
+  
+  .map-container .mapa-svg-wrapper {
+    flex: 1;
+    min-height: 600px;
+    background-color: transparent;
+    overflow: visible;
   }
   
   .map-container__header {
     position: relative;
     z-index: 1;
-  }
-  
-  .map-container .mapa-svg-wrapper {
-    flex: 1;
-    background-color: #e6efe9;
+    flex-shrink: 0;
   }
   
   @media (max-width: 768px) {
@@ -43,12 +50,10 @@ const customStyles = `
 
   .mapa-svg-wrapper {
     width: 100%;
-    height: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     /* Optimizaciones de rendimiento */
-    contain: layout style paint;
     transform: translateZ(0);
     will-change: contents;
     backface-visibility: hidden;
@@ -57,13 +62,34 @@ const customStyles = `
 
   .mapa-svg-wrapper svg {
     width: 100%;
-    height: 100%;
+    height: auto;
     max-width: 100%;
-    max-height: 100%;
     display: block;
     /* Optimizaciones de renderizado SVG */
     shape-rendering: geometricPrecision;
     text-rendering: optimizeLegibility;
+  }
+
+  /* Wrapper premium con sombra sutil para el mapa */
+  .mapa-wrapper {
+    padding: 0;
+    max-width: 98%;
+    margin: 0.75rem auto 0 auto;
+    background: #f9fafb; /* Color de fondo de la página */
+  }
+
+  .mapa-wrapper .mapa-svg-wrapper {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background: #f9fafb; /* Alineado con el fondo de la página */
+  }
+
+  .mapa-wrapper svg,
+  .mapa-wrapper img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
 `;
 
@@ -84,11 +110,11 @@ const getEstadoVariant = (estadoRaw) => {
   const key = normalizeEstadoKey(estadoRaw);
 
   const map = {
-    DISPONIBLE: "success",
+    DISPONIBLE: "info", // Color que tenía RESERVADO (azul)
     "EN PROMOCION": "warn",
-    RESERVADO: "info",
+    RESERVADO: "success", // Color que tenía DISPONIBLE (verde)
     ALQUILADO: "indigo",
-    VENDIDO: "success",
+    VENDIDO: "warn", // Amarillo/naranja
     "NO DISPONIBLE": "danger",
   };
 
@@ -185,6 +211,17 @@ export default function Map() {
     return map;
   }, [allLots]);
 
+  // Para cada lote, guardo su estado (para usar colores especiales como VENDIDO)
+  const estadoByMapId = useMemo(() => {
+    const map = {};
+    (allLots || []).forEach((lote) => {
+      if (!lote?.mapId) return;
+      const estadoRaw = getEstadoFromLote(lote);
+      map[lote.mapId] = normalizeEstadoKey(estadoRaw);
+    });
+    return map;
+  }, [allLots]);
+
   // Para cada lote, el número que quiero mostrar dentro de la parcela
   const labelByMapId = useMemo(() => {
     const map = {};
@@ -221,50 +258,56 @@ export default function Map() {
       {/* Estilos locales para esta página */}
       <style>{customStyles}</style>
 
-      {/* Barra de filtros igual que en el dashboard, pero aplicada al mapa */}
+      {/* Título y leyenda */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "0.5rem 1.5rem",
+          backgroundColor: "#f9fafb",
+          borderBottom: "1px solid #e5e7eb",
+          flexWrap: "wrap",
+          gap: "1rem",
+          marginTop: "-0.2rem",
+          paddingBottom: "1rem",
+        }}
+      >
+        <h3
+          style={{
+            margin: 0,
+            fontSize: "1.125rem",
+            fontWeight: 600,
+            color: "#111827",
+            paddingLeft: "0.55rem",
+          }}
+        >
+          Mapa Interactivo de Lotes
+        </h3>
+        <LoteLegend />
+      </div>
+
+      {/* Barra de filtros */}
       <FilterBarLotes
         variant="map"
         userRole={userRole}
         onParamsChange={handleParamsChange}
       />
 
-      <Container fluid style={{ paddingTop: "0.5rem", paddingBottom: "1.5rem" }}>
+      <Container fluid style={{ paddingTop: "0", paddingBottom: "1.5rem", paddingLeft: "0", paddingRight: "0", overflow: "visible" }}>
         {/* Contenedor del mapa interactivo */}
         <div className="map-container">
-          {/* Barra superior con título y leyenda */}
-          <div
-            className="map-container__header"
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              padding: "1rem 1.5rem",
-              backgroundColor: "#f9fafb",
-              borderBottom: "1px solid #e5e7eb",
-              flexWrap: "wrap",
-              gap: "1rem",
-            }}
-          >
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "1.125rem",
-                fontWeight: 600,
-                color: "#111827",
-              }}
-            >
-              Mapa Interactivo de Lotes
-            </h3>
-            <LoteLegend />
-          </div>
           
           {/* Mapa */}
-          <MapaInteractivo
-            onLoteClick={handleLoteClick}
-            variantByMapId={variantByMapId}
-            activeMapIds={activeMapIds}
-            labelByMapId={labelByMapId}
-          />
+          <div className="mapa-wrapper">
+            <MapaInteractivo
+              onLoteClick={handleLoteClick}
+              variantByMapId={variantByMapId}
+              activeMapIds={activeMapIds}
+              labelByMapId={labelByMapId}
+              estadoByMapId={estadoByMapId}
+            />
+          </div>
         </div>
       </Container>
     </>

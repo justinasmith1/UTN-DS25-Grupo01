@@ -21,11 +21,11 @@ export const fmtEstadoLote = (s) =>
 export const getEstadoVariant = (raw) => {
   const s = fmtEstadoLote(raw).toUpperCase(); // DISPO / EN PROMOCION / etc.
   const map = {
-    'DISPONIBLE': 'success',
+    'DISPONIBLE': 'info', // Color que tenía RESERVADO (azul)
     'EN PROMOCION': 'warn',
-    'RESERVADO': 'info',
+    'RESERVADO': 'success', // Color que tenía DISPONIBLE (verde)
     'ALQUILADO': 'indigo',
-    'VENDIDO': 'success',
+    'VENDIDO': 'warn', // Amarillo/naranja
     'NO DISPONIBLE': 'danger',
   };
   return map[s] || 'muted';

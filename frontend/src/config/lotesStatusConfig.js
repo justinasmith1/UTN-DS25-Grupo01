@@ -2,11 +2,11 @@
 // Configuración centralizada de estados de lotes
 
 export const LOTE_STATUS_CONFIG = {
-  DISPONIBLE: { label: "Disponible", color: "#10B981", variant: "success" },
-  RESERVADO: { label: "Reservado", color: "#3B82F6", variant: "info" },
-  VENDIDO: { label: "Vendido", color: "#EF4444", variant: "danger" },
-  "NO DISPONIBLE": { label: "No disponible", color: "#6B7280", variant: "muted" },
-  "EN PROMOCION": { label: "En promoción", color: "#F59E0B", variant: "warn" },
-  ALQUILADO: { label: "Alquilado", color: "#6366F1", variant: "indigo" },
+  DISPONIBLE: { label: "Disponible", color: "#2952CC", variant: "info" }, // Color que tenía RESERVADO (azul)
+  RESERVADO: { label: "Reservado", color: "#18794E", variant: "success" }, // Color que tenía DISPONIBLE (verde)
+  VENDIDO: { label: "Vendido", color: "#FBBF24", variant: "warn" }, // Amarillo brillante (diferente de EN PROMOCION)
+  "NO DISPONIBLE": { label: "No Disponible", color: "#475467", variant: "muted" },
+  "EN PROMOCION": { label: "En Promoción", color: "#9A5C00", variant: "warn" },
+  ALQUILADO: { label: "Alquilado", color: "#5B6BFF", variant: "indigo" },
 };
 
