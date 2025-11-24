@@ -7,128 +7,19 @@ import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import MapaInteractivo from "../components/Mapa/MapaInteractivo";
 import LoteLegend from "../components/Mapa/LoteLegend";
+import {
+  normalizeEstadoKey,
+  getEstadoVariant,
+  getEstadoFromLote,
+} from "../utils/mapaUtils";
 
-// Estilos específicos para la vista de mapa
-const customStyles = `
-  /* Centrar verticalmente la barra de filtros */
-  .fb-map {
-    padding: 16px 24px 16px 30px !important;
-  }
-
-  .map-container { 
-    min-height: 600px; 
-    position: relative; 
-    background-color: #ffffff;
-    border-radius: 12px;
-    overflow: visible;
-    box-shadow: none;
-    display: flex;
-    flex-direction: column;
-    /* Optimizaciones de rendimiento */
-    transform: translateZ(0);
-    isolation: isolate;
-  }
-  
-  .map-container .mapa-svg-wrapper {
-    flex: 1;
-    min-height: 600px;
-    background-color: transparent;
-    overflow: visible;
-  }
-  
-  .map-container__header {
-    position: relative;
-    z-index: 1;
-    flex-shrink: 0;
-  }
-  
-  @media (max-width: 768px) {
-    .map-container .lote-legend {
-      width: 100%;
-    }
-  }
-
-  .mapa-svg-wrapper {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* Optimizaciones de rendimiento */
-    transform: translateZ(0);
-    will-change: contents;
-    backface-visibility: hidden;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .mapa-svg-wrapper svg {
-    width: 100%;
-    height: auto;
-    max-width: 100%;
-    display: block;
-    /* Optimizaciones de renderizado SVG */
-    shape-rendering: geometricPrecision;
-    text-rendering: optimizeLegibility;
-  }
-
-  /* Wrapper premium con sombra sutil para el mapa */
-  .mapa-wrapper {
-    padding: 0;
-    max-width: 98%;
-    margin: 0.75rem auto 0 auto;
-    background: #f9fafb; /* Color de fondo de la página */
-  }
-
-  .mapa-wrapper .mapa-svg-wrapper {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    background: #f9fafb; /* Alineado con el fondo de la página */
-  }
-
-  .mapa-wrapper svg,
-  .mapa-wrapper img {
-    display: block;
-    width: 100%;
-    height: auto;
-  }
-`;
-
-// Normalizo el estado para poder mapearlo a un "variant" visual
-const normalizeEstadoKey = (value) => {
-  if (!value) return "";
-  return String(value)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\s+/g, " ")
-    .replace(/_/g, " ")
-    .trim()
-    .toUpperCase(); // ej: "EN_PROMOCION" -> "EN PROMOCION"
-};
-
-// De un estado (ALQUILADO, DISPONIBLE, etc.) saco un "variant" visual
-const getEstadoVariant = (estadoRaw) => {
-  const key = normalizeEstadoKey(estadoRaw);
-
-  const map = {
-    DISPONIBLE: "info", // Color que tenía RESERVADO (azul)
-    "EN PROMOCION": "warn",
-    RESERVADO: "success", // Color que tenía DISPONIBLE (verde)
-    ALQUILADO: "indigo",
-    VENDIDO: "warn", // Amarillo/naranja
-    "NO DISPONIBLE": "danger",
-  };
-
-  return map[key] || "muted";
-};
-
-// De un lote tomo el estado como hace applyLoteFilters (status || estado)
-const getEstadoFromLote = (lote) => lote?.status || lote?.estado || "";
+import "../components/Mapa/Map.css";
 
 export default function Map() {
   // Tomo del Layout los lotes y el handler para abrir el side panel
   const ctx = useOutletContext() || {};
   const allLots = ctx.allLots || ctx.lotes || ctx.lots || [];
-  const { openSidePanel } = ctx;
+  const { openSidePanel, selectedLotId, showPanel } = ctx;
 
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN")
@@ -238,6 +129,13 @@ export default function Map() {
     [filteredLots]
   );
 
+  // Obtener el mapId del lote seleccionado (para destacarlo en el mapa)
+  const selectedMapId = useMemo(() => {
+    if (!selectedLotId || !showPanel) return null;
+    const lote = allLots.find((l) => l.id === selectedLotId);
+    return lote?.mapId || null;
+  }, [selectedLotId, showPanel, allLots]);
+
   // Cuando clickeo un lote en el mapa, abro el side panel del lote correspondiente
   const handleLoteClick = (mapId) => {
     if (!mapId) return;
@@ -255,35 +153,20 @@ export default function Map() {
 
   return (
     <>
-      {/* Estilos locales para esta página */}
-      <style>{customStyles}</style>
-
       {/* Título y leyenda */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: "0.5rem 1.5rem",
-          backgroundColor: "#f9fafb",
-          borderBottom: "1px solid #e5e7eb",
-          flexWrap: "wrap",
-          gap: "1rem",
-          marginTop: "-0.2rem",
-          paddingBottom: "1rem",
-        }}
-      >
-        <h3
-          style={{
-            margin: 0,
-            fontSize: "1.125rem",
-            fontWeight: 600,
-            color: "#111827",
-            paddingLeft: "0.55rem",
-          }}
-        >
-          Mapa Interactivo de Lotes
-        </h3>
+      <div className="map-header">
+        <div className="map-header-left">
+          <h3>Mapa Interactivo de Lotes</h3>
+          <div className="map-info-messages">
+            {filteredLots.length > 0 ? (
+              <span className="map-info-count">
+                {filteredLots.length} {filteredLots.length === 1 ? "Lote mostrado" : "Lotes mostrados"}
+              </span>
+            ) : (
+              <span className="map-info-empty">No hay lotes que coincidan con este filtro</span>
+            )}
+          </div>
+        </div>
         <LoteLegend />
       </div>
 
@@ -294,7 +177,7 @@ export default function Map() {
         onParamsChange={handleParamsChange}
       />
 
-      <Container fluid style={{ paddingTop: "0", paddingBottom: "1.5rem", paddingLeft: "0", paddingRight: "0", overflow: "visible" }}>
+      <Container fluid className="map-container-wrapper">
         {/* Contenedor del mapa interactivo */}
         <div className="map-container">
           
@@ -306,6 +189,7 @@ export default function Map() {
               activeMapIds={activeMapIds}
               labelByMapId={labelByMapId}
               estadoByMapId={estadoByMapId}
+              selectedMapId={selectedMapId}
             />
           </div>
         </div>

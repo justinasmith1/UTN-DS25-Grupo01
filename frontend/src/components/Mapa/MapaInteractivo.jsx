@@ -2,6 +2,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { gsap } from "gsap";
 import mapaSvg from "../../assets/Mapa La Federala - Interactivo.svg?raw";
+import {
+  getColorForVariant,
+  getBorderColorForVariant,
+} from "../../utils/mapaUtils";
 
 function MapaInteractivo({
   onLoteClick,
@@ -9,45 +13,10 @@ function MapaInteractivo({
   activeMapIds = [],
   labelByMapId = {},
   estadoByMapId = {},
+  selectedMapId = null,
 }) {
   const wrapperRef = useRef(null);
   const [svgInjected, setSvgInjected] = useState(false);
-
-  // Paleta de colores por "variant" visual (igual que en TablaLotes.css - colores del dashboard)
-  const getColorForVariant = (variant, estado = null) => {
-    // VENDIDO tiene un color amarillo brillante especial, diferente de EN PROMOCION
-    if (estado && estado.toUpperCase() === "VENDIDO") {
-      return "#FBBF24"; // Amarillo brillante (más claro que EN PROMOCION)
-    }
-    
-    const colors = {
-      success: "#18794E", // color del texto en .tl-badge--success
-      warn: "#9A5C00",    // color del texto en .tl-badge--warn (EN PROMOCION)
-      info: "#2952CC",    // color del texto en .tl-badge--info
-      indigo: "#5B6BFF",  // color del texto en .tl-badge--indigo
-      danger: "#C23B3B",  // color del texto en .tl-badge--danger
-      muted: "#475467",   // color del texto en .tl-badge--muted
-    };
-    return colors[variant] || colors.muted;
-  };
-
-  const getBorderColorForVariant = (variant, estado = null) => {
-    // VENDIDO tiene un borde amarillo oscuro especial
-    if (estado && estado.toUpperCase() === "VENDIDO") {
-      return "#D97706"; // Amarillo/naranja oscuro para borde de VENDIDO
-    }
-    
-    // Bordes más oscuros basados en los colores del dashboard
-    const colors = {
-      success: "#11633E", // versión más oscura de #18794E
-      warn: "#7A4B00",    // versión más oscura de #9A5C00 (EN PROMOCION)
-      info: "#1E3A8A",    // versión más oscura de #2952CC
-      indigo: "#4338CA",  // versión más oscura de #5B6BFF
-      danger: "#991B1B",  // versión más oscura de #C23B3B
-      muted: "#334155",   // versión más oscura de #475467
-    };
-    return colors[variant] || colors.muted;
-  };
 
   // Inyectar SVG solo una vez
   useEffect(() => {
@@ -522,6 +491,70 @@ function MapaInteractivo({
     mapaShadowFilter.appendChild(feMergeMapa);
     defs.appendChild(mapaShadowFilter);
 
+    // Filtro de glow más fuerte para el lote seleccionado
+    let selectedGlowFilter = svgRoot.querySelector("#lot-selected-glow");
+    if (selectedGlowFilter) {
+      selectedGlowFilter.remove();
+    }
+    selectedGlowFilter = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "filter"
+    );
+    selectedGlowFilter.setAttribute("id", "lot-selected-glow");
+    selectedGlowFilter.setAttribute("x", "-100%");
+    selectedGlowFilter.setAttribute("y", "-100%");
+    selectedGlowFilter.setAttribute("width", "300%");
+    selectedGlowFilter.setAttribute("height", "300%");
+
+    const feGaussianBlurSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurSelected.setAttribute("in", "SourceAlpha");
+    feGaussianBlurSelected.setAttribute("stdDeviation", "5");
+    feGaussianBlurSelected.setAttribute("result", "alphaBlur");
+
+    const feFloodSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodSelected.setAttribute("flood-color", "#38BDF8");
+    feFloodSelected.setAttribute("flood-opacity", "1");
+    feFloodSelected.setAttribute("result", "celesteGlow");
+
+    const feCompositeSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeSelected.setAttribute("in", "celesteGlow");
+    feCompositeSelected.setAttribute("in2", "alphaBlur");
+    feCompositeSelected.setAttribute("operator", "in");
+    feCompositeSelected.setAttribute("result", "coloredGlow");
+
+    const feMergeSelected = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMerge"
+    );
+    const feMergeNodeSelected1 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeSelected1.setAttribute("in", "coloredGlow");
+    const feMergeNodeSelected2 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeSelected2.setAttribute("in", "SourceGraphic");
+
+    feMergeSelected.appendChild(feMergeNodeSelected1);
+    feMergeSelected.appendChild(feMergeNodeSelected2);
+
+    selectedGlowFilter.appendChild(feGaussianBlurSelected);
+    selectedGlowFilter.appendChild(feFloodSelected);
+    selectedGlowFilter.appendChild(feCompositeSelected);
+    selectedGlowFilter.appendChild(feMergeSelected);
+    defs.appendChild(selectedGlowFilter);
+
     // Aplicar la sombra directamente al rect de fondo del mapa (segundo nivel)
     const fondoMapaGroup = svgRoot.querySelector("g[id='Mapa - Fondo (Imagen)']");
     if (fondoMapaGroup) {
@@ -608,9 +641,20 @@ function MapaInteractivo({
       el.style.strokeWidth = strokeWidth;
       el.setAttribute("stroke-width", strokeWidth);
 
-      el.setAttribute("filter", filter);
+      // Si este lote está seleccionado y el panel está abierto, usar glow más fuerte
+      const isSelected = selectedMapId === id;
+      const finalFilter = isSelected ? "url(#lot-selected-glow)" : filter;
+      
+      el.setAttribute("filter", finalFilter);
       // Guardar el filtro base para restaurarlo después del hover
-      const baseFilter = filter;
+      const baseFilter = finalFilter;
+      
+      // Si está seleccionado, aumentar el grosor del borde
+      if (isSelected) {
+        const currentStrokeWidth = parseFloat(strokeWidth) || 1.6;
+        el.style.strokeWidth = (currentStrokeWidth + 1).toString();
+        el.setAttribute("stroke-width", (currentStrokeWidth + 1).toString());
+      }
 
       // Agregar atributo data-active para controlar clicks
       el.setAttribute("data-active", isActive ? "true" : "false");
@@ -762,8 +806,14 @@ function MapaInteractivo({
         gsap.killTweensOf(el);
         el.style.willChange = "transform, filter";
         
-        // Aplicar filtro de glow celeste uniforme
-        el.setAttribute("filter", "url(#lot-stroke-glow)");
+        // Si está seleccionado, mantener el filtro de selección pero con hover adicional
+        if (isSelected) {
+          // Usar un filtro combinado o mantener el selected glow más intenso
+          el.setAttribute("filter", "url(#lot-selected-glow)");
+        } else {
+          // Aplicar filtro de glow celeste uniforme
+          el.setAttribute("filter", "url(#lot-stroke-glow)");
+        }
         
         // Animar con GSAP - más fluido con mejor ease y duración
         gsap.to(el, {
@@ -785,7 +835,7 @@ function MapaInteractivo({
           ease: "power2.out",
           force3D: true,
           onComplete: () => {
-            // Restaurar el filtro base
+            // Restaurar el filtro base (puede ser el selected o el normal)
             el.setAttribute("filter", baseFilter);
             el.style.willChange = "auto";
           },
@@ -896,7 +946,7 @@ function MapaInteractivo({
         zona._hoverLeaveHandler = zonaHoverLeave;
       });
     }
-  }, [svgInjected, variantByMapId, activeMapIds, labelByMapId]);
+  }, [svgInjected, variantByMapId, activeMapIds, labelByMapId, selectedMapId]);
 
   // Click en el SVG: busco el shape base cuyo id empieza con "Lote"
   const handleSvgClick = (event) => {

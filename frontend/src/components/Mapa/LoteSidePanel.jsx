@@ -62,6 +62,7 @@ export default function LoteSidePanel({
   selectedLotId,
   onViewDetail,
   lots = [],
+  onLoteUpdated,
 }) {
   // TODOS LOS HOOKS DEBEN IR AQUÍ, ANTES DE CUALQUIER RETURN CONDICIONAL
   const navigate = useNavigate();
@@ -387,6 +388,10 @@ export default function LoteSidePanel({
   const handleEditSaved = (updatedLot) => {
     if (updatedLot) {
       setCurrentLot(updatedLot);
+      // Notificar al Layout para que actualice el estado
+      if (typeof onLoteUpdated === "function") {
+        onLoteUpdated(updatedLot);
+      }
     }
     setShowEditCard(false);
     // Mostrar animación de éxito
@@ -417,6 +422,21 @@ export default function LoteSidePanel({
 
   return (
     <>
+      {/* Backdrop personalizado que oscurece el fondo pero no cierra el panel */}
+      {show && (
+        <div
+          className="lote-side-panel-backdrop"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            zIndex: 1040,
+            pointerEvents: "none", // No intercepta clicks, solo oscurece
+            animation: "fadeIn 0.3s ease-in",
+          }}
+        />
+      )}
+
       {/* Animación de éxito al editar */}
       {showSuccessEdit && (
         <div
@@ -572,6 +592,14 @@ export default function LoteSidePanel({
           }
           100% {
             transform: scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
             opacity: 1;
           }
         }

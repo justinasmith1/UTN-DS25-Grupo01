@@ -1,25 +1,7 @@
 // src/components/Mapa/LoteLegend.jsx
 import React from "react";
 import { LOTE_STATUS_CONFIG } from "../../config/lotesStatusConfig";
-import { getEstadoVariant } from "../Table/TablaLotes/cells/StatusBadge";
-
-// Función para obtener el color basado en el variant (igual que en MapaInteractivo.jsx - colores del dashboard)
-const getColorForVariant = (variant, estadoKey = null) => {
-  // VENDIDO tiene un color amarillo brillante especial, diferente de EN PROMOCION
-  if (estadoKey && estadoKey === "VENDIDO") {
-    return "#FBBF24"; // Amarillo brillante (más claro que EN PROMOCION)
-  }
-  
-  const colors = {
-    success: "#18794E", // color del texto en .tl-badge--success
-    warn: "#9A5C00",    // color del texto en .tl-badge--warn (EN PROMOCION)
-    info: "#2952CC",    // color del texto en .tl-badge--info
-    indigo: "#5B6BFF",  // color del texto en .tl-badge--indigo
-    danger: "#C23B3B",  // color del texto en .tl-badge--danger
-    muted: "#475467",   // color del texto en .tl-badge--muted
-  };
-  return colors[variant] || colors.muted;
-};
+import { getEstadoVariant, getColorForVariant } from "../../utils/mapaUtils";
 
 function LoteLegend({ className = "" }) {
   // Orden de estados para mostrar en la leyenda
