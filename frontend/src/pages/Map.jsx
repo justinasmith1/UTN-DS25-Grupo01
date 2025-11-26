@@ -1,6 +1,6 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Container } from "react-bootstrap";
-import { useOutletContext } from "react-router-dom";
+import { useOutletContext, useSearchParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
@@ -27,11 +27,56 @@ export default function Map() {
     .trim()
     .toUpperCase();
 
+  // Leer parámetros de URL para mapId/mapIds/selectedMapIds
+  const [searchParams, setSearchParams] = useSearchParams();
+  const mapIdParam = searchParams.get("mapId");
+  const mapIdsParam = searchParams.get("mapIds");
+  const selectedMapIdsParam = searchParams.get("selectedMapIds");
+  const navigate = useNavigate();
+
   // Estado local de filtros (misma idea que en el dashboard)
   const [params, setParams] = useState({});
   
+  // Estado para lotes resaltados desde la preview (se puede limpiar)
+  // Inicializar desde la URL si existe
+  const [highlightedFromPreview, setHighlightedFromPreview] = useState(() => {
+    if (selectedMapIdsParam) {
+      return selectedMapIdsParam.split(',').filter(Boolean);
+    }
+    return [];
+  });
+  
+  // Track si es la primera llamada (inicialización) para no limpiar el resaltado
+  const isInitialMount = useRef(true);
+  
   // Handler para convertir filtros BAR de formato anidado a plano
   const handleParamsChange = useCallback((patch) => {
+    // Solo limpiar el resaltado si NO es la inicialización y realmente hay un cambio de filtros
+    if (!isInitialMount.current && highlightedFromPreview.length > 0) {
+      // Verificar si realmente hay filtros activos (no solo valores por defecto)
+      const hasActiveFilters = patch && Object.keys(patch).length > 0 && 
+        Object.values(patch).some(val => {
+          if (Array.isArray(val)) return val.length > 0;
+          if (typeof val === 'object' && val !== null) {
+            return val.min !== null || val.max !== null;
+          }
+          return val !== '' && val !== null && val !== undefined;
+        });
+      
+      if (hasActiveFilters) {
+        setHighlightedFromPreview([]);
+        // Limpiar también el parámetro de la URL
+        const newParams = new URLSearchParams(searchParams);
+        newParams.delete('selectedMapIds');
+        setSearchParams(newParams, { replace: true });
+      }
+    }
+    
+    // Marcar que ya pasó la inicialización
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+    }
+    
     if (!patch || Object.keys(patch).length === 0) { 
       setParams({}); 
       return; 
@@ -83,7 +128,7 @@ export default function Map() {
       
       return { ...cleaned, ...convertedParams };
     });
-  }, []);
+  }, [highlightedFromPreview, searchParams, setSearchParams]);
 
   // Lotes filtrados usando la utilidad que ya tenés
   const filteredLots = useMemo(
@@ -124,17 +169,66 @@ export default function Map() {
   }, [allLots]);
 
   // Ids de lotes que pasan el filtro actual (solo estos se verán opacos y clickeables)
-  const activeMapIds = useMemo(
-    () => filteredLots.map((l) => l.mapId).filter(Boolean),
-    [filteredLots]
-  );
+  // NUNCA usar selectedMapIds para filtrar, solo para resaltar
+  const activeMapIds = useMemo(() => {
+    // Siempre usar los lotes filtrados, sin importar si hay selectedMapIds en URL
+    return filteredLots.map((l) => l.mapId).filter(Boolean);
+  }, [filteredLots]);
+
+  // Obtener mapIds desde parámetros de URL (mapId o mapIds o selectedMapIds)
+  // selectedMapIds es para resaltar desde la preview, NO para filtrar
+  const mapIdsFromUrl = useMemo(() => {
+    if (mapIdsParam) {
+      // Si viene mapIds como lista separada por comas
+      return mapIdsParam.split(',').filter(Boolean);
+    }
+    if (mapIdParam) {
+      // Si viene mapId como un solo valor
+      return [mapIdParam];
+    }
+    return [];
+  }, [mapIdParam, mapIdsParam]);
+
+  // Sincronizar highlightedFromPreview con el parámetro de URL al cargar o cuando cambia
+  useEffect(() => {
+    if (selectedMapIdsParam) {
+      const ids = selectedMapIdsParam.split(',').filter(Boolean);
+      setHighlightedFromPreview((prev) => {
+        // Solo actualizar si es diferente al estado actual para evitar loops
+        const currentIds = prev.join(',');
+        const newIds = ids.join(',');
+        if (currentIds !== newIds) {
+          return ids;
+        }
+        return prev;
+      });
+    }
+    // No limpiar automáticamente - solo se limpia manualmente o al cambiar filtros
+  }, [selectedMapIdsParam]);
 
   // Obtener el mapId del lote seleccionado (para destacarlo en el mapa)
+  // Prioriza highlightedFromPreview si viene de la preview, sino mapIdsFromUrl, sino selectedLotId del panel
   const selectedMapId = useMemo(() => {
+    if (highlightedFromPreview.length > 0) {
+      // Si hay highlightedFromPreview de la preview, usar el primero
+      return highlightedFromPreview[0];
+    }
+    if (mapIdsFromUrl.length > 0) {
+      // Si hay mapIds en URL, usar el primero como selectedMapId
+      return mapIdsFromUrl[0];
+    }
     if (!selectedLotId || !showPanel) return null;
     const lote = allLots.find((l) => l.id === selectedLotId);
     return lote?.mapId || null;
-  }, [selectedLotId, showPanel, allLots]);
+  }, [highlightedFromPreview, mapIdsFromUrl, selectedLotId, showPanel, allLots]);
+
+  // Función para limpiar manualmente el resaltado
+  const handleClearHighlight = useCallback(() => {
+    setHighlightedFromPreview([]);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.delete('selectedMapIds');
+    setSearchParams(newParams, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // Cuando clickeo un lote en el mapa, abro el side panel del lote correspondiente
   const handleLoteClick = (mapId) => {
@@ -165,6 +259,26 @@ export default function Map() {
             ) : (
               <span className="map-info-empty">No hay lotes que coincidan con este filtro</span>
             )}
+            {highlightedFromPreview.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearHighlight}
+                style={{
+                  marginLeft: '12px',
+                  padding: '4px 12px',
+                  fontSize: '0.875rem',
+                  backgroundColor: '#fee2e2',
+                  color: '#991b1b',
+                  border: '1px solid #fecaca',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 500
+                }}
+                title="Quitar resaltado de selección previa"
+              >
+                Quitar resaltado ({highlightedFromPreview.length})
+              </button>
+            )}
           </div>
         </div>
         <LoteLegend />
@@ -190,6 +304,7 @@ export default function Map() {
               labelByMapId={labelByMapId}
               estadoByMapId={estadoByMapId}
               selectedMapId={selectedMapId}
+              selectedMapIds={highlightedFromPreview.length > 0 ? highlightedFromPreview : mapIdsFromUrl}
             />
           </div>
         </div>

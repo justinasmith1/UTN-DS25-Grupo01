@@ -15,6 +15,7 @@ import {
 } from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
+import { getAllLotes } from "../lib/api/lotes";
 
 import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
@@ -110,6 +111,7 @@ export default function VentasPage() {
   // Datos
   const [ventas, setVentas] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
+  const [lotes, setLotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -139,15 +141,17 @@ export default function VentasPage() {
           selectedInmobiliariaRequest != null
             ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
             : getAllVentas({});
-        const [ventasResp, personasResp, inmosResp] = await Promise.all([
+        const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
           ventasRequest,
           getAllPersonas({}),
           getAllInmobiliarias({}),
+          getAllLotes({}),
         ]);
 
         const ventasApi = pickArray(ventasResp, ["ventas"]);
         const personasApi = pickArray(personasResp, ["personas"]);
         const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+        const lotesApi = pickArray(lotesResp, ["lotes"]);
 
         const personasById = {};
         for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
@@ -160,6 +164,7 @@ export default function VentasPage() {
         if (alive) {
           setVentas(enriched);
           setInmobiliarias(inmosApi); // Guardar inmobiliarias para pasarlas al componente
+          setLotes(lotesApi); // Guardar lotes para obtener mapIds
         }
       } catch (err) {
         console.error("Error cargando ventas/personas/inmobiliarias:", err);
@@ -418,6 +423,7 @@ export default function VentasPage() {
         rows={ventasFiltradas}
         isLoading={isLoading}
         data={ventas}
+        lotes={lotes}
         onVer={canSaleView ? onVer : null}
         onEditar={onEditarAlways}
         onEliminar={canSaleDelete ? onEliminar : null}

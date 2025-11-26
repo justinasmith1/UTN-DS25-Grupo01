@@ -10,6 +10,7 @@ import FilterBarReservas from "../components/FilterBar/FilterBarReservas";
 import TablaReservas from "../components/Table/TablaReservas/TablaReservas";
 import { getAllReservas, getReservaById, updateReserva, deleteReserva } from "../lib/api/reservas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
+import { getAllLotes } from "../lib/api/lotes";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
 
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -29,6 +30,7 @@ export default function Reservas() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
+  const [lotes, setLotes] = useState([]);
 
   // Permisos
   const canReservaView = can(user, PERMISSIONS.RES_VIEW);
@@ -58,9 +60,10 @@ export default function Reservas() {
     (async () => {
       try {
         setLoading(true);
-        const [reservasResp, inmosResp] = await Promise.all([
+        const [reservasResp, inmosResp, lotesResp] = await Promise.all([
           getAllReservas({}),
           getAllInmobiliarias({}),
+          getAllLotes({}),
         ]);
         
         if (alive) {
@@ -76,6 +79,10 @@ export default function Reservas() {
           // getAllInmobiliarias devuelve { data: [...], meta: {...} }
           const inmosData = inmosResp?.data ?? (Array.isArray(inmosResp) ? inmosResp : []);
           setInmobiliarias(Array.isArray(inmosData) ? inmosData : []);
+          
+          // Guardar lotes para obtener mapIds
+          const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+          setLotes(Array.isArray(lotesData) ? lotesData : []);
         }
       } catch (err) {
         if (alive) {
@@ -277,6 +284,7 @@ export default function Reservas() {
         userRole={user?.role}
         reservas={reservas}
         data={reservas}
+        lotes={lotes}
         onVer={canReservaView ? onVer : null}
         onEditar={canReservaEdit ? onEditar : null}
         onEliminar={canReservaDelete ? onEliminar : null}
