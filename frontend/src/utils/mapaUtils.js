@@ -111,3 +111,14 @@ export const getLoteDisplayId = (entity) => {
   return null;
 };
 
+/**
+ * Quita el prefijo "Lote" del mapId si está presente.
+ * Ejemplo: "Lote16-3" -> "16-3", "16-3" -> "16-3"
+ */
+export const removeLotePrefix = (mapId) => {
+  if (!mapId) return mapId;
+  const str = String(mapId).trim();
+  // Quita "Lote" al inicio (case insensitive)
+  return str.replace(/^lote\s*/i, "");
+};
+

@@ -1,4 +1,5 @@
 import EliminarBase from "../Base/EliminarBase.jsx";
+import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 
 export default function LoteEliminarDialog({
   open,
@@ -14,10 +15,11 @@ export default function LoteEliminarDialog({
       ? `${lote.propietario.nombre} ${lote.propietario.apellido ?? ""}`.trim()
       : null;
 
-  const title = `Eliminar Lote N° ${lote?.mapId ?? lote?.id ?? "—"}`;
+  const mapIdClean = removeLotePrefix(lote?.mapId ?? lote?.id ?? "—");
+  const title = `Eliminar Lote N° ${mapIdClean}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar el lote #${lote?.mapId ?? lote?.id ?? "—"}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas eliminar el lote #${mapIdClean}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [

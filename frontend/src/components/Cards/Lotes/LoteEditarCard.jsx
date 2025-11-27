@@ -6,6 +6,7 @@ import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
 import { uploadArchivo, getArchivosByLote, deleteArchivo } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
+import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -627,7 +628,7 @@ export default function LoteEditarCard({
 
       <EditarBase
         open={open}
-        title={`Editar Lote Nº ${form.mapId || detalle?.mapId || ""}`}
+        title={`Editar Lote Nº ${removeLotePrefix(form.mapId || detalle?.mapId || "")}`}
         onCancel={() => { if (showSuccess) return; setSaving(false); setShowSuccess(false); onCancel?.(); }}
         saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
+import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
@@ -199,14 +200,15 @@ export default function LoteVerCard({
   }, [lot]);
 
   const ubicacion = useMemo(() => {
-    if (isBlank(lot?.location)) return safe(
-      lot?.ubicacion
-        ? `Calle ${lot.ubicacion?.calle ?? lot.ubicacion?.nombre ?? "-"} ${
-            lot.ubicacion?.numero != null ? `Nº ${lot.ubicacion.numero}` : ""
-          }`.trim()
-        : null
-    );
-    return safe(lot.location);
+    const ubicacionCalle = lot?.ubicacion?.calle ?? lot?.ubicacion?.nombre ?? "";
+    const ubicacionNumero = lot?.ubicacion?.numero ?? null;
+    
+    if (ubicacionCalle) {
+      const callePart = `Calle ${ubicacionCalle}`;
+      const numeroPart = ubicacionNumero != null ? `Nº ${ubicacionNumero}` : "";
+      return safe(`${callePart} ${numeroPart}`.trim());
+    }
+    return "—";
   }, [lot]);
 
   const fraccion = safe(
@@ -338,7 +340,7 @@ export default function LoteVerCard({
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Lote Nº ${safe(lot?.mapId ?? lot?.id)}`}</h2>
+          <h2 className="cclf-card__title">{`Lote Nº ${safe(removeLotePrefix(lot?.mapId ?? lot?.id))}`}</h2>
 
           <div className="cclf-card__actions lote-header-actions">
             <button

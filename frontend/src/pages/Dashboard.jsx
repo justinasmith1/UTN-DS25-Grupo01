@@ -11,6 +11,7 @@ import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
 import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
 import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
+import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 import { getAllReservas, getReservaById } from "../lib/api/reservas";
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -42,12 +43,17 @@ export default function Dashboard() {
   const [openReservaCrear, setOpenReservaCrear] = useState(false);
   const [openReservaVer, setOpenReservaVer] = useState(false);
   const [reservaSel, setReservaSel] = useState(null);
+  const [openVentaCrear, setOpenVentaCrear] = useState(false);
+  const [loteParaVenta, setLoteParaVenta] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
 
   // Callbacks normalizados
-  const goRegistrarVenta = (lot) =>
-    navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
+  const goRegistrarVenta = useCallback((lot) => {
+    if (!lot) return;
+    setLoteParaVenta(lot);
+    setOpenVentaCrear(true);
+  }, []);
 
   const handleReservarLote = useCallback(async (lot) => {
     if (!lot) return;
@@ -433,6 +439,23 @@ export default function Dashboard() {
           // Opcional: mostrar mensaje de éxito o actualizar lista
         }}
         loteIdPreSeleccionado={loteSel?.id}
+      />
+
+      <VentaCrearCard
+        open={openVentaCrear}
+        onCancel={() => {
+          setOpenVentaCrear(false);
+          setLoteParaVenta(null);
+        }}
+        onCreated={(newVenta) => {
+          setOpenVentaCrear(false);
+          // Actualizar el estado del lote a VENDIDO
+          if (loteParaVenta?.id) {
+            mergeUpdatedLote({ ...loteParaVenta, estado: "VENDIDO", status: "VENDIDO" });
+          }
+          setLoteParaVenta(null);
+        }}
+        loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
       />
 
       {/* Animación de éxito al eliminar */}

@@ -14,10 +14,9 @@ export default function FilterBarLotes({
   onParamsChange,
 }) {
   const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
-
   // Catálogos desde preset, filtrados por RBAC
   const ALL_ESTADOS = useMemo(
-    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"],
+    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO", "EN_PROMOCION"],
     [preset]
   );
   const ESTADOS = useMemo(
