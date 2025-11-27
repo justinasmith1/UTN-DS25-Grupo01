@@ -39,7 +39,7 @@ export async function getAllReservas(): Promise<{ reservas: any[]; total: number
             select: { id: true, nombre: true }, // nombre visible
           },
           lote: {
-            select: { id: true, precio: true }, // id y precio
+            select: { id: true, precio: true, mapId: true }, // id y precio
           },
         },
   });
@@ -60,7 +60,7 @@ export async function getReservaById(id: number): Promise<any> {
         select: { id: true, nombre: true },
       },
       lote: {
-        select: { id: true, precio: true },
+        select: { id: true, precio: true, mapId: true },
       },
     },
   });

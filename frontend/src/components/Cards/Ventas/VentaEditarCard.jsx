@@ -502,7 +502,7 @@ export default function VentaEditarCard({
           <div className="venta-col">
             <div className="field-row">
               <div className="field-label">LOTE N°</div>
-              <div className="field-value is-readonly">{detalle?.loteId ?? NA}</div>
+              <div className="field-value is-readonly">{detalle?.lote?.mapId ?? detalle?.lotMapId ?? detalle?.loteId ?? NA}</div>
             </div>
 
             <div className="field-row">

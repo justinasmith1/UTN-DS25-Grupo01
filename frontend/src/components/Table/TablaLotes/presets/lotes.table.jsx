@@ -1,5 +1,6 @@
 // src/components/TablaLotes/presets/lotes.table.jsx
 import React from 'react';
+import { getLoteDisplayId } from '../../../../utils/mapaUtils';
 // Reutiliza helpers y lo que hace es construir la configuración de la tabla para cada rol.
 
 export const lotesTablePreset = {
@@ -44,7 +45,12 @@ export const lotesTablePreset = {
     const getNumero            = getters.getNumero;
 
     return [
-      { id: 'id',          titulo: 'ID',          accessor: (l) => l.id ?? l.idLote ?? l.codigo ?? '—', align: 'center' },
+      {
+        id: 'id',
+        titulo: 'ID',
+        accessor: (l) => getLoteDisplayId(l) ?? '—',
+        align: 'center'
+      },
       { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado),               align: 'center' },
       { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),             align: 'center' },
       { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                         align: 'center' },

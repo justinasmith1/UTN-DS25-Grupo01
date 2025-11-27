@@ -224,7 +224,7 @@ export default function LoteVerCard({
     };
 
     const leftPairs = [
-      ["ID", safe(lot?.id)],
+      ["ID", safe(lot?.mapId ?? lot?.id)],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
       ["NUMERO FRACCION", fraccion],
       ["TIPO", titleCase(lot?.tipo)],
@@ -338,7 +338,7 @@ export default function LoteVerCard({
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Lote Nº ${safe(lot?.id)}`}</h2>
+          <h2 className="cclf-card__title">{`Lote Nº ${safe(lot?.mapId ?? lot?.id)}`}</h2>
 
           <div className="cclf-card__actions lote-header-actions">
             <button

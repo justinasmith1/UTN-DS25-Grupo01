@@ -173,7 +173,24 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        setReservaSel((prev) => ({ ...(prev || reserva), ...(detail || {}) }));
+        // Preservar mapId del lote si viene del backend o de la reserva original
+        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+        const enrichedDetail = mapId && detail?.lote
+          ? {
+              ...detail,
+              lotMapId: mapId,
+              lote: {
+                ...detail.lote,
+                mapId: mapId,
+              },
+            }
+          : mapId
+          ? {
+              ...detail,
+              lotMapId: mapId,
+            }
+          : detail;
+        setReservaSel((prev) => ({ ...(prev || reserva), ...(enrichedDetail || {}) }));
       } catch (e) {
         console.error("Error obteniendo reserva por id:", e);
       }
@@ -191,7 +208,24 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+        // Preservar mapId del lote si viene del backend o de la reserva original
+        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+        const enrichedDetail = mapId && detail?.lote
+          ? {
+              ...detail,
+              lotMapId: mapId,
+              lote: {
+                ...detail.lote,
+                mapId: mapId,
+              },
+            }
+          : mapId
+          ? {
+              ...detail,
+              lotMapId: mapId,
+            }
+          : detail;
+        setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
       } catch (e) {
         console.error("Error obteniendo reserva por id para editar:", e);
       }
@@ -347,7 +381,24 @@ export default function Reservas() {
             try {
               const resp = await getReservaById(reserva.id);
               const detail = resp?.data ?? resp ?? {};
-              setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+              // Preservar mapId del lote si viene del backend o de la reserva original
+              const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+              const enrichedDetail = mapId && detail?.lote
+                ? {
+                    ...detail,
+                    lotMapId: mapId,
+                    lote: {
+                      ...detail.lote,
+                      mapId: mapId,
+                    },
+                  }
+                : mapId
+                ? {
+                    ...detail,
+                    lotMapId: mapId,
+                  }
+                : detail;
+              setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
             } catch (e) {
               console.error("Error obteniendo reserva por id para editar:", e);
             }

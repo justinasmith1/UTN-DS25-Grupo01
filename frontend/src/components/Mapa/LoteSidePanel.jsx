@@ -844,7 +844,7 @@ export default function LoteSidePanel({
                 "Cargando..."
               ) : currentLot ? (
                 <>
-                  Lote N° {safe(currentLot?.numero)}
+                  Lote N° {safe(currentLot?.mapId ?? currentLot?.numero ?? currentLot?.id)}
                   {fraccionNumero != null && ` - Fracción ${fraccionNumero}`}
                 </>
               ) : (

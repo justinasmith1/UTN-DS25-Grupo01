@@ -28,7 +28,7 @@ export const reservasTablePreset = {
     {
       id: 'loteInfo',
       titulo: 'Lote',
-      accessor: (r) => r?.lote?.id ?? r?.loteId ?? '—',
+      accessor: (r) => r?.lote?.mapId ?? r?.lotMapId ?? r?.loteInfo?.mapId ?? r?.loteId ?? '—',
       width: '120px'
     },
 
@@ -94,7 +94,14 @@ export const reservasTablePreset = {
   // Para ordenar/filtrar con consistencia
   accessors: {
     id: (r) => r.id,
-    loteInfo: (r) => String(r?.lote?.id ?? r?.loteId ?? ''),
+    loteInfo: (r) =>
+      String(
+        r?.lote?.mapId ??
+          r?.lotMapId ??
+          r?.loteInfo?.mapId ??
+          r?.loteId ??
+          ''
+      ),
     clienteCompleto: (r) => String(getClienteNombre(r) ?? ''),
     fechaReserva: (r) => (getFechaReserva(r) ? new Date(getFechaReserva(r)).getTime() : 0),
     seña: (r) => Number(r?.senia ?? r?.sena ?? r?.seña ?? 0),

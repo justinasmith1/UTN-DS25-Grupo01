@@ -132,6 +132,7 @@ const buildInitialForm = (lot) => {
   if (!lot) {
     return {
       id: "",
+      mapId: "",
       tipo: "",
       estado: "",
       subestado: "",
@@ -190,6 +191,7 @@ const buildInitialForm = (lot) => {
 
   return {
     id: lot.id ?? "",
+    mapId: lot.mapId ?? lot.codigo ?? "",
     tipo: toFriendly(lot?.tipo),
     estado: toFriendly(lot?.estado ?? lot?.status),
     subestado: toFriendly(lot?.subestado ?? lot?.subStatus),
@@ -530,6 +532,7 @@ export default function LoteEditarCard({
       const enriched = {
         ...(detalle || {}),
         ...(updated || {}),
+        mapId: updated?.mapId ?? detalle?.mapId ?? form.mapId ?? null,
         images: [...(form.images || [])],
         descripcion: form.descripcion,
         alquiler: payload.alquiler,
@@ -624,7 +627,7 @@ export default function LoteEditarCard({
 
       <EditarBase
         open={open}
-        title={`Editar Lote Nº ${form.id || ""}`}
+        title={`Editar Lote Nº ${form.mapId || detalle?.mapId || ""}`}
         onCancel={() => { if (showSuccess) return; setSaving(false); setShowSuccess(false); onCancel?.(); }}
         saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}
@@ -643,7 +646,7 @@ export default function LoteEditarCard({
         {detalle && (
           <div className="lote-grid" style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}>
             <div className="lote-data-col">
-              <div className="field-row"><div className="field-label">ID</div><div className="field-value is-readonly">{form.id || "—"}</div></div>
+              <div className="field-row"><div className="field-label">ID</div><div className="field-value is-readonly">{form.mapId || detalle?.mapId || "—"}</div></div>
               <div className="field-row"><div className="field-label">Número Partida</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.numPartido ?? ""} onChange={(e) => updateForm({ numPartido: e.target.value })} placeholder="Número de partida" /></div></div>
               <div className="field-row"><div className="field-label">Tipo</div><div className="field-value p0"><NiceSelect value={form.tipo} options={TIPOS} placeholder="" onChange={(value) => updateForm({ tipo: value, nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "", capacidad: value === "Espacio Comun" ? form.capacidad : "" })} /></div></div>
 

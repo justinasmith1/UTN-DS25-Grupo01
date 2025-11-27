@@ -85,7 +85,7 @@ export default function SidePanel({
       >
         <Offcanvas.Header closeButton className="brand-pale-green">
           <Offcanvas.Title className="text-brand-dark-green fw-bold">
-            Lote #{currentLot.id}
+            Lote #{currentLot.mapId ?? currentLot.id}
           </Offcanvas.Title>
         </Offcanvas.Header>
 
@@ -103,7 +103,7 @@ export default function SidePanel({
                     <img
                       className="d-block w-100"
                       src={image || "/placeholder.svg"}
-                      alt={`Imagen ${index + 1} de Lote ${currentLot.id}`}
+                      alt={`Imagen ${index + 1} de Lote ${currentLot.mapId ?? currentLot.id}`}
                       style={{ height: "200px", objectFit: "cover" }}
                     />
                   </Carousel.Item>
@@ -115,7 +115,7 @@ export default function SidePanel({
                   <img
                     className="d-block w-100"
                     src={images[0] || "/placeholder.svg"}
-                    alt={`Lote ${currentLot.id}`}
+                    alt={`Lote ${currentLot.mapId ?? currentLot.id}`}
                     style={{ height: "200px", objectFit: "cover" }}
                   />
                 </Card.Body>

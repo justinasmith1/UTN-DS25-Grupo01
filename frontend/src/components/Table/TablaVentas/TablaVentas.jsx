@@ -72,6 +72,14 @@ export default function TablaVentas({
     }
   }, [userKey, role]);
 
+  const lotesById = useMemo(() => {
+    const map = {};
+    lotes.forEach((l) => {
+      if (l?.id != null) map[String(l.id)] = l;
+    });
+    return map;
+  }, [lotes]);
+
   // Helpers inyectados al preset (celdas/formatters/getters)
   const helpers = useMemo(
     () => ({
@@ -98,9 +106,18 @@ export default function TablaVentas({
             v?.inmobiliaria?.nombre || v?.inmobiliaria?.razonSocial;
           return (embedded && String(embedded).trim()) || '—';
         },
+        getLoteMapId: (v) => {
+          if (v?.lote?.mapId) return v.lote.mapId;
+          if (v?.lotMapId) return v.lotMapId;
+          const lookupId = v?.loteId ?? v?.lotId ?? null;
+          if (lookupId != null && lotesById[String(lookupId)]) {
+            return lotesById[String(lookupId)].mapId ?? null;
+          }
+          return null;
+        },
       },
     }),
-    []
+    [lotesById]
   );
 
   // Columnas desde preset
@@ -232,15 +249,6 @@ export default function TablaVentas({
   // ===== preview del mapa  =====
   const [selectedMapIdsForPreview, setSelectedMapIdsForPreview] = useState([]);
   const navigate = useNavigate();
-
-  // Índice de lotes por id para búsqueda rápida
-  const lotesById = useMemo(() => {
-    const map = {};
-    lotes.forEach((l) => {
-      if (l?.id != null) map[String(l.id)] = l;
-    });
-    return map;
-  }, [lotes]);
 
   // Obtener mapIds de las ventas seleccionadas
   const handleVerEnMapa = () => {

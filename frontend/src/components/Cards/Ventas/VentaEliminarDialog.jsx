@@ -22,7 +22,7 @@ export default function VentaEliminarDialog({
 
   // Detalles listados con bullets
   const details = [
-    `Lote: ${venta?.loteId ?? "—"}`,
+    `Lote: ${venta?.lote?.mapId ?? venta?.lotMapId ?? venta?.loteId ?? "—"}`,
     comprador ? `Comprador: ${comprador}` : null,
   ].filter(Boolean);
 

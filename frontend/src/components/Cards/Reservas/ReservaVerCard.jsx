@@ -72,8 +72,16 @@ export default function ReservaVerCard({
     return NA;
   })();
 
-  // Lote: mostrar ID o información del lote
+  // Lote: mostrar mapId o información del lote
   const loteInfo = (() => {
+    const mapId = res?.lote?.mapId ?? res?.lotMapId ?? null;
+    if (mapId) {
+      // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
+      if (String(mapId).toLowerCase().startsWith('lote')) {
+        return mapId;
+      }
+      return `Lote N° ${mapId}`;
+    }
     if (res?.lote?.id) {
       const num = res?.lote?.numero || res?.lote?.id;
       return `Lote N° ${num}`;

@@ -118,7 +118,7 @@ export default function VentaVerCard({
 
   // Orden solicitado: comprador/propietario a la izquierda; fechas/plazo a la derecha
   const leftPairs = [
-    ["LOTE N°", safe(sale?.loteId)],
+    ["LOTE N°", safe(sale?.lote?.mapId ?? sale?.lotMapId ?? sale?.loteId)],
     ["MONTO", fmtMoney(sale?.monto)],
     ["ESTADO DE VENTA", titleCaseEstado(sale?.estado)],
     ["INMOBILIARIA", safe(sale?.inmobiliaria?.nombre)],
