@@ -69,20 +69,56 @@ export default function Reservas() {
         if (alive) {
           if (reservasResp.success) {
             const reservasData = reservasResp.data?.reservas ?? reservasResp.data ?? [];
-            setAllReservas(Array.isArray(reservasData) ? reservasData : []);
+            const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+            const lotesById = {};
+            lotesData.forEach((lote) => {
+              if (lote && lote.id != null) {
+                lotesById[String(lote.id)] = lote;
+              }
+            });
+            const reservasWithMapId = (Array.isArray(reservasData) ? reservasData : []).map((reserva) => {
+              const lookupId = reserva?.loteId ?? reserva?.lotId ?? reserva?.lote?.id ?? null;
+              const loteRef =
+                reserva?.lote?.mapId
+                  ? reserva.lote
+                  : lookupId != null
+                  ? lotesById[String(lookupId)] || null
+                  : null;
+              const displayMapId =
+                loteRef?.mapId ??
+                reserva?.lotMapId ??
+                (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ??
+                null;
+
+              return {
+                ...reserva,
+                lotMapId: displayMapId ?? reserva?.lotMapId ?? null,
+                lote: loteRef
+                  ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+                  : reserva.lote ?? null,
+                loteInfo: reserva.loteInfo
+                  ? {
+                      ...reserva.loteInfo,
+                      mapId: reserva.loteInfo.mapId ?? displayMapId ?? null,
+                    }
+                  : displayMapId
+                  ? { mapId: displayMapId }
+                  : reserva.loteInfo ?? null,
+              };
+            });
+            setAllReservas(reservasWithMapId);
+            setLotes(Array.isArray(lotesData) ? lotesData : []);
           } else {
             error(reservasResp.message || 'Error al cargar reservas');
             setAllReservas([]);
+            const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+            setLotes(Array.isArray(lotesData) ? lotesData : []);
           }
           
           // Guardar inmobiliarias para pasarlas a los componentes
           // getAllInmobiliarias devuelve { data: [...], meta: {...} }
           const inmosData = inmosResp?.data ?? (Array.isArray(inmosResp) ? inmosResp : []);
           setInmobiliarias(Array.isArray(inmosData) ? inmosData : []);
-          
-          // Guardar lotes para obtener mapIds
-          const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
-          setLotes(Array.isArray(lotesData) ? lotesData : []);
         }
       } catch (err) {
         if (alive) {
@@ -349,7 +385,7 @@ export default function Reservas() {
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
       />
 
       {/* Modal de visualización de documento */}
@@ -362,7 +398,7 @@ export default function Reservas() {
         }}
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
         documentoUrl={null}
         onModificar={(url) => {
           console.log("Modificar documento:", url);

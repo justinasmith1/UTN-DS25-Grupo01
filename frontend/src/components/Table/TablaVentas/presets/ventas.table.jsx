@@ -33,8 +33,11 @@ export const ventasTablePreset = {
   },
 
   // makeColumns recibe helpers con { cells, fmt }, pero aquí evitamos depender de getters
-  makeColumns({ cells = {}, fmt = {} } = {}) {
+  makeColumns({ cells = {}, fmt = {}, getters = {} } = {}) {
     const money = fmt.fmtMoney || fmtMoney;
+    const getLoteMapId =
+      getters?.getLoteMapId ||
+      ((v) => v?.lote?.mapId ?? v?.lotMapId ?? v?.lote?.id ?? v?.loteId ?? '—');
 
     return [
       {
@@ -46,7 +49,7 @@ export const ventasTablePreset = {
       {
         id: 'loteId',
         titulo: 'ID Lote',
-        accessor: (v) => v.lotId ?? v.loteId ?? '—',
+        accessor: (v) => getLoteMapId(v) ?? '—',
         align: 'center',
       },
       {

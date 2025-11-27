@@ -11,11 +11,34 @@ const FALLBACK = "/lotes";
 const ok = (data) => ({ data });
 
 const numOrNull = (v) => (v === "" || v == null ? null : Number(v));
-const strOrNull = (v) => (v == null ? null : String(v));
+const strOrNull = (v) => {
+  if (v == null) return null;
+  const str = String(v).trim();
+  return str.length ? str : null;
+};
+
+const parseId = (raw) => {
+  if (raw === null || raw === undefined || raw === "") return null;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : String(raw).trim();
+};
+
+const deriveMapId = (row = {}) => {
+  const candidate =
+    row.mapId ??
+    row.codigo ??
+    row.code ??
+    row.identificador ??
+    (row.manzana != null || row.numero != null
+      ? `L${row.manzana ?? "?"}-${row.numero ?? "?"}`
+      : null);
+  return strOrNull(candidate);
+};
 
 // --------------------------- MAPEO BACK -> UI ---------------------------
 function fromApi(x = {}) {
-  const id = strOrNull(x.id ?? x.loteId ?? x.Id) ?? `${x.manzana ?? "?"}-${x.numero ?? "?"}`;
+  const id = parseId(x.id ?? x.loteId ?? x.Id);
+  const mapId = deriveMapId(x);
   const status = x.status ?? x.estado ?? null;
   const subStatus = x.subStatus ?? x.subestado ?? x.subEstado ?? x.estadoPlano ?? null;
   const owner =
@@ -30,7 +53,9 @@ function fromApi(x = {}) {
       : null);
 
   return {
+    ...x,
     id,
+    mapId: mapId ?? x.mapId ?? null,
     status,            // ⇐ ojo: mantenemos status/ subStatus además de los campos originales
     subStatus,
     estado: x.estado ?? null,
@@ -44,7 +69,6 @@ function fromApi(x = {}) {
     fondo: numOrNull(x.fondo),
     deuda: x.deuda ?? null,
     descripcion: x.descripcion ?? null,
-    ...x, // preservo otros campos por compatibilidad
   };
 }
 

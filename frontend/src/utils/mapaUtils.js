@@ -66,3 +66,48 @@ export const getBorderColorForVariant = (variant, estadoKey = null) => {
 // Re-exportar getEstadoVariant desde StatusBadge para mantener compatibilidad
 export { getEstadoVariant };
 
+const deriveFromCoordinates = (entity = {}) => {
+  const hasCoords = entity?.manzana != null || entity?.numero != null;
+  if (!hasCoords) return null;
+  const manzana = entity.manzana ?? "?";
+  const numero = entity.numero ?? "?";
+  return `L${manzana}-${numero}`;
+};
+
+/**
+ * Obtiene el identificador visible del lote (mapId/código) evitando usar el id interno.
+ * Acepta objetos de lote, ventas, reservas u otras entidades que contengan la info anidada.
+ */
+export const getLoteDisplayId = (entity) => {
+  if (!entity) return null;
+
+  const direct =
+    entity.mapId ??
+    entity.codigo ??
+    entity.identificador ??
+    entity.lotMapId ??
+    null;
+
+  if (direct) return direct;
+
+  if (entity.lote && entity.lote !== entity) {
+    const nested = getLoteDisplayId(entity.lote);
+    if (nested) return nested;
+  }
+
+  if (entity.loteInfo) {
+    const infoId = getLoteDisplayId(entity.loteInfo);
+    if (infoId) return infoId;
+  }
+
+  const derivedFromEntity = deriveFromCoordinates(entity);
+  if (derivedFromEntity) return derivedFromEntity;
+
+  if (entity.ubicacion) {
+    const derivedFromUbicacion = deriveFromCoordinates(entity.ubicacion);
+    if (derivedFromUbicacion) return derivedFromUbicacion;
+  }
+
+  return null;
+};
+

@@ -1,4 +1,6 @@
 // src/utils/applyLoteFilters.js
+import { getLoteDisplayId } from "./mapaUtils";
+
 export function applyLoteFilters(allLots = [], p = {}) {
   const norm = (s) => (s ?? "").toString().trim().toUpperCase().replace(/\s+/g, "_");
   const getCalle = (l) => l?.ubicacion?.calle || l?.ubicacion?.nombreCalle || l?.location || l?.calle || "";
@@ -20,10 +22,11 @@ export function applyLoteFilters(allLots = [], p = {}) {
   const q = (p.q || "").toString().trim().toLowerCase();
   if (q) {
     rows = rows.filter((l) => {
-      const idStr = String(l?.id ?? "");
+      const mapIdStr = (getLoteDisplayId(l) || "").toString().toLowerCase();
+      const idStr = String(l?.id ?? "").toLowerCase();
       const owner = (l?.owner || l?.propietario || "").toString().toLowerCase();
       const calle = getCalle(l).toString().toLowerCase();
-      return idStr.includes(q) || owner.includes(q) || calle.includes(q);
+      return mapIdStr.includes(q) || idStr.includes(q) || owner.includes(q) || calle.includes(q);
     });
   }
 

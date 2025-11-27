@@ -5,38 +5,66 @@ const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http, httpJson, normalizeApiListResponse } from "../http/http";
 
 // ===== NORMALIZADORES =====
-const fromApi = (row = {}) => ({
-  id: row.id ?? row.idReserva ?? row.reservaId ?? row.Id,
-  loteId: row.loteId ?? row.lote?.id ?? row.lote?.idLote ?? row.loteId,
-  clienteId: row.clienteId ?? row.cliente?.id ?? row.cliente?.idPersona ?? row.clienteId,
-  clienteNombre: row.cliente?.nombre ?? row.clienteNombre ?? '',
-  clienteApellido: row.cliente?.apellido ?? row.clienteApellido ?? '',
-  clienteCompleto: row.cliente?.nombreCompleto || 
-    `${row.cliente?.nombre || ''} ${row.cliente?.apellido || ''}`.trim() || 
-    `${row.clienteNombre || ''} ${row.clienteApellido || ''}`.trim() || 
-    `Cliente ID: ${row.clienteId || 'N/A'}`,
-  fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
-  seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
-  estado: row.estado ?? null, // Preservar estado para el badge
-  inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
-  inmobiliariaNombre: row.inmobiliaria?.nombre ?? row.inmobiliariaNombre ?? 
-    `Inmobiliaria ID: ${row.inmobiliariaId || 'N/A'}`,
-  loteInfo: row.lote ? {
-    fraccion: row.lote.fraccion ?? row.lote.numero ?? '',
-    calle: row.lote.ubicacion?.calle ?? row.lote.calle ?? '',
-    numero: row.lote.ubicacion?.numero ?? row.lote.numero ?? '',
-    estado: row.lote.estado ?? '',
-    precio: row.lote.precio ?? row.lote.valor ?? 0
-  } : {
-    fraccion: `Lote ID: ${row.loteId || 'N/A'}`,
-    calle: '',
-    numero: '',
-    estado: '',
-    precio: 0
-  },
-  createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
-  updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt
-});
+const fromApi = (row = {}) => {
+  const loteId =
+    row.loteId ?? row.lote?.id ?? row.lote?.idLote ?? row.lotId ?? null;
+  const lotMapId =
+    row.lote?.mapId ??
+    row.lotMapId ??
+    row.mapId ??
+    (row.lote?.codigo ?? row.codigo ?? null);
+
+  const buildLoteInfo = () => {
+    if (row.lote) {
+      return {
+        fraccion: row.lote.fraccion ?? row.lote.numero ?? "",
+        calle: row.lote.ubicacion?.calle ?? row.lote.calle ?? "",
+        numero: row.lote.ubicacion?.numero ?? row.lote.numero ?? "",
+        estado: row.lote.estado ?? "",
+        precio: row.lote.precio ?? row.lote.valor ?? 0,
+        mapId: row.lote.mapId ?? lotMapId ?? null,
+      };
+    }
+    return {
+      fraccion: lotMapId ?? `Lote ID: ${row.loteId || "N/A"}`,
+      calle: "",
+      numero: "",
+      estado: "",
+      precio: 0,
+      mapId: lotMapId ?? null,
+    };
+  };
+
+  return {
+    id: row.id ?? row.idReserva ?? row.reservaId ?? row.Id,
+    loteId,
+    lotMapId: lotMapId ?? null,
+    lote: row.lote
+      ? { ...row.lote, mapId: row.lote.mapId ?? lotMapId ?? null }
+      : row.lote ?? null,
+    clienteId:
+      row.clienteId ?? row.cliente?.id ?? row.cliente?.idPersona ?? row.clienteId,
+    clienteNombre: row.cliente?.nombre ?? row.clienteNombre ?? "",
+    clienteApellido: row.cliente?.apellido ?? row.clienteApellido ?? "",
+    clienteCompleto:
+      row.cliente?.nombreCompleto ||
+      `${row.cliente?.nombre || ""} ${row.cliente?.apellido || ""}`.trim() ||
+      `${row.clienteNombre || ""} ${row.clienteApellido || ""}`.trim() ||
+      `Cliente ID: ${row.clienteId || "N/A"}`,
+    fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
+    seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
+    estado: row.estado ?? null, // Preservar estado para el badge
+    inmobiliariaId:
+      row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
+    inmobiliariaNombre:
+      row.inmobiliaria?.nombre ??
+      row.inmobiliariaNombre ??
+      `Inmobiliaria ID: ${row.inmobiliariaId || "N/A"}`,
+    loteInfo: buildLoteInfo(),
+    createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
+    updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt,
+  };
+};
 
 const toApi = (data = {}) => ({
   loteId: data.loteId,
@@ -224,32 +252,43 @@ export const getReservaById = async (id) => {
     // Si raw no tiene las relaciones, puede que el backend no las esté incluyendo
     // Verificar que el backend esté devolviendo correctamente
     
+    const base = fromApi(raw);
     // Normalizar manteniendo relaciones y fechas
     const normalized = {
-      ...fromApi(raw),
+      ...base,
       // Preservar relaciones completas del backend (si vienen)
-      cliente: raw?.cliente || fromApi(raw).clienteNombre ? {
-        id: raw?.clienteId ?? fromApi(raw).clienteId,
-        nombre: raw?.cliente?.nombre ?? fromApi(raw).clienteNombre,
-        apellido: raw?.cliente?.apellido ?? fromApi(raw).clienteApellido,
-      } : null,
-      inmobiliaria: raw?.inmobiliaria || (raw?.inmobiliariaId ? {
-        id: raw?.inmobiliariaId,
-        nombre: raw?.inmobiliaria?.nombre ?? fromApi(raw).inmobiliariaNombre,
-      } : null),
-      lote: raw?.lote || (raw?.loteId ? {
-        id: raw?.loteId,
-        numero: raw?.lote?.numero ?? raw?.lote?.id ?? raw?.loteId,
-      } : null),
+      cliente: raw?.cliente
+        ? raw.cliente
+        : base?.clienteNombre
+        ? {
+            id: raw?.clienteId ?? base.clienteId,
+            nombre: base.clienteNombre,
+            apellido: base.clienteApellido,
+          }
+        : null,
+      inmobiliaria: raw?.inmobiliaria
+        ? raw.inmobiliaria
+        : raw?.inmobiliariaId
+        ? {
+            id: raw.inmobiliariaId,
+            nombre: raw?.inmobiliaria?.nombre ?? base.inmobiliariaNombre,
+          }
+        : null,
+      lote: raw?.lote
+        ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
+        : base.lote ||
+          (raw?.loteId
+            ? { id: raw.loteId, mapId: base.lotMapId ?? null }
+            : null),
       // Mapear fechas correctamente
-      createdAt: raw?.createdAt ?? null,
-      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? null,
+      createdAt: raw?.createdAt ?? base.createdAt ?? null,
+      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? base.updateAt ?? null,
       // Preservar también fechaReserva
-      fechaReserva: raw?.fechaReserva ?? fromApi(raw).fechaReserva ?? null,
+      fechaReserva: raw?.fechaReserva ?? base.fechaReserva ?? null,
       // Preservar estado
-      estado: raw?.estado ?? fromApi(raw).estado ?? null,
+      estado: raw?.estado ?? base.estado ?? null,
       // Preservar seña/sena
-      seña: raw?.sena ?? raw?.seña ?? fromApi(raw).seña ?? null,
+      seña: raw?.sena ?? raw?.seña ?? base.seña ?? null,
     };
 
     return {
@@ -381,17 +420,20 @@ export const updateReserva = async (id, payload) => {
     const raw = data?.data ?? data?.reserva ?? data;
     
     // Normalizar manteniendo relaciones y fechas
+    const base = fromApi(raw);
     const normalized = {
-      ...fromApi(raw),
+      ...base,
       // Preservar relaciones completas del backend
-      cliente: raw?.cliente || null,
-      inmobiliaria: raw?.inmobiliaria || null,
-      lote: raw?.lote || null,
+      cliente: raw?.cliente || base?.cliente || null,
+      inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
+      lote: raw?.lote
+        ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
+        : base.lote || null,
       // Mapear fechas correctamente
-      createdAt: raw?.createdAt ?? null,
-      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? null,
+      createdAt: raw?.createdAt ?? base.createdAt ?? null,
+      updatedAt: raw?.updatedAt ?? raw?.updateAt ?? base.updateAt ?? null,
       // Preservar estado del backend (importante para el badge)
-      estado: raw?.estado ?? fromApi(raw).estado ?? null,
+      estado: raw?.estado ?? base.estado ?? null,
     };
 
     return {
