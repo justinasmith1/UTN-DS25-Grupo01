@@ -1,9 +1,12 @@
 // src/utils/applyLoteFilters.js
+import { getLoteDisplayId } from "./mapaUtils";
+
 export function applyLoteFilters(allLots = [], p = {}) {
   const norm = (s) => (s ?? "").toString().trim().toUpperCase().replace(/\s+/g, "_");
   const getCalle = (l) => l?.ubicacion?.calle || l?.ubicacion?.nombreCalle || l?.location || l?.calle || "";
   const getEstado = (l) => l?.status || l?.estado || "";
   const getSub    = (l) => l?.subStatus || l?.subestado || l?.estadoPlano || "";
+  const getFraccion = (l) => String(l?.fraccion?.numero ?? "");
   const num = (x) => (x === null || x === undefined || x === "" ? NaN : +x);
 
   const getFrente = (l) => num(l?.frente ?? l?.anchoFrente ?? l?.frente_m ?? l?.frenteM);
@@ -20,10 +23,11 @@ export function applyLoteFilters(allLots = [], p = {}) {
   const q = (p.q || "").toString().trim().toLowerCase();
   if (q) {
     rows = rows.filter((l) => {
-      const idStr = String(l?.id ?? "");
+      const mapIdStr = (getLoteDisplayId(l) || "").toString().toLowerCase();
+      const idStr = String(l?.id ?? "").toLowerCase();
       const owner = (l?.owner || l?.propietario || "").toString().toLowerCase();
       const calle = getCalle(l).toString().toLowerCase();
-      return idStr.includes(q) || owner.includes(q) || calle.includes(q);
+      return mapIdStr.includes(q) || idStr.includes(q) || owner.includes(q) || calle.includes(q);
     });
   }
 
@@ -40,6 +44,11 @@ export function applyLoteFilters(allLots = [], p = {}) {
   if (Array.isArray(p.calle) && p.calle.length > 0) {
     const set = new Set(p.calle.map(norm));
     rows = rows.filter((l) => set.has(norm(getCalle(l))));
+  }
+
+  if (Array.isArray(p.fraccion) && p.fraccion.length > 0) {
+    const set = new Set(p.fraccion.map(v => String(v)));
+    rows = rows.filter((l) => set.has(getFraccion(l)));
   }
 
   const inRange = (val, min, max) => {

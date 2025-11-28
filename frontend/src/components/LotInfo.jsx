@@ -31,7 +31,7 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
       <Modal show={show} onHide={onHide} size="xl" centered>
         <Modal.Header closeButton className="brand-pale-green">
           <Modal.Title className="text-brand-dark-green fw-bold">
-            LOTE nº {lot.id}
+            LOTE nº {lot.mapId ?? lot.id}
           </Modal.Title>
         </Modal.Header>
         <Modal.Body>
@@ -46,7 +46,7 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
               <Col lg={6}>
                 <table className="table detail-card">
                   <tbody>
-                    <tr><th>ID</th><td>{lot.id}</td></tr>
+                    <tr><th>ID</th><td>{lot.mapId ?? lot.id}</td></tr>
                     <tr><th>Estado</th><td>{lot.status}</td></tr>
                     <tr><th>Sub-Estado</th><td>{lot.subStatus}</td></tr>
                     <tr><th>Propietario</th><td>{lot.owner}</td></tr>
@@ -65,7 +65,7 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
                         <img
                           className="d-block w-100 detail-card"
                           src={img}
-                          alt={`Lote ${lot.id} imagen ${i + 1}`}
+                          alt={`Lote ${lot.mapId ?? lot.id} imagen ${i + 1}`}
                           style={{ height: "300px", objectFit: "cover" }}
                         />
                       </Carousel.Item>
@@ -75,7 +75,7 @@ export default function LotInfo({ show, onHide, selectedLotId, lots, abrirModalE
                   // Si sólo hay una imagen
                   <img
                     src={images[0]}
-                    alt={`Lote ${lot.id}`}
+                    alt={`Lote ${lot.mapId ?? lot.id}`}
                     className="img-fluid detail-card mb-4"
                     style={{ width: "100%", height: "300px", objectFit: "cover" }}
                   />

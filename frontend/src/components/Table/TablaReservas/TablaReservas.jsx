@@ -8,12 +8,19 @@
 // - Se mantienen 7 columnas máximas visibles simultáneamente.
 // -----------------------------------------------------------------------------
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import TablaBase from '../TablaBase';
 
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, X } from 'lucide-react';
+import MapaInteractivo from '../../Mapa/MapaInteractivo';
+import {
+  normalizeEstadoKey,
+  getEstadoVariant,
+  getEstadoFromLote,
+} from '../../../utils/mapaUtils';
 
 import { reservasTablePreset as tablePreset } from './presets/reservas.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx'; 
@@ -96,7 +103,7 @@ export default function TablaReservas({
   data,
 
   // lookups opcionales
-  clientes, inmobiliarias, lotes,
+  clientes, inmobiliarias, lotes = [],
   clientesById, inmobiliariasById, lotesById,
   lookups,
 
@@ -196,16 +203,108 @@ export default function TablaReservas({
     [columnsWithEstado]
   );
 
+  // ===== preview del mapa  =====
+  const [selectedMapIdsForPreview, setSelectedMapIdsForPreview] = useState([]);
+  const navigate = useNavigate();
+
+  // Índice de lotes por id para búsqueda rápida
+  const lotesByIdIndex = useMemo(() => {
+    const map = {};
+    lotes.forEach((l) => {
+      if (l?.id != null) map[String(l.id)] = l;
+    });
+    // También usar lotesById si viene como prop
+    if (lotesById) {
+      Object.keys(lotesById).forEach((id) => {
+        if (!map[id]) map[id] = lotesById[id];
+      });
+    }
+    return map;
+  }, [lotes, lotesById]);
+
+  // Obtener mapIds de las reservas seleccionadas
+  const handleVerEnMapa = () => {
+    if (selectedIds.length === 0) return;
+    
+    const selectedReservas = rows.filter((r) => {
+      return selectedIds.includes(String(r.id));
+    });
+    
+    const mapIds = selectedReservas
+      .map((r) => {
+        // Intentar obtener mapId desde reserva.lote?.mapId o buscar en lotesByIdIndex
+        const loteId = r.loteId || r.lotId || r.lote?.id;
+        if (r.lote?.mapId) return r.lote.mapId;
+        if (loteId && lotesByIdIndex[String(loteId)]) {
+          return lotesByIdIndex[String(loteId)].mapId;
+        }
+        return null;
+      })
+      .filter(Boolean);
+    
+    if (mapIds.length > 0) {
+      setSelectedMapIdsForPreview(mapIds);
+    }
+  };
+
+  const handleCerrarPreview = () => {
+    setSelectedMapIdsForPreview([]);
+  };
+
+  const handleVerMapaCompleto = () => {
+    if (selectedMapIdsForPreview.length === 0) return;
+    // Navegar al mapa sin tocar filtros, solo pasando los mapIds para resaltar
+    const params = new URLSearchParams();
+    params.set('selectedMapIds', selectedMapIdsForPreview.join(','));
+    navigate(`/map?${params.toString()}`);
+  };
+
+  // Preparar datos para el mapa en preview (usar todos los lotes disponibles)
+  const variantByMapId = useMemo(() => {
+    const map = {};
+    lotes.forEach((lote) => {
+      if (!lote?.mapId) return;
+      const estadoRaw = getEstadoFromLote(lote);
+      map[lote.mapId] = getEstadoVariant(estadoRaw);
+    });
+    return map;
+  }, [lotes]);
+
+  const estadoByMapId = useMemo(() => {
+    const map = {};
+    lotes.forEach((lote) => {
+      if (!lote?.mapId) return;
+      const estadoRaw = getEstadoFromLote(lote);
+      map[lote.mapId] = normalizeEstadoKey(estadoRaw);
+    });
+    return map;
+  }, [lotes]);
+
+  const labelByMapId = useMemo(() => {
+    const map = {};
+    lotes.forEach((lote) => {
+      if (!lote?.mapId || lote?.numero == null) return;
+      map[lote.mapId] = String(lote.numero);
+    });
+    return map;
+  }, [lotes]);
+
+  // En modo preview, todos los lotes deben ser activos para verse con su color normal
+  const allActiveMapIds = useMemo(() => {
+    return lotes.map((l) => l.mapId).filter(Boolean);
+  }, [lotes]);
+
   // 8) Toolbar derecha
   const toolbarRight = (
     <div className="tl-actions-right">
       <button
         type="button"
         className="tl-btn tl-btn--soft"
-        title="Ver en mapa (futuro)"
+        title="Ver en mapa"
         disabled={selectedIds.length === 0}
+        onClick={handleVerEnMapa}
       >
-        Ver en mapa (futuro) ({selectedIds.length})
+        Ver en mapa ({selectedIds.length})
       </button>
 
       <button
@@ -258,18 +357,117 @@ export default function TablaReservas({
 
   // 10) Render
   return (
-    <TablaBase
-      rows={rows}
-      rowKey="id"
-      columns={columnsAligned}
-      widthFor={tablePreset.widthFor}
-      defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
-      maxVisible={7}                        // no permite activar una 8va
-      renderRowActions={renderRowActions}
-      toolbarRight={toolbarRight}
-      defaultPageSize={25}
-      selected={selectedIds}
-      onSelectedChange={onSelectedChange}
-    />
+    <>
+      {/* Preview del mapa - card flotante */}
+      {selectedMapIdsForPreview.length > 0 && (
+        <>
+          {/* Backdrop muy sutil */}
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.12)',
+              zIndex: 1999
+            }}
+            onClick={handleCerrarPreview}
+          />
+          {/* Card */}
+          <div 
+            style={{
+              position: 'fixed',
+              top: '15%',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 2000,
+              width: 'min(950px, 80vw)',
+              maxHeight: '80vh',
+              backgroundColor: '#fff',
+              borderRadius: '12px',
+              border: '1px solid rgba(0,0,0,0.12)',
+              boxShadow: '0 14px 34px rgba(0,0,0,0.18)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '12px 20px',
+            backgroundColor: '#eaf3ed',
+            borderBottom: '1px solid rgba(0,0,0,0.06)',
+            flexShrink: 0
+          }}>
+            <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 600 }}>
+              Vista previa del mapa ({selectedMapIdsForPreview.length} {selectedMapIdsForPreview.length === 1 ? 'lote' : 'lotes'})
+            </h4>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                className="tl-btn tl-btn--soft"
+                onClick={handleVerMapaCompleto}
+                style={{ fontSize: '0.875rem', padding: '6px 16px' }}
+              >
+                Ver mapa completo
+              </button>
+              <button
+                type="button"
+                className="tl-btn tl-btn--ghost"
+                onClick={handleCerrarPreview}
+                style={{ 
+                  padding: '4px 8px',
+                  minWidth: 'auto',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                title="Cerrar"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          </div>
+          <div style={{
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden',
+            backgroundColor: '#f9fafb',
+            position: 'relative',
+            padding: 0,
+            margin: 0,
+            display: 'flex',
+            flexDirection: 'column'
+          }}>
+            <MapaInteractivo
+              isPreview={true}
+              selectedMapIds={selectedMapIdsForPreview}
+              variantByMapId={variantByMapId}
+              activeMapIds={allActiveMapIds}
+              labelByMapId={labelByMapId}
+              estadoByMapId={estadoByMapId}
+            />
+          </div>
+        </div>
+        </>
+      )}
+
+      <TablaBase
+        rows={rows}
+        rowKey="id"
+        columns={columnsAligned}
+        widthFor={tablePreset.widthFor}
+        defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
+        maxVisible={7}                        // no permite activar una 8va
+        renderRowActions={renderRowActions}
+        toolbarRight={toolbarRight}
+        defaultPageSize={25}
+        selected={selectedIds}
+        onSelectedChange={onSelectedChange}
+      />
+    </>
   );
 }

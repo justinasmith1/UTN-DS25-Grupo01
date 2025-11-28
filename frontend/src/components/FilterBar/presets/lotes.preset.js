@@ -7,7 +7,7 @@
 export const lotesFilterPreset = {
   // Catálogos visibles (se filtran por RBAC dentro del componente)
   catalogs: {
-    ESTADOS: ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"],
+    ESTADOS: ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO", "EN_PROMOCION"],
     SUBESTADOS: ["CONSTRUIDO", "EN_CONSTRUCCION", "NO_CONSTRUIDO"],
     CALLES: [
       "REINAMORA",
@@ -24,6 +24,7 @@ export const lotesFilterPreset = {
       "LORCA",
       "MILANO",
     ],
+    FRACCIONES: ["3", "4", "6", "7", "8", "11", "14", "15"],
   },
 
   // Valores iniciales
@@ -32,6 +33,7 @@ export const lotesFilterPreset = {
     estado: [],
     subestado: [],
     calle: [],
+    fraccion: [],
     frente: { min: 0, max: 100 },
     fondo: { min: 0, max: 100 },
     sup: { min: 0, max: 5000 },

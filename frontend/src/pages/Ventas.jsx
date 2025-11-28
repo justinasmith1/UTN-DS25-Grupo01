@@ -15,6 +15,7 @@ import {
 } from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
+import { getAllLotes } from "../lib/api/lotes";
 
 import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
@@ -110,6 +111,7 @@ export default function VentasPage() {
   // Datos
   const [ventas, setVentas] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
+  const [lotes, setLotes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -139,15 +141,24 @@ export default function VentasPage() {
           selectedInmobiliariaRequest != null
             ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
             : getAllVentas({});
-        const [ventasResp, personasResp, inmosResp] = await Promise.all([
+        const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
           ventasRequest,
           getAllPersonas({}),
           getAllInmobiliarias({}),
+          getAllLotes({}),
         ]);
 
         const ventasApi = pickArray(ventasResp, ["ventas"]);
         const personasApi = pickArray(personasResp, ["personas"]);
         const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+        const lotesApi = pickArray(lotesResp, ["lotes"]);
+
+        const lotesById = {};
+        lotesApi.forEach((lote) => {
+          if (lote && lote.id != null) {
+            lotesById[String(lote.id)] = lote;
+          }
+        });
 
         const personasById = {};
         for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
@@ -156,10 +167,30 @@ export default function VentasPage() {
         for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
 
         const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
+        const enrichedWithMapId = enriched.map((venta) => {
+          const lookupId = venta.loteId ?? venta.lotId ?? null;
+          const loteRef =
+            venta.lote?.mapId
+              ? venta.lote
+              : lookupId != null
+              ? lotesById[String(lookupId)] || null
+              : null;
+          const displayMapId =
+            loteRef?.mapId ?? venta.lotMapId ?? (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ?? null;
+
+          return {
+            ...venta,
+            lotMapId: displayMapId ?? venta.lotMapId ?? null,
+            lote: loteRef
+              ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+              : venta.lote ?? null,
+          };
+        });
 
         if (alive) {
-          setVentas(enriched);
+          setVentas(enrichedWithMapId);
           setInmobiliarias(inmosApi); // Guardar inmobiliarias para pasarlas al componente
+          setLotes(lotesApi); // Guardar lotes para obtener mapIds
         }
       } catch (err) {
         console.error("Error cargando ventas/personas/inmobiliarias:", err);
@@ -418,6 +449,7 @@ export default function VentasPage() {
         rows={ventasFiltradas}
         isLoading={isLoading}
         data={ventas}
+        lotes={lotes}
         onVer={canSaleView ? onVer : null}
         onEditar={onEditarAlways}
         onEliminar={canSaleDelete ? onEliminar : null}
@@ -482,7 +514,7 @@ export default function VentasPage() {
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
-        loteNumero={ventaSel?.loteId || ventaSel?.lote?.id}
+        loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
       />
 
       {/* Modal de visualización de documento */}
@@ -495,7 +527,7 @@ export default function VentasPage() {
         }}
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
-        loteNumero={ventaSel?.loteId || ventaSel?.lote?.id}
+        loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
         documentoUrl={null}
         onModificar={(url) => {
           console.log("Modificar documento:", url);

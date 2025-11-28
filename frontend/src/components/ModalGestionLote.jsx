@@ -54,6 +54,7 @@ export default function ModalGestionLote({
   // Estado local de los campos del formulario
   const [formData, setFormData] = useState({
     id: "",
+    mapId: "",
     status: "Disponible",
     subStatus: "Construido",
     owner: "",
@@ -69,11 +70,15 @@ export default function ModalGestionLote({
   useEffect(() => {
     setShowConfirm(false)
     if (esEdicion && datosIniciales) {
-      setFormData({ ...datosIniciales })
+      setFormData({
+        ...datosIniciales,
+        mapId: datosIniciales.mapId ?? "",
+      })
     } else {
       // reinicia en modo creacion
       setFormData({
         id: "",
+        mapId: "",
         status: "Disponible", //Estos proque es medio raro que lo creemos y no este disponible, igual todo esto con BD
         subStatus: "Construido",
         owner: "",
@@ -119,14 +124,12 @@ export default function ModalGestionLote({
       <Modal.Body>
         <Form>
           <Form.Group className="mb-3">
-            <Form.Label>ID del lote</Form.Label>
-            {/* En edicion no permitimos cambiar el ID */}
+            <Form.Label>ID del lote (mapa)</Form.Label>
             <Form.Control
-              name="id"
-              value={formData.id}
+              name="mapId"
+              value={formData.mapId}
               onChange={handleChange}
-              disabled={esEdicion}
-              placeholder="Ej. L006"
+              placeholder="Ej. Lote16-3"
             />
           </Form.Group>
 
@@ -223,7 +226,7 @@ export default function ModalGestionLote({
         <Modal.Body>
           <p>
             ¿Estás seguro de que deseas eliminar el lote&nbsp;
-            <strong>{formData.id}</strong>? Esta acción es irreversible.
+            <strong>{formData.mapId || formData.id}</strong>? Esta acción es irreversible.
           </p>
         </Modal.Body>
         <Modal.Footer>

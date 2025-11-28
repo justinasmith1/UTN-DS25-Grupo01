@@ -18,18 +18,51 @@ const ok = (data) => ({ data });
 const toNumberOrNull = (v) => (v === "" || v == null ? null : Number(v));
 
 // Backend -> UI
-const fromApi = (row = {}) => ({
-  id: row.id ?? row.ventaId ?? row.Id,
-  lotId: row.lotId ?? row.loteId ?? row.lote_id ?? row.lote ?? row.lot,
-  date: row.date ?? row.fechaVenta ?? row.fecha ?? null,
-  status: row.status ?? row.estado ?? null,
-  amount: typeof row.amount === "number" ? row.amount : (row.monto != null ? Number(row.monto) : null),
-  paymentType: row.paymentType ?? row.tipoPago ?? null,
-  buyerId: row.buyerId ?? row.compradorId ?? null,
-  inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
-  reservaId: row.reservaId ?? row.reserva_id ?? null,
-  observaciones: row.observaciones ?? row.notas ?? "",
-});
+const fromApi = (row = {}) => {
+  const lotId =
+    row.lotId ?? row.loteId ?? row.lote_id ?? row.lote ?? row.lot ?? null;
+  const lotMapId =
+    row.lote?.mapId ??
+    row.lotMapId ??
+    row.mapId ??
+    (typeof row.codigo === "string" ? row.codigo : null);
+
+  const ensureLote = () => {
+    if (row.lote) {
+      return {
+        ...row.lote,
+        mapId: row.lote.mapId ?? lotMapId ?? null,
+      };
+    }
+    if (lotId != null && lotMapId != null) {
+      return {
+        id: lotId,
+        mapId: lotMapId,
+      };
+    }
+    return row.lote ?? null;
+  };
+
+  return {
+    id: row.id ?? row.ventaId ?? row.Id,
+    lotId,
+    lotMapId: lotMapId ?? null,
+    lote: ensureLote(),
+    date: row.date ?? row.fechaVenta ?? row.fecha ?? null,
+    status: row.status ?? row.estado ?? null,
+    amount:
+      typeof row.amount === "number"
+        ? row.amount
+        : row.monto != null
+        ? Number(row.monto)
+        : null,
+    paymentType: row.paymentType ?? row.tipoPago ?? null,
+    buyerId: row.buyerId ?? row.compradorId ?? null,
+    inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
+    reservaId: row.reservaId ?? row.reserva_id ?? null,
+    observaciones: row.observaciones ?? row.notas ?? "",
+  };
+};
 
 // UI -> Backend
 const toApi = (form = {}) => ({
@@ -136,15 +169,23 @@ async function apiGetById(id) {
   
   // Preservar las relaciones completas que vienen del backend
   // El backend incluye: comprador, lote (con propietario), inmobiliaria
+  const base = fromApi(raw);
   const normalized = {
-    ...fromApi(raw), // Campos planos normalizados
+    ...base, // Campos planos normalizados
     // Preservar relaciones completas del backend
-    comprador: raw?.comprador || null,
-    lote: raw?.lote || null,
-    inmobiliaria: raw?.inmobiliaria || null,
+    comprador: raw?.comprador || base?.comprador || null,
+    lote: raw?.lote
+      ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
+      : base.lote || null,
+    inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     // Mapear fechas correctamente (backend usa updateAt sin 'd')
-    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? null,
-    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.fechaActualizacion ?? null,
+    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? base.createdAt ?? null,
+    updatedAt:
+      raw?.updateAt ??
+      raw?.updatedAt ??
+      raw?.fechaActualizacion ??
+      base.updatedAt ??
+      null,
   };
   
   return ok(normalized);
@@ -222,15 +263,23 @@ async function apiUpdate(id, payload) {
   const raw = data?.data ?? data;
   
   // Preservar las relaciones completas que vienen del backend (igual que en apiGetById)
+  const base = fromApi(raw);
   const normalized = {
-    ...fromApi(raw), // Campos planos normalizados
+    ...base, // Campos planos normalizados
     // Preservar relaciones completas del backend
-    comprador: raw?.comprador || null,
-    lote: raw?.lote || null,
-    inmobiliaria: raw?.inmobiliaria || null,
+    comprador: raw?.comprador || base?.comprador || null,
+    lote: raw?.lote
+      ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
+      : base.lote || null,
+    inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     // Mapear fechas correctamente (backend usa updateAt sin 'd')
-    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? null,
-    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.fechaActualizacion ?? null,
+    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? base.createdAt ?? null,
+    updatedAt:
+      raw?.updateAt ??
+      raw?.updatedAt ??
+      raw?.fechaActualizacion ??
+      base.updatedAt ??
+      null,
   };
   
   return ok(normalized);

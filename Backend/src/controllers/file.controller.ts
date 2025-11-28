@@ -44,9 +44,19 @@ export const getAllFilesController = async (req: Request, res: Response) => {
     }
 };
 
-// Genenerar URL firmada para subir archivo
+// Generar URL firmada para descargar/ver archivo
 export const generateSignedUrlController = async (req: Request, res: Response) => {
-    const { filename } = req.body as { filename: string};
+    const { filename } = req.body as { filename: string };
+    const fileId = parseInt(req.params.id, 10);
+    
+    if (!filename) {
+        return res.status(400).json({ message: "El campo 'filename' es requerido en el body" });
+    }
+    
+    if (isNaN(fileId)) {
+        return res.status(400).json({ message: "ID de archivo inválido" });
+    }
+    
     try {
         const signedURL = await FileService.generateSignedUrl(filename);
         res.status(200).json({ signedURL });

@@ -126,7 +126,28 @@ export default function ReservaEditarCard({
           const response = await getReservaById(idToUse);
           const full = response?.data ?? response;
           if (!abort && full) {
-            setDetalle(full);
+            // Preservar mapId del lote si está disponible en la reserva original o en la lista
+            const originalReserva = reserva || (Array.isArray(reservas) ? reservas.find(r => `${r.id}` === `${idToUse}`) : null);
+            const preservedMapId = originalReserva?.lote?.mapId ?? originalReserva?.lotMapId ?? full?.lote?.mapId ?? full?.lotMapId ?? null;
+            
+            // Enriquecer el detalle con mapId si está disponible
+            const enriched = preservedMapId && full?.lote
+              ? {
+                  ...full,
+                  lotMapId: preservedMapId,
+                  lote: {
+                    ...full.lote,
+                    mapId: preservedMapId,
+                  },
+                }
+              : preservedMapId
+              ? {
+                  ...full,
+                  lotMapId: preservedMapId,
+                }
+              : full;
+            
+            setDetalle(enriched);
           }
         } catch (e) {
           console.error("Error obteniendo reserva por id:", e);
@@ -316,8 +337,26 @@ export default function ReservaEditarCard({
         throw new Error(response?.message || "No se pudo guardar la reserva.");
       }
       
+      // Preservar mapId del lote si está disponible
+      const mapId = updated?.lote?.mapId ?? detalle?.lote?.mapId ?? updated?.lotMapId ?? detalle?.lotMapId ?? null;
+      const enrichedUpdated = mapId && updated?.lote
+        ? {
+            ...updated,
+            lotMapId: mapId,
+            lote: {
+              ...updated.lote,
+              mapId: mapId,
+            },
+          }
+        : mapId
+        ? {
+            ...updated,
+            lotMapId: mapId,
+          }
+        : updated;
+      
       // Actualizar detalle inmediatamente con los valores guardados
-      setDetalle(updated);
+      setDetalle(enrichedUpdated);
       
       // Mostrar animación de éxito
       setShowSuccess(true);
@@ -354,6 +393,14 @@ export default function ReservaEditarCard({
   })();
 
   const loteInfo = (() => {
+    const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? null;
+    if (mapId) {
+      // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
+      if (String(mapId).toLowerCase().startsWith('lote')) {
+        return mapId;
+      }
+      return `Lote N° ${mapId}`;
+    }
     if (detalle?.lote?.id) {
       const num = detalle?.lote?.numero || detalle?.lote?.id;
       return `Lote N° ${num}`;

@@ -1,7 +1,6 @@
 import { useMemo, useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
-// import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
@@ -11,6 +10,7 @@ import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
 import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
 import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
+import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 import { getAllReservas, getReservaById } from "../lib/api/reservas";
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -42,12 +42,16 @@ export default function Dashboard() {
   const [openReservaCrear, setOpenReservaCrear] = useState(false);
   const [openReservaVer, setOpenReservaVer] = useState(false);
   const [reservaSel, setReservaSel] = useState(null);
+  const [openVentaCrear, setOpenVentaCrear] = useState(false);
+  const [loteParaVenta, setLoteParaVenta] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
 
-  // Callbacks normalizados
-  const goRegistrarVenta = (lot) =>
-    navigate(`/ventas?lotId=${encodeURIComponent(lot?.id ?? lot?.idLote)}`);
+  const goRegistrarVenta = useCallback((lot) => {
+    if (!lot) return;
+    setLoteParaVenta(lot);
+    setOpenVentaCrear(true);
+  }, []);
 
   const handleReservarLote = useCallback(async (lot) => {
     if (!lot) return;
@@ -200,7 +204,6 @@ export default function Dashboard() {
         []
       );
 
-  // Estado de filtros (FilterBarLotes)
   const [params, setParams] = useState({});
   const handleParamsChange = useCallback((patch) => {
     if (!patch || Object.keys(patch).length === 0) { 
@@ -256,7 +259,6 @@ export default function Dashboard() {
     });
   }, []);
 
-  // Dataset base: obtenemos todos los lotes desde la API una sola vez
   const [allLotes, setAllLotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -281,12 +283,9 @@ export default function Dashboard() {
     (async () => {
       try {
         setLoading(true);
-        console.log('🔍 Cargando lotes desde API...');
         const res = await getAllLotes({});
-        console.log('📊 Respuesta de API:', res);
         if (alive) { 
           const data = res.data || [];
-          console.log('📋 Datos de lotes:', data);
           setAllLotes(data); 
         }
       } catch (err) {
@@ -305,32 +304,14 @@ export default function Dashboard() {
     return () => { alive = false; };
   }, [error]);
 
-  // Aplicar filtros localmente
   const lots = useMemo(() => {
-    console.log('🔄 Aplicando filtros. allLotes:', allLotes.length, 'params:', params);
     const hasParams = params && Object.keys(params).length > 0;
-    try {
-      const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
-      console.log('✅ Resultado filtrado:', result.length, 'lotes');
-      
-      // Aplicar ordenamiento por ID ascendente siempre
-      const sortedResult = [...result].sort((a, b) => {
-        const idA = a?.id ?? a?.idLote ?? 0;
-        const idB = b?.id ?? b?.idLote ?? 0;
-        return idA - idB;
-      });
-      
-      return sortedResult;
-    } catch (err) {
-      console.error('❌ Error aplicando filtros:', err);
-      // Aplicar ordenamiento incluso en caso de error
-      const sortedAllLotes = [...allLotes].sort((a, b) => {
-        const idA = a?.id ?? a?.idLote ?? 0;
-        const idB = b?.id ?? b?.idLote ?? 0;
-        return idA - idB;
-      });
-      return sortedAllLotes;
-    }
+    const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
+    return [...result].sort((a, b) => {
+      const idA = a?.id ?? a?.idLote ?? 0;
+      const idB = b?.id ?? b?.idLote ?? 0;
+      return idA - idB;
+    });
   }, [allLotes, params]);
 
   // Mostrar loading mientras se cargan los datos
@@ -345,7 +326,6 @@ export default function Dashboard() {
 
   return (
     <>
-      {/* Barra de filtros globales (controla qué data llega a la tabla) */}
       <FilterBarLotes 
         variant="dashboard" 
         userRole={userRole} 
@@ -366,7 +346,6 @@ export default function Dashboard() {
         onRegistrarVenta={goRegistrarVenta}
         onRegisterSale={goRegistrarVenta}
         onAgregarLote={onAgregarLote}
-        // onVerEnMapa={(ids) => ...}
       />
 
       <LoteVerCard
@@ -430,12 +409,26 @@ export default function Dashboard() {
         onCreated={(newReserva) => {
           setOpenReservaCrear(false);
           setLoteSel(null);
-          // Opcional: mostrar mensaje de éxito o actualizar lista
         }}
         loteIdPreSeleccionado={loteSel?.id}
       />
 
-      {/* Animación de éxito al eliminar */}
+      <VentaCrearCard
+        open={openVentaCrear}
+        onCancel={() => {
+          setOpenVentaCrear(false);
+          setLoteParaVenta(null);
+        }}
+        onCreated={(newVenta) => {
+          setOpenVentaCrear(false);
+          if (loteParaVenta?.id) {
+            mergeUpdatedLote({ ...loteParaVenta, estado: "VENDIDO", status: "VENDIDO" });
+          }
+          setLoteParaVenta(null);
+        }}
+        loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
+      />
+
       {showDeleteSuccess && (
         <div
           style={{

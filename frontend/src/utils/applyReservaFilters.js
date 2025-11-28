@@ -82,6 +82,9 @@ export const applyReservaFilters = (reservas, params = {}) => {
         r?.loteInfo?.fraccion,
         r?.loteInfo?.numero,
         r?.id,
+        r?.lotMapId,
+        r?.lote?.mapId,
+        r?.loteInfo?.mapId,
       ];
       return fields
         .map((x) => (x == null ? "" : String(x).toLowerCase()))

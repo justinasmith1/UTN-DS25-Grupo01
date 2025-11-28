@@ -14,10 +14,9 @@ export default function FilterBarLotes({
   onParamsChange,
 }) {
   const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
-
   // Catálogos desde preset, filtrados por RBAC
   const ALL_ESTADOS = useMemo(
-    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO"],
+    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO", "EN_PROMOCION"],
     [preset]
   );
   const ESTADOS = useMemo(
@@ -35,6 +34,9 @@ export default function FilterBarLotes({
   const CALLES = useMemo(() => preset?.catalogs?.CALLES ?? [
     "REINAMORA", "MACA", "ZORZAL", "CAUQUEN", "ALONDRA", "JACANA", "TACUARITO", 
     "JILGUERO", "GOLONDRINA", "CALANDRIA", "AGUILAMORA", "LORCA", "MILANO"
+  ], [preset]);
+  const FRACCIONES = useMemo(() => preset?.catalogs?.FRACCIONES ?? [
+    "3", "4", "6", "7", "8", "11", "14", "15"
   ], [preset]);
 
   // Configuración de campos para lotes
@@ -62,6 +64,13 @@ export default function FilterBarLotes({
       id: 'calle',
       type: 'multiSelect',
       label: 'Calle',
+      defaultValue: [],
+      useGrid: true
+    },
+    {
+      id: 'fraccion',
+      type: 'multiSelect',
+      label: 'Fracción',
       defaultValue: [],
       useGrid: true
     },
@@ -102,8 +111,9 @@ export default function FilterBarLotes({
     estado: ESTADOS,
     subestado: SUBESTADOS,
     calle: CALLES,
+    fraccion: FRACCIONES,
     ...(canDeudor ? { deudor: [true, false] } : {})
-  }), [ESTADOS, SUBESTADOS, CALLES, canDeudor]);
+  }), [ESTADOS, SUBESTADOS, CALLES, FRACCIONES, canDeudor]);
 
   // Configuración de rangos para lotes
   const ranges = useMemo(() => ({
@@ -119,6 +129,7 @@ export default function FilterBarLotes({
     estado: [],
     subestado: [],
     calle: [],
+    fraccion: [],
     frente: { min: null, max: null },
     fondo: { min: null, max: null },
     sup: { min: null, max: null },
@@ -147,6 +158,7 @@ export default function FilterBarLotes({
     estado: nice,
     subestado: nice,
     calle: nice,
+    fraccion: (val) => `Fracción ${val}`,
     deudor: (val) => val === true ? "Solo deudor" : val === false ? "Sin deuda" : val
   }), []);
 

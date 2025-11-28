@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
+import { removeLotePrefix } from "../../../utils/mapaUtils.js";
+import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
+import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
@@ -83,8 +86,6 @@ const SUBESTADOS_LOTE = [
   { value: "CONSTRUIDO", label: "Construido" },
 ];
 
-const FALLBACK_IMAGE =
-  "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
 /**
  * LoteVerCard
@@ -199,24 +200,19 @@ export default function LoteVerCard({
   }, [lot]);
 
   const ubicacion = useMemo(() => {
-    if (isBlank(lot?.location)) return safe(
-      lot?.ubicacion
-        ? `Calle ${lot.ubicacion?.calle ?? lot.ubicacion?.nombre ?? "-"} ${
-            lot.ubicacion?.numero != null ? `Nº ${lot.ubicacion.numero}` : ""
-          }`.trim()
-        : null
-    );
-    return safe(lot.location);
+    const ubicacionCalle = lot?.ubicacion?.calle ?? lot?.ubicacion?.nombre ?? "";
+    const ubicacionNumero = lot?.ubicacion?.numero ?? null;
+    
+    if (ubicacionCalle) {
+      const callePart = `Calle ${ubicacionCalle}`;
+      const numeroPart = ubicacionNumero != null ? `Nº ${ubicacionNumero}` : "";
+      return safe(`${callePart} ${numeroPart}`.trim());
+    }
+    return "—";
   }, [lot]);
 
-  const fraccion = safe(
-    lot?.fraccion?.numero ??
-      lot?.fraccionNumero ??
-      lot?.fraccionId ??
-      lot?.fraccion
-  );
+  const fraccion = safe(lot?.fraccion?.numero ?? "");
 
-    // Función helper para obtener el valor del estado/subestado en formato que coincida con las opciones
     const getEstadoValue = (estado) => {
       if (!estado) return "";
       const normalized = String(estado).toUpperCase().replace(/\s+/g, "_");
@@ -224,9 +220,9 @@ export default function LoteVerCard({
     };
 
     const leftPairs = [
-      ["ID", safe(lot?.id)],
+      ["ID", safe(lot?.mapId ?? lot?.id)],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
-      ["NUMERO FRACCION", fraccion],
+      ["FRACCIÓN", fraccion],
       ["TIPO", titleCase(lot?.tipo)],
       ["ESTADO", getEstadoValue(lot?.estado ?? lot?.status)],
       ["SUB-ESTADO", getEstadoValue(lot?.subestado ?? lot?.subStatus)],
@@ -274,16 +270,54 @@ export default function LoteVerCard({
     file: getDocByType(btn.type),
   }));
 
+  const [imageUrls, setImageUrls] = useState([]);
+
+  useEffect(() => {
+    if (!open || !lot?.id) {
+      setImageUrls([]);
+      return;
+    }
+
+    (async () => {
+      try {
+        const imagenesConOrden = Array.isArray(lot?.images) && lot.images.length > 0
+          ? lot.images.filter(img => img?.id && img?.url)
+          : null;
+        
+        const archivos = await getArchivosByLote(lot.id);
+        const imagenes = archivos.filter(a => (a.tipo || "").toUpperCase() === "IMAGEN" && a.id);
+        
+        const obtenerSignedUrl = async (img) => {
+          const signedUrl = await getFileSignedUrl(img.id);
+          return signedUrl?.startsWith('http') ? signedUrl : null;
+        };
+        
+        if (imagenesConOrden?.length > 0) {
+          const ordenIds = imagenesConOrden.map(img => img.id);
+          const imagenesMap = new Map(imagenes.map(img => [img.id, img]));
+          
+          const urlsOrdenadas = await Promise.all(
+            ordenIds.map(id => {
+              const img = imagenesMap.get(id);
+              return img ? obtenerSignedUrl(img) : null;
+            })
+          );
+          
+          setImageUrls(urlsOrdenadas.filter(Boolean));
+        } else {
+          const urls = await Promise.all(imagenes.map(obtenerSignedUrl));
+          setImageUrls(urls.filter(Boolean));
+        }
+      } catch (err) {
+        console.error("Error cargando imágenes:", err);
+        setImageUrls([]);
+      }
+    })();
+  }, [open, lot?.id, lot?.images]);
+
   const imageSources = useMemo(() => {
-    const fromFiles = docs
-      .filter(
-        (f) => (f.tipo || f.type || "").toUpperCase() === "IMAGEN"
-      )
-      .map((f) => f.url || f.linkArchivo)
-      .filter(Boolean);
-    const fromLegacy = Array.isArray(lot?.images) ? lot.images : [];
-    return [...fromFiles, ...fromLegacy].filter(Boolean);
-  }, [docs, lot?.images]);
+    return imageUrls.filter(Boolean);
+  }, [imageUrls]);
 
   const descriptionText = safe(lot?.descripcion ?? lot?.description);
 
@@ -292,7 +326,8 @@ export default function LoteVerCard({
     setCurrentImage(0);
   }, [lot?.id, open]);
 
-  const images = imageSources.length > 0 ? imageSources : [FALLBACK_IMAGE];
+  const hasImages = imageSources.length > 0;
+  const images = hasImages ? imageSources : [];
   const showCarouselControls = imageSources.length > 1;
 
   const handlePrev = () =>
@@ -306,17 +341,13 @@ export default function LoteVerCard({
 
   const infoPairs = [...leftPairs, ...rightPairs];
 
-  const containerRef = useRef(null);
   const [labelWidth, setLabelWidth] = useState(190);
   useEffect(() => {
     const labels = infoPairs.map(([label]) => label);
     const longest = Math.max(...labels.map((l) => l.length));
-    const computed = Math.min(
-      260,
-      Math.max(160, Math.round(longest * 8.2) + 22)
-    );
+    const computed = Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
     setLabelWidth(computed);
-  }, [leftPairs, rightPairs, open]);
+  }, [infoPairs, open]);
 
   if (!open || !lot) return null;
 
@@ -325,8 +356,7 @@ export default function LoteVerCard({
   });
 
   const handleOpenDocument = (type, file) => {
-    if (!onOpenDocument) return;
-    onOpenDocument({ type, file, lote: lot });
+    onOpenDocument?.({ type, file, lote: lot });
   };
 
   return (
@@ -334,11 +364,10 @@ export default function LoteVerCard({
       <div
         className="cclf-card"
         onClick={(e) => e.stopPropagation()}
-        ref={containerRef}
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Lote Nº ${safe(lot?.id)}`}</h2>
+          <h2 className="cclf-card__title">{`Lote Nº ${safe(removeLotePrefix(lot?.mapId ?? lot?.id))}`}</h2>
 
           <div className="cclf-card__actions lote-header-actions">
             <button
@@ -427,41 +456,52 @@ export default function LoteVerCard({
 
             <div className="lote-media-col">
               <div className="lote-carousel">
-                <img
-                  src={images[currentImage]}
-                  alt={`Imagen lote ${safe(lot?.id)} ${currentImage + 1}`}
-                  className="lote-carousel__image"
-                />
-
-                {showCarouselControls && (
+                {hasImages ? (
                   <>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--prev"
-                      onClick={handlePrev}
-                      aria-label="Imagen anterior"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--next"
-                      onClick={handleNext}
-                      aria-label="Imagen siguiente"
-                    >
-                      ›
-                    </button>
-                    <div className="lote-carousel__indicator">
-                      {images.map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`lote-carousel__dot ${
-                            idx === currentImage ? "is-active" : ""
-                          }`}
-                        />
-                      ))}
-                    </div>
+                    <img
+                      src={images[currentImage]}
+                      alt={`Imagen ${currentImage + 1}`}
+                      className="lote-carousel__image"
+                    />
+                    {showCarouselControls && (
+                      <>
+                        <button
+                          type="button"
+                          className="lote-carousel__nav lote-carousel__nav--prev"
+                          onClick={handlePrev}
+                          aria-label="Imagen anterior"
+                        >
+                          <ChevronLeft size={24} strokeWidth={2.5} />
+                        </button>
+                        <button
+                          type="button"
+                          className="lote-carousel__nav lote-carousel__nav--next"
+                          onClick={handleNext}
+                          aria-label="Imagen siguiente"
+                        >
+                          <ChevronRight size={24} strokeWidth={2.5} />
+                        </button>
+                        <div className="lote-carousel__indicator">
+                          {images.map((_, idx) => (
+                            <span
+                              key={idx}
+                              className={`lote-carousel__dot ${
+                                idx === currentImage ? "is-active" : ""
+                              }`}
+                            />
+                          ))}
+                        </div>
+                        <div className="lote-carousel__counter">
+                          {currentImage + 1} / {images.length}
+                        </div>
+                      </>
+                    )}
                   </>
+                ) : (
+                  <div className="lote-carousel__placeholder">
+                    <ImageIcon size={64} strokeWidth={1.5} />
+                    <p>Imagen no cargada</p>
+                  </div>
                 )}
               </div>
 
@@ -519,11 +559,6 @@ export default function LoteVerCard({
     </div>
   );
 }
-
-
-
-
-
 
 
 

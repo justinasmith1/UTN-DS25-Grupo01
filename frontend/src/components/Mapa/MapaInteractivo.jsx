@@ -14,6 +14,10 @@ function MapaInteractivo({
   labelByMapId = {},
   estadoByMapId = {},
   selectedMapId = null,
+  // Modo preview: si es true, oculta elementos que solo tienen sentido en pantalla completa
+  isPreview = false,
+  // MapIds a resaltar (para preview desde tablas)
+  selectedMapIds = [],
 }) {
   const wrapperRef = useRef(null);
   const [svgInjected, setSvgInjected] = useState(false);
@@ -39,6 +43,22 @@ function MapaInteractivo({
     
     // Hacer que el SVG tenga fondo transparente
     svgRoot.style.backgroundColor = "transparent";
+    
+    // En modo preview, asegurar que el SVG ocupe todo el espacio sin espacios en blanco
+    if (isPreview) {
+      svgRoot.style.width = "100%";
+      svgRoot.style.height = "100%";
+      svgRoot.style.display = "block";
+      svgRoot.style.margin = "0";
+      svgRoot.style.padding = "0";
+      svgRoot.style.objectFit = "contain";
+      root.style.height = "100%";
+      root.style.width = "100%";
+      root.style.margin = "0";
+      root.style.padding = "0";
+      root.style.display = "flex";
+      root.style.flexDirection = "column";
+    }
     
     // Eliminar el rect de fondo verde completo si existe
     const fondoVerdeRect = svgRoot.querySelector("rect[data-fondo-verde-completo]");
@@ -501,17 +521,17 @@ function MapaInteractivo({
       "filter"
     );
     selectedGlowFilter.setAttribute("id", "lot-selected-glow");
-    selectedGlowFilter.setAttribute("x", "-100%");
-    selectedGlowFilter.setAttribute("y", "-100%");
-    selectedGlowFilter.setAttribute("width", "300%");
-    selectedGlowFilter.setAttribute("height", "300%");
+    selectedGlowFilter.setAttribute("x", "-150%");
+    selectedGlowFilter.setAttribute("y", "-150%");
+    selectedGlowFilter.setAttribute("width", "400%");
+    selectedGlowFilter.setAttribute("height", "400%");
 
     const feGaussianBlurSelected = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "feGaussianBlur"
     );
     feGaussianBlurSelected.setAttribute("in", "SourceAlpha");
-    feGaussianBlurSelected.setAttribute("stdDeviation", "5");
+    feGaussianBlurSelected.setAttribute("stdDeviation", "12");
     feGaussianBlurSelected.setAttribute("result", "alphaBlur");
 
     const feFloodSelected = document.createElementNS(
@@ -531,6 +551,32 @@ function MapaInteractivo({
     feCompositeSelected.setAttribute("operator", "in");
     feCompositeSelected.setAttribute("result", "coloredGlow");
 
+    // Capa adicional más concentrada cerca del borde para glow más marcado
+    const feGaussianBlurSelectedInner = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feGaussianBlur"
+    );
+    feGaussianBlurSelectedInner.setAttribute("in", "SourceAlpha");
+    feGaussianBlurSelectedInner.setAttribute("stdDeviation", "5");
+    feGaussianBlurSelectedInner.setAttribute("result", "alphaBlurInner");
+
+    const feFloodSelectedInner = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feFlood"
+    );
+    feFloodSelectedInner.setAttribute("flood-color", "#0EA5E9");
+    feFloodSelectedInner.setAttribute("flood-opacity", "1");
+    feFloodSelectedInner.setAttribute("result", "celesteGlowInner");
+
+    const feCompositeSelectedInner = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feComposite"
+    );
+    feCompositeSelectedInner.setAttribute("in", "celesteGlowInner");
+    feCompositeSelectedInner.setAttribute("in2", "alphaBlurInner");
+    feCompositeSelectedInner.setAttribute("operator", "in");
+    feCompositeSelectedInner.setAttribute("result", "coloredGlowInner");
+
     const feMergeSelected = document.createElementNS(
       "http://www.w3.org/2000/svg",
       "feMerge"
@@ -544,14 +590,23 @@ function MapaInteractivo({
       "http://www.w3.org/2000/svg",
       "feMergeNode"
     );
-    feMergeNodeSelected2.setAttribute("in", "SourceGraphic");
+    feMergeNodeSelected2.setAttribute("in", "coloredGlowInner");
+    const feMergeNodeSelected3 = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "feMergeNode"
+    );
+    feMergeNodeSelected3.setAttribute("in", "SourceGraphic");
 
     feMergeSelected.appendChild(feMergeNodeSelected1);
     feMergeSelected.appendChild(feMergeNodeSelected2);
+    feMergeSelected.appendChild(feMergeNodeSelected3);
 
     selectedGlowFilter.appendChild(feGaussianBlurSelected);
     selectedGlowFilter.appendChild(feFloodSelected);
     selectedGlowFilter.appendChild(feCompositeSelected);
+    selectedGlowFilter.appendChild(feGaussianBlurSelectedInner);
+    selectedGlowFilter.appendChild(feFloodSelectedInner);
+    selectedGlowFilter.appendChild(feCompositeSelectedInner);
     selectedGlowFilter.appendChild(feMergeSelected);
     defs.appendChild(selectedGlowFilter);
 
@@ -584,13 +639,17 @@ function MapaInteractivo({
       .querySelectorAll("text[data-label-for]")
       .forEach((el) => el.remove());
 
+    // Modo preview: todos los lotes activos se ven con su color normal, solo los seleccionados tienen glow
+    const selectedMapIdsSet = new Set((selectedMapIds || []).filter(Boolean));
+    // En modo preview, todos los lotes activos se muestran normalmente (no se grisean)
     const activeSet = new Set((activeMapIds || []).filter(Boolean));
 
     allLotes.forEach((el) => {
       const id = el.id;
       if (!/^Lote[0-9]/.test(id)) return;
 
-      // Solo es activo si está en activeMapIds (sin caso especial de "vacío = todos activos")
+      // En modo preview, todos los lotes activos se muestran con su color normal
+      // Solo los seleccionados tienen glow adicional
       const isActive = activeSet.has(id);
       const variant = variantByMapId[id];
       const label = labelByMapId[id];
@@ -641,8 +700,8 @@ function MapaInteractivo({
       el.style.strokeWidth = strokeWidth;
       el.setAttribute("stroke-width", strokeWidth);
 
-      // Si este lote está seleccionado y el panel está abierto, usar glow más fuerte
-      const isSelected = selectedMapId === id;
+      // Si este lote está seleccionado (selectedMapId singular o en selectedMapIds), usar glow más fuerte
+      const isSelected = selectedMapId === id || selectedMapIdsSet.has(id);
       const finalFilter = isSelected ? "url(#lot-selected-glow)" : filter;
       
       el.setAttribute("filter", finalFilter);
@@ -793,6 +852,10 @@ function MapaInteractivo({
       }
 
       // ---------- HOVER (para todos los lotes, activos y desactivados) ----------
+      // En modo preview, solo los lotes seleccionados tienen hover
+      // En modo normal, TODOS los lotes tienen hover (como estaba antes)
+      const shouldHaveHover = isPreview ? isSelected : true;
+      
       // Primero limpio handlers anteriores para no duplicar listeners
       if (el._hoverEnterHandler) {
         el.removeEventListener("mouseenter", el._hoverEnterHandler);
@@ -801,52 +864,61 @@ function MapaInteractivo({
         el.removeEventListener("mouseleave", el._hoverLeaveHandler);
       }
 
-      // Hover funciona para todos los lotes (activos y desactivados)
-      const hoverEnter = () => {
-        gsap.killTweensOf(el);
-        el.style.willChange = "transform, filter";
-        
-        // Si está seleccionado, mantener el filtro de selección pero con hover adicional
-        if (isSelected) {
-          // Usar un filtro combinado o mantener el selected glow más intenso
-          el.setAttribute("filter", "url(#lot-selected-glow)");
-        } else {
-          // Aplicar filtro de glow celeste uniforme
-          el.setAttribute("filter", "url(#lot-stroke-glow)");
-        }
-        
-        // Animar con GSAP - más fluido con mejor ease y duración
-        gsap.to(el, {
-          scale: 1.04,
-          y: -2,
-          duration: 0.25,
-          ease: "power2.out",
-          force3D: true,
-        });
-      };
+      if (shouldHaveHover) {
+        // Hover solo para lotes seleccionados en preview, o activos en modo normal
+        const hoverEnter = () => {
+          gsap.killTweensOf(el);
+          el.style.willChange = "transform, filter";
+          
+          // Si está seleccionado, mantener el filtro de selección pero con hover adicional
+          if (isSelected) {
+            // Usar un filtro combinado o mantener el selected glow más intenso
+            el.setAttribute("filter", "url(#lot-selected-glow)");
+          } else {
+            // Aplicar filtro de glow celeste uniforme
+            el.setAttribute("filter", "url(#lot-stroke-glow)");
+          }
+          
+          // Animar con GSAP - más fluido con mejor ease y duración
+          gsap.to(el, {
+            scale: 1.04,
+            y: -2,
+            duration: 0.25,
+            ease: "power2.out",
+            force3D: true,
+          });
+        };
 
-      const hoverLeave = () => {
-        gsap.killTweensOf(el);
-        
-        gsap.to(el, {
-          scale: 1,
-          y: 0,
-          duration: 0.2,
-          ease: "power2.out",
-          force3D: true,
-          onComplete: () => {
-            // Restaurar el filtro base (puede ser el selected o el normal)
-            el.setAttribute("filter", baseFilter);
-            el.style.willChange = "auto";
-          },
-        });
-      };
+        const hoverLeave = () => {
+          gsap.killTweensOf(el);
+          
+          gsap.to(el, {
+            scale: 1,
+            y: 0,
+            duration: 0.2,
+            ease: "power2.out",
+            force3D: true,
+            onComplete: () => {
+              // Restaurar el filtro base (puede ser el selected o el normal)
+              el.setAttribute("filter", baseFilter);
+              el.style.willChange = "auto";
+            },
+          });
+        };
 
-      el.addEventListener("mouseenter", hoverEnter);
-      el.addEventListener("mouseleave", hoverLeave);
+        el.addEventListener("mouseenter", hoverEnter);
+        el.addEventListener("mouseleave", hoverLeave);
 
-      el._hoverEnterHandler = hoverEnter;
-      el._hoverLeaveHandler = hoverLeave;
+        el._hoverEnterHandler = hoverEnter;
+        el._hoverLeaveHandler = hoverLeave;
+      } else {
+        // En modo preview, lotes no seleccionados no tienen hover - parecen no clickeables
+        el.style.cursor = "default";
+        el.style.pointerEvents = "auto"; // Mantener pointer events para que no interfiera con otros elementos
+        // No agregar event listeners de hover
+        el._hoverEnterHandler = null;
+        el._hoverLeaveHandler = null;
+      }
     });
 
     // ---------- ZONAS COMUNES (espacios comunes: transparentes por defecto, glow en hover) ----------
@@ -969,7 +1041,7 @@ function MapaInteractivo({
   return (
     <div
       ref={wrapperRef}
-      className="mapa-svg-wrapper"
+      className={`mapa-svg-wrapper ${isPreview ? 'mapa-preview' : ''}`}
       onClick={handleSvgClick}
     />
   );

@@ -10,6 +10,7 @@ import FilterBarReservas from "../components/FilterBar/FilterBarReservas";
 import TablaReservas from "../components/Table/TablaReservas/TablaReservas";
 import { getAllReservas, getReservaById, updateReserva, deleteReserva } from "../lib/api/reservas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
+import { getAllLotes } from "../lib/api/lotes";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
 
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -29,6 +30,7 @@ export default function Reservas() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
+  const [lotes, setLotes] = useState([]);
 
   // Permisos
   const canReservaView = can(user, PERMISSIONS.RES_VIEW);
@@ -58,18 +60,59 @@ export default function Reservas() {
     (async () => {
       try {
         setLoading(true);
-        const [reservasResp, inmosResp] = await Promise.all([
+        const [reservasResp, inmosResp, lotesResp] = await Promise.all([
           getAllReservas({}),
           getAllInmobiliarias({}),
+          getAllLotes({}),
         ]);
         
         if (alive) {
           if (reservasResp.success) {
             const reservasData = reservasResp.data?.reservas ?? reservasResp.data ?? [];
-            setAllReservas(Array.isArray(reservasData) ? reservasData : []);
+            const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+            const lotesById = {};
+            lotesData.forEach((lote) => {
+              if (lote && lote.id != null) {
+                lotesById[String(lote.id)] = lote;
+              }
+            });
+            const reservasWithMapId = (Array.isArray(reservasData) ? reservasData : []).map((reserva) => {
+              const lookupId = reserva?.loteId ?? reserva?.lotId ?? reserva?.lote?.id ?? null;
+              const loteRef =
+                reserva?.lote?.mapId
+                  ? reserva.lote
+                  : lookupId != null
+                  ? lotesById[String(lookupId)] || null
+                  : null;
+              const displayMapId =
+                loteRef?.mapId ??
+                reserva?.lotMapId ??
+                (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ??
+                null;
+
+              return {
+                ...reserva,
+                lotMapId: displayMapId ?? reserva?.lotMapId ?? null,
+                lote: loteRef
+                  ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+                  : reserva.lote ?? null,
+                loteInfo: reserva.loteInfo
+                  ? {
+                      ...reserva.loteInfo,
+                      mapId: reserva.loteInfo.mapId ?? displayMapId ?? null,
+                    }
+                  : displayMapId
+                  ? { mapId: displayMapId }
+                  : reserva.loteInfo ?? null,
+              };
+            });
+            setAllReservas(reservasWithMapId);
+            setLotes(Array.isArray(lotesData) ? lotesData : []);
           } else {
             error(reservasResp.message || 'Error al cargar reservas');
             setAllReservas([]);
+            const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+            setLotes(Array.isArray(lotesData) ? lotesData : []);
           }
           
           // Guardar inmobiliarias para pasarlas a los componentes
@@ -130,7 +173,24 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        setReservaSel((prev) => ({ ...(prev || reserva), ...(detail || {}) }));
+        // Preservar mapId del lote si viene del backend o de la reserva original
+        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+        const enrichedDetail = mapId && detail?.lote
+          ? {
+              ...detail,
+              lotMapId: mapId,
+              lote: {
+                ...detail.lote,
+                mapId: mapId,
+              },
+            }
+          : mapId
+          ? {
+              ...detail,
+              lotMapId: mapId,
+            }
+          : detail;
+        setReservaSel((prev) => ({ ...(prev || reserva), ...(enrichedDetail || {}) }));
       } catch (e) {
         console.error("Error obteniendo reserva por id:", e);
       }
@@ -148,7 +208,24 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+        // Preservar mapId del lote si viene del backend o de la reserva original
+        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+        const enrichedDetail = mapId && detail?.lote
+          ? {
+              ...detail,
+              lotMapId: mapId,
+              lote: {
+                ...detail.lote,
+                mapId: mapId,
+              },
+            }
+          : mapId
+          ? {
+              ...detail,
+              lotMapId: mapId,
+            }
+          : detail;
+        setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
       } catch (e) {
         console.error("Error obteniendo reserva por id para editar:", e);
       }
@@ -277,6 +354,7 @@ export default function Reservas() {
         userRole={user?.role}
         reservas={reservas}
         data={reservas}
+        lotes={lotes}
         onVer={canReservaView ? onVer : null}
         onEditar={canReservaEdit ? onEditar : null}
         onEliminar={canReservaDelete ? onEliminar : null}
@@ -303,7 +381,24 @@ export default function Reservas() {
             try {
               const resp = await getReservaById(reserva.id);
               const detail = resp?.data ?? resp ?? {};
-              setReservaSel({ ...(reserva || {}), ...(detail || {}) });
+              // Preservar mapId del lote si viene del backend o de la reserva original
+              const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
+              const enrichedDetail = mapId && detail?.lote
+                ? {
+                    ...detail,
+                    lotMapId: mapId,
+                    lote: {
+                      ...detail.lote,
+                      mapId: mapId,
+                    },
+                  }
+                : mapId
+                ? {
+                    ...detail,
+                    lotMapId: mapId,
+                  }
+                : detail;
+              setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
             } catch (e) {
               console.error("Error obteniendo reserva por id para editar:", e);
             }
@@ -341,7 +436,7 @@ export default function Reservas() {
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
       />
 
       {/* Modal de visualización de documento */}
@@ -354,7 +449,7 @@ export default function Reservas() {
         }}
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.loteId || reservaSel?.lote?.id}
+        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
         documentoUrl={null}
         onModificar={(url) => {
           console.log("Modificar documento:", url);

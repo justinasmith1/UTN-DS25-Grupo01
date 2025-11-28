@@ -87,6 +87,7 @@ export function applyVentaFilters(rows = [], f = {}) {
 
     // Lote e id para búsqueda por texto
     const loteIdStr = v?.loteId != null ? String(v.loteId) : "";
+    const loteMapIdStr = norm(v?.lotMapId ?? v?.lote?.mapId ?? "");
     const ventaIdStr = v?.id != null ? String(v.id) : "";
 
     // Monto y Fecha
@@ -97,6 +98,7 @@ export function applyVentaFilters(rows = [], f = {}) {
     if (q) {
       const haystack = [
         loteIdStr,
+        loteMapIdStr,
         ventaIdStr,
         compradorNorm,
         inmoNombreNorm,
