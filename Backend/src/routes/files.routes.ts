@@ -25,11 +25,10 @@ router.get(
     fileController.getFileByIdController);
 
 // Obtener URL firmada para descargar/ver archivo
-router.get(
+router.post(
     '/:id/url',
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
-    validateParams(deleteFileMetadataSchema),
     fileController.generateSignedUrlController);
 
 //POST /api/files

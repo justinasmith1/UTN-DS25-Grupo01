@@ -4,9 +4,13 @@ import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
-import { uploadArchivo, getArchivosByLote, deleteArchivo } from "../../../lib/api/archivos.js";
+import { uploadArchivo, getArchivosByLote, deleteArchivo, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
 import { removeLotePrefix } from "../../../utils/mapaUtils.js";
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { Trash2, Upload, GripVertical } from "lucide-react";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -85,6 +89,57 @@ const SUBESTADOS = [
 ];
 
 const FALLBACK_IMAGE = "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
+
+// Componente para cada miniatura ordenable
+function SortableImageItem({ image, index, onRemove, getImageUrl }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `image-${index}` });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const imageUrl = getImageUrl(image);
+  
+  if (!imageUrl) {
+    return null;
+  }
+
+  return (
+    <div ref={setNodeRef} style={style} className="lote-image-thumbnail">
+      <div className="lote-image-thumbnail__image-wrapper">
+        <img src={imageUrl} alt={`Imagen ${index + 1}`} onError={(e) => { e.target.style.display = 'none'; }} />
+        <div className="lote-image-thumbnail__overlay">
+          <button
+            type="button"
+            className="lote-image-thumbnail__drag"
+            {...attributes}
+            {...listeners}
+            aria-label="Reordenar"
+          >
+            <GripVertical size={18} strokeWidth={2} />
+          </button>
+          <button
+            type="button"
+            className="lote-image-thumbnail__delete"
+            onClick={() => onRemove(index)}
+            aria-label="Eliminar imagen"
+          >
+            <Trash2 size={16} strokeWidth={2} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 const LABELS = [
   "ID",
@@ -166,7 +221,6 @@ const buildInitialForm = (lot) => {
   const fraccionId = lot?.fraccionId ?? lot?.fraccion?.id ?? "";
   const fraccionNumero = lot?.fraccion?.numero ?? lot?.fraccionNumero ?? lot?.fraccion ?? "";
   const ubicacion = lot?.ubicacion ?? {};
-  const images = Array.isArray(lot?.images) ? lot.images : [];
 
   const frente = lot?.frente ?? "";
   const fondo = lot?.fondo ?? "";
@@ -213,7 +267,7 @@ const buildInitialForm = (lot) => {
     ubicacionNumero: ubicacion?.numero ?? "",
     nombreEspacioComun: lot?.nombreEspacioComun ?? "",
     capacidad: lot?.capacidad ?? "",
-    images,
+    images: [], // Siempre inicializar vacío, se cargan desde el backend
   };
 };
 
@@ -295,7 +349,7 @@ export default function LoteEditarCard({
     }
   }, [open, detalle, loteId, loadingDetalle]);
 
-  // Inicializar formulario y cargar archivos asociados
+  // Inicializar formulario cuando se abre el modal o cambia el detalle
   useEffect(() => {
     if (!open) return;
     if (!detalle) return;
@@ -304,23 +358,42 @@ export default function LoteEditarCard({
     setArchivosParaBorrar([]);
     setError(null);
     setShowSuccess(false);
+  }, [detalle?.id, open]);
 
-    // Cargar archivos (imágenes) del lote
+  useEffect(() => {
+    if (!open || !detalle?.id) return;
+
+    let cancelled = false;
+
     (async () => {
       try {
-        if (!detalle?.id) return;
         const resp = await getArchivosByLote(detalle.id);
-        const archivos = resp?.data?.archivos ?? resp?.archivos ?? resp ?? [];
-        const archivosForm = (Array.isArray(archivos) ? archivos : []).map(a => {
-          const url = a.url ?? a.publicUrl ?? a.link ?? a.path ?? a.path_public ?? "";
-          return { id: a.id ?? a.idArchivo ?? null, url };
-        }).filter(a => a.url);
-        setForm(prev => ({ ...prev, images: archivosForm }));
+        if (cancelled) return;
+        
+        const archivos = Array.isArray(resp) ? resp : (resp?.archivos ?? resp?.data?.archivos ?? []);
+        const imagenes = archivos.filter(a => (a.tipo || "").toUpperCase() === "IMAGEN" && a.id);
+        
+        const imagenesConUrls = await Promise.all(
+          imagenes.map(async (img) => {
+            const signedUrl = await getFileSignedUrl(img.id);
+            return signedUrl?.startsWith('http') ? { id: img.id, url: signedUrl } : null;
+          })
+        );
+        
+        if (cancelled) return;
+        
+        const imagenesValidas = imagenesConUrls.filter(i => i?.id && i?.url);
+        setForm(prev => {
+          const existingFiles = (prev.images || []).filter(img => img instanceof File && img.objectURL);
+          return { ...prev, images: [...existingFiles, ...imagenesValidas] };
+        });
       } catch (err) {
-        console.error("Error cargando archivos del lote:", err);
+        if (!cancelled) console.error("Error cargando archivos del lote:", err);
       }
     })();
-  }, [detalle, open]);
+
+    return () => { cancelled = true; };
+  }, [detalle?.id, open]);
 
   // Cargar reservas/ventas
   useEffect(() => {
@@ -382,7 +455,10 @@ export default function LoteEditarCard({
       return fw;
     });
 
-    setForm(prev => ({ ...prev, images: [...(prev.images || []), ...filesWithPreview] }));
+    setForm(prev => {
+      const currentImages = (prev.images || []).filter(img => img != null);
+      return { ...prev, images: [...currentImages, ...filesWithPreview] };
+    });
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -414,21 +490,34 @@ export default function LoteEditarCard({
     };
   }, [form.images]);
 
-  const displayImages = useMemo(() => {
-    if (!form.images || form.images.length === 0) return [FALLBACK_IMAGE];
-    return form.images.map(img => {
-      if (img instanceof File && img.objectURL) return img.objectURL;
-      if (typeof img === "string") return img;
-      if (img && img.url) return img.url;
-      return FALLBACK_IMAGE;
-    });
-  }, [form.images]);
 
-  const [currentImage, setCurrentImage] = useState(0);
-  useEffect(() => setCurrentImage(0), [form.images, open]);
-  const showCarouselControls = (form.images || []).length > 1;
-  const handlePrev = () => setCurrentImage(i => (i === 0 ? displayImages.length - 1 : i - 1));
-  const handleNext = () => setCurrentImage(i => (i === displayImages.length - 1 ? 0 : i + 1));
+  // Drag & Drop para reordenar imágenes
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    setForm(prev => {
+      const images = prev.images || [];
+      const oldIndex = parseInt(active.id.toString().replace("image-", ""));
+      const newIndex = parseInt(over.id.toString().replace("image-", ""));
+      const newImages = arrayMove(images, oldIndex, newIndex);
+      return { ...prev, images: newImages };
+    });
+  };
+
+  const getImageUrl = (img) => {
+    if (!img) return null;
+    if (img instanceof File && img.objectURL) return img.objectURL;
+    if (img?.url?.startsWith('http')) return img.url;
+    return null;
+  };
 
   // Agregar try-catch en el buildPayload
   const buildPayload = () => {
@@ -507,6 +596,15 @@ export default function LoteEditarCard({
         }
       }
 
+      if (estadoUpper === "ALQUILADO") {
+        const tieneInquilino = detalle?.inquilinoId || detalle?.inquilino?.id;
+        if (!tieneInquilino) {
+          setError("No se puede establecer el estado ALQUILADO sin un inquilino asignado para este lote.");
+          setSaving(false);
+          return;
+        }
+      }
+
       const resp = await updateLote(detalle.id, payload);
       const updated = resp?.data ?? resp ?? {};
 
@@ -524,17 +622,63 @@ export default function LoteEditarCard({
       // Borrar archivos marcados
       if (archivosParaBorrar.length > 0) {
         try {
-          await Promise.all(archivosParaBorrar.map(id => deleteArchivo(id)));
+          await Promise.allSettled(
+            archivosParaBorrar.map(id => 
+              deleteArchivo(id).catch(err => {
+                console.warn(`Error borrando archivo ${id}:`, err);
+                return null;
+              })
+            )
+          );
         } catch (delErr) {
           console.error("Error borrando archivos:", delErr);
         }
+      }
+
+      const ordenActual = (form.images || [])
+        .filter(img => !(img instanceof File) && img?.id)
+        .map(img => img.id);
+      
+      let imagenesActualizadas = [];
+      try {
+        const resp = await getArchivosByLote(detalle.id);
+        const archivos = Array.isArray(resp) ? resp : (resp?.archivos ?? resp?.data?.archivos ?? []);
+        const imagenes = archivos.filter(a => (a.tipo || "").toUpperCase() === "IMAGEN" && a.id);
+        
+        imagenesActualizadas = await Promise.all(
+          imagenes.map(async (img) => {
+            const signedUrl = await getFileSignedUrl(img.id);
+            return signedUrl?.startsWith('http') ? { id: img.id, url: signedUrl } : null;
+          })
+        );
+        imagenesActualizadas = imagenesActualizadas.filter(i => i?.id && i?.url);
+        
+        const imagenesMap = new Map(imagenesActualizadas.map(img => [img.id, img]));
+        const imagenesOrdenadas = [];
+        
+        ordenActual.forEach(id => {
+          const img = imagenesMap.get(id);
+          if (img) {
+            imagenesOrdenadas.push(img);
+            imagenesMap.delete(id);
+          }
+        });
+        
+        imagenesMap.forEach(img => imagenesOrdenadas.push(img));
+        imagenesActualizadas = imagenesOrdenadas;
+        
+        setForm(prev => ({ ...prev, images: imagenesActualizadas }));
+      } catch (err) {
+        console.error("Error recargando imágenes:", err);
+        imagenesActualizadas = (form.images || []).filter(img => !(img instanceof File) && img?.id && img?.url);
+        setForm(prev => ({ ...prev, images: imagenesActualizadas }));
       }
 
       const enriched = {
         ...(detalle || {}),
         ...(updated || {}),
         mapId: updated?.mapId ?? detalle?.mapId ?? form.mapId ?? null,
-        images: [...(form.images || [])],
+        images: imagenesActualizadas,
         descripcion: form.descripcion,
         alquiler: payload.alquiler,
         deuda: payload.deuda,
@@ -660,7 +804,7 @@ export default function LoteEditarCard({
 
               <div className="field-row"><div className="field-label">Estado</div><div className="field-value p0"><NiceSelect value={form.estado} options={ESTADOS} placeholder="" onChange={(value) => updateForm({ estado: value })} /></div></div>
               <div className="field-row"><div className="field-label">Sub-Estado</div><div className="field-value p0"><NiceSelect value={form.subestado} options={SUBESTADOS} placeholder="" onChange={(value) => updateForm({ subestado: value })} /></div></div>
-              <div className="field-row"><div className="field-label">Fracción</div><div className="field-value p0"><NiceSelect value={form.fraccionId ? String(form.fraccionId) : ""} options={fracciones.map(f => ({ value: String(f.idFraccion ?? f.id ?? ""), label: `Fracción ${f.numero ?? f.id}` }))} placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"} onChange={(value) => { const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value); updateForm({ fraccionId: value ? Number(value) : "", fraccionNumero: fraccion?.numero ?? "" }); }} /></div></div>
+              <div className="field-row"><div className="field-label">Fracción</div><div className="field-value p0"><NiceSelect value={form.fraccionId ? String(form.fraccionId) : ""} options={fracciones.map(f => ({ value: String(f.idFraccion ?? f.id ?? ""), label: `Fracción ${f.numero ?? f.id}` }))} placeholder={loadingFracciones ? "Cargando..." : ""} onChange={(value) => { const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value); updateForm({ fraccionId: value ? Number(value) : "", fraccionNumero: fraccion?.numero ?? "" }); }} /></div></div>
               <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input is-readonly" type="number" inputMode="decimal" value={form.superficie ?? ""} readOnly placeholder="Se calcula automáticamente" title="La superficie se calcula automáticamente como frente × fondo" /></div></div>
               <div className="field-row"><div className="field-label">Frente</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.frente ?? ""} onChange={(e) => updateForm({ frente: e.target.value })} placeholder="Metros" /></div></div>
               <div className="field-row"><div className="field-label">Fondo</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.fondo ?? ""} onChange={(e) => updateForm({ fondo: e.target.value })} placeholder="Metros" /></div></div>
@@ -672,52 +816,115 @@ export default function LoteEditarCard({
             </div>
 
             <div className="lote-media-col">
-              <div className="lote-image-manager">
-                <div className="lote-carousel">
-                  <img src={displayImages[currentImage]} alt={`Imagen lote ${currentImage + 1}`} className="lote-carousel__image" />
-                  {showCarouselControls && (
-                    <>
-                      <button type="button" className="lote-carousel__nav lote-carousel__nav--prev" onClick={handlePrev} aria-label="Imagen anterior">‹</button>
-                      <button type="button" className="lote-carousel__nav lote-carousel__nav--next" onClick={handleNext} aria-label="Imagen siguiente">›</button>
-                      <div className="lote-carousel__indicator">{displayImages.map((_, idx) => (<span key={idx} className={`lote-carousel__dot ${idx === currentImage ? "is-active" : ""}`} />))}</div>
-                    </>
+              <div className="lote-image-manager-card">
+                <h3 className="lote-image-manager-card__title">Imágenes del lote</h3>
+                
+                {/* Contenedor scrolleable para la grid de imágenes */}
+                <div className="lote-image-grid-container">
+                  {form.images && form.images.length > 0 ? (
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <SortableContext
+                        items={form.images
+                          .filter(img => {
+                            if (!img) return false;
+                            if (img instanceof File) return img.objectURL != null;
+                            return img?.id && img?.url?.startsWith('http');
+                          })
+                          .map((img, idx) => {
+                            return img instanceof File 
+                              ? `file-${idx}-${img.name}-${img.size}`
+                              : `img-${img.id}`;
+                          })}
+                        strategy={rectSortingStrategy}
+                      >
+                        <div className="lote-image-grid">
+                          {form.images
+                            .filter(img => {
+                              if (!img) return false;
+                              if (img instanceof File) return img.objectURL != null;
+                              return img?.id && img?.url?.startsWith('http');
+                            })
+                            .map((img, idx) => {
+                              const imageUrl = getImageUrl(img);
+                              if (!imageUrl) return null;
+                              const uniqueKey = img instanceof File 
+                                ? `file-${idx}-${img.name}-${img.size}` 
+                                : `img-${img.id}`;
+                              return (
+                                <SortableImageItem
+                                  key={uniqueKey}
+                                  image={img}
+                                  index={idx}
+                                  onRemove={handleRemoveImage}
+                                  getImageUrl={getImageUrl}
+                                />
+                              );
+                            })
+                            .filter(Boolean)}
+                        </div>
+                      </SortableContext>
+                    </DndContext>
+                  ) : (
+                    <div className="lote-image-empty">
+                      <p>Imagen no cargada</p>
+                    </div>
                   )}
                 </div>
 
-                <div className="lote-image-actions">
-                  <label htmlFor="file-input-lote-editar" style={{ display: "inline-block", padding: "8px 16px", background: "#2563eb", color: "white", borderRadius: "6px", cursor: "pointer", fontSize: "14px", fontWeight: "500", border: "none" }}>Seleccionar imágenes</label>
-                  <input ref={fileInputRef} id="file-input-lote-editar" type="file" accept="image/*" multiple onChange={handleFileSelect} style={{ display: "none" }} />
-                  {form.images.length > 0 && <button type="button" className="lote-add-btn" style={{ background: "#b91c1c", borderColor: "#b91c1c" }} onClick={() => handleRemoveImage(currentImage)}>Quitar imagen actual</button>}
-                  {form.images.length > 0 && <div style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>{form.images.length} imagen{form.images.length !== 1 ? "es" : ""} seleccionada{form.images.length !== 1 ? "s" : ""}</div>}
-                </div>
-
-                {form.images.length > 0 && (
-                  <div className="lote-image-list">
-                    {form.images.map((img, idx) => {
-                      let fileName = `Imagen ${idx + 1}`;
-                      if (img instanceof File) {
-                        fileName = img.name;
-                      } else if (img && img.url) {
-                        try {
-                          const url = new URL(img.url);
-                          const pathName = url.pathname.split("/").pop();
-                          if (pathName && pathName.trim()) {
-                            fileName = pathName;
-                          }
-                        } catch (e) {
-                          console.error("URL inválida:", img.url, e);
-                          fileName = `Imagen ${idx + 1}`;
+                {/* Zona de agregar imágenes */}
+                <div className="lote-image-dropzone">
+                  <div
+                    className="lote-image-dropzone__area"
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.add("is-dragover");
+                    }}
+                    onDragLeave={(e) => {
+                      e.currentTarget.classList.remove("is-dragover");
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      e.currentTarget.classList.remove("is-dragover");
+                      const files = Array.from(e.dataTransfer.files || []);
+                      if (files.length > 0) {
+                        const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+                        if (imageFiles.length !== files.length) {
+                          showError("Solo se pueden subir archivos de imagen");
+                          return;
                         }
+                        const filesWithPreview = imageFiles.map((file) => {
+                          const fw = file;
+                          fw.objectURL = URL.createObjectURL(file);
+                          return fw;
+                        });
+                        setForm(prev => {
+                          const currentImages = (prev.images || []).filter(img => img != null);
+                          return { ...prev, images: [...currentImages, ...filesWithPreview] };
+                        });
                       }
-                      return (
-                        <div key={idx} className="lote-image-chip">
-                          <button type="button" onClick={() => setCurrentImage(idx)} style={{ border: "none", background: "transparent", color: "#1f2937", cursor: "pointer", fontSize: "13px", maxWidth: "200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={fileName}>{fileName}</button>
-                          <button type="button" onClick={() => handleRemoveImage(idx)} aria-label={`Eliminar ${fileName}`}>×</button>
-                        </div>
-                      );
-                    })}
+                    }}
+                  >
+                    <Upload size={32} strokeWidth={1.5} />
+                    <p>Arrastrá aquí tus imágenes</p>
+                    <span>o</span>
+                    <label htmlFor="file-input-lote-editar" className="lote-image-dropzone__button">
+                      Seleccionar imágenes
+                    </label>
+                    <input
+                      ref={fileInputRef}
+                      id="file-input-lote-editar"
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFileSelect}
+                      style={{ display: "none" }}
+                    />
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="lote-description">

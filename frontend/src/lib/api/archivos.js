@@ -1,9 +1,13 @@
-// src/lib/api/archivos.js
-// API adapter para archivos/documentos
-
 import { http } from '../http/http';
 
 const PRIMARY = "/files";
+
+const getApiBase = () => {
+  const RAW_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "";
+  const FORCE_ABS = import.meta.env.VITE_API_FORCE_ABSOLUTE === "true";
+  const isLocalAbs = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(RAW_BASE);
+  return (import.meta.env.DEV && isLocalAbs && !FORCE_ABS) ? "/api" : (RAW_BASE || "/api");
+};
 
 /**
  * Obtiene todos los archivos de un lote
@@ -21,14 +25,13 @@ export async function getArchivosByLote(loteId) {
       throw new Error(data?.message || "Error al obtener archivos");
     }
     
-    // Normalizar respuesta - puede venir como array directo o dentro de data
     const archivos = Array.isArray(data) ? data : (data?.archivos || data?.data || []);
     
     return archivos.map(archivo => ({
       id: archivo.id,
       filename: archivo.filename || archivo.nombreArchivo,
       url: archivo.url || archivo.linkArchivo,
-      tipo: archivo.tipo, // BOLETO, ESCRITURA, PLANO, IMAGEN
+      tipo: archivo.tipo,
       uploadedAt: archivo.uploadedAt || archivo.createdAt,
       uploadedBy: archivo.uploadedBy,
       idLoteAsociado: archivo.idLoteAsociado,
@@ -92,22 +95,17 @@ export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
     formData.append('idLoteAsociado', String(idLoteAsociado));
     formData.append('tipo', tipo);
 
-    // Obtener token de acceso
     const { getAccessToken } = await import('../auth/token');
     const access = getAccessToken();
+    const url = `${getApiBase()}${PRIMARY}`;
 
-    // Construir URL
-    const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "/api";
-    const url = `${API_BASE}${PRIMARY}`;
-
-    // Hacer la petición con FormData (sin Content-Type header, el navegador lo agrega automáticamente)
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
       },
       credentials: 'include',
-      body: formData, // No serializar, enviar FormData directamente
+      body: formData,
     });
 
     const data = await res.json().catch(() => ({}));
@@ -133,7 +131,6 @@ export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
   }
 }
 
-// Delete Archivo
 export async function deleteArchivo(id) {
   try {
     const res = await http(`${PRIMARY}/${id}`, { method: "DELETE" });
@@ -145,5 +142,44 @@ export async function deleteArchivo(id) {
   } catch (error) {
     console.error("Error eliminando archivo:", error);
     throw error;
+  }
+}
+
+/**
+ * Obtiene la URL firmada (signed URL) de un archivo usando su ID
+ * @param {number|string} fileId - ID del archivo
+ * @returns {Promise<string|null>} URL firmada o null si hay error
+ */
+export async function getFileSignedUrl(fileId) {
+  if (!fileId) return null;
+  try {
+    const res = await http(`${PRIMARY}/${fileId}`, { method: "GET" });
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok || !data) return null;
+    
+    const archivo = data?.archivo || data?.data || data;
+    const objectPath = archivo?.url || archivo?.linkArchivo;
+    if (!objectPath) return null;
+    
+    const { getAccessToken } = await import('../auth/token');
+    const access = getAccessToken();
+    
+    const urlRes = await fetch(`${getApiBase()}${PRIMARY}/${fileId}/url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(access ? { Authorization: `Bearer ${access}` } : {}),
+      },
+      credentials: 'include',
+      body: JSON.stringify({ filename: objectPath })
+    });
+    
+    const urlData = await urlRes.json().catch(() => ({}));
+    if (!urlRes.ok) return null;
+    
+    return urlData?.signedURL || urlData?.signedUrl || null;
+  } catch (error) {
+    return null;
   }
 }

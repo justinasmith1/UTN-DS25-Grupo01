@@ -36,7 +36,7 @@ export async function uploadFileToSupabase(
     .from(bucket)
     .upload(objectPath, fileBuffer, {
       contentType: "application/octet-stream",
-      upsert: false,
+      upsert: true, // Permitir sobrescribir archivos existentes
     });
 
   if (error) throw new Error(`Error uploading file: ${error.message}`);
