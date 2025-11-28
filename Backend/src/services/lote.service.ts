@@ -98,6 +98,7 @@ export async function getAllLotes(query: any = {}, role?: string) {
         ubicacion: { select: { calle: true, numero: true} },
         // Para mostrar el nombre del Propietario
         propietario: { select: { nombre: true, apellido: true } },
+        fraccion: { select: { numero: true } },
       },
     }),
     prisma.lote.count({ where }),

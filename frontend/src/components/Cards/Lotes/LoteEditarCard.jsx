@@ -88,7 +88,6 @@ const SUBESTADOS = [
   { value: "Construido", label: "Construido" },
 ];
 
-const FALLBACK_IMAGE = "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
 // Componente para cada miniatura ordenable
 function SortableImageItem({ image, index, onRemove, getImageUrl }) {
@@ -219,7 +218,7 @@ const buildInitialForm = (lot) => {
     .join(" ");
 
   const fraccionId = lot?.fraccionId ?? lot?.fraccion?.id ?? "";
-  const fraccionNumero = lot?.fraccion?.numero ?? lot?.fraccionNumero ?? lot?.fraccion ?? "";
+  const fraccionNumero = lot?.fraccion?.numero ?? "";
   const ubicacion = lot?.ubicacion ?? {};
 
   const frente = lot?.frente ?? "";
@@ -278,7 +277,6 @@ export default function LoteEditarCard({
   lote,
   loteId,
   lotes,
-  entityType = "Lote",
 }) {
   const { success, error: showError } = useToast();
   const [detalle, setDetalle] = useState(lote || null);
@@ -294,7 +292,6 @@ export default function LoteEditarCard({
   const [archivosParaBorrar, setArchivosParaBorrar] = useState([]);
   const fileInputRef = useRef(null);
 
-  // Cargar fracciones
   useEffect(() => {
     if (!open) return;
     if (fracciones.length > 0) return;
@@ -349,7 +346,6 @@ export default function LoteEditarCard({
     }
   }, [open, detalle, loteId, loadingDetalle]);
 
-  // Inicializar formulario cuando se abre el modal o cambia el detalle
   useEffect(() => {
     if (!open) return;
     if (!detalle) return;
@@ -395,7 +391,6 @@ export default function LoteEditarCard({
     return () => { cancelled = true; };
   }, [detalle?.id, open]);
 
-  // Cargar reservas/ventas
   useEffect(() => {
     if (!open || !detalle?.id) return;
     (async () => {
@@ -438,7 +433,6 @@ export default function LoteEditarCard({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // Gestión de imágenes
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -491,7 +485,6 @@ export default function LoteEditarCard({
   }, [form.images]);
 
 
-  // Drag & Drop para reordenar imágenes
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {
@@ -519,7 +512,6 @@ export default function LoteEditarCard({
     return null;
   };
 
-  // Agregar try-catch en el buildPayload
   const buildPayload = () => {
     try {
       const payload = {};
@@ -548,6 +540,11 @@ export default function LoteEditarCard({
       if (form.descripcion != null) payload.descripcion = form.descripcion;
       payload.alquiler = Boolean(form.alquiler);
       payload.deuda = Boolean(form.deuda);
+      
+      // Si se marca alquiler, establecer estado a ALQUILADO
+      if (form.alquiler) {
+        payload.estado = "Alquilado";
+      }
 
       const fraccionId = toNumberOrNull(form.fraccionId);
       if (fraccionId) payload.fraccionId = fraccionId;
@@ -700,12 +697,10 @@ export default function LoteEditarCard({
     }
   };
 
-  // Renderizar animación incluso si el modal se está cerrando
   if (!open && !showSuccess) return null;
 
   return (
     <>
-      {/* Animación de éxito - se muestra incluso si open es false */}
       {showSuccess && (
         <div
           style={{
@@ -764,7 +759,7 @@ export default function LoteEditarCard({
                 color: "#111",
               }}
             >
-              ¡{entityType} guardado exitosamente!
+              ¡Lote guardado exitosamente!
             </h3>
           </div>
         </div>
@@ -819,7 +814,6 @@ export default function LoteEditarCard({
               <div className="lote-image-manager-card">
                 <h3 className="lote-image-manager-card__title">Imágenes del lote</h3>
                 
-                {/* Contenedor scrolleable para la grid de imágenes */}
                 <div className="lote-image-grid-container">
                   {form.images && form.images.length > 0 ? (
                     <DndContext
@@ -875,7 +869,6 @@ export default function LoteEditarCard({
                   )}
                 </div>
 
-                {/* Zona de agregar imágenes */}
                 <div className="lote-image-dropzone">
                   <div
                     className="lote-image-dropzone__area"

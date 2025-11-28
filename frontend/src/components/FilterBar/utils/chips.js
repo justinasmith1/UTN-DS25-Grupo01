@@ -16,6 +16,7 @@ export function chipsFrom(applied, D, isInmo) {
 
   (applied.subestado || []).forEach((v) => arr.push({ k: "subestado", v, label: nice(v) }));
   (applied.calle || []).forEach((v) => arr.push({ k: "calle", v, label: nice(v) }));
+  (applied.fraccion || []).forEach((v) => arr.push({ k: "fraccion", v, label: `Fracción ${v}` }));
 
   if (applied.frente && (applied.frente.min !== D.frente.min || applied.frente.max !== D.frente.max)) {
     arr.push({ k: "frente", label: `Frente ${applied.frente.min}–${applied.frente.max} m` });

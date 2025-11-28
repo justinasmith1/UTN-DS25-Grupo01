@@ -6,6 +6,7 @@ export function applyLoteFilters(allLots = [], p = {}) {
   const getCalle = (l) => l?.ubicacion?.calle || l?.ubicacion?.nombreCalle || l?.location || l?.calle || "";
   const getEstado = (l) => l?.status || l?.estado || "";
   const getSub    = (l) => l?.subStatus || l?.subestado || l?.estadoPlano || "";
+  const getFraccion = (l) => String(l?.fraccion?.numero ?? "");
   const num = (x) => (x === null || x === undefined || x === "" ? NaN : +x);
 
   const getFrente = (l) => num(l?.frente ?? l?.anchoFrente ?? l?.frente_m ?? l?.frenteM);
@@ -43,6 +44,11 @@ export function applyLoteFilters(allLots = [], p = {}) {
   if (Array.isArray(p.calle) && p.calle.length > 0) {
     const set = new Set(p.calle.map(norm));
     rows = rows.filter((l) => set.has(norm(getCalle(l))));
+  }
+
+  if (Array.isArray(p.fraccion) && p.fraccion.length > 0) {
+    const set = new Set(p.fraccion.map(v => String(v)));
+    rows = rows.filter((l) => set.has(getFraccion(l)));
   }
 
   const inRange = (val, min, max) => {

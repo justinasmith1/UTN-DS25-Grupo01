@@ -86,8 +86,6 @@ const SUBESTADOS_LOTE = [
   { value: "CONSTRUIDO", label: "Construido" },
 ];
 
-const FALLBACK_IMAGE =
-  "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
 
 /**
  * LoteVerCard
@@ -213,14 +211,8 @@ export default function LoteVerCard({
     return "—";
   }, [lot]);
 
-  const fraccion = safe(
-    lot?.fraccion?.numero ??
-      lot?.fraccionNumero ??
-      lot?.fraccionId ??
-      lot?.fraccion
-  );
+  const fraccion = safe(lot?.fraccion?.numero ?? "");
 
-    // Función helper para obtener el valor del estado/subestado en formato que coincida con las opciones
     const getEstadoValue = (estado) => {
       if (!estado) return "";
       const normalized = String(estado).toUpperCase().replace(/\s+/g, "_");
@@ -280,7 +272,6 @@ export default function LoteVerCard({
 
   const [imageUrls, setImageUrls] = useState([]);
 
-  // Cargar archivos y obtener signed URLs cuando se abre el modal
   useEffect(() => {
     if (!open || !lot?.id) {
       setImageUrls([]);
@@ -350,17 +341,13 @@ export default function LoteVerCard({
 
   const infoPairs = [...leftPairs, ...rightPairs];
 
-  const containerRef = useRef(null);
   const [labelWidth, setLabelWidth] = useState(190);
   useEffect(() => {
     const labels = infoPairs.map(([label]) => label);
     const longest = Math.max(...labels.map((l) => l.length));
-    const computed = Math.min(
-      260,
-      Math.max(160, Math.round(longest * 8.2) + 22)
-    );
+    const computed = Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
     setLabelWidth(computed);
-  }, [leftPairs, rightPairs, open]);
+  }, [infoPairs, open]);
 
   if (!open || !lot) return null;
 
@@ -369,8 +356,7 @@ export default function LoteVerCard({
   });
 
   const handleOpenDocument = (type, file) => {
-    if (!onOpenDocument) return;
-    onOpenDocument({ type, file, lote: lot });
+    onOpenDocument?.({ type, file, lote: lot });
   };
 
   return (
@@ -378,7 +364,6 @@ export default function LoteVerCard({
       <div
         className="cclf-card"
         onClick={(e) => e.stopPropagation()}
-        ref={containerRef}
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
@@ -574,11 +559,6 @@ export default function LoteVerCard({
     </div>
   );
 }
-
-
-
-
-
 
 
 
