@@ -346,7 +346,7 @@ export default function TablaVentas({
           className="tl-btn tl-btn--soft"
           onClick={() => onAgregarVenta?.()}
         >
-          Registrar venta
+         + Registrar venta
         </button>
       )}
     </div>

@@ -271,40 +271,32 @@ export default function Reservas() {
     async (updatedReserva) => {
       if (!updatedReserva?.id) return;
       try {
-        // La reserva actualizada ya viene completa del backend con todas las relaciones
-        // Actualizar la lista con la reserva actualizada
         setAllReservas((prev) => prev.map((r) => (r.id === updatedReserva.id ? updatedReserva : r)));
         setReservaSel(updatedReserva);
-        success("Reserva actualizada correctamente");
       } catch (e) {
         console.error("Error actualizando reserva:", e);
         error(e?.message || "Error al actualizar reserva");
       }
     },
-    [success, error]
+    [error]
   );
 
-  // POST (Crear) - recibe la nueva reserva creada
   const handleCreated = useCallback(
     async (newReserva) => {
       if (!newReserva?.id) return;
       try {
-        // Agregar la nueva reserva a la lista (obtener datos completos)
         const resp = await getReservaById(newReserva.id);
         const detail = resp?.data ?? resp ?? newReserva;
         setAllReservas((prev) => [detail, ...prev]);
-        success("Reserva creada correctamente");
       } catch (e) {
-        console.error("Error obteniendo reserva creada:", e);
-        // Aún así agregar la reserva que viene del create
         setAllReservas((prev) => [newReserva, ...prev]);
-        success("Reserva creada correctamente");
+      } finally {
+        window.dispatchEvent(new CustomEvent('reloadLotes'));
       }
     },
-    [success]
+    []
   );
 
-  // DELETE (Eliminar)
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const handleDelete = useCallback(async () => {
     if (!reservaSel?.id) return;
@@ -314,11 +306,11 @@ export default function Reservas() {
       setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
+      window.dispatchEvent(new CustomEvent('reloadLotes'));
       setTimeout(() => {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error eliminando reserva:", e);
       alert(e?.message || "No se pudo eliminar la reserva.");
     } finally {
       setDeleting(false);

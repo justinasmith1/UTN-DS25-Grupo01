@@ -249,17 +249,21 @@ export default function ReservaEditarCard({
 
   const initialInmobId = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
 
+  const initialNumero = detalle?.numero != null ? String(detalle.numero) : "";
   const base = {
     estado: String(detalle?.estado ?? "ACTIVA"),
     fechaReserva: toDateInputValue(fechaReservaISO),
     sena: detalle?.seña != null ? String(detalle.seña) : detalle?.sena != null ? String(detalle.sena) : "",
     inmobiliariaId: initialInmobId,
+    numero: initialNumero,
   };
 
   const [estado, setEstado] = useState(base.estado);
   const [fechaReserva, setFechaReserva] = useState(base.fechaReserva);
   const [sena, setSena] = useState(base.sena);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
+  const [numero, setNumero] = useState(base.numero);
+  const [numeroError, setNumeroError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   // re-sync cuando cambia 'detalle' o se reabre
@@ -269,13 +273,15 @@ export default function ReservaEditarCard({
     setFechaReserva(base.fechaReserva);
     setSena(base.sena);
     setInmobiliariaId(base.inmobiliariaId);
+    setNumero(base.numero);
+    setNumeroError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, detalle?.id]);
 
   /* 6) ancho de label como en VerCard */
   useEffect(() => {
     const labels = [
-      "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
+      "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
       "FECHA RESERVA", "FECHA DE ACTUALIZACIÓN", "FECHA DE CREACIÓN"
     ];
     const longest = Math.max(...labels.map(s => s.length));
@@ -314,12 +320,22 @@ export default function ReservaEditarCard({
       patch.inmobiliariaId = inmobiliariaId || null;
     }
 
+    const prevNumero = detalle?.numero != null ? String(detalle.numero) : "";
+    if (numero !== prevNumero) {
+      const trimmed = (numero || "").trim();
+      if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
+        throw new Error("Número de reserva inválido (3 a 30 caracteres).");
+      }
+      patch.numero = trimmed;
+    }
+
     return patch;
   }
 
   async function handleSave() {
     try {
       setSaving(true);
+      setNumeroError(null);
       const patch = buildPatch();
       
       if (Object.keys(patch).length === 0) { 
@@ -337,41 +353,40 @@ export default function ReservaEditarCard({
         throw new Error(response?.message || "No se pudo guardar la reserva.");
       }
       
-      // Preservar mapId del lote si está disponible
       const mapId = updated?.lote?.mapId ?? detalle?.lote?.mapId ?? updated?.lotMapId ?? detalle?.lotMapId ?? null;
-      const enrichedUpdated = mapId && updated?.lote
-        ? {
-            ...updated,
-            lotMapId: mapId,
-            lote: {
+      const enrichedUpdated = {
+        ...updated,
+        numero: updated?.numero ?? detalle?.numero ?? null,
+        lotMapId: mapId ?? updated?.lotMapId ?? null,
+        lote: updated?.lote
+          ? {
               ...updated.lote,
-              mapId: mapId,
-            },
-          }
-        : mapId
-        ? {
-            ...updated,
-            lotMapId: mapId,
-          }
-        : updated;
+              mapId: mapId ?? updated.lote.mapId ?? null,
+            }
+          : updated?.lote ?? null,
+      };
       
-      // Actualizar detalle inmediatamente con los valores guardados
       setDetalle(enrichedUpdated);
-      
-      // Mostrar animación de éxito
       setShowSuccess(true);
       
-      // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
-        onSaved?.(updated);
+        onSaved?.(enrichedUpdated);
         onCancel?.();
       }, 1500);
     } catch (e) {
       console.error("Error guardando reserva:", e);
+      const msg = e?.message || "";
+      if (msg.toLowerCase().includes("número de reserva")) {
+        setNumeroError(msg);
+      } else if (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg)) {
+        setNumeroError("Ya existe una reserva con este número");
+      }
       setSaving(false);
-      alert(e?.message || "No se pudo guardar la reserva.");
+      if (!msg.toLowerCase().includes("número de reserva")) {
+        alert(msg || "No se pudo guardar la reserva.");
+      }
     }
   }
 
@@ -380,6 +395,8 @@ export default function ReservaEditarCard({
     setFechaReserva(base.fechaReserva);
     setSena(base.sena);
     setInmobiliariaId(base.inmobiliariaId);
+    setNumero(base.numero);
+    setNumeroError(null);
   }
 
   /* 8) Render */
@@ -485,7 +502,7 @@ export default function ReservaEditarCard({
 
       <EditarBase
         open={open}
-        title={`Reserva N° ${detalle?.id ?? "—"}`}
+        title={`Reserva N° ${detalle?.numero ?? detalle?.id ?? "—"}`}
         onCancel={() => {
           // Siempre resetear estados antes de cerrar
           setSaving(false);
@@ -508,6 +525,18 @@ export default function ReservaEditarCard({
               </div>
 
               <div className="field-row">
+                <div className="field-label">FECHA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={fechaReserva}
+                    onChange={(e) => setFechaReserva(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="field-row">
                 <div className="field-label">CLIENTE</div>
                 <div className="field-value is-readonly">{clienteNombre}</div>
               </div>
@@ -518,7 +547,7 @@ export default function ReservaEditarCard({
                   <NiceSelect
                     value={inmobiliariaId || ""}
                     options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                    placeholder=""
+                    placeholder="La Federala"
                     showPlaceholderOption={false}
                     onChange={setInmobiliariaId}
                   />
@@ -537,6 +566,30 @@ export default function ReservaEditarCard({
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Columna derecha */}
+            <div className="venta-col">
+              <div className="field-row">
+                <div className="field-label">NÚMERO DE RESERVA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="text"
+                    value={numero}
+                    onChange={(e) => {
+                      setNumero(e.target.value);
+                      if (numeroError) setNumeroError(null);
+                    }}
+                    placeholder="Ej: RES-2025-01"
+                  />
+                  {numeroError && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                      {numeroError}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               <div className="field-row">
                 <div className="field-label">SEÑA</div>
@@ -551,7 +604,6 @@ export default function ReservaEditarCard({
                     onChange={(e) => setSena(e.target.value)}
                     style={{ paddingRight: "50px" }}
                   />
-                  {/* Mostrar USD como símbolo al final */}
                   <span style={{ 
                     position: "absolute", 
                     right: "12px", 
@@ -564,21 +616,6 @@ export default function ReservaEditarCard({
                   }}>
                     {sena && Number(sena) > 0 ? "USD" : ""}
                   </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Columna derecha */}
-            <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">FECHA RESERVA</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="date"
-                    value={fechaReserva}
-                    onChange={(e) => setFechaReserva(e.target.value)}
-                  />
                 </div>
               </div>
 

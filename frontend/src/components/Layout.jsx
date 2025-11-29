@@ -49,6 +49,17 @@ export default function Layout() {
     }
   }, [location.pathname]);
 
+  // Escuchar evento personalizado para recargar lotes (cuando se crea/elimina una reserva o venta)
+  useEffect(() => {
+    const handleReloadLotes = () => {
+      loadLotes();
+    };
+    window.addEventListener('reloadLotes', handleReloadLotes);
+    return () => {
+      window.removeEventListener('reloadLotes', handleReloadLotes);
+    };
+  }, []);
+
   const [filters, setFilters] = useState({
     search: "", owner: [], location: [], status: [], subStatus: [],
   });

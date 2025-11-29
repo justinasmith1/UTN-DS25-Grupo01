@@ -37,6 +37,7 @@ const fromApi = (row = {}) => {
 
   return {
     id: row.id ?? row.idReserva ?? row.reservaId ?? row.Id,
+    numero: row.numero ?? row.numeroReserva ?? row.numero_publico ?? null, // Dejamos de usar el ID interno como número visible de reserva. A partir de ahora usamos reserva.numero como identificador de negocio, igual que hacemos con venta.numero en el módulo de ventas.
     loteId,
     lotMapId: lotMapId ?? null,
     lote: row.lote
@@ -59,7 +60,7 @@ const fromApi = (row = {}) => {
     inmobiliariaNombre:
       row.inmobiliaria?.nombre ??
       row.inmobiliariaNombre ??
-      `Inmobiliaria ID: ${row.inmobiliariaId || "N/A"}`,
+      "La Federala",
     loteInfo: buildLoteInfo(),
     createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
     updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt,
@@ -72,6 +73,7 @@ const toApi = (data = {}) => ({
   fechaReserva: data.fechaReserva,
   sena: data.sena ?? data.seña ?? null,
   inmobiliariaId: data.inmobiliariaId ?? null,
+  numero: data.numero, // Número de reserva editable por el usuario. Usamos reserva.numero como identificador de negocio y mostramos el input arriba a la derecha. El placeholder sugiere el formato RES-AAAA-NN, pero no lo forzamos.
   // estado no se envía en create, se asigna automáticamente como ACTIVA en el backend
 });
 
@@ -385,6 +387,10 @@ export const updateReserva = async (id, payload) => {
   if (payload.inmobiliariaId !== undefined) {
     body.inmobiliariaId = payload.inmobiliariaId || null;
   }
+  // Para numero, enviar si está presente
+  if (payload.numero !== undefined && payload.numero !== null) {
+    body.numero = String(payload.numero).trim();
+  }
   
   // Verificar que al menos hay un campo para actualizar
   if (Object.keys(body).length === 0) {
@@ -419,21 +425,18 @@ export const updateReserva = async (id, payload) => {
     // El backend devuelve { success: true, data: {...}, message: '...' }
     const raw = data?.data ?? data?.reserva ?? data;
     
-    // Normalizar manteniendo relaciones y fechas
     const base = fromApi(raw);
     const normalized = {
       ...base,
-      // Preservar relaciones completas del backend
       cliente: raw?.cliente || base?.cliente || null,
       inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
       lote: raw?.lote
         ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
         : base.lote || null,
-      // Mapear fechas correctamente
       createdAt: raw?.createdAt ?? base.createdAt ?? null,
       updatedAt: raw?.updatedAt ?? raw?.updateAt ?? base.updateAt ?? null,
-      // Preservar estado del backend (importante para el badge)
       estado: raw?.estado ?? base.estado ?? null,
+      numero: raw?.numero ?? base.numero ?? null,
     };
 
     return {
