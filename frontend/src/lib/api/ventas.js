@@ -45,6 +45,8 @@ const fromApi = (row = {}) => {
 
   return {
     id: row.id ?? row.ventaId ?? row.Id,
+    // Identificador visible para el usuario
+    numero: row.numero ?? row.numeroVenta ?? row.numero_publico ?? null,
     lotId,
     lotMapId: lotMapId ?? null,
     lote: ensureLote(),
@@ -273,6 +275,7 @@ async function apiUpdate(id, payload) {
   if (payload.estado != null) body.estado = payload.estado;
   if (payload.plazoEscritura != null) body.plazoEscritura = payload.plazoEscritura;
   if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
+  if (payload.numero != null) body.numero = payload.numero;
   if (payload.compradorId != null) body.compradorId = payload.compradorId;
   if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
   if (payload.reservaId != null) body.reservaId = payload.reservaId;

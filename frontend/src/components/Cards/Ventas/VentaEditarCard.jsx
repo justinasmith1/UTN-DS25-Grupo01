@@ -258,6 +258,7 @@ export default function VentaEditarCard({
 
   const initialInmobId =
     detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
+  const initialNumero = detalle?.numero != null ? String(detalle.numero) : "";
 
   const base = {
     estado: String(detalle?.estado ?? "INICIADA"),
@@ -266,6 +267,7 @@ export default function VentaEditarCard({
     fechaVenta: toDateInputValue(fechaVentaISO),
     plazoEscritura: toDateInputValue(detalle?.plazoEscritura),
     inmobiliariaId: initialInmobId,
+    numero: initialNumero,
   };
 
   const [estado, setEstado] = useState(base.estado);
@@ -274,6 +276,8 @@ export default function VentaEditarCard({
   const [fechaVenta, setFechaVenta] = useState(base.fechaVenta);
   const [plazoEscritura, setPlazoEscritura] = useState(base.plazoEscritura);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
+  const [numero, setNumero] = useState(base.numero);
+  const [numeroError, setNumeroError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
   // re-sync cuando cambia 'detalle' o se reabre
@@ -285,6 +289,8 @@ export default function VentaEditarCard({
     setFechaVenta(base.fechaVenta);
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
+    setNumero(base.numero);
+    setNumeroError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, detalle?.id, detalle?.monto]);
 
@@ -292,7 +298,7 @@ export default function VentaEditarCard({
   useEffect(() => {
     const labels = [
       "LOTE N°","MONTO","ESTADO DE VENTA","INMOBILIARIA","COMPRADOR","PROPIETARIO",
-      "FECHA VENTA","TIPO DE PAGO","PLAZO ESCRITURA","FECHA DE ACTUALIZACIÓN","FECHA DE CREACIÓN"
+      "NÚMERO DE VENTA","FECHA VENTA","TIPO DE PAGO","PLAZO ESCRITURA","FECHA DE ACTUALIZACIÓN","FECHA DE CREACIÓN"
     ];
     const longest = Math.max(...labels.map(s => s.length));
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
@@ -315,6 +321,15 @@ export default function VentaEditarCard({
 
     if ((detalle?.tipoPago ?? "") !== (tipoPago ?? "")) {
       patch.tipoPago = tipoPago || null;
+    }
+
+    const prevNumero = detalle?.numero != null ? String(detalle.numero) : "";
+    if (numero !== prevNumero) {
+      const trimmed = (numero || "").trim();
+      if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
+        throw new Error("Número de venta inválido (3 a 30 caracteres).");
+      }
+      patch.numero = trimmed;
     }
 
     const prevFV = toDateInputValue(fechaVentaISO);
@@ -341,6 +356,7 @@ export default function VentaEditarCard({
   async function handleSave() {
     try {
       setSaving(true);
+      setNumeroError(null);
       const patch = buildPatch();
       
       if (Object.keys(patch).length === 0) { 
@@ -366,8 +382,16 @@ export default function VentaEditarCard({
       }, 1500);
     } catch (e) {
       console.error("Error guardando venta:", e);
+      const msg = e?.message || "";
+      if (msg.toLowerCase().includes("número de venta")) {
+        setNumeroError(msg);
+      } else if (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg)) {
+        setNumeroError("Ya existe una venta con este número");
+      }
       setSaving(false);
-      alert(e?.message || "No se pudo guardar la venta.");
+      if (!msg.toLowerCase().includes("número de venta")) {
+        alert(msg || "No se pudo guardar la venta.");
+      }
     }
   }
 
@@ -378,6 +402,8 @@ export default function VentaEditarCard({
     setFechaVenta(base.fechaVenta);
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
+    setNumero(base.numero);
+    setNumeroError(null);
   }
 
   /* 8) Render */
@@ -487,8 +513,9 @@ export default function VentaEditarCard({
         title={`Venta N° ${detalle?.id ?? "—"}`}
         onCancel={() => {
           // Siempre resetear estados antes de cerrar
-          setSaving(false);
-          setShowSuccess(false);
+      setSaving(false);
+      setShowSuccess(false);
+      setNumeroError(null);
           onCancel?.();
         }}
         onSave={handleSave}
@@ -573,6 +600,27 @@ export default function VentaEditarCard({
 
           {/* Columna derecha */}
           <div className="venta-col">
+            <div className="field-row">
+              <div className="field-label">NÚMERO DE VENTA</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="text"
+                  value={numero}
+                  onChange={(e) => {
+                    setNumero(e.target.value);
+                    if (numeroError) setNumeroError(null);
+                  }}
+                  placeholder="Ej: CCLF-2025-01"
+                />
+                {numeroError && (
+                  <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                    {numeroError}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="field-row">
               <div className="field-label">FECHA VENTA</div>
               <div className="field-value p0">

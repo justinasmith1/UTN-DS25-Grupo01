@@ -122,7 +122,7 @@ export default function VentaVerCard({
       sale?.lote?.creadoEl
   );
 
-  // Orden solicitado: comprador/propietario a la izquierda; fechas/plazo a la derecha
+  // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha
   const leftPairs = [
     ["LOTE N°", safe(sale?.lote?.mapId ?? sale?.lotMapId ?? sale?.loteId)],
     ["MONTO", fmtMoney(sale?.monto)],
@@ -133,6 +133,7 @@ export default function VentaVerCard({
   ];
 
   const rightPairs = [
+    ["NÚMERO DE VENTA", safe(sale?.numero)],
     ["FECHA VENTA", fechaVenta],
     ["TIPO DE PAGO", fmtTipoPago(sale?.tipoPago)],
     ["PLAZO ESCRITURA", fmtDate(sale?.plazoEscritura)],
@@ -165,7 +166,7 @@ export default function VentaVerCard({
       >
         {/* Header */}
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Venta N° ${sale?.id ?? "—"}`}</h2>
+          <h2 className="cclf-card__title">{`Venta N° ${sale?.numero ?? sale?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
             <button

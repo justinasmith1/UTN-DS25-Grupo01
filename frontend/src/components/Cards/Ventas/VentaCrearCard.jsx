@@ -73,6 +73,7 @@ export default function VentaCrearCard({
   const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
   const [compradorId, setCompradorId] = useState("");
   const [inmobiliariaId, setInmobiliariaId] = useState("");
+  const [numero, setNumero] = useState("");
   const [monto, setMonto] = useState("");
   const [tipoPago, setTipoPago] = useState("");
   const [plazoEscritura, setPlazoEscritura] = useState("");
@@ -84,6 +85,7 @@ export default function VentaCrearCard({
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
+  const [numeroError, setNumeroError] = useState(null);
   const [openCrearPersona, setOpenCrearPersona] = useState(false);
 
   useEffect(() => {
@@ -121,11 +123,13 @@ export default function VentaCrearCard({
       setBusquedaLote("");
       setCompradorId("");
       setInmobiliariaId("");
+      setNumero("");
       setMonto("");
       setTipoPago("");
       setPlazoEscritura("");
       setFechaVenta(toDateInputValue(new Date()));
       setError(null);
+      setNumeroError(null);
       setOpenCrearPersona(false);
       return;
     }
@@ -171,8 +175,15 @@ export default function VentaCrearCard({
   async function handleSave() {
     setSaving(true);
     setError(null);
+    setNumeroError(null);
     try {
       const errores = [];
+
+      const numeroTrim = String(numero || "").trim();
+      if (!numeroTrim || numeroTrim.length < 3 || numeroTrim.length > 30) {
+        setNumeroError("Número de venta obligatorio (3 a 30 caracteres)");
+        errores.push("Número de venta");
+      }
       
       if (!loteId || String(loteId).trim() === "") {
         errores.push("Lote");
@@ -201,6 +212,7 @@ export default function VentaCrearCard({
         fechaVenta: fromDateInputToISO(fechaVenta) || new Date().toISOString(),
         monto: montoNum,
         estado: 'INICIADA',
+        numero: numeroTrim,
         tipoPago: String(tipoPago).trim(),
       };
       
@@ -243,6 +255,13 @@ export default function VentaCrearCard({
           if (typeof err === 'string') return err;
           const campo = err.path?.[0] || '';
           const msg = err.message || '';
+          if (campo === 'numero') {
+            if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('exist')) {
+              setNumeroError("Ya existe una venta con este número");
+              return "Número de venta ya existente";
+            }
+            setNumeroError("Número de venta inválido");
+          }
           if (msg.includes('expected string, received null')) {
             return `${campo || 'Campo'}: no puede estar vacío`;
           }
@@ -252,6 +271,9 @@ export default function VentaCrearCard({
           return msg || 'Error de validación';
         });
         errorMessage = mensajes.join(", ");
+      } else if (typeof errorMessage === "string" && /numero/i.test(errorMessage)) {
+        // Fallback genérico para errores de unicidad provenientes del backend
+        setNumeroError("Ya existe una venta con este número");
       }
       
       setError(errorMessage);
@@ -453,6 +475,26 @@ export default function VentaCrearCard({
             </div>
 
             <div className="venta-col">
+              <div className="field-row">
+                <div className="field-label">NÚMERO DE VENTA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    value={numero}
+                    onChange={(e) => {
+                      setNumero(e.target.value);
+                      if (numeroError) setNumeroError(null);
+                    }}
+                    placeholder="Ej: CCLF-2025-01"
+                  />
+                  {numeroError && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                      {numeroError}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="field-row">
                 <div className="field-label">FECHA</div>
                 <div className="field-value p0">

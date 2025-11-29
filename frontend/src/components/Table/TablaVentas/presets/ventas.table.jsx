@@ -18,7 +18,7 @@ export const ventasTablePreset = {
 
   widthFor(id) {
     switch (id) {
-      case 'id':             return '80px';
+      case 'id':             return '120px'; // más ancho para ver el número completo en una sola fila
       case 'loteId':         return '100px';
       case 'fechaVenta':     return '120px';
       case 'estado':         return '140px';
@@ -43,7 +43,8 @@ export const ventasTablePreset = {
       {
         id: 'id',
         titulo: 'ID',
-        accessor: (v) => v.numeroPublico ?? v.codigoVenta ?? v.numero ?? v.id ?? v.ventaId ?? '—',
+        // Identificador visible para el usuario: usamos siempre `venta.numero`
+        accessor: (v) => v.numero ?? '—',
         align: 'center',
       },
       {
@@ -130,12 +131,6 @@ export const ventasTablePreset = {
           return new Date(fecha).toLocaleDateString('es-AR');
         },
         align: 'center',
-      },
-      {
-        id: 'observaciones',
-        titulo: 'Observaciones',
-        accessor: (v) => v.observaciones ?? '—',
-        align: 'left',
       },
     ];
   },

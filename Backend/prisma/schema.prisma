@@ -201,6 +201,7 @@ model Fraccion {
 // VENTAS
 model Venta {
   id             Int           @id @default(autoincrement())
+  numero         String        @unique
   loteId         Int
   lote           Lote          @relation(fields: [loteId], references: [id], onDelete: Restrict)
   fechaVenta     DateTime

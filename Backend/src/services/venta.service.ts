@@ -103,6 +103,7 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
             tipoPago: data.tipoPago,
             compradorId: data.compradorId,
             inmobiliariaId: data.inmobiliariaId || null,
+            numero: data.numero,
             createdAt: new Date(),
         },
         include: { comprador: true }, // Incluir datos del comprador
