@@ -121,6 +121,7 @@ model Persona {
 // Reserva
 model Reserva {
   id             Int      @id @default(autoincrement())
+  numero         String  @unique
   fechaReserva   DateTime
   estado         EstadoReserva @default(ACTIVA)
   loteId         Int

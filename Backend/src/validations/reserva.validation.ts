@@ -32,7 +32,8 @@ export const createReservaSchema = z.object({
   loteId: idInt,                         // FK obligatoria
   clienteId: idInt,                      // FK obligatoria
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
-  sena: dinero.optional(),               
+  sena: dinero.optional(),
+  numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim(),
 }).strict(); // rechaza campos adicionales que por ahi se manden
 
 
@@ -48,6 +49,7 @@ export const updateReservaSchema = z.object({
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
   sena: dinero.optional().nullable(), // Permitir null para eliminar la seña
   estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
+  numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim().optional(),
 }).refine((data) => {
   // Asegurar que al menos un campo está presente
   return Object.keys(data).length > 0;

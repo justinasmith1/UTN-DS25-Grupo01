@@ -8,7 +8,14 @@ import { updateLoteState } from './lote.service';
 // -------------------------------------
 function mapPrismaError(e: unknown) {
   if (e instanceof PrismaClientKnownRequestError) {
-    if (e.code === 'P2002') { // unique compuesta (clienteId + loteId + fechaReserva)
+    if (e.code === 'P2002') {
+      // Verificar si es un error de unicidad de numero
+      if (e.meta?.target && Array.isArray(e.meta.target) && e.meta.target.includes('numero')) {
+        const err: any = new Error('Ya existe una reserva con este número');
+        err.status = 409;
+        return err;
+      }
+      // unique compuesta (clienteId + loteId + fechaReserva)
       const err: any = new Error('Ya existe una reserva para ese cliente, lote y fecha');
       err.status = 409; return err;
     }
@@ -104,6 +111,7 @@ export async function createReserva(body: {
   clienteId: number;
   inmobiliariaId?: number | null;
   sena?: number;                  // Zod ya garantiza >= 0 si viene
+  numero: string;                 // Número de reserva (obligatorio y único)
 }): Promise<any> {
   try {
     const lote = await prisma.lote.findUnique({ where: { id: body.loteId } });
@@ -123,10 +131,11 @@ export async function createReserva(body: {
         // Para Decimal no necesito new Decimal: Prisma acepta number|string
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
-      },});
+        numero: body.numero, // Número de reserva
+      },
+    });
 
-    // Cambiar el estado del lote asociado a "RESERVADO"
-    await updateLoteState (body.loteId, 'Reservado'); 
+    await updateLoteState(body.loteId, 'Reservado');
     return row;
   } catch (e) {
     throw mapPrismaError(e);
@@ -145,6 +154,7 @@ export async function updateReserva(
     clienteId: number;
     inmobiliariaId: number | null;
     sena: number;
+    numero: string;
   }>
 ): Promise<any> {
   try {
@@ -157,6 +167,7 @@ export async function updateReserva(
         ...(body.inmobiliariaId !== undefined ? { inmobiliariaId: body.inmobiliariaId } : {}),
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         ...(body.estado !== undefined ? { estado: body.estado } : {}),
+        ...(body.numero !== undefined ? { numero: body.numero } : {}),
       },
       include: {
         cliente: {
@@ -194,7 +205,22 @@ export async function updateReserva(
 // ==============================
 export async function deleteReserva(id: number): Promise<void> {
   try {
+    const reserva = await prisma.reserva.findUnique({
+      where: { id },
+      select: { estado: true, loteId: true },
+    });
+
+    if (!reserva) {
+      const err: any = new Error('La reserva no existe');
+      err.status = 404;
+      throw err;
+    }
+
     await prisma.reserva.delete({ where: { id } });
+
+    if (reserva.estado === EstadoReserva.ACTIVA && reserva.loteId) {
+      await updateLoteState(reserva.loteId, 'Disponible');
+    }
   } catch (e) {
     throw mapPrismaError(e);
   }
