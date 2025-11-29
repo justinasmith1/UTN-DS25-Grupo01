@@ -56,6 +56,12 @@ export default function VentaVerCard({
       ? NA
       : String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase();
 
+  // Importar helper común para tipo de pago (reutilizable)
+  const fmtTipoPago = (tp) => {
+    if (isBlank(tp)) return NA;
+    return capitalizeFirst(tp);
+  };
+
   const titleCaseEstado = (s) => {
     if (isBlank(s)) return NA;
     const t = String(s).toLowerCase().replace(/_/g, " ");
@@ -128,7 +134,7 @@ export default function VentaVerCard({
 
   const rightPairs = [
     ["FECHA VENTA", fechaVenta],
-    ["TIPO DE PAGO", capitalizeFirst(safe(sale?.tipoPago))],
+    ["TIPO DE PAGO", fmtTipoPago(sale?.tipoPago)],
     ["PLAZO ESCRITURA", fmtDate(sale?.plazoEscritura)],
     ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
     ["FECHA DE CREACIÓN", fechaCreacion],

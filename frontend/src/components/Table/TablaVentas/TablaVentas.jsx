@@ -330,7 +330,7 @@ export default function TablaVentas({
         disabled={selectedIds.length === 0}
         onClick={handleVerEnMapa}
       >
-        Ver en mapa ({selectedIds.length})
+        Ver en mapa ({selectedIds.length} {selectedIds.length === 1 ? 'venta' : 'ventas'})
       </button>
       <button
         type="button"
@@ -346,7 +346,7 @@ export default function TablaVentas({
           className="tl-btn tl-btn--soft"
           onClick={() => onAgregarVenta?.()}
         >
-          + Agregar Venta
+          Registrar venta
         </button>
       )}
     </div>

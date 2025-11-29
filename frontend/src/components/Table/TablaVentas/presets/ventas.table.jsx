@@ -1,6 +1,6 @@
 // src/components/Table/TablaVentas/presets/ventas.table.jsx
 import React from 'react';
-import { fmtMoney, fmtEstado} from '../utils/formatters';
+import { fmtMoney, fmtEstado, fmtTipoPago} from '../utils/formatters';
 import StatusBadge from '../cells/StatusBadge';
 
 // DEBUG: verificar que este preset sea el que usa la tabla de verdad
@@ -43,7 +43,7 @@ export const ventasTablePreset = {
       {
         id: 'id',
         titulo: 'ID',
-        accessor: (v) => v.id ?? v.ventaId ?? '—',
+        accessor: (v) => v.numeroPublico ?? v.codigoVenta ?? v.numero ?? v.id ?? v.ventaId ?? '—',
         align: 'center',
       },
       {
@@ -118,7 +118,7 @@ export const ventasTablePreset = {
       {
         id: 'tipoPago',
         titulo: 'Tipo Pago',
-        accessor: (v) => v.tipoPago ?? v.paymentType ?? '—',
+        accessor: (v) => fmtTipoPago(v.tipoPago ?? v.paymentType),
         align: 'center',
       },
       {

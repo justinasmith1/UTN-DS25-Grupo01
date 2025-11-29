@@ -230,9 +230,33 @@ async function apiGetByInmobiliaria(inmobiliariaId, params = {}) {
 }
 
 async function apiCreate(payload) {
-  const res = await fetchWithFallback(PRIMARY, { method: "POST", body: toApi(payload) });
+  const res = await fetchWithFallback(PRIMARY, { method: "POST", body: payload });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al crear la venta");
+  if (!res.ok) {
+    let errorMsg = data?.message || "Error al crear la venta";
+    
+    if (data?.errors && Array.isArray(data.errors) && data.errors.length > 0) {
+      const mensajes = data.errors.map((err) => {
+        if (typeof err === 'string') return err;
+        const campo = err.path?.[0] || '';
+        const msg = err.message || '';
+        if (msg.includes('expected string, received null')) {
+          return `${campo || 'Campo'}: no puede estar vacío`;
+        }
+        if (msg.includes('expected number')) {
+          return `${campo || 'Campo'}: debe ser un número válido`;
+        }
+        return msg || 'Error de validación';
+      });
+      errorMsg = mensajes.join(", ");
+    } else if (data?.error) {
+      errorMsg = data.error;
+    }
+    
+    const error = new Error(errorMsg);
+    error.response = { data };
+    throw error;
+  }
   return ok(fromApi(data?.data ?? data));
 }
 

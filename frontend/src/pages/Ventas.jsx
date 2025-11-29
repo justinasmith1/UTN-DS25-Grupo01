@@ -131,78 +131,82 @@ export default function VentasPage() {
   const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
   const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
 
+  // Función reutilizable para cargar datos
+  const loadVentasData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const ventasRequest =
+        selectedInmobiliariaRequest != null
+          ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
+          : getAllVentas({});
+      const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
+        ventasRequest,
+        getAllPersonas({}),
+        getAllInmobiliarias({}),
+        getAllLotes({}),
+      ]);
+
+      const ventasApi = pickArray(ventasResp, ["ventas"]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      const lotesApi = pickArray(lotesResp, ["lotes"]);
+
+      const lotesById = {};
+      lotesApi.forEach((lote) => {
+        if (lote && lote.id != null) {
+          lotesById[String(lote.id)] = lote;
+        }
+      });
+
+      const personasById = {};
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+
+      const inmosById = {};
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
+      const enrichedWithMapId = enriched.map((venta) => {
+        const lookupId = venta.loteId ?? venta.lotId ?? null;
+        const loteRef =
+          venta.lote?.mapId
+            ? venta.lote
+            : lookupId != null
+            ? lotesById[String(lookupId)] || null
+            : null;
+        const displayMapId =
+          loteRef?.mapId ?? venta.lotMapId ?? (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ?? null;
+
+        return {
+          ...venta,
+          lotMapId: displayMapId ?? venta.lotMapId ?? null,
+          lote: loteRef
+            ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+            : venta.lote ?? null,
+        };
+      });
+
+      setVentas(enrichedWithMapId);
+      setInmobiliarias(inmosApi);
+      setLotes(lotesApi);
+    } catch (err) {
+      console.error("Error cargando ventas/personas/inmobiliarias:", err);
+      setVentas([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedInmobiliariaRequest]);
+
   // Carga inicial + join con personas/inmobiliarias
   useEffect(() => {
     let alive = true;
     (async () => {
-      setIsLoading(true);
-      try {
-        const ventasRequest =
-          selectedInmobiliariaRequest != null
-            ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
-            : getAllVentas({});
-        const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
-          ventasRequest,
-          getAllPersonas({}),
-          getAllInmobiliarias({}),
-          getAllLotes({}),
-        ]);
-
-        const ventasApi = pickArray(ventasResp, ["ventas"]);
-        const personasApi = pickArray(personasResp, ["personas"]);
-        const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
-        const lotesApi = pickArray(lotesResp, ["lotes"]);
-
-        const lotesById = {};
-        lotesApi.forEach((lote) => {
-          if (lote && lote.id != null) {
-            lotesById[String(lote.id)] = lote;
-          }
-        });
-
-        const personasById = {};
-        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
-
-        const inmosById = {};
-        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
-
-        const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
-        const enrichedWithMapId = enriched.map((venta) => {
-          const lookupId = venta.loteId ?? venta.lotId ?? null;
-          const loteRef =
-            venta.lote?.mapId
-              ? venta.lote
-              : lookupId != null
-              ? lotesById[String(lookupId)] || null
-              : null;
-          const displayMapId =
-            loteRef?.mapId ?? venta.lotMapId ?? (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ?? null;
-
-          return {
-            ...venta,
-            lotMapId: displayMapId ?? venta.lotMapId ?? null,
-            lote: loteRef
-              ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
-              : venta.lote ?? null,
-          };
-        });
-
-        if (alive) {
-          setVentas(enrichedWithMapId);
-          setInmobiliarias(inmosApi); // Guardar inmobiliarias para pasarlas al componente
-          setLotes(lotesApi); // Guardar lotes para obtener mapIds
-        }
-      } catch (err) {
-        console.error("Error cargando ventas/personas/inmobiliarias:", err);
-        if (alive) setVentas([]);
-      } finally {
-        if (alive) setIsLoading(false);
-      }
+      await loadVentasData();
+      if (!alive) return;
     })();
     return () => {
       alive = false;
     };
-  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest]);
+  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest, loadVentasData]);
 
   useEffect(() => {
     const target = selectedInmobiliariaKey;
@@ -361,7 +365,7 @@ export default function VentasPage() {
   }, []);
 
   const onAgregarVenta = useCallback(() => {
-    console.debug("[ALTA] venta");
+    setOpenCrear(true);
   }, []);
 
   // PUT (Editar) - ahora recibe el objeto actualizado completo del componente
@@ -397,7 +401,30 @@ export default function VentasPage() {
     if (!ventaSel?.id) return;
     try {
       setDeleting(true);
+      const loteId = ventaSel.loteId ?? ventaSel.lotId ?? ventaSel.lote?.id;
+      
       await deleteVenta(ventaSel.id);
+      
+      if (loteId) {
+        try {
+          const { getAllReservas } = await import("../lib/api/reservas");
+          const reservasResp = await getAllReservas({});
+          const reservas = reservasResp?.data ?? [];
+          
+          const loteIdNum = Number(loteId);
+          const reservaActiva = reservas.find((r) => {
+            const rLoteId = Number(r.loteId ?? r.lote?.id ?? 0);
+            const estado = String(r.estado ?? "").toUpperCase();
+            return rLoteId === loteIdNum && estado === "ACTIVA";
+          });
+          
+          const { updateLote } = await import("../lib/api/lotes");
+          await updateLote(loteIdNum, { estado: reservaActiva ? "Reservado" : "Disponible" });
+        } catch (err) {
+          console.error("Error restaurando estado del lote:", err);
+        }
+      }
+      
       setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
@@ -504,7 +531,10 @@ export default function VentasPage() {
       <VentaCrearCard
         open={openCrear}
         onCancel={() => setOpenCrear(false)}
-        onCreated={() => setOpenCrear(false)}
+        onCreated={async () => {
+          setOpenCrear(false);
+          await loadVentasData();
+        }}
         loteIdPreSeleccionado={new URLSearchParams(searchParamsString).get("lotId")}
       />
 

@@ -68,7 +68,9 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
+  const label = value 
+    ? (options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder)
+    : placeholder;
 
   // Solo incluir placeholder como opción si showPlaceholderOption es true
   const optionsToShow = showPlaceholderOption && placeholder 
@@ -552,7 +554,7 @@ export default function VentaEditarCard({
                 <NiceSelect
                   value={inmobiliariaId || ""}
                   options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                  placeholder="Sin información"
+                  placeholder="La Federala"
                   onChange={setInmobiliariaId}
                 />
               </div>
