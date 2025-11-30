@@ -9,6 +9,7 @@ import jwt from 'jsonwebtoken';
                id: number;
                email: string;
                role: 'ADMINISTRADOR' | 'INMOBILIARIA' | 'TECNICO' | 'GESTOR';
+               inmobiliariaId?: number | null;
            }
        }
    }
@@ -25,11 +26,14 @@ import jwt from 'jsonwebtoken';
        const token = authHeader.split(' ')[1];
        // 2. Verificar token
        const decoded = jwt.verify( token, process.env.JWT_SECRET!) as any;
+       
        // 3. Agregar usuario al request
+       // El inmobiliariaId ya viene en el JWT si el rol es INMOBILIARIA (se incluye en el login)
        req.user = {
-           id: decoded.id,
+           id: decoded.sub || decoded.id,
            email: decoded.email,
-           role: decoded.role
+           role: decoded.role,
+           ...(decoded.inmobiliariaId != null && { inmobiliariaId: decoded.inmobiliariaId })
        };
        next();
    } catch (error: any) {

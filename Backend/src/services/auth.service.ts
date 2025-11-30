@@ -8,6 +8,7 @@ type JWTPayload = {
     sub: number;
     email: string; 
     role: Role;
+    inmobiliariaId?: number;
 };
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
@@ -37,11 +38,24 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   }
   const EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '2h';
 
+  // Si el rol es INMOBILIARIA, buscar la inmobiliaria asociada
+  // La relación es: Inmobiliaria.userId -> User.id (no User.inmobiliariaId)
+  let inmobiliariaId: number | null = null;
+  if (user.role === 'INMOBILIARIA') {
+    const inmobiliaria = await prisma.inmobiliaria.findUnique({
+      where: { userId: user.id },
+      select: { id: true }
+    });
+    inmobiliariaId = inmobiliaria?.id ?? null;
+  }
+
+  // Incluir inmobiliariaId en el JWT si el rol es INMOBILIARIA
+  // Esto evita consultar la BD en cada request en el middleware
   const payload: JWTPayload = {
     sub: user.id,
     email: user.email,
-    // No agrego el name asi queda mas chico, supuestamente es una buena practica
     role: user.role as Role,
+    ...(inmobiliariaId != null && { inmobiliariaId }),
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: EXPIRES_IN } as SignOptions);

@@ -1,8 +1,10 @@
 // src/components/Reservas/ReservaEditarCard.jsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
+import { getAllPersonas } from "../../../lib/api/personas.js";
+import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
@@ -31,7 +33,7 @@ function fromDateInputToISO(s) {
 }
 
 /* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true }) {
+function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true, disabled = false }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const listRef = useRef(null);
@@ -48,6 +50,16 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
 
   const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
 
+  if (disabled) {
+    return (
+      <div className="ns-wrap" style={{ position: "relative" }}>
+        <div className="ns-trigger" style={{ opacity: 1, cursor: "default", pointerEvents: "none" }}>
+          <span>{label}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="ns-wrap" style={{ position: "relative" }}>
       <button
@@ -57,6 +69,7 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
         onClick={() => setOpen(o => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
       >
         <span>{label}</span>
         <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -99,8 +112,11 @@ export default function ReservaEditarCard({
   entityType = "Reserva",     // tipo de entidad para el mensaje de éxito
 }) {
   /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
+  const { user } = useAuth();
+  const isInmobiliaria = user?.role === 'INMOBILIARIA';
   const [detalle, setDetalle] = useState(reserva || null);
   const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
+  const [personas, setPersonas] = useState([]);
   const [saving, setSaving] = useState(false);
 
   // evita múltiples llamados a inmobiliarias
@@ -223,24 +239,61 @@ export default function ReservaEditarCard({
         return;
       }
 
+      // Solo cargar inmobiliarias si NO es INMOBILIARIA (no las necesita)
+      if (!isInmobiliaria) {
+        try {
+          const response = await getAllInmobiliarias({});
+          const norm = normalizeList(response);
+          if (!abort) {
+            setInmobiliarias(norm);
+            fetchedInmobRef.current = true;
+          }
+        } catch (e) {
+          console.error("Error obteniendo inmobiliarias:", e);
+          if (!abort) {
+            setInmobiliarias([]);
+            fetchedInmobRef.current = true;
+          }
+        }
+      } else {
+        fetchedInmobRef.current = true;
+      }
+    }
+    run();
+    return () => { abort = true; };
+  }, [open, propsInmob, isInmobiliaria]);
+
+  /* 4.1) GET de personas para selector de cliente (solo si es INMOBILIARIA o si se necesita editar cliente) */
+  const fetchedPersonasRef = useRef(false);
+  useEffect(() => {
+    let abort = false;
+
+    async function run() {
+      if (!open || fetchedPersonasRef.current) return;
+
       try {
-        const response = await getAllInmobiliarias({});
-        const norm = normalizeList(response);
+        const response = await getAllPersonas({});
+        const personasData = response?.personas || response?.data || [];
+        const personasNormalizadas = personasData.map(p => ({
+          value: String(p.id ?? p.idPersona ?? ""),
+          label: `${p.nombre || ""} ${p.apellido || ""}`.trim() || "Sin nombre"
+        })).filter(p => p.value);
+        
         if (!abort) {
-          setInmobiliarias(norm);
-          fetchedInmobRef.current = true;
+          setPersonas(personasNormalizadas);
+          fetchedPersonasRef.current = true;
         }
       } catch (e) {
-        console.error("Error obteniendo inmobiliarias:", e);
+        console.error("Error obteniendo personas:", e);
         if (!abort) {
-          setInmobiliarias([]);
-          fetchedInmobRef.current = true;
+          setPersonas([]);
+          fetchedPersonasRef.current = true;
         }
       }
     }
     run();
     return () => { abort = true; };
-  }, [open, propsInmob]);
+  }, [open]);
 
   /* 5) STATES EDITABLES derivados de 'detalle' */
   const fechaReservaISO = detalle?.fechaReserva ?? null;
@@ -248,6 +301,7 @@ export default function ReservaEditarCard({
   const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
 
   const initialInmobId = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
+  const initialClienteId = detalle?.cliente?.id ?? detalle?.clienteId ?? "";
 
   const initialNumero = detalle?.numero != null ? String(detalle.numero) : "";
   const base = {
@@ -255,6 +309,7 @@ export default function ReservaEditarCard({
     fechaReserva: toDateInputValue(fechaReservaISO),
     sena: detalle?.seña != null ? String(detalle.seña) : detalle?.sena != null ? String(detalle.sena) : "",
     inmobiliariaId: initialInmobId,
+    clienteId: initialClienteId,
     numero: initialNumero,
   };
 
@@ -262,6 +317,7 @@ export default function ReservaEditarCard({
   const [fechaReserva, setFechaReserva] = useState(base.fechaReserva);
   const [sena, setSena] = useState(base.sena);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
+  const [clienteId, setClienteId] = useState(base.clienteId);
   const [numero, setNumero] = useState(base.numero);
   const [numeroError, setNumeroError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -273,6 +329,7 @@ export default function ReservaEditarCard({
     setFechaReserva(base.fechaReserva);
     setSena(base.sena);
     setInmobiliariaId(base.inmobiliariaId);
+    setClienteId(base.clienteId);
     setNumero(base.numero);
     setNumeroError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -293,7 +350,22 @@ export default function ReservaEditarCard({
   function buildPatch() {
     const patch = {};
 
+    // Para INMOBILIARIA: solo permitir cambiar estado a CANCELADA (y no desde CANCELADA)
     if (estado !== (detalle?.estado ?? "")) {
+      if (isInmobiliaria) {
+        const estadoActual = String(detalle?.estado ?? "").toUpperCase();
+        const nuevoEstado = String(estado).toUpperCase();
+        
+        // Si ya está cancelada, no permitir cambiar
+        if (estadoActual === "CANCELADA") {
+          throw new Error("No se puede cambiar el estado de una reserva cancelada.");
+        }
+        
+        // Solo permitir cambiar a CANCELADA
+        if (nuevoEstado !== "CANCELADA") {
+          throw new Error("Solo se puede cambiar el estado a 'Cancelada'.");
+        }
+      }
       patch.estado = estado;
     }
 
@@ -315,18 +387,33 @@ export default function ReservaEditarCard({
       }
     }
 
-    const prevInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
-    if (prevInmob !== (inmobiliariaId ?? "")) {
-      patch.inmobiliariaId = inmobiliariaId || null;
+    // Para INMOBILIARIA: no permitir cambiar inmobiliariaId
+    if (!isInmobiliaria) {
+      const prevInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
+      if (prevInmob !== (inmobiliariaId ?? "")) {
+        patch.inmobiliariaId = inmobiliariaId || null;
+      }
     }
 
-    const prevNumero = detalle?.numero != null ? String(detalle.numero) : "";
-    if (numero !== prevNumero) {
-      const trimmed = (numero || "").trim();
-      if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
-        throw new Error("Número de reserva inválido (3 a 30 caracteres).");
+    // Para INMOBILIARIA: no permitir cambiar número
+    if (!isInmobiliaria) {
+      const prevNumero = detalle?.numero != null ? String(detalle.numero) : "";
+      if (numero !== prevNumero) {
+        const trimmed = (numero || "").trim();
+        if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
+          throw new Error("Número de reserva inválido (3 a 30 caracteres).");
+        }
+        patch.numero = trimmed;
       }
-      patch.numero = trimmed;
+    }
+
+    // Cliente: permitir cambiar para todos (incluyendo INMOBILIARIA)
+    const prevCliente = detalle?.cliente?.id ?? detalle?.clienteId ?? "";
+    if (prevCliente !== (clienteId ?? "")) {
+      if (!clienteId || !clienteId.trim()) {
+        throw new Error("El cliente es obligatorio.");
+      }
+      patch.clienteId = Number(clienteId);
     }
 
     return patch;
@@ -395,9 +482,28 @@ export default function ReservaEditarCard({
     setFechaReserva(base.fechaReserva);
     setSena(base.sena);
     setInmobiliariaId(base.inmobiliariaId);
+    setClienteId(base.clienteId);
     setNumero(base.numero);
     setNumeroError(null);
   }
+
+  // Para INMOBILIARIA: opciones de estado limitadas (solo CANCELADA si no está cancelada)
+  const estadosDisponibles = useMemo(() => {
+    if (!isInmobiliaria) {
+      return ESTADOS_RESERVA; // ADMIN y GESTOR ven todos los estados
+    }
+    
+    const estadoActual = String(detalle?.estado ?? "").toUpperCase();
+    if (estadoActual === "CANCELADA") {
+      // Si ya está cancelada, solo mostrar CANCELADA (read-only)
+      return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA");
+    }
+    
+    // Si no está cancelada, permitir cambiar solo a CANCELADA
+    return ESTADOS_RESERVA.filter(e => 
+      e.value === estadoActual || e.value === "CANCELADA"
+    );
+  }, [isInmobiliaria, detalle?.estado]);
 
   /* 8) Render */
   const NA = "Sin información";
@@ -532,26 +638,45 @@ export default function ReservaEditarCard({
                     type="date"
                     value={fechaReserva}
                     onChange={(e) => setFechaReserva(e.target.value)}
+                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                   />
                 </div>
               </div>
 
               <div className="field-row">
                 <div className="field-label">CLIENTE</div>
-                <div className="field-value is-readonly">{clienteNombre}</div>
+                <div className="field-value p0">
+                  {isInmobiliaria ? (
+                    <NiceSelect
+                      value={clienteId || ""}
+                      options={personas}
+                      placeholder="Seleccionar cliente"
+                      showPlaceholderOption={false}
+                      onChange={setClienteId}
+                    />
+                  ) : (
+                    <div className="is-readonly">{clienteNombre}</div>
+                  )}
+                </div>
               </div>
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
-                <div className="field-value p0">
-                  <NiceSelect
-                    value={inmobiliariaId || ""}
-                    options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                    placeholder="La Federala"
-                    showPlaceholderOption={false}
-                    onChange={setInmobiliariaId}
-                  />
-                </div>
+                {isInmobiliaria ? (
+                  <div className="field-value is-readonly">
+                    {detalle?.inmobiliaria?.nombre ?? "La Federala"}
+                  </div>
+                ) : (
+                  <div className="field-value p0">
+                    <NiceSelect
+                      value={inmobiliariaId || ""}
+                      options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+                      placeholder="La Federala"
+                      showPlaceholderOption={false}
+                      onChange={setInmobiliariaId}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="field-row">
@@ -559,10 +684,11 @@ export default function ReservaEditarCard({
                 <div className="field-value p0">
                   <NiceSelect
                     value={estado}
-                    options={ESTADOS_RESERVA}
+                    options={estadosDisponibles}
                     placeholder=""
                     showPlaceholderOption={false}
                     onChange={setEstado}
+                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                   />
                 </div>
               </div>
@@ -572,23 +698,27 @@ export default function ReservaEditarCard({
             <div className="venta-col">
               <div className="field-row">
                 <div className="field-label">NÚMERO DE RESERVA</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={numero}
-                    onChange={(e) => {
-                      setNumero(e.target.value);
-                      if (numeroError) setNumeroError(null);
-                    }}
-                    placeholder="Ej: RES-2025-01"
-                  />
-                  {numeroError && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
-                      {numeroError}
-                    </div>
-                  )}
-                </div>
+                {isInmobiliaria ? (
+                  <div className="field-value is-readonly">{detalle?.numero ?? "—"}</div>
+                ) : (
+                  <div className="field-value p0">
+                    <input
+                      className="field-input"
+                      type="text"
+                      value={numero}
+                      onChange={(e) => {
+                        setNumero(e.target.value);
+                        if (numeroError) setNumeroError(null);
+                      }}
+                      placeholder="Ej: RES-2025-01"
+                    />
+                    {numeroError && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                        {numeroError}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="field-row">
@@ -603,6 +733,7 @@ export default function ReservaEditarCard({
                     value={sena}
                     onChange={(e) => setSena(e.target.value)}
                     style={{ paddingRight: "50px" }}
+                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                   />
                   <span style={{ 
                     position: "absolute", 

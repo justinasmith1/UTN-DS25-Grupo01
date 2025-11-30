@@ -11,24 +11,30 @@ const upload = multer({ storage: multer.memoryStorage() });
 const router = Router();
 
 //GET /api/files/lote/:idLoteAsociado
+// Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
+// INMOBILIARIA puede ver las imágenes/archivos de los lotes
 router.get(
     '/lote/:idLoteAsociado',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
     fileController.getAllFilesController);
 
 //GET /api/files/:id
+// Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
+// INMOBILIARIA puede ver los archivos de los lotes
 router.get(
     '/:id', 
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
     fileController.getFileByIdController);
 
 // Obtener URL firmada para descargar/ver archivo
+// Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
+// INMOBILIARIA puede ver las imágenes/archivos de los lotes
 router.post(
     '/:id/url',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
     fileController.generateSignedUrlController);
 
 //POST /api/files

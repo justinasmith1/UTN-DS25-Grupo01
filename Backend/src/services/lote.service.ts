@@ -81,6 +81,14 @@ function buildWhereFromQueryDTO(query: any, role?: string) {
   if (query?.propietarioId) where.propietarioId = Number(query.propietarioId) || undefined;
   if (query?.ubicacionId)   where.ubicacionId   = Number(query.ubicacionId) || undefined;
 
+  // El filtro "solo deudores" debe restringir el query a lotes que tengan deuda (deuda === true).
+  // El campo en el modelo es `deuda` (Boolean?).
+  if (query?.deudor === true || query?.deudor === 'true') {
+    where.deuda = true;
+  } else if (query?.deudor === false || query?.deudor === 'false') {
+    where.deuda = false;
+  }
+
   // Los técnicos ya no se limitan a EN_CONSTRUCCION; visibilidad controlada más abajo.
   return where;
 }
@@ -144,7 +152,62 @@ export async function createLote(data: any): Promise<Lote> {
 
   normalizeSuperficie(data);
 
+  // Si el cliente no envía mapId, lo generamos automáticamente
+  // a partir del número de lote y el número de fracción, por ejemplo: Lote16-3.
+  // El número de lote es obligatorio y debe venir en el payload.
+  let mapId = data.mapId;
+  const numeroLote = data.numero ?? data.numeroLote;
+  
+  // Validar que el número de lote esté presente
+  if (numeroLote == null) {
+    const error: any = new Error('El número de lote es obligatorio');
+    error.statusCode = 400;
+    throw error;
+  }
+  
+  // Obtener el número de fracción desde la base de datos
+  const fraccion = await prisma.fraccion.findUnique({
+    where: { id: data.fraccionId },
+    select: { numero: true },
+  });
+
+  if (!fraccion) {
+    const error: any = new Error('Fracción no encontrada');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const fraccionNumero = fraccion.numero;
+  
+  // Validar que no exista un lote con el mismo número en la misma fracción
+  const loteExistente = await prisma.lote.findFirst({
+    where: {
+      numero: numeroLote,
+      fraccionId: data.fraccionId,
+    },
+    select: { id: true, mapId: true },
+  });
+
+  if (loteExistente) {
+    const error: any = new Error(`Ya existe un lote con el número ${numeroLote} en la fracción ${fraccionNumero}`);
+    error.statusCode = 409; // Conflict
+    throw error;
+  }
+  
+  // Generar mapId usando el número de lote (obligatorio) y el número de fracción
+  if (!mapId || (typeof mapId === 'string' && mapId.trim() === '')) {
+    if (numeroLote != null && fraccionNumero != null) {
+      mapId = `Lote${numeroLote}-${fraccionNumero}`;
+    }
+  }
+
   // Crear lote. `data` tiene la forma del schema de Zod.
+  // Si se proporcionan calle y numeroCalle, crear la ubicación asociada.
+  const ubicacionData = (data.calle && data.numeroCalle != null) ? {
+    calle: data.calle as any, // El enum NombreCalle se valida en el backend
+    numero: Number(data.numeroCalle),
+  } : undefined;
+
   return prisma.lote.create({
     data: {
       // Mapeo de DTO a Prisma
@@ -160,14 +223,21 @@ export async function createLote(data: any): Promise<Lote> {
       precio: data.precio,
       numPartido: data.numPartido,
       alquiler: data.alquiler,
-      deuda: data.deuda,
       nombreEspacioComun: data.nombreEspacioComun,
       capacidad: data.capacidad,
+      numero: numeroLote,
+      mapId: mapId || null,
+      // Un lote recién creado arranca sin deuda -> AL_DÍA (deuda = false)
+      // Si no se especifica, establecer false por defecto para que muestre "AL DÍA" en lugar de "N/D"
+      deuda: data.deuda !== undefined ? data.deuda : false,
 
       // Relaciones por ID
       fraccion: { connect: { id: data.fraccionId } },
       propietario: { connect: { id: data.propietarioId } },
+      // Si se proporciona ubicacionId, conectar ubicación existente
+      // Si se proporcionan calle y numeroCalle, crear nueva ubicación
       ...(data.ubicacionId && { ubicacion: { connect: { id: data.ubicacionId } } }),
+      ...(ubicacionData && !data.ubicacionId && { ubicacion: { create: ubicacionData } }),
     },
   });
 }
@@ -255,6 +325,32 @@ export async function deleteLote(id: number, role?: string): Promise<DeleteLoteR
     e.statusCode = 403;
     throw e;
   }
+  
+  // 1) Borrar archivos asociados a este lote antes de eliminar el lote
+  // Esto evita el error de foreign key constraint "Archivos_idLoteAsociado_fkey"
+  await prisma.archivos.deleteMany({
+    where: {
+      idLoteAsociado: id,
+    },
+  });
+
+  // 2) Borrar reservas asociadas a este lote antes de eliminar el lote
+  // Esto evita el error de foreign key constraint "Reserva_loteId_fkey"
+  await prisma.reserva.deleteMany({
+    where: {
+      loteId: id,
+    },
+  });
+
+  // 3) Borrar ventas asociadas a este lote antes de eliminar el lote
+  // Esto evita el error de foreign key constraint "Venta_loteId_fkey"
+  await prisma.venta.deleteMany({
+    where: {
+      loteId: id,
+    },
+  });
+
+  // 4) Recién después borrar el lote
   await prisma.lote.delete({ where: { id: id } });
   return { message: 'Lote eliminado correctamente' };
 }

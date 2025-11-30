@@ -1,11 +1,5 @@
 // src/components/TablaInmobiliarias/TablaInmobiliarias.jsx
 // Wrapper de la tabla de inmobiliarias que usa TablaBase
-// CAMBIOS:
-// 1) Reemplazo del icono "Ver ventas" por ListTodo (lucide-react) para unificar iconografía.
-// 2) Agrego botón "Aplicar bonificación (N)" con contador a la izquierda de "Limpiar selección".
-//    - Llama a la callback opcional onAplicarBonificacion(selectedRows).
-// 3) Refuerzo de metadatos de columnas (header + accessorKey cuando aplica) para evitar desfasajes
-//    entre encabezados y celdas en algunos renderers de tablas (sin romper formato ni estilos).
 
 import { useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -130,7 +124,6 @@ export default function TablaInmobiliarias({
   onEditarInmobiliaria,
   onEliminarInmobiliaria,
   onVerInmobiliaria,
-  // NUEVO: acción para el botón de bonificación (opcional y no breaking)
   onAplicarBonificacion,
   selectedRows = [],
   onSelectionChange,
@@ -140,9 +133,7 @@ export default function TablaInmobiliarias({
   const navigate = useNavigate();
 
   // -----------------------------------------
-  // Columnas: usar las del preset SIN remapear para evitar desfases de header/celdas.
-  // (FIX visual mínimo y seguro: respetamos accessor/width/order definidos en el preset)
-  // Agregamos un renderer personalizado para la columna "nombre" que evita el wrap excesivo
+  // Columnas: 
   // -----------------------------------------
   const columns = useMemo(() => {
     return inmobiliariasTablePreset.columns.map((col) => {
@@ -170,7 +161,7 @@ export default function TablaInmobiliarias({
   }, []);
 
   // -----------------------------------------
-  // Acciones por fila (íconos): solo cambio el de "ver ventas"
+  // Acciones por fila (íconos):
   // -----------------------------------------
   const renderRowActions = useCallback(
     (row) => {
@@ -224,10 +215,8 @@ export default function TablaInmobiliarias({
         );
       }
 
-      // Unificamos la acción de "ver asociadas" en un solo botón con menú,
-      // que permite elegir entre ver las ventas o las reservas asociadas
-      // a esta inmobiliaria. Cada opción navega al módulo correspondiente
-      // aplicando el filtro por inmobiliaria.
+      // Unifique la acción de "ver asociadas" en un solo botón con un tipo dropdown, que permite elegir entre ver las ventas o las reservas asociadas
+      // a esta inmobiliaria. Cada opción navega al módulo correspondiente aplicando el filtro por inmobiliaria.
       if (can(user, PERMISSIONS.SALE_VIEW)) {
         actions.push(
           <VerAsociadasDropdown
@@ -272,13 +261,13 @@ export default function TablaInmobiliarias({
 
   // -----------------------------------------
   // Acciones de la barra superior
-  // - Agrego botón "Aplicar bonificación (N)" antes de "Limpiar selección"
-  // - Mantengo "+ Agregar Inmobiliaria" igual
+  // - "Aplicar bonificación" (siempre visible, pero deshabilitado si no hay selección)
+  // - "+ Agregar Inmobiliaria" igual
   // -----------------------------------------
   const topActions = useMemo(() => {
     const actions = [];
 
-    // (2) NUEVO: Aplicar bonificación (replicando patrón de "Ver en Mapa")
+    // Aplicar bonificación
     actions.push(
       <button
         key="apply-bonus"
@@ -292,7 +281,7 @@ export default function TablaInmobiliarias({
         title="Aplicar bonificación a seleccionados"
         aria-label="Aplicar bonificación"
       >
-        {/* Icono sutil para sugerir “bonificación” (porcentaje). Si preferís sin icono, se quita */}
+        {/* Icono sutil para sugerir “bonificación” (porcentaje). */}
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <Percent size={14} />
           <span>Aplicar bonificación</span>

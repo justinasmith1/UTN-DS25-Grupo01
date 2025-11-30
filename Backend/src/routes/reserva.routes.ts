@@ -7,17 +7,21 @@ import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, delet
 const router = Router();
 
 // GET /api/Reservas
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// INMOBILIARIA solo verá sus propias reservas (filtrado en el servicio)
 router.get(
     '/', 
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR',),
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
     reservaController.getAllReservasController);
 
 // GET /api/Reservas/:id
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// INMOBILIARIA solo puede ver sus propias reservas (validado en el servicio)
 router.get(
     '/:id',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
     validateParams(getReservaParamsSchema),
     reservaController.getReservaByIdController);
 

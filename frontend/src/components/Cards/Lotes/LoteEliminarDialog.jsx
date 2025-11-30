@@ -15,11 +15,13 @@ export default function LoteEliminarDialog({
       ? `${lote.propietario.nombre} ${lote.propietario.apellido ?? ""}`.trim()
       : null;
 
-  const mapIdClean = removeLotePrefix(lote?.mapId ?? lote?.id ?? "—");
-  const title = `Eliminar Lote N° ${mapIdClean}`;
+  // Nunca mostramos el ID interno del lote en la UI.
+  // Si no hay mapId, no mostramos identificador en este lugar.
+  const mapIdClean = lote?.mapId ? removeLotePrefix(lote.mapId) : "—";
+  const title = `Eliminar Lote${mapIdClean !== "—" ? ` N° ${mapIdClean}` : ""}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar el lote #${mapIdClean}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas eliminar${mapIdClean !== "—" ? ` el lote #${mapIdClean}` : " este lote"}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [
