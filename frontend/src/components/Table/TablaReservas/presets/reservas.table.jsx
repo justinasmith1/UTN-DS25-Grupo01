@@ -11,8 +11,10 @@ const getClienteNombre = (row) => {
   return row?.clienteNombre ?? null;
 };
 
-const getInmobiliariaNombre = (row) =>
-  row?.inmobiliaria?.nombre ?? row?.inmobiliariaNombre ?? null;
+const getInmobiliariaNombre = (row) => {
+  const nombre = row?.inmobiliaria?.nombre ?? row?.inmobiliariaNombre ?? null;
+  return nombre || 'La Federala';
+};
 
 const getLotePrecio = (row) =>
   row?.lote?.precio ?? row?.lotePrecio ?? null;
@@ -22,7 +24,7 @@ const getFechaReserva = (row) =>
 
 export const reservasTablePreset = {
   columns: [
-    { id: 'id', titulo: 'ID', accessorKey: 'id', width: '80px', align: 'center' },
+    { id: 'id', titulo: 'ID', accessor: (r) => r?.numero ?? r?.id ?? '—', width: '120px', align: 'center' },
 
     // Lote: si solo viene el id, mostramos el id.
     {
@@ -65,7 +67,7 @@ export const reservasTablePreset = {
     {
       id: 'inmobiliariaNombre',
       titulo: 'Inmobiliaria',
-      accessor: (r) => getInmobiliariaNombre(r) ?? '—',
+      accessor: (r) => getInmobiliariaNombre(r),
       width: '200px'
     },
 
@@ -113,7 +115,7 @@ export const reservasTablePreset = {
   // anchos por id
   widthFor: (id) => {
     const W = {
-      id: '80px',
+      id: '120px',
       loteInfo: '120px',
       clienteCompleto: '220px',
       fechaReserva: '140px',

@@ -1,7 +1,7 @@
 // src/pages/Reservas.jsx
 // Página de reservas usando la arquitectura genérica
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
@@ -25,7 +25,60 @@ export default function Reservas() {
   const { success, error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const crearParam = searchParams.get('crear') === 'true';
-  const [params, setParams] = useState({});
+  const searchParamsString = searchParams.toString();
+  
+  // Detectar inmobiliariaId desde query params
+  const selectedInmobiliariaParam = useMemo(() => {
+    const params = new URLSearchParams(searchParamsString);
+    const raw = params.get("inmobiliariaId");
+    if (raw == null) return null;
+    const trimmed = raw.trim();
+    return trimmed.length ? trimmed : null;
+  }, [searchParamsString]);
+  
+  const selectedInmobiliariaKey = selectedInmobiliariaParam != null ? selectedInmobiliariaParam : null;
+  
+  const [params, setParams] = useState(() => ({
+    inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
+  }));
+
+  // Aplicar filtro de inmobiliaria cuando cambia desde la URL
+  // Usar useRef para evitar loops infinitos
+  const lastAppliedInmoRef = useRef(null);
+  useEffect(() => {
+    if (selectedInmobiliariaKey) {
+      // Solo aplicar si no se aplicó ya este mismo valor
+      if (lastAppliedInmoRef.current === selectedInmobiliariaKey) {
+        return;
+      }
+      setParams(prev => {
+        const currentIds = Array.isArray(prev.inmobiliarias) ? prev.inmobiliarias.map(String) : [];
+        if (currentIds.includes(String(selectedInmobiliariaKey))) {
+          return prev; // Ya está aplicado
+        }
+        lastAppliedInmoRef.current = selectedInmobiliariaKey;
+        return {
+          ...prev,
+          inmobiliarias: [String(selectedInmobiliariaKey)],
+        };
+      });
+    } else {
+      // Si no hay inmobiliariaId en la URL, limpiar el filtro solo si estaba aplicado
+      if (lastAppliedInmoRef.current != null) {
+        lastAppliedInmoRef.current = null;
+        setParams(prev => {
+          if (Array.isArray(prev.inmobiliarias) && prev.inmobiliarias.length > 0) {
+            return {
+              ...prev,
+              inmobiliarias: [],
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [selectedInmobiliariaKey]);
+
   const [allReservas, setAllReservas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -51,8 +104,41 @@ export default function Reservas() {
 
   // Manejar cambios de parámetros
   const handleParamsChange = useCallback((patch) => {
-    setParams((prev) => ({ ...prev, ...patch }));
-  }, []);
+    if (!patch || Object.keys(patch).length === 0) {
+      return;
+    }
+    setParams(prev => {
+      const hasInmoInUrl = selectedInmobiliariaKey != null;
+      const patchHasInmo = patch.inmobiliarias && Array.isArray(patch.inmobiliarias) && patch.inmobiliarias.length > 0;
+      
+      // Si el patch incluye inmobiliarias vacías explícitamente Y hay inmobiliariaId en la URL, NO permitir limpiarlo
+      if (hasInmoInUrl && patch.inmobiliarias && Array.isArray(patch.inmobiliarias) && patch.inmobiliarias.length === 0) {
+        return {
+          ...prev,
+          ...patch,
+          inmobiliarias: prev.inmobiliarias && prev.inmobiliarias.length > 0 
+            ? prev.inmobiliarias 
+            : [String(selectedInmobiliariaKey)],
+        };
+      }
+      
+      // Si el patch no incluye inmobiliarias o las tiene vacías, y hay inmobiliariaId en la URL, preservar
+      if (hasInmoInUrl && !patchHasInmo) {
+        return {
+          ...prev,
+          ...patch,
+          inmobiliarias: prev.inmobiliarias && prev.inmobiliarias.length > 0 
+            ? prev.inmobiliarias 
+            : [String(selectedInmobiliariaKey)],
+        };
+      }
+      
+      return {
+        ...prev,
+        ...patch,
+      };
+    });
+  }, [selectedInmobiliariaKey]);
 
   // Cargar todas las reservas e inmobiliarias al montar el componente
   useEffect(() => {
@@ -271,40 +357,32 @@ export default function Reservas() {
     async (updatedReserva) => {
       if (!updatedReserva?.id) return;
       try {
-        // La reserva actualizada ya viene completa del backend con todas las relaciones
-        // Actualizar la lista con la reserva actualizada
         setAllReservas((prev) => prev.map((r) => (r.id === updatedReserva.id ? updatedReserva : r)));
         setReservaSel(updatedReserva);
-        success("Reserva actualizada correctamente");
       } catch (e) {
         console.error("Error actualizando reserva:", e);
         error(e?.message || "Error al actualizar reserva");
       }
     },
-    [success, error]
+    [error]
   );
 
-  // POST (Crear) - recibe la nueva reserva creada
   const handleCreated = useCallback(
     async (newReserva) => {
       if (!newReserva?.id) return;
       try {
-        // Agregar la nueva reserva a la lista (obtener datos completos)
         const resp = await getReservaById(newReserva.id);
         const detail = resp?.data ?? resp ?? newReserva;
         setAllReservas((prev) => [detail, ...prev]);
-        success("Reserva creada correctamente");
       } catch (e) {
-        console.error("Error obteniendo reserva creada:", e);
-        // Aún así agregar la reserva que viene del create
         setAllReservas((prev) => [newReserva, ...prev]);
-        success("Reserva creada correctamente");
+      } finally {
+        window.dispatchEvent(new CustomEvent('reloadLotes'));
       }
     },
-    [success]
+    []
   );
 
-  // DELETE (Eliminar)
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const handleDelete = useCallback(async () => {
     if (!reservaSel?.id) return;
@@ -314,11 +392,11 @@ export default function Reservas() {
       setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
+      window.dispatchEvent(new CustomEvent('reloadLotes'));
       setTimeout(() => {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error eliminando reserva:", e);
       alert(e?.message || "No se pudo eliminar la reserva.");
     } finally {
       setDeleting(false);
@@ -346,8 +424,27 @@ export default function Reservas() {
         variant="dashboard" 
         userRole={user?.role} 
         value={params} 
-        onChange={handleParamsChange} 
-        onClear={() => setParams({})} 
+        onChange={(newParams) => {
+          handleParamsChange(newParams);
+          // Si se quitó el filtro de inmobiliaria, limpiar la URL
+          const inmobIds = Array.isArray(newParams.inmobiliarias) ? newParams.inmobiliarias.map(String) : [];
+          if (inmobIds.length === 0 && selectedInmobiliariaKey) {
+            const next = new URLSearchParams(searchParams);
+            if (next.has("inmobiliariaId")) {
+              next.delete("inmobiliariaId");
+              setSearchParams(next, { replace: true });
+            }
+          }
+        }}
+        inmobiliariasOpts={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))} 
+        onClear={() => {
+          const next = new URLSearchParams(searchParams);
+          if (next.has("inmobiliariaId")) {
+            next.delete("inmobiliariaId");
+            setSearchParams(next, { replace: true });
+          }
+          setParams({});
+        }} 
       />
 
       <TablaReservas

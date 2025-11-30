@@ -56,6 +56,12 @@ export default function VentaVerCard({
       ? NA
       : String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase();
 
+  // Importar helper común para tipo de pago (reutilizable)
+  const fmtTipoPago = (tp) => {
+    if (isBlank(tp)) return NA;
+    return capitalizeFirst(tp);
+  };
+
   const titleCaseEstado = (s) => {
     if (isBlank(s)) return NA;
     const t = String(s).toLowerCase().replace(/_/g, " ");
@@ -116,7 +122,7 @@ export default function VentaVerCard({
       sale?.lote?.creadoEl
   );
 
-  // Orden solicitado: comprador/propietario a la izquierda; fechas/plazo a la derecha
+  // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha
   const leftPairs = [
     ["LOTE N°", safe(sale?.lote?.mapId ?? sale?.lotMapId ?? sale?.loteId)],
     ["MONTO", fmtMoney(sale?.monto)],
@@ -127,8 +133,9 @@ export default function VentaVerCard({
   ];
 
   const rightPairs = [
+    ["NÚMERO DE VENTA", safe(sale?.numero)],
     ["FECHA VENTA", fechaVenta],
-    ["TIPO DE PAGO", capitalizeFirst(safe(sale?.tipoPago))],
+    ["TIPO DE PAGO", fmtTipoPago(sale?.tipoPago)],
     ["PLAZO ESCRITURA", fmtDate(sale?.plazoEscritura)],
     ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
     ["FECHA DE CREACIÓN", fechaCreacion],
@@ -159,7 +166,7 @@ export default function VentaVerCard({
       >
         {/* Header */}
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Venta N° ${sale?.id ?? "—"}`}</h2>
+          <h2 className="cclf-card__title">{`Venta N° ${sale?.numero ?? sale?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
             <button

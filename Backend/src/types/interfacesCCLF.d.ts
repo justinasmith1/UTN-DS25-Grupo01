@@ -220,6 +220,7 @@ export interface PostVentaRequest {
     reservaId?: number;
     createdAt?: DateTime;
     updateAt?: DateTime;
+    numero: string;
 } 
 
 export interface PostVentaResponse {

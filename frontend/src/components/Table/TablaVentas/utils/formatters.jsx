@@ -37,3 +37,12 @@ export const fmtPlazoEscritura = (dias) => {
 export function formatEstadoVenta(estado) {
   return <StatusBadge status={estado} />;
 }
+
+// Helper para formatear tipo de pago (reutilizable en Ver Venta y Dashboard)
+export const fmtTipoPago = (tipoPago) => {
+  if (!tipoPago || (typeof tipoPago === 'string' && tipoPago.trim().length === 0)) {
+    return '—';
+  }
+  const str = String(tipoPago).trim();
+  return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};

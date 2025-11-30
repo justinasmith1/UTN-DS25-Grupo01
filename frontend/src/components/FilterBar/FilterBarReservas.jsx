@@ -169,7 +169,20 @@ export default function FilterBarReservas({
     };
   };
 
-  const handleParamsChange = (paramsFromFB) => onChange?.(toPageShape(paramsFromFB));
+  const handleParamsChange = (paramsFromFB) => {
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // no convertir con toPageShape porque agrega todos los campos con defaults
+    const isPartialUpdate = paramsFromFB && (
+      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
+      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    );
+    
+    if (isPartialUpdate) {
+      onChange?.(paramsFromFB);
+    } else {
+      onChange?.(toPageShape(paramsFromFB));
+    }
+  };
 
   const viewsConfig = useMemo(
     () => ({ isInmo: false, sanitizeForRole: (filters) => filters }),

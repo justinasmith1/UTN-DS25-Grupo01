@@ -15,14 +15,14 @@ export default function VentaEliminarDialog({
       ? `${venta.comprador.nombre} ${venta.comprador.apellido ?? ""}`.trim()
       : null;
 
-  const title = `Eliminar Venta N° ${venta?.id ?? "—"}`;
+  const title = `Eliminar Venta N° ${venta?.numero ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la venta #${venta?.id ?? "—"}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [
-    `Lote: ${venta?.lote?.mapId ?? venta?.lotMapId ?? venta?.loteId ?? "—"}`,
+    `${venta?.lote?.mapId ?? "—"}`,
     comprador ? `Comprador: ${comprador}` : null,
   ].filter(Boolean);
 

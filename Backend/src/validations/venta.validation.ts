@@ -10,6 +10,7 @@ export const createVentaSchema = z.object({
     compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo'),
     inmobiliariaId: z.coerce.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo').optional(),
     reservaId: z.number().int('El ID de la reserva debe ser un número entero').positive('El ID de la reserva debe ser un número positivo').optional().nullable(),
+    numero: z.string().min(3, 'El número de venta es obligatorio').max(30, 'El número de venta es demasiado largo').trim(),
 });
 
 export const updateVentaSchema = createVentaSchema.partial();

@@ -105,12 +105,23 @@ export default function DocumentoVerCard({
   if (!open || !tipoDocumento) return null;
 
   const info = DOC_INFO[tipoDocumento] || DOC_INFO.BOLETO;
+  
+  // Función para limpiar el mapId (eliminar "Lote" del inicio si está presente)
+  const limpiarMapId = (mapId) => {
+    if (!mapId) return mapId;
+    const str = String(mapId);
+    // Eliminar "Lote" o "lote" del inicio (case insensitive)
+    return str.replace(/^lote\s*/i, "").trim() || str;
+  };
+  
+  const numeroLote = limpiarMapId(loteNumero) || loteId || "XXXX";
+  
   // Título dinámico según el tipo de documento
   const titulo = tipoDocumento === "BOLETO"
-    ? `Boleto de CompraVenta de Lote N° ${loteNumero || loteId || "XXXX"}`
+    ? `Boleto de CompraVenta de Lote N° ${numeroLote}`
     : tipoDocumento === "ESCRITURA"
-    ? `Escritura de Lote N° ${loteNumero || loteId || "XXXX"}`
-    : `Planos de Lote N° ${loteNumero || loteId || "XXXX"}`;
+    ? `Escritura de Lote N° ${numeroLote}`
+    : `Planos de Lote N° ${numeroLote}`;
 
   const handleModificar = () => {
     if (isEditingImage) {

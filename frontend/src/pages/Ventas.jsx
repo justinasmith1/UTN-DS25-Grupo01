@@ -105,8 +105,6 @@ export default function VentasPage() {
   }, [selectedInmobiliariaParam]);
   const selectedInmobiliariaKey =
     selectedInmobiliariaParam != null ? selectedInmobiliariaParam : null;
-  const lastAppliedInmoRef = useRef(null);
-  const hasSyncedInitialInmoRef = useRef(false);
 
   // Datos
   const [ventas, setVentas] = useState([]);
@@ -115,8 +113,8 @@ export default function VentasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
-  // Filtros
-  const [filters, setFilters] = useState({
+  // Filtros - inicializar con inmobiliariaId de la URL si existe
+  const [filters, setFilters] = useState(() => ({
     texto: "",
     tipoPago: [],
     inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
@@ -125,145 +123,122 @@ export default function VentasPage() {
     montoMin: null,
     montoMax: null,
     estados: [],
-  });
+  }));
+
+  // Aplicar filtro de inmobiliaria cuando cambia desde la URL
+  const lastAppliedInmoRef = useRef(null);
+  useEffect(() => {
+    if (selectedInmobiliariaKey) {
+      if (lastAppliedInmoRef.current === selectedInmobiliariaKey) {
+        return;
+      }
+      setFilters(prev => {
+        const currentIds = Array.isArray(prev.inmobiliarias) ? prev.inmobiliarias.map(String) : [];
+        if (currentIds.includes(String(selectedInmobiliariaKey))) {
+          return prev;
+        }
+        lastAppliedInmoRef.current = selectedInmobiliariaKey;
+        return {
+          ...prev,
+          inmobiliarias: [String(selectedInmobiliariaKey)],
+        };
+      });
+    } else {
+      if (lastAppliedInmoRef.current != null) {
+        lastAppliedInmoRef.current = null;
+        setFilters(prev => {
+          if (Array.isArray(prev.inmobiliarias) && prev.inmobiliarias.length > 0) {
+            return {
+              ...prev,
+              inmobiliarias: [],
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [selectedInmobiliariaKey]);
 
   // Permisos (en esta pantalla Editar abre siempre)
   const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
   const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
 
+  // Función reutilizable para cargar datos
+  const loadVentasData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const ventasRequest =
+        selectedInmobiliariaRequest != null
+          ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
+          : getAllVentas({});
+      const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
+        ventasRequest,
+        getAllPersonas({}),
+        getAllInmobiliarias({}),
+        getAllLotes({}),
+      ]);
+
+      const ventasApi = pickArray(ventasResp, ["ventas"]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      const lotesApi = pickArray(lotesResp, ["lotes"]);
+
+      const lotesById = {};
+      lotesApi.forEach((lote) => {
+        if (lote && lote.id != null) {
+          lotesById[String(lote.id)] = lote;
+        }
+      });
+
+      const personasById = {};
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+
+      const inmosById = {};
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
+      const enrichedWithMapId = enriched.map((venta) => {
+        const lookupId = venta.loteId ?? venta.lotId ?? null;
+        const loteRef =
+          venta.lote?.mapId
+            ? venta.lote
+            : lookupId != null
+            ? lotesById[String(lookupId)] || null
+            : null;
+        const displayMapId =
+          loteRef?.mapId ?? venta.lotMapId ?? (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ?? null;
+
+        return {
+          ...venta,
+          lotMapId: displayMapId ?? venta.lotMapId ?? null,
+          lote: loteRef
+            ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+            : venta.lote ?? null,
+        };
+      });
+
+      setVentas(enrichedWithMapId);
+      setInmobiliarias(inmosApi);
+      setLotes(lotesApi);
+    } catch (err) {
+      console.error("Error cargando ventas/personas/inmobiliarias:", err);
+      setVentas([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedInmobiliariaRequest]);
+
   // Carga inicial + join con personas/inmobiliarias
   useEffect(() => {
     let alive = true;
     (async () => {
-      setIsLoading(true);
-      try {
-        const ventasRequest =
-          selectedInmobiliariaRequest != null
-            ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
-            : getAllVentas({});
-        const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
-          ventasRequest,
-          getAllPersonas({}),
-          getAllInmobiliarias({}),
-          getAllLotes({}),
-        ]);
-
-        const ventasApi = pickArray(ventasResp, ["ventas"]);
-        const personasApi = pickArray(personasResp, ["personas"]);
-        const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
-        const lotesApi = pickArray(lotesResp, ["lotes"]);
-
-        const lotesById = {};
-        lotesApi.forEach((lote) => {
-          if (lote && lote.id != null) {
-            lotesById[String(lote.id)] = lote;
-          }
-        });
-
-        const personasById = {};
-        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
-
-        const inmosById = {};
-        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
-
-        const enriched = ventasApi.map((v) => enrichVenta(v, personasById, inmosById));
-        const enrichedWithMapId = enriched.map((venta) => {
-          const lookupId = venta.loteId ?? venta.lotId ?? null;
-          const loteRef =
-            venta.lote?.mapId
-              ? venta.lote
-              : lookupId != null
-              ? lotesById[String(lookupId)] || null
-              : null;
-          const displayMapId =
-            loteRef?.mapId ?? venta.lotMapId ?? (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ?? null;
-
-          return {
-            ...venta,
-            lotMapId: displayMapId ?? venta.lotMapId ?? null,
-            lote: loteRef
-              ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
-              : venta.lote ?? null,
-          };
-        });
-
-        if (alive) {
-          setVentas(enrichedWithMapId);
-          setInmobiliarias(inmosApi); // Guardar inmobiliarias para pasarlas al componente
-          setLotes(lotesApi); // Guardar lotes para obtener mapIds
-        }
-      } catch (err) {
-        console.error("Error cargando ventas/personas/inmobiliarias:", err);
-        if (alive) setVentas([]);
-      } finally {
-        if (alive) setIsLoading(false);
-      }
+      await loadVentasData();
+      if (!alive) return;
     })();
     return () => {
       alive = false;
     };
-  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest]);
-
-  useEffect(() => {
-    const target = selectedInmobiliariaKey;
-    if (target) {
-      if (lastAppliedInmoRef.current === target) return;
-      setFilters((prev) => {
-        const prevIds = Array.isArray(prev.inmobiliarias)
-          ? prev.inmobiliarias.map(String)
-          : [];
-        if (prevIds.length === 1 && prevIds[0] === target) return prev;
-        return { ...prev, inmobiliarias: [target] };
-      });
-      lastAppliedInmoRef.current = target;
-      hasSyncedInitialInmoRef.current = true;
-      return;
-    }
-
-    if (!lastAppliedInmoRef.current) return;
-    const lastId = lastAppliedInmoRef.current;
-    lastAppliedInmoRef.current = null;
-    hasSyncedInitialInmoRef.current = true;
-    setFilters((prev) => {
-      const prevIds = Array.isArray(prev.inmobiliarias)
-        ? prev.inmobiliarias.map(String)
-        : [];
-      if (prevIds.length === 1 && prevIds[0] === lastId) {
-        return { ...prev, inmobiliarias: [] };
-      }
-      return prev;
-    });
-  }, [selectedInmobiliariaKey]);
-
-  useEffect(() => {
-    if (!hasSyncedInitialInmoRef.current) return;
-    const currentIds = Array.isArray(filters.inmobiliarias)
-      ? filters.inmobiliarias.map(String)
-      : [];
-    const currentMatchesParam =
-      selectedInmobiliariaKey != null
-        ? currentIds.includes(selectedInmobiliariaKey)
-        : currentIds.length === 0;
-
-    if (currentMatchesParam) return;
-
-    const next = new URLSearchParams(searchParamsString);
-    if (selectedInmobiliariaKey == null) {
-      if (next.has("inmobiliariaId")) {
-        next.delete("inmobiliariaId");
-        setSearchParams(next, { replace: true });
-      }
-      return;
-    }
-
-    next.set("inmobiliariaId", selectedInmobiliariaKey);
-    setSearchParams(next, { replace: true });
-  }, [
-    filters.inmobiliarias,
-    selectedInmobiliariaKey,
-    searchParamsString,
-    setSearchParams,
-  ]);
+  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest, loadVentasData]);
 
   // Aplicar filtros
   const ventasFiltradas = useMemo(
@@ -361,7 +336,7 @@ export default function VentasPage() {
   }, []);
 
   const onAgregarVenta = useCallback(() => {
-    console.debug("[ALTA] venta");
+    setOpenCrear(true);
   }, []);
 
   // PUT (Editar) - ahora recibe el objeto actualizado completo del componente
@@ -397,7 +372,30 @@ export default function VentasPage() {
     if (!ventaSel?.id) return;
     try {
       setDeleting(true);
+      const loteId = ventaSel.loteId ?? ventaSel.lotId ?? ventaSel.lote?.id;
+      
       await deleteVenta(ventaSel.id);
+      
+      if (loteId) {
+        try {
+          const { getAllReservas } = await import("../lib/api/reservas");
+          const reservasResp = await getAllReservas({});
+          const reservas = reservasResp?.data ?? [];
+          
+          const loteIdNum = Number(loteId);
+          const reservaActiva = reservas.find((r) => {
+            const rLoteId = Number(r.loteId ?? r.lote?.id ?? 0);
+            const estado = String(r.estado ?? "").toUpperCase();
+            return rLoteId === loteIdNum && estado === "ACTIVA";
+          });
+          
+          const { updateLote } = await import("../lib/api/lotes");
+          await updateLote(loteIdNum, { estado: reservaActiva ? "Reservado" : "Disponible" });
+        } catch (err) {
+          console.error("Error restaurando estado del lote:", err);
+        }
+      }
+      
       setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
@@ -426,11 +424,61 @@ export default function VentasPage() {
       {/* Filtros */}
       <FilterBarVentas
         value={filters}
-        onChange={setFilters}
+        onChange={(newFilters) => {
+          if (!newFilters || Object.keys(newFilters).length === 0) {
+            return;
+          }
+          setFilters(prev => {
+            const hasInmoInUrl = selectedInmobiliariaKey != null;
+            const newHasInmo = newFilters.inmobiliarias && Array.isArray(newFilters.inmobiliarias) && newFilters.inmobiliarias.length > 0;
+            
+            // Si el nuevo filtro incluye inmobiliarias vacías explícitamente Y hay inmobiliariaId en la URL, NO permitir limpiarlo
+            if (hasInmoInUrl && newFilters.inmobiliarias && Array.isArray(newFilters.inmobiliarias) && newFilters.inmobiliarias.length === 0) {
+              return {
+                ...prev,
+                ...newFilters,
+                inmobiliarias: prev.inmobiliarias && prev.inmobiliarias.length > 0 
+                  ? prev.inmobiliarias 
+                  : [String(selectedInmobiliariaKey)],
+              };
+            }
+            
+            // Si el nuevo filtro no incluye inmobiliarias o las tiene vacías, y hay inmobiliariaId en la URL, preservar
+            if (hasInmoInUrl && !newHasInmo) {
+              return {
+                ...prev,
+                ...newFilters,
+                inmobiliarias: prev.inmobiliarias && prev.inmobiliarias.length > 0 
+                  ? prev.inmobiliarias 
+                  : [String(selectedInmobiliariaKey)],
+              };
+            }
+            
+            return {
+              ...prev,
+              ...newFilters,
+            };
+          });
+          // Si se quitó el filtro de inmobiliaria, limpiar la URL
+          const inmobIds = Array.isArray(newFilters.inmobiliarias) ? newFilters.inmobiliarias.map(String) : [];
+          if (inmobIds.length === 0 && selectedInmobiliariaKey) {
+            const next = new URLSearchParams(searchParams);
+            if (next.has("inmobiliariaId")) {
+              next.delete("inmobiliariaId");
+              setSearchParams(next, { replace: true });
+            }
+          }
+        }}
         isLoading={isLoading}
         total={ventas.length}
         filtrados={ventasFiltradas.length}
-        onClear={() =>
+        inmobiliariasOpts={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+        onClear={() => {
+          const next = new URLSearchParams(searchParams);
+          if (next.has("inmobiliariaId")) {
+            next.delete("inmobiliariaId");
+            setSearchParams(next, { replace: true });
+          }
           setFilters({
             texto: "",
             tipoPago: [],
@@ -440,8 +488,8 @@ export default function VentasPage() {
             montoMin: null,
             montoMax: null,
             estados: [],
-          })
-        }
+          });
+        }}
       />
 
       {/* Tabla */}
@@ -504,7 +552,10 @@ export default function VentasPage() {
       <VentaCrearCard
         open={openCrear}
         onCancel={() => setOpenCrear(false)}
-        onCreated={() => setOpenCrear(false)}
+        onCreated={async () => {
+          setOpenCrear(false);
+          await loadVentasData();
+        }}
         loteIdPreSeleccionado={new URLSearchParams(searchParamsString).get("lotId")}
       />
 

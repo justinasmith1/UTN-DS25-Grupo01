@@ -98,17 +98,17 @@ export default function ReservaVerCard({
     res?.createdAt ?? res?.fechaCreacion
   );
 
-  // Orden: campos principales a la izquierda; fechas a la derecha
   const leftPairs = [
     ["LOTE", loteInfo],
+    ["FECHA", fechaReserva],
     ["CLIENTE", clienteNombre],
-    ["INMOBILIARIA", safe(res?.inmobiliaria?.nombre)],
+    ["INMOBILIARIA", safe(res?.inmobiliaria?.nombre) || "La Federala"],
     ["ESTADO", titleCaseEstado(res?.estado)],
-    ["SEÑA", res?.seña != null ? fmtMoney(res.seña) : NA],
   ];
 
   const rightPairs = [
-    ["FECHA RESERVA", fechaReserva],
+    ["NÚMERO DE RESERVA", safe(res?.numero)],
+    ["SEÑA", res?.seña != null ? fmtMoney(res.seña) : NA],
     ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
     ["FECHA DE CREACIÓN", fechaCreacion],
   ];
@@ -138,7 +138,7 @@ export default function ReservaVerCard({
       >
         {/* Header */}
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Reserva N° ${res?.id ?? "—"}`}</h2>
+          <h2 className="cclf-card__title">{`Reserva N° ${res?.numero ?? res?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
             <button

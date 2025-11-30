@@ -18,7 +18,7 @@ export default function ReservaEliminarDialog({
   })();
 
   const loteInfo = (() => {
-    const mapId = reserva?.lote?.mapId ?? reserva?.lotMapId ?? null;
+    const mapId = reserva?.lote?.mapId ??  null;
     if (mapId) {
       // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
       if (String(mapId).toLowerCase().startsWith('lote')) {
@@ -26,17 +26,13 @@ export default function ReservaEliminarDialog({
       }
       return `Lote N° ${mapId}`;
     }
-    if (reserva?.lote?.id) {
-      const num = reserva?.lote?.numero || reserva?.lote?.id;
-      return `Lote N° ${num}`;
-    }
-    return reserva?.loteId ? `Lote N° ${reserva.loteId}` : null;
+    return reserva?.loteId ? `Lote N° ${reserva.lote.mapId}` : null;
   })();
 
-  const title = `Eliminar Reserva N° ${reserva?.id ?? "—"}`;
+  const title = `Eliminar Reserva N° ${reserva?.numero ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la reserva #${reserva?.id ?? "—"}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas eliminar la Reserva N° ${reserva?.numero ?? "—"}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [

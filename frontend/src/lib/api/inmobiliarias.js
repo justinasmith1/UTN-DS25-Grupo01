@@ -20,6 +20,7 @@ const fromApi = (row = {}) => ({
   comxventa: row.comxventa ?? row.comision ?? null,
   contacto: row.contacto ?? row.phone ?? row.telefono ?? "",
   cantidadVentas: row.cantidadVentas ?? row.ventas_count ?? 0,
+  cantidadReservas: row.cantidadReservas ?? row.reservas_count ?? row._count?.reservas ?? 0,
   createdAt: row.createdAt ?? row.created_at ?? null,
   updateAt: row.updateAt ?? row.updated_at ?? null,
 });
@@ -68,6 +69,7 @@ function ensureSeed() {
       comxventa: 3.5,
       contacto: "11-5555-0001",
       cantidadVentas: 15,
+      cantidadReservas: 5,
       createdAt: "2023-01-15T10:00:00Z"
     },
     { 
@@ -77,6 +79,7 @@ function ensureSeed() {
       comxventa: 4.0,
       contacto: "11-5555-0002",
       cantidadVentas: 8,
+      cantidadReservas: 3,
       createdAt: "2023-03-20T14:30:00Z"
     },
     { 
@@ -86,6 +89,7 @@ function ensureSeed() {
       comxventa: 2.8,
       contacto: "11-5555-0003",
       cantidadVentas: 23,
+      cantidadReservas: 12,
       createdAt: "2022-11-10T09:15:00Z"
     },
   ].map(fromApi);
@@ -156,10 +160,11 @@ async function apiGetAll(params = {}) {
   
   const mapped = finalArray.map((row) => {
     const base = fromApi(row);
-    // Preservar cantidadVentas y fechas si vienen del backend
+    // Preservar cantidadVentas, cantidadReservas y fechas si vienen del backend
     return {
       ...base,
       cantidadVentas: row?.cantidadVentas ?? row?._count?.ventas ?? row?.ventas_count ?? base.cantidadVentas ?? 0,
+      cantidadReservas: row?.cantidadReservas ?? row?._count?.reservas ?? row?.reservas_count ?? base.cantidadReservas ?? 0,
       createdAt: row?.createdAt ?? row?.created_at ?? base.createdAt ?? null,
       updatedAt: row?.updateAt ?? row?.updatedAt ?? row?.updated_at ?? base.updateAt ?? null,
     };
@@ -177,14 +182,15 @@ async function apiGetById(id) {
   // El backend devuelve { success: true, data: { inmobiliaria: {...} } }
   const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
   
-  // Normalizar manteniendo las fechas y cantidadVentas correctamente mapeadas
+  // Normalizar manteniendo las fechas, cantidadVentas y cantidadReservas correctamente mapeadas
   const normalized = {
     ...fromApi(raw),
     // Mapear fechas correctamente (backend usa updateAt sin 'd')
     createdAt: raw?.createdAt ?? raw?.created_at ?? null,
     updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? null,
-    // Incluir cantidadVentas si viene del backend
+    // Incluir cantidadVentas y cantidadReservas si vienen del backend
     cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? 0,
+    cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? 0,
   };
   
   return ok(normalized);
@@ -264,15 +270,16 @@ async function apiUpdate(id, payload) {
   // El backend devuelve { success: true, data: { inmobiliaria: {...}, message: '...' } }
   const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
   
-  // Normalizar manteniendo las fechas y cantidadVentas correctamente mapeadas
+  // Normalizar manteniendo las fechas, cantidadVentas y cantidadReservas correctamente mapeadas
   const base = fromApi(raw);
   const normalized = {
     ...base,
     // Mapear fechas correctamente (backend usa updateAt sin 'd')
     createdAt: raw?.createdAt ?? raw?.created_at ?? base.createdAt ?? null,
     updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? base.updateAt ?? null,
-    // Incluir cantidadVentas si viene del backend
+    // Incluir cantidadVentas y cantidadReservas si vienen del backend
     cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
+    cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? base.cantidadReservas ?? 0,
   };
   
   return ok(normalized);

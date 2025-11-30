@@ -28,8 +28,15 @@ export function reservasChipsFrom(applied, catalogs) {
   });
 
   // Inmobiliarias (plural, como el field.id)
+  // Buscar el nombre en el catálogo si solo viene el ID
+  const inmCatalog = catalogs?.inmobiliarias || [];
   (applied.inmobiliarias || []).forEach((v) => {
-    const label = getLabel(v);
+    let label = getLabel(v);
+    // Si el valor es un ID (número o string numérico), buscar el nombre en el catálogo
+    if (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v))) {
+      const found = inmCatalog.find(opt => String(opt.value) === String(v));
+      if (found) label = found.label;
+    }
     chips.push({ k: "inmobiliarias", v, label: `Inmobiliaria: ${label}` });
   });
 
