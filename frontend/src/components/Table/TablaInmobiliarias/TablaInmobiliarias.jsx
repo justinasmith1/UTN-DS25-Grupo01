@@ -7,20 +7,121 @@
 // 3) Refuerzo de metadatos de columnas (header + accessorKey cuando aplica) para evitar desfasajes
 //    entre encabezados y celdas en algunos renderers de tablas (sin romper formato ni estilos).
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ListTodo, Percent } from "lucide-react"; // (1) nuevo icono + icono decorativo opcional
+import { ListTodo, Percent } from "lucide-react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../../../lib/auth/rbac";
 import TablaBase from "../TablaBase";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
-// (nota) Se importan formatters por si en el futuro formateamos desde acá
 import {
   fmtComxVenta,
   fmtCantidadVentas,
   fmtFecha,
   fmtContacto,
 } from "./utils/formatters";
+
+// Componente dropdown para "Ver asociadas" (ventas y reservas)
+function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (
+        btnRef.current &&
+        !btnRef.current.contains(e.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleVerVentas = () => {
+    navigate(`/ventas?inmobiliariaId=${inmobiliariaId}`);
+    setOpen(false);
+  };
+
+  const handleVerReservas = () => {
+    navigate(`/reservas?inmobiliariaId=${inmobiliariaId}`);
+    setOpen(false);
+  };
+
+  return (
+    <div style={{ position: "relative", zIndex: open ? 9999 : "auto" }}>
+      <button
+        ref={btnRef}
+        className="tl-icon tl-icon--money"
+        aria-label="Ver asociadas"
+        data-tooltip="Ver asociadas"
+        onClick={() => setOpen(!open)}
+        style={{ position: "relative" }}
+      >
+        <ListTodo size={18} />
+      </button>
+      {open && (
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: btnRef.current ? `${btnRef.current.getBoundingClientRect().bottom + 4}px` : "auto",
+            right: btnRef.current ? `${window.innerWidth - btnRef.current.getBoundingClientRect().right}px` : "auto",
+            background: "#fff",
+            border: "1px solid rgba(0,0,0,.14)",
+            borderRadius: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,.15)",
+            zIndex: 9999,
+            minWidth: "120px",
+            overflow: "hidden",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleVerVentas}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#111827",
+            }}
+            onMouseEnter={(e) => (e.target.style.background = "#f3f4f6")}
+            onMouseLeave={(e) => (e.target.style.background = "transparent")}
+          >
+            Ver ventas asociadas
+          </button>
+          <button
+            type="button"
+            onClick={handleVerReservas}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              borderTop: "1px solid #e5e7eb",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#111827",
+            }}
+            onMouseEnter={(e) => (e.target.style.background = "#f3f4f6")}
+            onMouseLeave={(e) => (e.target.style.background = "transparent")}
+          >
+            Ver reservas asociadas
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function TablaInmobiliarias({
   data = [],
@@ -41,8 +142,32 @@ export default function TablaInmobiliarias({
   // -----------------------------------------
   // Columnas: usar las del preset SIN remapear para evitar desfases de header/celdas.
   // (FIX visual mínimo y seguro: respetamos accessor/width/order definidos en el preset)
+  // Agregamos un renderer personalizado para la columna "nombre" que evita el wrap excesivo
   // -----------------------------------------
-  const columns = useMemo(() => inmobiliariasTablePreset.columns, []);
+  const columns = useMemo(() => {
+    return inmobiliariasTablePreset.columns.map((col) => {
+      if (col.id === 'nombre') {
+        return {
+          ...col,
+          accessor: (row) => {
+            const nombre = row.nombre || '-';
+            return (
+              <span style={{ 
+                display: 'inline-block', 
+                maxWidth: '100%',
+                lineHeight: '1.2',
+                wordBreak: 'break-word',
+                hyphens: 'auto'
+              }}>
+                {nombre}
+              </span>
+            );
+          },
+        };
+      }
+      return col;
+    });
+  }, []);
 
   // -----------------------------------------
   // Acciones por fila (íconos): solo cambio el de "ver ventas"
@@ -99,18 +224,18 @@ export default function TablaInmobiliarias({
         );
       }
 
+      // Unificamos la acción de "ver asociadas" en un solo botón con menú,
+      // que permite elegir entre ver las ventas o las reservas asociadas
+      // a esta inmobiliaria. Cada opción navega al módulo correspondiente
+      // aplicando el filtro por inmobiliaria.
       if (can(user, PERMISSIONS.SALE_VIEW)) {
-        // (1) CAMBIO DE ICONO: ahora ListTodo de lucide-react
         actions.push(
-          <button
-            key="ventas"
-            className="tl-icon tl-icon--money"
-            aria-label="Ver ventas de la Inmobiliaria"
-            data-tooltip="Ver ventas de la Inmobiliaria"
-            onClick={() => navigate(`/ventas?inmobiliariaId=${row.id}`)}
-          >
-            <ListTodo size={18} />
-          </button>
+          <VerAsociadasDropdown
+            key="ver-asociadas"
+            inmobiliariaId={row.id}
+            inmobiliariaNombre={row.nombre}
+            navigate={navigate}
+          />
         );
       }
 
@@ -245,11 +370,21 @@ export default function TablaInmobiliarias({
     config
   );
 
+  // Función para obtener el ancho de las columnas
+  const widthFor = useCallback((id) => {
+    const col = config.columns.find((c) => c.id === id);
+    if (col?.width) {
+      return typeof col.width === 'number' ? `${col.width}px` : col.width;
+    }
+    return '1fr';
+  }, [config.columns]);
+
   return (
     <TablaBase
       {...tablaProps}
       rows={data}
       columns={config.columns}
+      widthFor={widthFor}
       renderRowActions={config.renderRowActions}
       toolbarRight={config.topActions}
       selected={selectedRows}

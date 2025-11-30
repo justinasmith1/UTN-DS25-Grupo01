@@ -16,7 +16,7 @@ export const nice = (s) =>
     .toLowerCase()
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
-export function ventasChipsFrom(applied) {
+export function ventasChipsFrom(applied, catalogs = {}) {
   const arr = [];
 
   if (applied.q) {
@@ -34,10 +34,16 @@ export function ventasChipsFrom(applied) {
     arr.push({ k: "tipoPago", v, label: `Tipo de pago: ${nice(v)}` })
   );
 
-  // Inmobiliarias: plural o singular
-  const inmList = applied.inmobiliarias ?? applied.inmobiliaria ?? [];
-  (inmList || []).forEach((v) => {
-    const label = getLabel(v);
+  // Inmobiliarias (plural, como el field.id)
+  // Buscar el nombre en el catálogo si solo viene el ID
+  const inmCatalog = catalogs?.inmobiliarias || [];
+  (applied.inmobiliarias || []).forEach((v) => {
+    let label = getLabel(v);
+    // Si el valor es un ID (número o string numérico), buscar el nombre en el catálogo
+    if (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v))) {
+      const found = inmCatalog.find(opt => String(opt.value) === String(v));
+      if (found) label = found.label;
+    }
     arr.push({ k: "inmobiliarias", v, label: `Inmobiliaria: ${label}` });
   });
 

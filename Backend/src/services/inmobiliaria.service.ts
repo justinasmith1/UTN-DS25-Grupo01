@@ -14,7 +14,7 @@ import { Inmobiliaria as PrismaInmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
 
-const toInmobiliaria = (i: PrismaInmobiliaria & { _count?: { ventas?: number } }): Inmobiliaria => ({
+const toInmobiliaria = (i: PrismaInmobiliaria & { _count?: { ventas?: number; reservas?: number } }): Inmobiliaria => ({
     idInmobiliaria: i.id,
     nombre: i.nombre,
     razonSocial: i.razonSocial,
@@ -32,19 +32,20 @@ export async function getAllInmobiliarias(): Promise<GetInmobiliariasResponse> {
       orderBy: { id: 'asc' },
       include: {
         _count: {
-          select: { ventas: true }
+          select: { ventas: true, reservas: true }
         }
       }
     }),
     prisma.inmobiliaria.count(),
   ]);
   
-  // Mapear incluyendo el conteo de ventas y las fechas
+  // Mapear incluyendo el conteo de ventas, reservas y las fechas
   const inmobiliarias = rows.map((i) => {
     const base = toInmobiliaria(i);
     return {
       ...base,
       cantidadVentas: i._count?.ventas ?? 0,
+      cantidadReservas: i._count?.reservas ?? 0,
       createdAt: i.createdAt,
       updateAt: i.updateAt,
     };
@@ -62,7 +63,7 @@ export async function getInmobiliariaById(req: GetInmobiliariaRequest): Promise<
         where: { id: req.idInmobiliaria },
         include: {
             _count: {
-                select: { ventas: true }
+                select: { ventas: true, reservas: true }
             }
         }
     });
@@ -71,12 +72,13 @@ export async function getInmobiliariaById(req: GetInmobiliariaRequest): Promise<
         return { inmobiliaria: null, message: 'Inmobiliaria no encontrada' };
     }
     
-    // Incluir conteo de ventas y fechas
+    // Incluir conteo de ventas, reservas y fechas
     const mapped = toInmobiliaria(inmobiliaria);
     return { 
         inmobiliaria: {
             ...mapped,
             cantidadVentas: inmobiliaria._count?.ventas ?? 0,
+            cantidadReservas: inmobiliaria._count?.reservas ?? 0,
             createdAt: inmobiliaria.createdAt,
             updateAt: inmobiliaria.updateAt,
         } as any
@@ -148,17 +150,18 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
     },
     include: {
       _count: {
-        select: { ventas: true }
+        select: { ventas: true, reservas: true }
       }
     }
   });
 
-  // Incluir conteo de ventas y fechas en la respuesta
+  // Incluir conteo de ventas, reservas y fechas en la respuesta
   const mapped = toInmobiliaria(updated);
   return { 
     inmobiliaria: {
       ...mapped,
       cantidadVentas: updated._count?.ventas ?? 0,
+      cantidadReservas: updated._count?.reservas ?? 0,
       createdAt: updated.createdAt,
       updateAt: updated.updateAt,
     } as any,

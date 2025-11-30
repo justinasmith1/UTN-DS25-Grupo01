@@ -39,6 +39,9 @@ export default function FilterBarBase({
   
   // Estilo
   variant = "dashboard",
+  
+  // Valor inicial (para sincronizar desde props externas)
+  initialValue,
 }) {
   // Helpers
   const getDefaultValueForType = (type) => {
@@ -60,22 +63,52 @@ export default function FilterBarBase({
   const [filterState, setFilterState] = useState(() => {
     const state = {};
     fields.forEach(field => {
-      state[field.id] = defaults[field.id] ?? field.defaultValue ?? getDefaultValueForType(field.type);
+      // Si hay initialValue, usarlo; si no, usar defaults
+      const initialVal = initialValue?.[field.id];
+      state[field.id] = initialVal !== undefined 
+        ? initialVal 
+        : (defaults[field.id] ?? field.defaultValue ?? getDefaultValueForType(field.type));
     });
     return state;
   });
   
-  // Estado de filtros aplicados (chips)
-  const [appliedFilters, setAppliedFilters] = useState(() => ({ ...filterState }));
+  // Estado de filtros aplicados (chips) - inicializar desde initialValue si está disponible
+  const [appliedFilters, setAppliedFilters] = useState(() => {
+    if (initialValue && typeof initialValue === 'object') {
+      const applied = {};
+      fields.forEach(field => {
+        const val = initialValue[field.id];
+        if (val !== undefined) {
+          applied[field.id] = val;
+        } else {
+          applied[field.id] = filterState[field.id] ?? defaults[field.id] ?? field.defaultValue ?? getDefaultValueForType(field.type);
+        }
+      });
+      return applied;
+    }
+    return { ...filterState };
+  });
 
-  // Llamar a onParamsChange con los valores por defecto al montar
+  // Sincronizar appliedFilters cuando initialValue cambia (para cuando value se actualiza después del montaje)
   useEffect(() => {
-    const defaultParams = {};
-    fields.forEach(field => {
-      defaultParams[field.id] = defaults[field.id] ?? field.defaultValue ?? getDefaultValueForType(field.type);
-    });
-    onParamsChange?.(defaultParams);
-  }, []); // Solo ejecutar una vez al montar
+    if (initialValue && typeof initialValue === 'object') {
+      setAppliedFilters(prev => {
+        const updated = { ...prev };
+        let hasChanges = false;
+        fields.forEach(field => {
+          const val = initialValue[field.id];
+          if (val !== undefined) {
+            // Solo actualizar si el valor es diferente
+            if (JSON.stringify(prev[field.id]) !== JSON.stringify(val)) {
+              updated[field.id] = val;
+              hasChanges = true;
+            }
+          }
+        });
+        return hasChanges ? updated : prev;
+      });
+    }
+  }, [initialValue]);
 
   // Debounce de búsqueda (solo para búsqueda inmediata)
   const searchField = fields.find(f => f.type === 'search');

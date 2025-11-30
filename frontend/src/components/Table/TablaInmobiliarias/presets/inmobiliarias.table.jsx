@@ -1,42 +1,41 @@
 // src/components/TablaInmobiliarias/inmobiliarias.table.jsx
 // Preset de columnas para la tabla de inmobiliarias
+// Dejamos de mostrar el ID interno en la tabla de inmobiliarias.
+// El identificador visual pasa a ser el Nombre junto con otros datos.
 
 export const inmobiliariasTablePreset = {
   columns: [
     {
-      id: 'id',
-      header: 'ID',
-      accessor: (row) => row.id,
-      width: 80,
-      sortable: true,
-    },
-    {
       id: 'nombre',
       header: 'Nombre',
       accessor: (row) => row.nombre || '-',
-      width: 200,
+      width: 240,
       sortable: true,
+      align: 'center',
     },
     {
       id: 'razonSocial',
       header: 'Razón Social',
       accessor: (row) => row.razonSocial || '-',
-      width: 200,
+      width: 160,
       sortable: true,
+      align: 'center',
     },
     {
       id: 'comxventa',
       header: 'Comisión x Venta (%)',
       accessor: (row) => row.comxventa ? `${row.comxventa}%` : '-',
-      width: 150,
+      width: 180,
       sortable: true,
+      align: 'center',
     },
     {
       id: 'contacto',
       header: 'Contacto',
       accessor: (row) => row.contacto || '-',
-      width: 200,
+      width: 160,
       sortable: true,
+      align: 'center',
     },
     {
       id: 'cantidadVentas',
@@ -44,13 +43,15 @@ export const inmobiliariasTablePreset = {
       accessor: (row) => row.cantidadVentas || 0,
       width: 150,
       sortable: true,
+      align: 'center',
     },
     {
-      id: 'createdAt',
-      header: 'Fecha Creación',
-      accessor: (row) => row.createdAt ? new Date(row.createdAt).toLocaleDateString() : '-',
-      width: 150,
+      id: 'cantidadReservas',
+      header: 'Reservas asociadas',
+      accessor: (row) => row.cantidadReservas || 0,
+      width: 160,
       sortable: true,
+      align: 'center',
     },
   ],
   

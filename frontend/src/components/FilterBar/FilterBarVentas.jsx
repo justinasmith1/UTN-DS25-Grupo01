@@ -34,23 +34,28 @@ export default function FilterBarVentas({
 
   // ===== Catálogos =====
   const catalogs = useMemo(() => {
-    const norm = (arr) =>
-      (arr ?? []).map((o) =>
-        typeof o === "string"
-          ? { value: o, label: o }
-          : {
-              value: o.value ?? o.id ?? o.label ?? String(o),
-              label: o.label ?? o.name ?? String(o.value ?? o.id ?? o),
-            }
-      );
+    const normOptions = (arr) =>
+      (arr ?? []).map((o) => {
+        // Soporta backends distintos
+        if (typeof o === "string") return { value: o, label: o };
+        if (typeof o === "number") return { value: o, label: String(o) };
+        // nombres comunes que solemos tener
+        const id = o.value ?? o.id ?? o.key ?? o.codigo ?? o.code ?? null;
+        const label = o.label ?? o.nombre ?? o.name ?? o.descripcion ?? o.desc ?? o.title ?? String(id ?? "");
+        return { value: id ?? label, label };
+      });
 
-    const ESTADOS = norm(ventasFilterPreset?.catalogs?.ESTADOS ?? []);
-    const TIPO_PAGO = norm(ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? []);
-    const INM_PRESET = norm(ventasFilterPreset?.catalogs?.INMOBILIARIAS ?? inmobiliariasOpts ?? []);
+    const ESTADOS = normOptions(ventasFilterPreset?.catalogs?.ESTADOS ?? []);
+    const TIPO_PAGO = normOptions(ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? []);
+    
+    // INM: priorizamos lo que venga del container, luego preset. Normalizamos a { value: ID, label: nombre }
+    const INM_FROM_PROPS = normOptions(inmobiliariasOpts);
+    const INM_FROM_PRESET = normOptions(ventasFilterPreset?.catalogs?.INMOBILIARIAS ?? []);
+    const INM = INM_FROM_PROPS.length ? INM_FROM_PROPS : INM_FROM_PRESET;
 
-    // Garantizar "La Federala"
-    const hasLF = INM_PRESET.some((o) => (o.value ?? o.label) === "La Federala");
-    const INMOBILIARIAS = hasLF ? INM_PRESET : [{ value: "La Federala", label: "La Federala" }, ...INM_PRESET];
+    // Garantizamos "La Federala" si no está (label), sin romper IDs
+    const hasLF = INM.some((o) => (o.label ?? "").toLowerCase().includes("la federala"));
+    const INMOBILIARIAS = hasLF ? INM : [{ value: "La Federala", label: "La Federala" }, ...INM];
 
     return {
       estado: ESTADOS,
@@ -150,7 +155,18 @@ export default function FilterBarVentas({
   });
 
   const handleParamsChange = (paramsFromFB) => {
-    onChange?.(toPageShape(paramsFromFB));
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // no convertir con toPageShape porque agrega todos los campos con defaults
+    const isPartialUpdate = paramsFromFB && (
+      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
+      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    );
+    
+    if (isPartialUpdate) {
+      onChange?.(paramsFromFB);
+    } else {
+      onChange?.(toPageShape(paramsFromFB));
+    }
   };
 
   return (
