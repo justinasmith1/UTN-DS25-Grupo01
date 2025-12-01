@@ -5,9 +5,7 @@
 // - fromApi / toApi: mapean nombres.
 // - list(): usa normalizador para entregar { data, meta } consistente.
 
-// Usar mock SOLO en desarrollo y controlado por su propio flag
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-console.log("Ventas API - USO DE MOCK:", USE_MOCK);
 import { http, normalizeApiListResponse } from "../http/http";
 
 const PRIMARY = "/Ventas";
@@ -45,24 +43,29 @@ const fromApi = (row = {}) => {
 
   return {
     id: row.id ?? row.ventaId ?? row.Id,
-    // Identificador visible para el usuario
     numero: row.numero ?? row.numeroVenta ?? row.numero_publico ?? null,
     lotId,
     lotMapId: lotMapId ?? null,
     lote: ensureLote(),
-    date: row.date ?? row.fechaVenta ?? row.fecha ?? null,
-    status: row.status ?? row.estado ?? null,
-    amount:
-      typeof row.amount === "number"
-        ? row.amount
-        : row.monto != null
-        ? Number(row.monto)
-        : null,
-    paymentType: row.paymentType ?? row.tipoPago ?? null,
+    // Preservar campos en español del backend (monto, fechaVenta, estado, tipoPago, plazoEscritura)
+    monto: row.monto != null ? (typeof row.monto === "number" ? row.monto : Number(row.monto)) : (row.amount != null ? Number(row.amount) : null),
+    fechaVenta: row.fechaVenta ?? row.date ?? row.fecha ?? null,
+    estado: row.estado ?? row.status ?? null,
+    tipoPago: row.tipoPago ?? row.paymentType ?? null,
+    plazoEscritura: row.plazoEscritura ?? row.plazo_escritura ?? null,
+    // Mantener compatibilidad con nombres en inglés para código existente
+    date: row.fechaVenta ?? row.date ?? row.fecha ?? null,
+    status: row.estado ?? row.status ?? null,
+    amount: row.monto != null ? (typeof row.monto === "number" ? row.monto : Number(row.monto)) : (row.amount != null ? Number(row.amount) : null),
+    paymentType: row.tipoPago ?? row.paymentType ?? null,
     buyerId: row.buyerId ?? row.compradorId ?? null,
+    compradorId: row.compradorId ?? row.buyerId ?? null,
     inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
     reservaId: row.reservaId ?? row.reserva_id ?? null,
     observaciones: row.observaciones ?? row.notas ?? "",
+    // Preservar fechas del backend
+    createdAt: row.createdAt ?? row.fechaCreacion ?? null,
+    updatedAt: row.updatedAt ?? row.updateAt ?? row.fechaActualizacion ?? null,
   };
 };
 
@@ -166,31 +169,19 @@ async function apiGetById(id) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al obtener la venta");
   
-  // El backend devuelve { success: true, data: {...} }
   const raw = data?.data ?? data;
-  
-  // Preservar las relaciones completas que vienen del backend
-  // El backend incluye: comprador, lote (con propietario), inmobiliaria
   const base = fromApi(raw);
-  const normalized = {
-    ...base, // Campos planos normalizados
+  
+  return ok({
+    ...base,
     // Preservar relaciones completas del backend
     comprador: raw?.comprador || base?.comprador || null,
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
-    // Mapear fechas correctamente (backend usa updateAt sin 'd')
-    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? base.createdAt ?? null,
-    updatedAt:
-      raw?.updateAt ??
-      raw?.updatedAt ??
-      raw?.fechaActualizacion ??
-      base.updatedAt ??
-      null,
-  };
-  
-  return ok(normalized);
+    reserva: raw?.reserva || null,
+  });
 }
 
 async function apiGetByInmobiliaria(inmobiliariaId, params = {}) {
@@ -286,30 +277,18 @@ async function apiUpdate(id, payload) {
     throw new Error(data?.message || "Error al actualizar la venta");
   }
   
-  // El backend devuelve { success: true, data: {...} } con la venta actualizada completa
   const raw = data?.data ?? data;
-  
-  // Preservar las relaciones completas que vienen del backend (igual que en apiGetById)
   const base = fromApi(raw);
-  const normalized = {
-    ...base, // Campos planos normalizados
-    // Preservar relaciones completas del backend
+  
+  return ok({
+    ...base,
     comprador: raw?.comprador || base?.comprador || null,
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
-    // Mapear fechas correctamente (backend usa updateAt sin 'd')
-    createdAt: raw?.createdAt ?? raw?.fechaCreacion ?? base.createdAt ?? null,
-    updatedAt:
-      raw?.updateAt ??
-      raw?.updatedAt ??
-      raw?.fechaActualizacion ??
-      base.updatedAt ??
-      null,
-  };
-  
-  return ok(normalized);
+    reserva: raw?.reserva || null,
+  });
 }
 
 async function apiDelete(id) {

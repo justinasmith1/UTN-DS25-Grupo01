@@ -6,6 +6,7 @@ import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
+import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 
 /* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
@@ -82,14 +83,17 @@ function NiceSelect({ value, options, placeholder = "Seleccionar", onChange }) {
 }
 
 /* ========================================================================== */
-
 export default function ReservaCrearCard({
   open,
   onCancel,
   onCreated,
   loteIdPreSeleccionado, // Opcional: si viene desde el módulo de lotes
   entityType = "Reserva",
+  fromSidePanel = false, // Si viene del side panel, el lote debe estar freezado
 }) {
+  const { user } = useAuth();
+  const isInmobiliaria = user?.role === 'INMOBILIARIA';
+
   // Estados de formulario
   const [fechaReserva, setFechaReserva] = useState(toDateInputValue(new Date()));
   const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
@@ -99,15 +103,15 @@ export default function ReservaCrearCard({
   const [sena, setSena] = useState("");
   const [numero, setNumero] = useState(""); // Número de reserva editable
   const [numeroError, setNumeroError] = useState(null); // Error de validación de numero
-  
+
   // Estados de datos
   const [lotes, setLotes] = useState([]);
-  const [personas, setPersonas] = useState([]);
+  const [personas, setPersonas] = useState([]); // Guardar como objetos, no como opciones
   const [inmobiliarias, setInmobiliarias] = useState([]);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [loadingInmobiliarias, setLoadingInmobiliarias] = useState(false);
-  
+
   // Estados de UI
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -115,10 +119,20 @@ export default function ReservaCrearCard({
   const [openCrearPersona, setOpenCrearPersona] = useState(false);
   const [busquedaLote, setBusquedaLote] = useState("");
 
+  // Calcular el mapId del lote seleccionado cuando viene del side panel
+  const loteSeleccionadoMapId = useMemo(() => {
+    if (!fromSidePanel || !loteId) return null;
+    const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
+    if (!loteSeleccionado) return null;
+    const mapId = loteSeleccionado.mapId;
+    if (!mapId) return null;
+    return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
+  }, [fromSidePanel, loteId, lotes]);
+
   // Cargar datos al abrir
   useEffect(() => {
     if (!open) return;
-    
+
     // Cargar lotes disponibles (solo DISPONIBLE)
     setLoadingLotes(true);
     (async () => {
@@ -139,18 +153,13 @@ export default function ReservaCrearCard({
       }
     })();
 
-    // Cargar personas
+    // Cargar personas (siempre, para todos los roles incluyendo INMOBILIARIA)
     setLoadingPersonas(true);
     (async () => {
       try {
         const resp = await getAllPersonas({});
-        const personasData = resp?.personas || [];
-        const personasNormalizadas = personasData.map(p => ({
-          value: String(p.id),
-          label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
-          persona: p
-        }));
-        setPersonas(personasNormalizadas);
+        const personasData = resp?.personas ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
+        setPersonas(Array.isArray(personasData) ? personasData : []);
       } catch (err) {
         console.error("Error cargando personas:", err);
         setPersonas([]);
@@ -162,26 +171,28 @@ export default function ReservaCrearCard({
     // Resetear búsqueda de lote al abrir
     setBusquedaLote("");
 
-    // Cargar inmobiliarias
-    setLoadingInmobiliarias(true);
-    (async () => {
-      try {
-        const resp = await getAllInmobiliarias({});
-        const inmobData = resp?.data || resp?.inmobiliarias || [];
-        const inmobNormalizadas = inmobData.map(i => ({
-          value: String(i.id),
-          label: i.nombre || `ID: ${i.id}`,
-          inmobiliaria: i
-        }));
-        setInmobiliarias(inmobNormalizadas);
-      } catch (err) {
-        console.error("Error cargando inmobiliarias:", err);
-        setInmobiliarias([]);
-      } finally {
-        setLoadingInmobiliarias(false);
-      }
-    })();
-  }, [open]);
+    // Cargar inmobiliarias solo si NO es INMOBILIARIA
+    if (!isInmobiliaria) {
+      setLoadingInmobiliarias(true);
+      (async () => {
+        try {
+          const resp = await getAllInmobiliarias({});
+          const inmobData = resp?.data || resp?.inmobiliarias || [];
+          const inmobNormalizadas = inmobData.map(i => ({
+            value: String(i.id),
+            label: i.nombre || `ID: ${i.id}`,
+            inmobiliaria: i
+          }));
+          setInmobiliarias(inmobNormalizadas);
+        } catch (err) {
+          console.error("Error cargando inmobiliarias:", err);
+          setInmobiliarias([]);
+        } finally {
+          setLoadingInmobiliarias(false);
+        }
+      })();
+    }
+  }, [open, isInmobiliaria]);
 
   // Resetear cuando se cierra
   useEffect(() => {
@@ -215,15 +226,20 @@ export default function ReservaCrearCard({
     });
   }, [busquedaLote, lotes]);
 
+  // Opciones de personas para el selector (igual que en VentaCrearCard)
+  const personaOpts = useMemo(
+    () => personas.map((p) => ({
+      value: String(p.id ?? p.idPersona ?? ""),
+      label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
+      persona: p
+    })),
+    [personas]
+  );
+
   // Handler para cuando se crea una nueva persona
   const handlePersonaCreated = (nuevaPersona) => {
-    // Agregar la nueva persona a la lista
-    const nuevaOpcion = {
-      value: String(nuevaPersona.id),
-      label: `${nuevaPersona.nombreCompleto || `${nuevaPersona.nombre || ""} ${nuevaPersona.apellido || ""}`.trim() || `ID: ${nuevaPersona.id}`}`,
-      persona: nuevaPersona
-    };
-    setPersonas(prev => [nuevaOpcion, ...prev]);
+    // Agregar la nueva persona a la lista (como objeto, igual que en VentaCrearCard)
+    setPersonas(prev => [nuevaPersona, ...prev]);
     // Seleccionar automáticamente la nueva persona
     setClienteId(String(nuevaPersona.id));
     setOpenCrearPersona(false);
@@ -245,6 +261,7 @@ export default function ReservaCrearCard({
       setSaving(false);
       return;
     }
+
 
     if (!fechaReserva || !fechaReserva.trim()) {
       setError("La fecha de reserva es obligatoria.");
@@ -288,7 +305,11 @@ export default function ReservaCrearCard({
         fechaReserva: fechaISO,
         loteId: Number(loteId),
         clienteId: Number(clienteId),
-        inmobiliariaId: inmobiliariaId && inmobiliariaId.trim() ? Number(inmobiliariaId) : null,
+        // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
+        // Para ADMIN/GESTOR: enviar inmobiliariaId si fue seleccionada
+        ...(isInmobiliaria ? {} : {
+          inmobiliariaId: inmobiliariaId && inmobiliariaId.trim() ? Number(inmobiliariaId) : null,
+        }),
         sena: senaNum,
         numero: numeroTrim, // Incluir numero en el payload
       };
@@ -302,7 +323,7 @@ export default function ReservaCrearCard({
       // Mostrar animación de éxito
       setShowSuccess(true);
       onCreated?.(response.data);
-      
+
       // Esperar un momento y luego cerrar
       setTimeout(() => {
         setShowSuccess(false);
@@ -337,7 +358,7 @@ export default function ReservaCrearCard({
         }
         errorMessage = err.response.data.message;
       }
-      
+
       setError(errorMessage);
       setSaving(false);
     }
@@ -427,7 +448,7 @@ export default function ReservaCrearCard({
         saving={saving}
         saveButtonText="Confirmar Reserva"
         headerRight={
-          (loadingLotes || loadingPersonas || loadingInmobiliarias) ? (
+          (loadingLotes || loadingPersonas || (!isInmobiliaria && loadingInmobiliarias)) ? (
             <span className="badge bg-warning text-dark">Cargando...</span>
           ) : null
         }
@@ -444,65 +465,75 @@ export default function ReservaCrearCard({
             <div className="venta-col">
               <div className="field-row">
                 <div className="field-label">LOTE</div>
-                <div className="field-value p0" style={{ alignItems: "flex-start" }}>
-                  <div style={{ width: "100%", position: "relative" }}>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        className="field-input"
-                        placeholder={loteId ? "" : "Buscar lote por número o calle"}
-                        value={loteId && !busquedaLote ? (() => {
-                          const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
-                          if (!loteSeleccionado) return "";
-                          const mapId = loteSeleccionado.mapId;
-                          return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
-                        })() : busquedaLote}
-                        onChange={(e) => {
-                          setBusquedaLote(e.target.value);
-                          // Si empieza a escribir, limpiar la selección para permitir buscar otro lote
-                          if (e.target.value && loteId) {
-                            setLoteId("");
-                          }
-                        }}
-                        onFocus={() => {
-                          // Al hacer focus, activar el modo búsqueda
-                          if (loteId) {
-                            setBusquedaLote("");
-                            setLoteId("");
-                          }
-                        }}
-                      />
-                      <svg width="18" height="18" viewBox="0 0 24 24" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: .6 }}>
-                        <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none"/>
-                        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2"/>
-                      </svg>
-                    </div>
-                    {busquedaLote && (
-                      <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff" }}>
-                        {lotesFiltrados.length === 0 && (
-                          <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
-                        )}
-                        {lotesFiltrados.map((l) => {
-                          const mapId = l.mapId || l.numero || l.id;
-                          const displayText = String(mapId).toLowerCase().startsWith('lote') 
-                            ? mapId 
-                            : `Lote ${mapId}`;
-                          return (
-                            <button
-                              key={l.id}
-                              type="button"
-                              onClick={() => { setLoteId(String(l.id)); setBusquedaLote(""); }}
-                              style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
-                              onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
-                              onMouseLeave={(e) => e.target.style.background = "#fff"}
-                            >
-                              {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    )}
+                {fromSidePanel && loteSeleccionadoMapId ? (
+                  // Cuando viene del side panel, mostrar el lote como read-only con el mismo estilo que otros campos freezados
+                  <div className="field-value is-readonly">
+                    {loteSeleccionadoMapId}
                   </div>
-                </div>
+                ) : fromSidePanel ? (
+                  // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
+                  <div className="field-value is-readonly">—</div>
+                ) : (
+                  <div className="field-value p0" style={{ alignItems: "flex-start" }}>
+                    <div style={{ width: "100%", position: "relative" }}>
+                      <div style={{ position: "relative" }}>
+                        <input
+                          className="field-input"
+                          placeholder={loteId ? "" : "Buscar lote por número o calle"}
+                          value={loteId && !busquedaLote ? (() => {
+                            const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
+                            if (!loteSeleccionado) return "";
+                            const mapId = loteSeleccionado.mapId;
+                            return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
+                          })() : busquedaLote}
+                          onChange={(e) => {
+                            setBusquedaLote(e.target.value);
+                            // Si empieza a escribir, limpiar la selección para permitir buscar otro lote
+                            if (e.target.value && loteId) {
+                              setLoteId("");
+                            }
+                          }}
+                          onFocus={() => {
+                            // Al hacer focus, activar el modo búsqueda
+                            if (loteId) {
+                              setBusquedaLote("");
+                              setLoteId("");
+                            }
+                          }}
+                        />
+                        <svg width="18" height="18" viewBox="0 0 24 24" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: .6 }}>
+                          <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none"/>
+                          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2"/>
+                        </svg>
+                      </div>
+                      {busquedaLote && (
+                        <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff" }}>
+                          {lotesFiltrados.length === 0 && (
+                            <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
+                          )}
+                          {lotesFiltrados.map((l) => {
+                            const mapId = l.mapId || l.numero || l.id;
+                            const displayText = String(mapId).toLowerCase().startsWith('lote') 
+                              ? mapId 
+                              : `Lote ${mapId}`;
+                            return (
+                              <button
+                                key={l.id}
+                                type="button"
+                                onClick={() => { setLoteId(String(l.id)); setBusquedaLote(""); }}
+                                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                                onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
+                                onMouseLeave={(e) => e.target.style.background = "#fff"}
+                              >
+                                {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="field-row">
@@ -523,10 +554,10 @@ export default function ReservaCrearCard({
                 <div className="field-value p0" style={{ position: "relative", display: "flex", alignItems: "center" }}>
                   <div style={{ flex: 1 }}>
                     <NiceSelect
-                      value={clienteId}
-                      options={personas}
+                      value={clienteId || ""}
+                      options={personaOpts}
                       placeholder="Seleccionar cliente"
-                      onChange={(val) => setClienteId(val)}
+                      onChange={(val) => setClienteId(val || "")}
                     />
                   </div>
                   <button
@@ -561,16 +592,22 @@ export default function ReservaCrearCard({
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
-                <div className="field-value p0">
-                  <NiceSelect
-                    value={inmobiliariaId}
-                    options={inmobiliarias}
-                    placeholder="Seleccionar inmobiliaria (opcional)"
-                    onChange={(val) => setInmobiliariaId(val)}
-                  />
-                </div>
-                </div>
+                {isInmobiliaria ? (
+                  <div className="field-value is-readonly">
+                    {user?.inmobiliariaNombre || ""}
+                  </div>
+                ) : (
+                  <div className="field-value p0">
+                    <NiceSelect
+                      value={inmobiliariaId}
+                      options={inmobiliarias}
+                      placeholder="Seleccionar inmobiliaria (opcional)"
+                      onChange={(val) => setInmobiliariaId(val)}
+                    />
+                  </div>
+                )}
               </div>
+            </div>
 
             {/* Columna derecha */}
             <div className="venta-col">
@@ -640,7 +677,6 @@ export default function ReservaCrearCard({
           onCancel={() => setOpenCrearPersona(false)}
           onCreated={handlePersonaCreated}
         />
-
         {error && (
           <div
             style={{

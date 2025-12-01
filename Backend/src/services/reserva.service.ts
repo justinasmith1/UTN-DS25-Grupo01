@@ -127,15 +127,18 @@ export async function getReservaByEstado(estadoR: EstadoReserva): Promise<any> {
 // ==============================
 // Crear reserva
 // ==============================
-export async function createReserva(body: {
-  fechaReserva: string;           // ISO (lo transformo a Date)
-  estado: EstadoReserva;         // Nuevo campo estado
-  loteId: number;
-  clienteId: number;
-  inmobiliariaId?: number | null;
-  sena?: number;                  // Zod ya garantiza >= 0 si viene
-  numero: string;                 // Número de reserva (obligatorio y único)
-}): Promise<any> {
+export async function createReserva(
+  body: {
+    fechaReserva: string;           // ISO (lo transformo a Date)
+    estado: EstadoReserva;         // Nuevo campo estado
+    loteId: number;
+    clienteId: number;
+    inmobiliariaId?: number | null;
+    sena?: number;                  // Zod ya garantiza >= 0 si viene
+    numero: string;                 // Número de reserva (obligatorio y único)
+  },
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
   try {
     const lote = await prisma.lote.findUnique({ where: { id: body.loteId } });
     if (!lote) {
@@ -145,12 +148,21 @@ export async function createReserva(body: {
       throw new Error("El lote no está disponible para reservar.");
     }
 
+    // Si el usuario es INMOBILIARIA, usar siempre su inmobiliariaId
+    let inmobiliariaIdFinal = body.inmobiliariaId ?? null;
+    if (user?.role === 'INMOBILIARIA') {
+      if (!user.inmobiliariaId) {
+        throw new Error("El usuario INMOBILIARIA no tiene una inmobiliaria asociada.");
+      }
+      inmobiliariaIdFinal = user.inmobiliariaId;
+    }
+
     const row = await prisma.reserva.create({
       data: {
         fechaReserva: new Date(body.fechaReserva), // ISO -> Date
         loteId: body.loteId,
         clienteId: body.clienteId,
-        inmobiliariaId: body.inmobiliariaId ?? null,
+        inmobiliariaId: inmobiliariaIdFinal,
         // Para Decimal no necesito new Decimal: Prisma acepta number|string
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA

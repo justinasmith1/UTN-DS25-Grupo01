@@ -268,41 +268,18 @@ export default function VentasPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // Ver: abre con la fila y luego refina con getVentaById(id) para traer propietario/fechas/etc.
+  // Ver: abre directamente con la venta (VentaVerCard carga los datos completos internamente)
   const onVer = useCallback((venta) => {
     if (!venta) return;
     setVentaSel(venta);
     setOpenVer(true);
-
-    (async () => {
-      try {
-        const resp = await getVentaById(venta.id);
-        const detail = resp?.data ?? resp ?? {};
-        setVentaSel((prev) => enrichVenta({ ...(prev || venta), ...(detail || {}) }));
-      } catch (e) {
-        console.error("Error obteniendo venta por id:", e);
-      }
-    })();
   }, []);
 
-  // Editar: abre siempre y carga datos completos con relaciones
+  // Editar: abre siempre (VentaEditarCard carga los datos completos internamente)
   const onEditarAlways = useCallback((venta) => {
     if (!venta) return;
     setVentaSel(venta);
     setOpenEditar(true);
-
-    // Cargar datos completos con relaciones (comprador, lote.propietario, inmobiliaria, fechas)
-    (async () => {
-      try {
-        const resp = await getVentaById(venta.id);
-        const detail = resp?.data ?? resp ?? {};
-        // Enriquecer con datos completos pero mantener lo que ya teníamos
-        const enriched = enrichVenta({ ...(venta || {}), ...(detail || {}) }, {}, {});
-        setVentaSel(enriched);
-      } catch (e) {
-        console.error("Error obteniendo venta por id para editar:", e);
-      }
-    })();
   }, []);
 
   const onEliminar = useCallback((venta) => {
@@ -511,24 +488,12 @@ export default function VentasPage() {
       <VentaVerCard 
         open={openVer} 
         venta={ventaSel} 
+        ventaId={ventaSel?.id}
         onClose={() => setOpenVer(false)}
         onEdit={(venta) => {
           setOpenVer(false);
-          // Abrir el modal de editar con la misma venta
           setVentaSel(venta);
           setOpenEditar(true);
-          
-          // Cargar datos completos con relaciones
-          (async () => {
-            try {
-              const resp = await getVentaById(venta.id);
-              const detail = resp?.data ?? resp ?? {};
-              const enriched = enrichVenta({ ...(venta || {}), ...(detail || {}) }, {}, {});
-              setVentaSel(enriched);
-            } catch (e) {
-              console.error("Error obteniendo venta por id para editar:", e);
-            }
-          })();
         }}
       />
 

@@ -5,6 +5,7 @@ import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
+import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
@@ -118,6 +119,7 @@ export default function ReservaEditarCard({
   const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
   const [personas, setPersonas] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [openCrearPersona, setOpenCrearPersona] = useState(false);
 
   // evita múltiples llamados a inmobiliarias
   const fetchedInmobRef = useRef(false);
@@ -274,13 +276,24 @@ export default function ReservaEditarCard({
       try {
         const response = await getAllPersonas({});
         const personasData = response?.personas || response?.data || [];
-        const personasNormalizadas = personasData.map(p => ({
-          value: String(p.id ?? p.idPersona ?? ""),
-          label: `${p.nombre || ""} ${p.apellido || ""}`.trim() || "Sin nombre"
-        })).filter(p => p.value);
+        
+        // Si hay un detalle con cliente, asegurarse de que esté en la lista
+        let personasList = Array.isArray(personasData) ? personasData : [];
+        if (detalle?.cliente && !abort) {
+          const clienteIdStr = String(detalle.cliente.id ?? detalle.clienteId ?? "");
+          const clienteYaExiste = personasList.some(p => String(p.id ?? p.idPersona ?? "") === clienteIdStr);
+          
+          if (!clienteYaExiste && clienteIdStr) {
+            const clienteNombre = `${detalle.cliente.nombre || ""} ${detalle.cliente.apellido || ""}`.trim() || "Sin nombre";
+            personasList = [
+              { id: detalle.cliente.id, nombre: detalle.cliente.nombre, apellido: detalle.cliente.apellido, nombreCompleto: clienteNombre },
+              ...personasList
+            ];
+          }
+        }
         
         if (!abort) {
-          setPersonas(personasNormalizadas);
+          setPersonas(personasList);
           fetchedPersonasRef.current = true;
         }
       } catch (e) {
@@ -293,7 +306,26 @@ export default function ReservaEditarCard({
     }
     run();
     return () => { abort = true; };
-  }, [open]);
+  }, [open, detalle?.cliente?.id, detalle?.clienteId]);
+
+  // Opciones de personas para el selector (igual que en ReservaCrearCard)
+  const personaOpts = useMemo(
+    () => personas.map((p) => ({
+      value: String(p.id ?? p.idPersona ?? ""),
+      label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
+      persona: p
+    })),
+    [personas]
+  );
+
+  // Handler para cuando se crea una nueva persona
+  const handlePersonaCreated = (nuevaPersona) => {
+    // Agregar la nueva persona a la lista (como objeto, igual que en ReservaCrearCard)
+    setPersonas(prev => [nuevaPersona, ...prev]);
+    // Seleccionar automáticamente la nueva persona
+    setClienteId(String(nuevaPersona.id));
+    setOpenCrearPersona(false);
+  };
 
   /* 5) STATES EDITABLES derivados de 'detalle' */
   const fechaReservaISO = detalle?.fechaReserva ?? null;
@@ -645,15 +677,48 @@ export default function ReservaEditarCard({
 
               <div className="field-row">
                 <div className="field-label">CLIENTE</div>
-                <div className="field-value p0">
+                <div className="field-value p0" style={{ position: "relative", display: "flex", alignItems: "center" }}>
                   {isInmobiliaria ? (
-                    <NiceSelect
-                      value={clienteId || ""}
-                      options={personas}
-                      placeholder="Seleccionar cliente"
-                      showPlaceholderOption={false}
-                      onChange={setClienteId}
-                    />
+                    <>
+                      <div style={{ flex: 1 }}>
+                        <NiceSelect
+                          value={String(clienteId || "")}
+                          options={personaOpts}
+                          placeholder="Seleccionar cliente"
+                          showPlaceholderOption={false}
+                          onChange={(val) => setClienteId(val || "")}
+                          disabled={String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenCrearPersona(true);
+                        }}
+                        style={{
+                          padding: "8px 12px",
+                          background: "white",
+                          color: "#111",
+                          border: "1px solid rgba(0,0,0,.3)",
+                          borderRadius: "6px",
+                          cursor: "pointer",
+                          fontSize: "16px",
+                          fontWeight: 600,
+                          whiteSpace: "nowrap",
+                          marginLeft: "8px",
+                          flexShrink: 0,
+                          height: "44px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center"
+                        }}
+                        title="Crear nuevo cliente"
+                        disabled={String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                      >
+                        +
+                      </button>
+                    </>
                   ) : (
                     <div className="is-readonly">{clienteNombre}</div>
                   )}
@@ -763,6 +828,12 @@ export default function ReservaEditarCard({
           </div>
         </div>
       </EditarBase>
+
+      <PersonaCrearCard
+        open={openCrearPersona}
+        onCancel={() => setOpenCrearPersona(false)}
+        onCreated={handlePersonaCreated}
+      />
     </>
   );
 }

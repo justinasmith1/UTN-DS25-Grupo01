@@ -122,7 +122,14 @@ export async function getAllLotes(query: any = {}, role?: string) {
 
 
 export async function getLoteById(id: number, role?: string) {
-  const lote = await prisma.lote.findUnique({ where: { id: id } });
+  const lote = await prisma.lote.findUnique({
+    where: { id: id },
+    include: {
+      ubicacion: { select: { calle: true, numero: true } },
+      propietario: { select: { nombre: true, apellido: true } },
+      fraccion: { select: { numero: true } },
+    },
+  });
   if (!lote) {
     const e: any = new Error('Lote no encontrado'); e.statusCode = 404; throw e;
   }

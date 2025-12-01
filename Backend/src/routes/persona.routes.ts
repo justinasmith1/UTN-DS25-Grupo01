@@ -8,10 +8,12 @@ const router = Router();
 const personaController = new PersonaController(); 
 
 // GET /api/personas
+// Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
+// INMOBILIARIA necesita ver clientes para crear reservas
 router.get(
     '/', 
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
     personaController.obtenerTodas
 );
 
@@ -33,10 +35,12 @@ router.get(
 );
 
 // POST /api/personas
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// INMOBILIARIA necesita crear clientes para completar reservas
 router.post(
     '/', 
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
     validate(createPersonaSchema), 
     personaController.create
 );

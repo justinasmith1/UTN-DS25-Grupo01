@@ -12,9 +12,10 @@ type JWTPayload = {
 };
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
-  // 1. Buscar usuario
+  // 1. Buscar usuario con su inmobiliaria incluida
   const user = await prisma.user.findUnique({
-    where: { email: data.email }
+    where: { email: data.email },
+    include: { inmobiliaria: true }
   });
 
   if (!user) {
@@ -32,22 +33,14 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   }
 
   // 3. Generar JWT
-    const JWT_SECRET = process.env.JWT_SECRET as Secret | undefined;
+  const JWT_SECRET = process.env.JWT_SECRET as Secret | undefined;
   if (!JWT_SECRET) {
     throw new Error('Falta JWT_SECRET en .env');
   }
   const EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '2h';
 
-  // Si el rol es INMOBILIARIA, buscar la inmobiliaria asociada
-  // La relación es: Inmobiliaria.userId -> User.id (no User.inmobiliariaId)
-  let inmobiliariaId: number | null = null;
-  if (user.role === 'INMOBILIARIA') {
-    const inmobiliaria = await prisma.inmobiliaria.findUnique({
-      where: { userId: user.id },
-      select: { id: true }
-    });
-    inmobiliariaId = inmobiliaria?.id ?? null;
-  }
+  // Obtener inmobiliariaId desde la relación incluida
+  const inmobiliariaId = user.inmobiliaria?.id ?? null;
 
   // Incluir inmobiliariaId en el JWT si el rol es INMOBILIARIA
   // Esto evita consultar la BD en cada request en el middleware
@@ -59,10 +52,15 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: EXPIRES_IN } as SignOptions);
-  // 4. Retornar sin password
-  const { password: _, ...userWithoutPassword } = user;
+  
+  // 4. Retornar sin password, pero incluyendo inmobiliariaId e inmobiliariaNombre
+  const { password: _, inmobiliaria, ...userWithoutPassword } = user;
   return {
-    user: userWithoutPassword,
+    user: {
+      ...userWithoutPassword,
+      inmobiliariaId: inmobiliaria?.id ?? null,
+      inmobiliariaNombre: inmobiliaria?.nombre ?? null,
+    },
     token,
   };
 }

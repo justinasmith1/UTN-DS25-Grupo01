@@ -14,6 +14,7 @@ export default function ReservaVerCard({
   reserva,
   reservaId,
   reservas,
+  fromSidePanel = false, // Si viene del side panel, ocultar botón Editar
 }) {
   // Elegimos primero el objeto de detalle; si no llegó, buscamos en la lista
   const res = useMemo(() => {
@@ -141,13 +142,15 @@ export default function ReservaVerCard({
           <h2 className="cclf-card__title">{`Reserva N° ${res?.numero ?? res?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
-            <button
-              type="button"
-              className="cclf-tab thin"
-              onClick={() => res && onEdit?.(res)}
-            >
-              Editar Reserva
-            </button>
+            {!fromSidePanel && (
+              <button
+                type="button"
+                className="cclf-tab thin"
+                onClick={() => res && onEdit?.(res)}
+              >
+                Editar Reserva
+              </button>
+            )}
 
             <button type="button" className="cclf-btn-close" onClick={onClose}>
               <span className="cclf-btn-close__x">×</span>

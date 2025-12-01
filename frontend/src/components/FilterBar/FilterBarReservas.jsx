@@ -29,22 +29,35 @@ export default function FilterBarReservas({
     });
 
   // ===== Campos visibles =====
+  // Para INMOBILIARIA: ocultar el filtro de inmobiliaria (solo ven sus propias reservas)
   const fields = useMemo(
-    () => [
+    () => {
+      const allFields = [
       { id: "q",              type: "search",     label: "Buscar",             placeholder: "Cliente, inmobiliaria, lote...", defaultValue: "" },
       { id: "estado",         type: "multiSelect",label: "Estado",             defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect",label: "Inmobiliaria",       defaultValue: [] },
       { id: "fechaReserva",   type: "dateRange",  label: "Fecha de Reserva",   defaultValue: { min: null, max: null } },
       { id: "fechaCreacion",  type: "dateRange",  label: "Fecha de Creación",  defaultValue: { min: null, max: null } },
       { id: "seña",           type: "range",      label: "Seña",               defaultValue: { min: null, max: null } },
-    ],
-    []
+      ];
+      // Filtrar el campo de inmobiliaria si el usuario es INMOBILIARIA
+      if (userRole === 'INMOBILIARIA') {
+        return allFields.filter(f => f.id !== 'inmobiliarias');
+      }
+      return allFields;
+    },
+    [userRole]
   );
 
   // ===== Catálogos (IDs reales para Inmobiliarias) =====
   const catalogs = useMemo(() => {
     // ESTADOS: aceptamos strings o {id/nombre}
     const ESTADOS = normOptions(estadosOpts ?? reservasFilterPreset?.catalogs?.ESTADOS ?? []);
+
+    // Para INMOBILIARIA: no incluir catálogo de inmobiliarias (no pueden filtrar por inmobiliaria)
+    if (userRole === 'INMOBILIARIA') {
+      return { estado: ESTADOS };
+    }
 
     // INM: priorizamos lo que venga del container (de Ventas),
     // luego preset. Normalizamos a { value: ID, label: nombre }
@@ -57,7 +70,7 @@ export default function FilterBarReservas({
     const INMOBILIARIAS = hasLF ? INM : [{ value: "La Federala", label: "La Federala" }, ...INM];
 
     return { estado: ESTADOS, inmobiliarias: INMOBILIARIAS };
-  }, [estadosOpts, inmobiliariasOpts]);
+  }, [estadosOpts, inmobiliariasOpts, userRole]);
 
   // ===== Rangos / Defaults =====
   const ranges = useMemo(
@@ -70,18 +83,31 @@ export default function FilterBarReservas({
   );
 
   const defaults = useMemo(
-    () => ({
+    () => {
+      const baseDefaults = {
       q: "",
       estado: [],
-      inmobiliarias: [],
       fechaReserva:  { min: null, max: null },
       fechaCreacion: { min: null, max: null },
       seña:          { min: null, max: null },
-    }),
-    []
+      };
+      // Para INMOBILIARIA: no incluir inmobiliarias en defaults
+      if (userRole !== 'INMOBILIARIA') {
+        return { ...baseDefaults, inmobiliarias: [] };
+      }
+      return baseDefaults;
+    },
+    [userRole]
   );
 
-  const optionFormatter = useMemo(() => ({ estado: nice, inmobiliarias: nice }), []);
+  const optionFormatter = useMemo(() => {
+    const base = { estado: nice };
+    // Para INMOBILIARIA: no incluir inmobiliarias en optionFormatter
+    if (userRole !== 'INMOBILIARIA') {
+      return { ...base, inmobiliarias: nice };
+    }
+    return base;
+  }, [userRole]);
 
   // ===== Mapper NUEVO → LEGACY + IDs + ISO =====
   const toUpperArray = (xs) =>

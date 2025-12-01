@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getVentaById } from "../../../lib/api/ventas";
 
 /**
  * VentaVerCard
  * – Dos columnas; cada fila: label + valor en una misma línea.
  * – Labels con el mismo ancho (se calcula por el más largo).
- * – Fallbacks: dinero/fechas/strings y “Sin información”.
+ * – Fallbacks: dinero/fechas/strings y "Sin información".
  * – Usa `venta` (detalle) cuando está; si no, busca por `ventaId` en `ventas`.
  */
 export default function VentaVerCard({
@@ -14,15 +15,83 @@ export default function VentaVerCard({
   venta,
   ventaId,
   ventas,
+  fromSidePanel = false, // Si viene del side panel, ocultar botón Editar
 }) {
-  // Elegimos primero el objeto de detalle; si no llegó, buscamos en la lista
+  // Estado para el detalle completo de la venta
+  const [detalleCompleto, setDetalleCompleto] = useState(null);
+
+  // Cargar datos completos cuando se abre el card (igual que ReservaEditarCard)
+  useEffect(() => {
+    let abort = false;
+    async function run() {
+      if (!open) {
+        setDetalleCompleto(null);
+        return;
+      }
+
+      // Determinar el ID a usar
+      const idToUse = venta?.id ?? ventaId;
+
+      // Siempre llamar a getVentaById para obtener datos completos con relaciones
+      // Incluso si viene venta por props, puede no tener todas las relaciones
+      if (idToUse != null) {
+        try {
+          const response = await getVentaById(idToUse);
+          const full = response?.data ?? response;
+          if (!abort && full) {
+            // Preservar mapId del lote si está disponible
+            const originalVenta = venta || (Array.isArray(ventas) ? ventas.find(v => `${v.id}` === `${idToUse}`) : null);
+            const preservedMapId = originalVenta?.lote?.mapId ?? originalVenta?.lotMapId ?? full?.lote?.mapId ?? full?.lotMapId ?? null;
+            
+            // Enriquecer el detalle con mapId si está disponible
+            const enriched = preservedMapId && full?.lote
+              ? {
+                  ...full,
+                  lotMapId: preservedMapId,
+                  lote: {
+                    ...full.lote,
+                    mapId: preservedMapId,
+                  },
+                }
+              : preservedMapId
+              ? {
+                  ...full,
+                  lotMapId: preservedMapId,
+                }
+              : full;
+            
+            setDetalleCompleto(enriched);
+          }
+        } catch (e) {
+          console.error("Error obteniendo venta por id:", e);
+          // Si falla el GET pero tenemos venta por props, usarla como fallback
+          if (venta && !abort) {
+            setDetalleCompleto(venta);
+          } else if (ventaId != null && Array.isArray(ventas) && !abort) {
+            const found = ventas.find(v => `${v.id}` === `${ventaId}`);
+            if (found) {
+              setDetalleCompleto(found);
+            }
+          }
+        }
+      } else if (venta) {
+        // Si no hay ID pero viene venta por props, usarla
+        if (!abort) setDetalleCompleto(venta);
+      }
+    }
+    run();
+    return () => { abort = true; };
+  }, [open, venta?.id, ventaId, venta, ventas]);
+
+  // Elegimos primero el objeto de detalle completo; si no llegó, buscamos en la lista
   const sale = useMemo(() => {
+    if (detalleCompleto) return detalleCompleto;
     if (venta) return venta;
     if (ventaId != null && Array.isArray(ventas)) {
       return ventas.find((v) => `${v.id}` === `${ventaId}`) || null;
     }
     return null;
-  }, [venta, ventaId, ventas]);
+  }, [detalleCompleto, venta, ventaId, ventas]);
 
   const NA = "Sin información";
   const isBlank = (v) =>
@@ -105,22 +174,10 @@ export default function VentaVerCard({
     return NA;
   })();
 
-  // Fechas: venta primero, si no existen intentamos variantes y/o las del lote
-  const fechaVenta = fmtDate(sale?.fechaVenta);
-  const fechaActualizacion = fmtDate(
-    sale?.updatedAt ??
-      sale?.updateAt ??
-      sale?.fechaActualizacion ??
-      sale?.lote?.updatedAt ??
-      sale?.lote?.updateAt
-  );
-  const fechaCreacion = fmtDate(
-    sale?.createdAt ??
-      sale?.creadoEl ??
-      sale?.fechaCreacion ??
-      sale?.lote?.createdAt ??
-      sale?.lote?.creadoEl
-  );
+  // Fechas
+  const fechaVentaFormatted = fmtDate(sale?.fechaVenta);
+  const fechaActualizacion = fmtDate(sale?.updatedAt ?? sale?.updateAt ?? sale?.fechaActualizacion);
+  const fechaCreacion = fmtDate(sale?.createdAt ?? sale?.fechaCreacion);
 
   // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha
   const leftPairs = [
@@ -134,7 +191,7 @@ export default function VentaVerCard({
 
   const rightPairs = [
     ["NÚMERO DE VENTA", safe(sale?.numero)],
-    ["FECHA VENTA", fechaVenta],
+    ["FECHA VENTA", fechaVentaFormatted],
     ["TIPO DE PAGO", fmtTipoPago(sale?.tipoPago)],
     ["PLAZO ESCRITURA", fmtDate(sale?.plazoEscritura)],
     ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
@@ -169,13 +226,15 @@ export default function VentaVerCard({
           <h2 className="cclf-card__title">{`Venta N° ${sale?.numero ?? sale?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
-            <button
-              type="button"
-              className="cclf-tab thin"
-              onClick={() => sale && onEdit?.(sale)}
-            >
-              Editar Venta
-            </button>
+            {!fromSidePanel && (
+              <button
+                type="button"
+                className="cclf-tab thin"
+                onClick={() => sale && onEdit?.(sale)}
+              >
+                Editar Venta
+              </button>
+            )}
 
             <button type="button" className="cclf-btn-close" onClick={onClose}>
               <span className="cclf-btn-close__x">×</span>

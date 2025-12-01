@@ -71,7 +71,8 @@ export async function getAllReservasByEstadoController(req: Request, res: Respon
 // Body validado por Zod (createReservaSchema.strict()).
 export async function createReservaController(req: Request, res: Response, next: NextFunction) {
   try {
-    const data = await createReserva(req.body);
+    const user = req.user; // Usuario autenticado desde el middleware
+    const data = await createReserva(req.body, user);
     res.status(201).json({ success: true, message: 'Reserva creada exitosamente', data });
   } catch (error) {
     next(error);

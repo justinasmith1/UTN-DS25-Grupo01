@@ -4,6 +4,7 @@ import LoteEditarCard from "./LoteEditarCard.jsx";
 import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
+import { getLoteById } from "../../../lib/api/lotes.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 
@@ -122,6 +123,45 @@ export default function LoteVerCard({
   useEffect(() => {
     setCurrentLot(resolvedLot);
   }, [resolvedLot]);
+
+  // Cargar datos completos con relaciones (propietario, ubicacion) cuando se abre el card
+  useEffect(() => {
+    let abort = false;
+    async function loadCompleteData() {
+      if (!open) return;
+
+      const idToUse = currentLot?.id ?? resolvedLot?.id;
+      if (!idToUse) return;
+
+      // Verificar si ya tenemos las relaciones necesarias (objeto completo con nombre/calle)
+      const hasPropietario = currentLot?.propietario && typeof currentLot.propietario === 'object' && (currentLot.propietario.nombre || currentLot.propietario.apellido);
+      const hasUbicacion = currentLot?.ubicacion && typeof currentLot.ubicacion === 'object' && currentLot.ubicacion.calle;
+
+      // Si ya tenemos los datos completos, no hacer la llamada
+      if (hasPropietario && hasUbicacion) return;
+
+      try {
+        const response = await getLoteById(idToUse);
+        const full = response?.data ?? response;
+        if (!abort && full) {
+          setCurrentLot((prev) => ({
+            ...prev,
+            ...full,
+            // Preservar mapId si está disponible
+            mapId: full.mapId ?? prev?.mapId ?? null,
+            // Asegurar que las relaciones estén presentes
+            propietario: full.propietario ?? prev?.propietario ?? null,
+            ubicacion: full.ubicacion ?? prev?.ubicacion ?? null,
+          }));
+        }
+      } catch (e) {
+        console.error("Error obteniendo lote por id:", e);
+        // Si falla, mantener los datos que ya tenemos
+      }
+    }
+    loadCompleteData();
+    return () => { abort = true; };
+  }, [open, currentLot?.id, resolvedLot?.id]);
 
   // Cargar reserva activa si el lote está reservado
   useEffect(() => {
