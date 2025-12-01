@@ -39,7 +39,7 @@ export const reservasTablePreset = {
       id: 'clienteCompleto',
       titulo: 'Cliente',
       accessor: (r) => getClienteNombre(r) ?? '—',
-      width: '220px'
+      width: '140px'
     },
 
     // Fecha Reserva en una sola línea
