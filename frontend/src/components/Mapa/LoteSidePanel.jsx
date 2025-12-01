@@ -12,7 +12,7 @@ import { can, PERMISSIONS, userPermissions } from "../../lib/auth/rbac";
 import { useNavigate } from "react-router-dom";
 import { getLoteById } from "../../lib/api/lotes";
 import { useToast } from "../../app/providers/ToastProvider";
-import { getArchivosByLote } from "../../lib/api/archivos";
+import { getArchivosByLote, getFileSignedUrl } from "../../lib/api/archivos";
 import LoteImageCarousel from "./LoteImageCarousel";
 import StatusBadge, { fmtEstadoLote } from "../Table/TablaLotes/cells/StatusBadge";
 import SubstatusBadge from "../Table/TablaLotes/cells/SubstatusBadge";
@@ -119,18 +119,31 @@ export default function LoteSidePanel({
         const resp = await getLoteById(selectedLotId);
         const lot = resp?.data ?? resp ?? null;
         setCurrentLot(lot);
-        
-        // Cargar imágenes del lote
+
+        // Cargar imágenes del lote (misma lógica que en LoteVerCard)
         if (lot?.id) {
           try {
-            const archivosResp = await getArchivosByLote(lot.id);
-            const archivos = archivosResp?.data || archivosResp || [];
-            // Obtener URLs firmadas de las imágenes
-            const imageUrls = archivos
-              .filter(archivo => archivo.tipo === 'IMAGEN' || archivo.tipo === 'image' || !archivo.tipo)
-              .map(archivo => archivo.url || archivo.signedUrl || archivo.path)
-              .filter(Boolean);
-            setLoteImages(imageUrls);
+            const archivos = await getArchivosByLote(lot.id);
+            const imagenes = (archivos?.data ?? archivos ?? []).filter(
+              (a) => ((a.tipo || "").toUpperCase() === "IMAGEN") && a.id
+            );
+
+            const obtenerSignedUrl = async (img) => {
+              try {
+                const signedUrl = await getFileSignedUrl(img.id);
+                return typeof signedUrl === "string" && signedUrl.startsWith("http")
+                  ? signedUrl
+                  : signedUrl?.signedUrl && String(signedUrl.signedUrl).startsWith("http")
+                  ? signedUrl.signedUrl
+                  : null;
+              } catch (e) {
+                console.error("Error obteniendo URL firmada para imagen de lote:", img.id, e);
+                return null;
+              }
+            };
+
+            const urls = await Promise.all(imagenes.map(obtenerSignedUrl));
+            setLoteImages(urls.filter(Boolean));
           } catch (err) {
             console.error("Error cargando imágenes del lote:", err);
             setLoteImages([]);
