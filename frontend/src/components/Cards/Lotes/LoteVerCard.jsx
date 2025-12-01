@@ -3,6 +3,9 @@ import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
 import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
+import { getAllReservas } from "../../../lib/api/reservas.js";
+import { getLoteById } from "../../../lib/api/lotes.js";
+import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
@@ -104,6 +107,7 @@ export default function LoteVerCard({
   loteId,
   lotes,
 }) {
+  const { user } = useAuth();
   const resolvedLot = useMemo(() => {
     if (lote) return lote;
     if (loteId != null && Array.isArray(lotes)) {
@@ -114,10 +118,81 @@ export default function LoteVerCard({
 
   const [currentLot, setCurrentLot] = useState(resolvedLot);
   const [editOpen, setEditOpen] = useState(false);
+  const [reservaActiva, setReservaActiva] = useState(null);
 
   useEffect(() => {
     setCurrentLot(resolvedLot);
   }, [resolvedLot]);
+
+  // Cargar datos completos con relaciones (propietario, ubicacion) cuando se abre el card
+  useEffect(() => {
+    let abort = false;
+    async function loadCompleteData() {
+      if (!open) return;
+
+      const idToUse = currentLot?.id ?? resolvedLot?.id;
+      if (!idToUse) return;
+
+      // Verificar si ya tenemos las relaciones necesarias (objeto completo con nombre/calle)
+      const hasPropietario = currentLot?.propietario && typeof currentLot.propietario === 'object' && (currentLot.propietario.nombre || currentLot.propietario.apellido);
+      const hasUbicacion = currentLot?.ubicacion && typeof currentLot.ubicacion === 'object' && currentLot.ubicacion.calle;
+
+      // Si ya tenemos los datos completos, no hacer la llamada
+      if (hasPropietario && hasUbicacion) return;
+
+      try {
+        const response = await getLoteById(idToUse);
+        const full = response?.data ?? response;
+        if (!abort && full) {
+          setCurrentLot((prev) => ({
+            ...prev,
+            ...full,
+            // Preservar mapId si está disponible
+            mapId: full.mapId ?? prev?.mapId ?? null,
+            // Asegurar que las relaciones estén presentes
+            propietario: full.propietario ?? prev?.propietario ?? null,
+            ubicacion: full.ubicacion ?? prev?.ubicacion ?? null,
+          }));
+        }
+      } catch (e) {
+        console.error("Error obteniendo lote por id:", e);
+        // Si falla, mantener los datos que ya tenemos
+      }
+    }
+    loadCompleteData();
+    return () => { abort = true; };
+  }, [open, currentLot?.id, resolvedLot?.id]);
+
+  // Cargar reserva activa si el lote está reservado
+  useEffect(() => {
+    if (!open || !currentLot?.id) {
+      setReservaActiva(null);
+      return;
+    }
+
+    const estadoUpper = String(currentLot?.estado || "").toUpperCase();
+    if (estadoUpper === "RESERVADO") {
+      (async () => {
+        try {
+          const reservasResp = await getAllReservas({});
+          const allReservas = reservasResp?.data?.reservas ?? reservasResp?.data ?? [];
+          const reserva = allReservas.find(
+            (r) => {
+              const rLoteId = r.loteId || r.lote?.id || r.lotId || r.lot?.id;
+              const estadoReserva = String(r.estado || "").toUpperCase();
+              return (rLoteId === currentLot.id || String(rLoteId) === String(currentLot.id)) && estadoReserva === "ACTIVA";
+            }
+          );
+          setReservaActiva(reserva || null);
+        } catch (err) {
+          console.error("Error cargando reserva activa:", err);
+          setReservaActiva(null);
+        }
+      })();
+    } else {
+      setReservaActiva(null);
+    }
+  }, [open, currentLot?.id, currentLot?.estado]);
 
   useEffect(() => {
     if (!open) setEditOpen(false);
@@ -220,7 +295,9 @@ export default function LoteVerCard({
     };
 
     const leftPairs = [
-      ["ID", safe(lot?.mapId ?? lot?.id)],
+      // Nunca mostramos el ID interno del lote en la UI.
+      // Si no hay mapId, no mostramos identificador en este lugar.
+      ["ID", safe(lot?.mapId ?? "")],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
       ["FRACCIÓN", fraccion],
       ["TIPO", titleCase(lot?.tipo)],
@@ -349,6 +426,24 @@ export default function LoteVerCard({
     setLabelWidth(computed);
   }, [infoPairs, open]);
 
+  // Determinar si se puede ver la reserva (solo si es de la inmobiliaria del usuario)
+  // IMPORTANTE: Estos hooks deben estar ANTES del return condicional para cumplir con las reglas de hooks
+  const puedeVerReserva = useMemo(() => {
+    if (!reservaActiva) return false;
+    if (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') return true;
+    if (user?.role === 'INMOBILIARIA' && reservaActiva.inmobiliariaId === user.inmobiliariaId) return true;
+    return false;
+  }, [reservaActiva, user]);
+
+  // Determinar si se puede reservar (solo INMOBILIARIA en lotes DISPONIBLE)
+  const estadosReservables = ['DISPONIBLE', 'EN_PROMOCION'];
+  const puedeReservar = useMemo(() => {
+    if (user?.role !== 'INMOBILIARIA') return false;
+    const estadoUpper = String(currentLot?.estado || "").toUpperCase();
+    return estadosReservables.includes(estadoUpper);
+  }, [user?.role, currentLot?.estado]);
+
+  // Early return DESPUÉS de todos los hooks
   if (!open || !lot) return null;
 
   const valueStyle = (val) => ({
@@ -367,30 +462,47 @@ export default function LoteVerCard({
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Lote Nº ${safe(removeLotePrefix(lot?.mapId ?? lot?.id))}`}</h2>
+          {/* Nunca mostramos el ID interno del lote en la UI. Si no hay mapId, no mostramos identificador. */}
+          <h2 className="cclf-card__title">{lot?.mapId ? `Lote Nº ${safe(removeLotePrefix(lot.mapId))}` : "Lote"}</h2>
 
           <div className="cclf-card__actions lote-header-actions">
-            <button
-              type="button"
-              className="cclf-tab thin"
-              onClick={() => {
-              if (!lot) return;
-              if (onEdit) {
-                onEdit(lot);
-              } else {
-                setEditOpen(true);
-              }
-            }}
-            >
-              Editar Lote
-            </button>
-            <button
-              type="button"
-              className="cclf-tab thin reserve"
-              onClick={() => lot && onReserve?.(lot)}
-            >
-              {lot?.estado === "RESERVADO" || String(lot?.estado || "").toUpperCase() === "RESERVADO" ? "Ver Reserva" : "Reservar"}
-            </button>
+            {/* Botón "Editar Lote": NO se muestra para INMOBILIARIA */}
+            {user?.role !== 'INMOBILIARIA' && (
+              <button
+                type="button"
+                className="cclf-tab thin"
+                onClick={() => {
+                  if (!lot) return;
+                  if (onEdit) {
+                    onEdit(lot);
+                  } else {
+                    setEditOpen(true);
+                  }
+                }}
+              >
+                Editar Lote
+              </button>
+            )}
+            {/* Botón "Ver Reserva": solo si la reserva es de la inmobiliaria del usuario */}
+            {puedeVerReserva && (
+              <button
+                type="button"
+                className="cclf-tab thin reserve"
+                onClick={() => currentLot && onReserve?.(currentLot)}
+              >
+                Ver Reserva
+              </button>
+            )}
+            {/* Botón "Reservar": solo si el lote está disponible y el usuario es INMOBILIARIA */}
+            {puedeReservar && (
+              <button
+                type="button"
+                className="cclf-tab thin reserve"
+                onClick={() => currentLot && onReserve?.(currentLot)}
+              >
+                Reservar
+              </button>
+            )}
             <button
               type="button"
               className="cclf-btn-close"

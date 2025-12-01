@@ -21,6 +21,8 @@ export default function Layout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
 
+  // El fetch de lotes está centralizado en Dashboard.jsx para evitar múltiples llamadas.
+  // Layout solo carga lotes si no estamos en el Dashboard (para otras páginas como Map).
   const loadLotes = async () => {
     try {
       setLoadingLots(true);
@@ -34,17 +36,24 @@ export default function Layout() {
     }
   };
 
+  // Solo cargar lotes si NO estamos en el Dashboard (donde ya se cargan)
   useEffect(() => {
+    if (location.pathname === "/" || location.pathname === "/dashboard") {
+      // En Dashboard, no hacer fetch aquí (ya lo hace Dashboard.jsx)
+      setLoadingLots(false);
+      return;
+    }
+    
     let alive = true;
     loadLotes().then(() => {
       if (!alive) return;
     });
     return () => { alive = false; };
-  }, []);
+  }, [location.pathname]);
 
   // Recargar lotes cuando se navega al mapa para asegurar datos actualizados
   useEffect(() => {
-    if (location.pathname === "/mapa" || location.pathname === "/map") {
+    if ((location.pathname === "/mapa" || location.pathname === "/map") && location.pathname !== "/" && location.pathname !== "/dashboard") {
       loadLotes();
     }
   }, [location.pathname]);

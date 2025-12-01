@@ -12,6 +12,7 @@ import { can, PERMISSIONS, userPermissions } from "../../lib/auth/rbac";
 import { useNavigate } from "react-router-dom";
 import { getLoteById } from "../../lib/api/lotes";
 import { useToast } from "../../app/providers/ToastProvider";
+import { getArchivosByLote, getFileSignedUrl } from "../../lib/api/archivos";
 import LoteImageCarousel from "./LoteImageCarousel";
 import StatusBadge, { fmtEstadoLote } from "../Table/TablaLotes/cells/StatusBadge";
 import SubstatusBadge from "../Table/TablaLotes/cells/SubstatusBadge";
@@ -20,8 +21,8 @@ import ReservaCrearCard from "../Cards/Reservas/ReservaCrearCard";
 import ReservaVerCard from "../Cards/Reservas/ReservaVerCard";
 import VentaVerCard from "../Cards/Ventas/VentaVerCard";
 import LoteVerCard from "../Cards/Lotes/LoteVerCard";
-import { getAllReservas } from "../../lib/api/reservas";
-import { getAllVentas } from "../../lib/api/ventas";
+import { getAllReservas, getReservaById } from "../../lib/api/reservas";
+import { getAllVentas, getVentaById } from "../../lib/api/ventas";
 import "../Cards/Base/cards.css";
 
 // Helper para verificar si es inmobiliaria
@@ -74,6 +75,7 @@ export default function LoteSidePanel({
   const [currentLot, setCurrentLot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [descripcionExpanded, setDescripcionExpanded] = useState(false);
+  const [loteImages, setLoteImages] = useState([]);
   
   // Estados para controlar qué card se muestra
   const [showEditCard, setShowEditCard] = useState(false);
@@ -107,6 +109,7 @@ export default function LoteSidePanel({
       setLoadingReservaVenta(false);
       setShowSuccessEdit(false);
       setShowSuccessReserve(false);
+      setLoteImages([]);
       return;
     }
 
@@ -116,6 +119,38 @@ export default function LoteSidePanel({
         const resp = await getLoteById(selectedLotId);
         const lot = resp?.data ?? resp ?? null;
         setCurrentLot(lot);
+
+        // Cargar imágenes del lote (misma lógica que en LoteVerCard)
+        if (lot?.id) {
+          try {
+            const archivos = await getArchivosByLote(lot.id);
+            const imagenes = (archivos?.data ?? archivos ?? []).filter(
+              (a) => ((a.tipo || "").toUpperCase() === "IMAGEN") && a.id
+            );
+
+            const obtenerSignedUrl = async (img) => {
+              try {
+                const signedUrl = await getFileSignedUrl(img.id);
+                return typeof signedUrl === "string" && signedUrl.startsWith("http")
+                  ? signedUrl
+                  : signedUrl?.signedUrl && String(signedUrl.signedUrl).startsWith("http")
+                  ? signedUrl.signedUrl
+                  : null;
+              } catch (e) {
+                console.error("Error obteniendo URL firmada para imagen de lote:", img.id, e);
+                return null;
+              }
+            };
+
+            const urls = await Promise.all(imagenes.map(obtenerSignedUrl));
+            setLoteImages(urls.filter(Boolean));
+          } catch (err) {
+            console.error("Error cargando imágenes del lote:", err);
+            setLoteImages([]);
+          }
+        } else {
+          setLoteImages([]);
+        }
         
         // Buscar reserva/venta asociada si el lote está RESERVADO o VENDIDO
         if (lot) {
@@ -139,7 +174,19 @@ export default function LoteSidePanel({
             return matches;
           }
         );
-              setReservaAsociada(reservaActiva || null);
+              // Cargar datos completos de la reserva si se encontró
+              if (reservaActiva) {
+                try {
+                  const reservaCompleta = await getReservaById(reservaActiva.id || reservaActiva.idReserva);
+                  const fullReserva = reservaCompleta?.data ?? reservaCompleta ?? reservaActiva;
+                  setReservaAsociada(fullReserva);
+                } catch (err) {
+                  console.error("Error obteniendo reserva completa al cargar lote:", err);
+                  setReservaAsociada(reservaActiva);
+                }
+              } else {
+                setReservaAsociada(null);
+              }
               setVentaAsociada(null);
             } catch (err) {
               console.error("Error buscando reserva:", err);
@@ -155,7 +202,19 @@ export default function LoteSidePanel({
                   return vLoteId === lot.id;
                 }
               );
-              setVentaAsociada(ventaDelLote || null);
+              // Cargar datos completos de la venta si se encontró
+              if (ventaDelLote) {
+                try {
+                  const ventaCompleta = await getVentaById(ventaDelLote.id);
+                  const fullVenta = ventaCompleta?.data ?? ventaCompleta ?? ventaDelLote;
+                  setVentaAsociada(fullVenta);
+                } catch (err) {
+                  console.error("Error obteniendo venta completa al cargar lote:", err);
+                  setVentaAsociada(ventaDelLote);
+                }
+              } else {
+                setVentaAsociada(null);
+              }
               setReservaAsociada(null);
             } catch (err) {
               console.error("Error buscando venta:", err);
@@ -180,10 +239,11 @@ export default function LoteSidePanel({
     fetchLote();
   }, [selectedLotId, show, showError]);
 
-  // Calcular valores que dependen de currentLot, pero usar valores por defecto si es null
+  // Usar las imágenes cargadas desde getArchivosByLote, con fallback a las del lote
   const images = useMemo(() => {
+    if (loteImages.length > 0) return loteImages;
     return currentLot ? (currentLot.images || currentLot.imagenes || []) : [];
-  }, [currentLot]);
+  }, [loteImages, currentLot]);
 
   // Permisos basados en RBAC (manejar caso cuando user es null)
   const hasReservePermission = user ? can(user, PERMISSIONS.RES_CREATE) : false;
@@ -222,27 +282,6 @@ export default function LoteSidePanel({
       currentLot?.fraccionId ??
       (typeof currentLot?.fraccion === "number" ? currentLot.fraccion : null)
     );
-  }, [currentLot]);
-  
-  const ubicacion = useMemo(() => {
-    if (!currentLot) return "Sin información";
-    return safe(
-      currentLot.calle || 
-      (currentLot.fraccion && currentLot.fraccion.calle) || 
-      (currentLot.ubicacion && currentLot.ubicacion.calle) || 
-      null
-    );
-  }, [currentLot]);
-
-  // Obtener nombre del propietario
-  const propietarioNombre = useMemo(() => {
-    if (!currentLot) return "Sin información";
-    const p = currentLot.propietario || currentLot.owner || currentLot.Propietario || null;
-    if (!p) return safe(currentLot.owner);
-    const nombre = p.nombre || p.firstName || p.username || p.name || "";
-    const apellido = p.apellido || p.lastName || p.surname || "";
-    const full = [nombre, apellido].filter(Boolean).join(" ");
-    return safe(full || nombre || apellido || "Sin información");
   }, [currentLot]);
 
   // Determinar el estado del lote y la lógica del botón de reserva
@@ -302,8 +341,18 @@ export default function LoteSidePanel({
         );
         
         if (reservaActiva) {
-          setReservaAsociada(reservaActiva);
-          setShowReservaVerCard(true);
+          // Cargar datos completos de la reserva usando getReservaById
+          try {
+            const reservaCompleta = await getReservaById(reservaActiva.id || reservaActiva.idReserva);
+            const fullReserva = reservaCompleta?.data ?? reservaCompleta ?? reservaActiva;
+            setReservaAsociada(fullReserva);
+            setShowReservaVerCard(true);
+          } catch (err) {
+            console.error("Error obteniendo reserva completa:", err);
+            // Si falla, usar la reserva encontrada como fallback
+            setReservaAsociada(reservaActiva);
+            setShowReservaVerCard(true);
+          }
         } else {
           console.warn("No se encontró reserva activa para el lote", currentLot.id);
           showError("No se encontró la reserva activa para este lote.");
@@ -336,8 +385,18 @@ export default function LoteSidePanel({
         );
         
         if (ventaDelLote) {
-          setVentaAsociada(ventaDelLote);
-          setShowVentaVerCard(true);
+          // Cargar datos completos de la venta usando getVentaById
+          try {
+            const ventaCompleta = await getVentaById(ventaDelLote.id);
+            const fullVenta = ventaCompleta?.data ?? ventaCompleta ?? ventaDelLote;
+            setVentaAsociada(fullVenta);
+            setShowVentaVerCard(true);
+          } catch (err) {
+            console.error("Error obteniendo venta completa:", err);
+            // Si falla, usar la venta encontrada como fallback
+            setVentaAsociada(ventaDelLote);
+            setShowVentaVerCard(true);
+          }
         } else {
           console.warn("No se encontró venta para el lote", currentLot.id);
           showError("No se encontró la venta para este lote.");
@@ -929,20 +988,6 @@ export default function LoteSidePanel({
                   </div>
                 )}
 
-                {ubicacion && ubicacion !== "Sin información" && (
-                  <div className="lote-side-panel__field lote-side-panel__field--full">
-                    <div className="lote-side-panel__field-label">Ubicación</div>
-                    <div className="lote-side-panel__field-value">{ubicacion}</div>
-                  </div>
-                )}
-
-                {propietarioNombre && propietarioNombre !== "Sin información" && (
-                  <div className="lote-side-panel__field lote-side-panel__field--full">
-                    <div className="lote-side-panel__field-label">Propietario</div>
-                    <div className="lote-side-panel__field-value">{propietarioNombre}</div>
-                  </div>
-                )}
-
                 {/* Indicador visual de deuda */}
                 {currentLot.deuda && (
                   <div className="lote-side-panel__field" style={{ position: "relative" }}>
@@ -1148,6 +1193,7 @@ export default function LoteSidePanel({
           lotes={[currentLot]}
           onCancel={handleCloseEditCard}
           onSaved={handleEditSaved}
+          fromSidePanel={true}
         />
       )}
 
@@ -1158,6 +1204,7 @@ export default function LoteSidePanel({
           onCreated={handleReserveCreated}
           loteIdPreSeleccionado={currentLot.id}
           entityType="Reserva"
+          fromSidePanel={true}
         />
       )}
 
@@ -1182,6 +1229,7 @@ export default function LoteSidePanel({
           lote={currentLot}
           loteId={currentLot.id}
           lotes={[currentLot]}
+          fromSidePanel={true}
         />
       )}
 
@@ -1192,6 +1240,7 @@ export default function LoteSidePanel({
           reserva={reservaAsociada}
           reservaId={reservaAsociada.id || reservaAsociada.idReserva}
           reservas={reservaAsociada ? [reservaAsociada] : []}
+          fromSidePanel={true}
         />
       )}
 
@@ -1202,6 +1251,7 @@ export default function LoteSidePanel({
           venta={ventaAsociada}
           ventaId={ventaAsociada.id}
           ventas={[ventaAsociada]}
+          fromSidePanel={true}
         />
       )}
     </>

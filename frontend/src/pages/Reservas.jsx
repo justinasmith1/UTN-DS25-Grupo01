@@ -140,21 +140,39 @@ export default function Reservas() {
     });
   }, [selectedInmobiliariaKey]);
 
-  // Cargar todas las reservas e inmobiliarias al montar el componente
+  // Cargar datos según rol: evitar requests duplicados y cargar solo lo necesario
+  const hasLoadedRef = useRef(false);
+  const lastUserRoleRef = useRef(user?.role);
+  
   useEffect(() => {
+    // Si cambió el rol del usuario, resetear el flag para permitir recarga
+    if (lastUserRoleRef.current !== user?.role) {
+      hasLoadedRef.current = false;
+      lastUserRoleRef.current = user?.role;
+    }
+    
+    // Evitar doble llamada en React StrictMode (solo en el mismo render)
+    if (hasLoadedRef.current) return;
+    hasLoadedRef.current = true;
+
     let alive = true;
     (async () => {
       try {
         setLoading(true);
-        const [reservasResp, inmosResp, lotesResp] = await Promise.all([
-          getAllReservas({}),
-          getAllInmobiliarias({}),
-          getAllLotes({}),
-        ]);
         
-        if (alive) {
-          if (reservasResp.success) {
-            const reservasData = reservasResp.data?.reservas ?? reservasResp.data ?? [];
+        // Si el usuario es INMOBILIARIA, no cargar inmobiliarias (no las necesita)
+        if (user?.role === 'INMOBILIARIA') {
+          const [reservasResp, lotesResp] = await Promise.all([
+            getAllReservas({}), // Backend ya las devuelve filtradas por inmobiliaria
+            getAllLotes({}),
+          ]);
+          
+          if (alive) {
+            // Manejar respuesta de reservas (puede venir con success o directamente con data)
+            const reservasData = reservasResp?.success 
+              ? (reservasResp.data?.reservas ?? reservasResp.data ?? [])
+              : (reservasResp?.data?.reservas ?? reservasResp?.data ?? []);
+            
             const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
             const lotesById = {};
             lotesData.forEach((lote) => {
@@ -194,23 +212,79 @@ export default function Reservas() {
             });
             setAllReservas(reservasWithMapId);
             setLotes(Array.isArray(lotesData) ? lotesData : []);
-          } else {
-            error(reservasResp.message || 'Error al cargar reservas');
-            setAllReservas([]);
-            const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
-            setLotes(Array.isArray(lotesData) ? lotesData : []);
+            // INMOBILIARIA no necesita inmobiliarias
+            setInmobiliarias([]);
           }
+        } else {
+          // ADMIN / GESTOR: cargar todo
+          const [reservasResp, inmosResp, lotesResp] = await Promise.all([
+            getAllReservas({}),
+            getAllInmobiliarias({}),
+            getAllLotes({}),
+          ]);
           
-          // Guardar inmobiliarias para pasarlas a los componentes
-          // getAllInmobiliarias devuelve { data: [...], meta: {...} }
-          const inmosData = inmosResp?.data ?? (Array.isArray(inmosResp) ? inmosResp : []);
-          setInmobiliarias(Array.isArray(inmosData) ? inmosData : []);
+          if (alive) {
+            if (reservasResp.success) {
+              const reservasData = reservasResp.data?.reservas ?? reservasResp.data ?? [];
+              const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+              const lotesById = {};
+              lotesData.forEach((lote) => {
+                if (lote && lote.id != null) {
+                  lotesById[String(lote.id)] = lote;
+                }
+              });
+              const reservasWithMapId = (Array.isArray(reservasData) ? reservasData : []).map((reserva) => {
+                const lookupId = reserva?.loteId ?? reserva?.lotId ?? reserva?.lote?.id ?? null;
+                const loteRef =
+                  reserva?.lote?.mapId
+                    ? reserva.lote
+                    : lookupId != null
+                    ? lotesById[String(lookupId)] || null
+                    : null;
+                const displayMapId =
+                  loteRef?.mapId ??
+                  reserva?.lotMapId ??
+                  (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ??
+                  null;
+
+                return {
+                  ...reserva,
+                  lotMapId: displayMapId ?? reserva?.lotMapId ?? null,
+                  lote: loteRef
+                    ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+                    : reserva.lote ?? null,
+                  loteInfo: reserva.loteInfo
+                    ? {
+                        ...reserva.loteInfo,
+                        mapId: reserva.loteInfo.mapId ?? displayMapId ?? null,
+                      }
+                    : displayMapId
+                    ? { mapId: displayMapId }
+                    : reserva.loteInfo ?? null,
+                };
+              });
+              setAllReservas(reservasWithMapId);
+              setLotes(Array.isArray(lotesData) ? lotesData : []);
+            } else {
+              error(reservasResp.message || 'Error al cargar reservas');
+              setAllReservas([]);
+              const lotesData = lotesResp?.data ?? (Array.isArray(lotesResp) ? lotesResp : []);
+              setLotes(Array.isArray(lotesData) ? lotesData : []);
+            }
+            
+            // Guardar inmobiliarias para pasarlas a los componentes
+            // getAllInmobiliarias devuelve { data: [...], meta: {...} }
+            const inmosData = inmosResp?.data ?? (Array.isArray(inmosResp) ? inmosResp : []);
+            setInmobiliarias(Array.isArray(inmosData) ? inmosData : []);
+          }
         }
       } catch (err) {
         if (alive) {
           console.error('❌ Error cargando reservas:', err);
           error('Error al cargar reservas');
           setAllReservas([]);
+          setLotes([]);
+          setInmobiliarias([]);
         }
       } finally {
         if (alive) {
@@ -219,8 +293,12 @@ export default function Reservas() {
       }
     })();
 
-    return () => { alive = false; };
-  }, [error]);
+    return () => { 
+      alive = false;
+      // Resetear el flag si el componente se desmonta para permitir recarga al volver a montar
+      hasLoadedRef.current = false;
+    };
+  }, [user?.role]); // Solo dependemos del rol del usuario, no de la función error
 
   // Aplicar filtros localmente
   const reservas = useMemo(() => {

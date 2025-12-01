@@ -7,10 +7,7 @@ import { getAllVentas } from "../../../lib/api/ventas.js";
 import { uploadArchivo, getArchivosByLote, deleteArchivo, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
 import { removeLotePrefix } from "../../../utils/mapaUtils.js";
-import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, rectSortingStrategy } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { Trash2, Upload, GripVertical } from "lucide-react";
+import LoteImageUploader from "./LoteImageUploader.jsx";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -89,56 +86,6 @@ const SUBESTADOS = [
 ];
 
 
-// Componente para cada miniatura ordenable
-function SortableImageItem({ image, index, onRemove, getImageUrl }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: `image-${index}` });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  const imageUrl = getImageUrl(image);
-  
-  if (!imageUrl) {
-    return null;
-  }
-
-  return (
-    <div ref={setNodeRef} style={style} className="lote-image-thumbnail">
-      <div className="lote-image-thumbnail__image-wrapper">
-        <img src={imageUrl} alt={`Imagen ${index + 1}`} onError={(e) => { e.target.style.display = 'none'; }} />
-        <div className="lote-image-thumbnail__overlay">
-          <button
-            type="button"
-            className="lote-image-thumbnail__drag"
-            {...attributes}
-            {...listeners}
-            aria-label="Reordenar"
-          >
-            <GripVertical size={18} strokeWidth={2} />
-          </button>
-          <button
-            type="button"
-            className="lote-image-thumbnail__delete"
-            onClick={() => onRemove(index)}
-            aria-label="Eliminar imagen"
-          >
-            <Trash2 size={16} strokeWidth={2} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const LABELS = [
   "ID",
@@ -290,7 +237,6 @@ export default function LoteEditarCard({
   const [reservasLote, setReservasLote] = useState([]);
   const [ventasLote, setVentasLote] = useState([]);
   const [archivosParaBorrar, setArchivosParaBorrar] = useState([]);
-  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -430,86 +376,16 @@ export default function LoteEditarCard({
     setForm(buildInitialForm(detalle));
     setError(null);
     setArchivosParaBorrar([]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-    if (imageFiles.length !== files.length) {
-      showError("Solo se pueden subir archivos de imagen");
-      return;
-    }
-
-    const filesWithPreview = imageFiles.map((file) => {
-      const fw = file;
-      fw.objectURL = URL.createObjectURL(file);
-      return fw;
-    });
-
-    setForm(prev => {
-      const currentImages = (prev.images || []).filter(img => img != null);
-      return { ...prev, images: [...currentImages, ...filesWithPreview] };
-    });
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  // Callback para manejar cambios en las imágenes desde el componente reutilizable
+  const handleImagesChange = (newImages) => {
+    setForm(prev => ({ ...prev, images: newImages }));
   };
 
-  const handleRemoveImage = (index) => {
-    setForm(prev => {
-      if (!prev.images || !Array.isArray(prev.images)) return prev;
-      const img = prev.images[index];
-      if (img instanceof File && img.objectURL) {
-        try {
-          URL.revokeObjectURL(img.objectURL);
-        } catch (e) {
-          console.error("Error liberando objectURL:", e);
-        }
-      }
-      if (img && img.id) {
-        setArchivosParaBorrar(prevIds => [...prevIds, img.id]);
-      }
-      const next = prev.images.filter((_, i) => i !== index);
-      return { ...prev, images: next };
-    });
-  };
-
-  useEffect(() => {
-    const current = form.images;
-    return () => {
-      (current || []).forEach(img => {
-        if (img instanceof File && img.objectURL) URL.revokeObjectURL(img.objectURL);
-      });
-    };
-  }, [form.images]);
-
-
-  const sensors = useSensors(
-    useSensor(PointerSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (!over || active.id === over.id) return;
-
-    setForm(prev => {
-      const images = prev.images || [];
-      const oldIndex = parseInt(active.id.toString().replace("image-", ""));
-      const newIndex = parseInt(over.id.toString().replace("image-", ""));
-      const newImages = arrayMove(images, oldIndex, newIndex);
-      return { ...prev, images: newImages };
-    });
-  };
-
-  const getImageUrl = (img) => {
-    if (!img) return null;
-    if (img instanceof File && img.objectURL) return img.objectURL;
-    if (img?.url?.startsWith('http')) return img.url;
-    return null;
+  // Callback para manejar IDs de imágenes eliminadas (para borrar del backend)
+  const handleDeletedIdsChange = (deletedIds) => {
+    setArchivosParaBorrar(deletedIds);
   };
 
   const buildPayload = () => {
@@ -811,114 +687,14 @@ export default function LoteEditarCard({
             </div>
 
             <div className="lote-media-col">
-              <div className="lote-image-manager-card">
-                <h3 className="lote-image-manager-card__title">Imágenes del lote</h3>
-                
-                <div className="lote-image-grid-container">
-                  {form.images && form.images.length > 0 ? (
-                    <DndContext
-                      sensors={sensors}
-                      collisionDetection={closestCenter}
-                      onDragEnd={handleDragEnd}
-                    >
-                      <SortableContext
-                        items={form.images
-                          .filter(img => {
-                            if (!img) return false;
-                            if (img instanceof File) return img.objectURL != null;
-                            return img?.id && img?.url?.startsWith('http');
-                          })
-                          .map((img, idx) => {
-                            return img instanceof File 
-                              ? `file-${idx}-${img.name}-${img.size}`
-                              : `img-${img.id}`;
-                          })}
-                        strategy={rectSortingStrategy}
-                      >
-                        <div className="lote-image-grid">
-                          {form.images
-                            .filter(img => {
-                              if (!img) return false;
-                              if (img instanceof File) return img.objectURL != null;
-                              return img?.id && img?.url?.startsWith('http');
-                            })
-                            .map((img, idx) => {
-                              const imageUrl = getImageUrl(img);
-                              if (!imageUrl) return null;
-                              const uniqueKey = img instanceof File 
-                                ? `file-${idx}-${img.name}-${img.size}` 
-                                : `img-${img.id}`;
-                              return (
-                                <SortableImageItem
-                                  key={uniqueKey}
-                                  image={img}
-                                  index={idx}
-                                  onRemove={handleRemoveImage}
-                                  getImageUrl={getImageUrl}
-                                />
-                              );
-                            })
-                            .filter(Boolean)}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  ) : (
-                    <div className="lote-image-empty">
-                      <p>Imagen no cargada</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="lote-image-dropzone">
-                  <div
-                    className="lote-image-dropzone__area"
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.add("is-dragover");
-                    }}
-                    onDragLeave={(e) => {
-                      e.currentTarget.classList.remove("is-dragover");
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      e.currentTarget.classList.remove("is-dragover");
-                      const files = Array.from(e.dataTransfer.files || []);
-                      if (files.length > 0) {
-                        const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-                        if (imageFiles.length !== files.length) {
-                          showError("Solo se pueden subir archivos de imagen");
-                          return;
-                        }
-                        const filesWithPreview = imageFiles.map((file) => {
-                          const fw = file;
-                          fw.objectURL = URL.createObjectURL(file);
-                          return fw;
-                        });
-                        setForm(prev => {
-                          const currentImages = (prev.images || []).filter(img => img != null);
-                          return { ...prev, images: [...currentImages, ...filesWithPreview] };
-                        });
-                      }
-                    }}
-                  >
-                    <Upload size={32} strokeWidth={1.5} />
-                    <p>Arrastrá aquí tus imágenes</p>
-                    <span>o</span>
-                    <label htmlFor="file-input-lote-editar" className="lote-image-dropzone__button">
-                      Seleccionar imágenes
-                    </label>
-                    <input
-                      ref={fileInputRef}
-                      id="file-input-lote-editar"
-                      type="file"
-                      accept="image/*"
-                      multiple
-                      onChange={handleFileSelect}
-                      style={{ display: "none" }}
-                    />
-                  </div>
-                </div>
-              </div>
+              {/* Reutilizamos el mismo componente de subida de imágenes en Crear y Editar lote
+                  para garantizar un comportamiento consistente. */}
+              <LoteImageUploader
+                images={form.images || []}
+                onChange={handleImagesChange}
+                onDeletedIdsChange={handleDeletedIdsChange}
+                inputId="file-input-lote-editar"
+              />
 
               <div className="lote-description">
                 <span className="lote-description__icon">ℹ️</span>

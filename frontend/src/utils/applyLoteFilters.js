@@ -13,9 +13,11 @@ export function applyLoteFilters(allLots = [], p = {}) {
   const getFondo  = (l) => num(l?.fondo  ?? l?.largoFondo ?? l?.fondo_m  ?? l?.fondoM);
   const getSup    = (l) => num(l?.superficie ?? l?.superficieM2 ?? l?.m2 ?? l?.area);
   const getPrecio = (l) => num(l?.precioUSD ?? l?.priceUSD ?? l?.precio ?? l?.price);
+  // El filtro "solo deudores" debe restringir el query a lotes que tengan deuda (deuda === true).
+  // El campo en el modelo es `deuda` (Boolean?).
   const getDeudor = (l) => {
-    const v = l?.deudor ?? l?.tieneDeuda ?? l?.hasDebt ?? l?.debt;
-    return v === true || v === "true" || v === 1 || v === "SI";
+    // Usar el campo real del modelo: deuda (Boolean?)
+    return l?.deuda === true;
   };
 
   let rows = [...(allLots || [])];

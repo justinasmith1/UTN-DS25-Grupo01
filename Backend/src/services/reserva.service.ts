@@ -34,9 +34,16 @@ function mapPrismaError(e: unknown) {
 // ==============================
 // Obtener todas las reservas
 // Retorna el listado junto con el total.
+// Si el usuario es INMOBILIARIA, solo devuelve las reservas de su inmobiliaria.
 // ==============================
-export async function getAllReservas(): Promise<{ reservas: any[]; total: number }> {
+export async function getAllReservas(user?: { role: string; inmobiliariaId?: number | null }): Promise<{ reservas: any[]; total: number }> {
+  // Si el usuario es INMOBILIARIA, filtrar por su inmobiliariaId
+  const whereClause = user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null
+    ? { inmobiliariaId: user.inmobiliariaId }
+    : {};
+  
   const reservas = await prisma.reserva.findMany({
+    where: whereClause,
     orderBy: { fechaReserva: 'desc' },
     include: {
           cliente: {
@@ -55,8 +62,9 @@ export async function getAllReservas(): Promise<{ reservas: any[]; total: number
 
 // ==============================
 // Obtener una reserva por ID
+// Valida permisos: INMOBILIARIA solo puede ver sus propias reservas.
 // ==============================
-export async function getReservaById(id: number): Promise<any> {
+export async function getReservaById(id: number, user?: { role: string; inmobiliariaId?: number | null }): Promise<any> {
   const row = await prisma.reserva.findUnique({ 
     where: { id },
     include: {
@@ -76,6 +84,21 @@ export async function getReservaById(id: number): Promise<any> {
     err.status = 404;
     throw err;
   }
+  
+  // Validar permisos: INMOBILIARIA solo puede ver sus propias reservas
+  if (user?.role === 'INMOBILIARIA') {
+    if (row.inmobiliariaId !== user.inmobiliariaId) {
+      const err: any = new Error('No puedes ver esta reserva');
+      err.status = 403;
+      throw err;
+    }
+  } else if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
+    // Cualquier otro rol que no sea Admin/Gestor/Inmobiliaria queda bloqueado
+    const err: any = new Error('No tienes permisos para ver esta reserva');
+    err.status = 403;
+    throw err;
+  }
+  
   return row; // devolvemos el registro con relaciones incluidas
 }
 
@@ -104,15 +127,18 @@ export async function getReservaByEstado(estadoR: EstadoReserva): Promise<any> {
 // ==============================
 // Crear reserva
 // ==============================
-export async function createReserva(body: {
-  fechaReserva: string;           // ISO (lo transformo a Date)
-  estado: EstadoReserva;         // Nuevo campo estado
-  loteId: number;
-  clienteId: number;
-  inmobiliariaId?: number | null;
-  sena?: number;                  // Zod ya garantiza >= 0 si viene
-  numero: string;                 // Número de reserva (obligatorio y único)
-}): Promise<any> {
+export async function createReserva(
+  body: {
+    fechaReserva: string;           // ISO (lo transformo a Date)
+    estado: EstadoReserva;         // Nuevo campo estado
+    loteId: number;
+    clienteId: number;
+    inmobiliariaId?: number | null;
+    sena?: number;                  // Zod ya garantiza >= 0 si viene
+    numero: string;                 // Número de reserva (obligatorio y único)
+  },
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
   try {
     const lote = await prisma.lote.findUnique({ where: { id: body.loteId } });
     if (!lote) {
@@ -122,12 +148,21 @@ export async function createReserva(body: {
       throw new Error("El lote no está disponible para reservar.");
     }
 
+    // Si el usuario es INMOBILIARIA, usar siempre su inmobiliariaId
+    let inmobiliariaIdFinal = body.inmobiliariaId ?? null;
+    if (user?.role === 'INMOBILIARIA') {
+      if (!user.inmobiliariaId) {
+        throw new Error("El usuario INMOBILIARIA no tiene una inmobiliaria asociada.");
+      }
+      inmobiliariaIdFinal = user.inmobiliariaId;
+    }
+
     const row = await prisma.reserva.create({
       data: {
         fechaReserva: new Date(body.fechaReserva), // ISO -> Date
         loteId: body.loteId,
         clienteId: body.clienteId,
-        inmobiliariaId: body.inmobiliariaId ?? null,
+        inmobiliariaId: inmobiliariaIdFinal,
         // Para Decimal no necesito new Decimal: Prisma acepta number|string
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
@@ -150,25 +185,88 @@ export async function updateReserva(
   body: Partial<{
     fechaReserva: string;
     loteId: number;
-    estado: EstadoReserva;      // Nuevo campo estado
+    estado: EstadoReserva;
     clienteId: number;
     inmobiliariaId: number | null;
     sena: number;
     numero: string;
-  }>
+  }>,
+  user?: { role: string; inmobiliariaId?: number | null }
 ): Promise<any> {
   try {
+    // Obtener reserva actual para validaciones
+    const reservaActual = await prisma.reserva.findUnique({
+      where: { id },
+      select: { estado: true, inmobiliariaId: true, loteId: true }
+    });
+
+    if (!reservaActual) {
+      const err: any = new Error('La reserva no existe');
+      err.status = 404;
+      throw err;
+    }
+
+    // Validar permisos y restricciones para INMOBILIARIA
+    if (user?.role === 'INMOBILIARIA') {
+      // Validar que la reserva pertenece a la inmobiliaria del usuario
+      if (reservaActual.inmobiliariaId !== user.inmobiliariaId) {
+        const err: any = new Error('No puedes modificar esta reserva');
+        err.status = 403;
+        throw err;
+      }
+
+      // Validar cambio de estado: solo puede cambiar a CANCELADA
+      if (body.estado !== undefined) {
+        if (reservaActual.estado === EstadoReserva.CANCELADA) {
+          const err: any = new Error('No se puede cambiar el estado de una reserva cancelada');
+          err.status = 400;
+          throw err;
+        }
+        if (body.estado !== EstadoReserva.CANCELADA) {
+          const err: any = new Error('Solo se puede cambiar el estado a "Cancelada"');
+          err.status = 400;
+          throw err;
+        }
+      }
+
+      // Filtrar campos permitidos para INMOBILIARIA (similar a TECNICO en updatedLote)
+      const allowedFields = ['fechaReserva', 'clienteId', 'sena', 'estado'];
+      const filtered: Record<string, any> = {};
+      Object.keys(body || {}).forEach((field) => {
+        if (allowedFields.includes(field)) {
+          filtered[field] = body[field as keyof typeof body];
+        }
+      });
+      body = filtered as typeof body;
+    }
+
+    // Construir dataToUpdate
+    const dataToUpdate: any = {};
+    if (body.fechaReserva !== undefined) {
+      dataToUpdate.fechaReserva = new Date(body.fechaReserva);
+    }
+    if (body.loteId !== undefined) {
+      dataToUpdate.loteId = body.loteId;
+    }
+    if (body.clienteId !== undefined) {
+      dataToUpdate.clienteId = body.clienteId;
+    }
+    if (body.inmobiliariaId !== undefined) {
+      dataToUpdate.inmobiliariaId = body.inmobiliariaId;
+    }
+    if (body.sena !== undefined) {
+      dataToUpdate.sena = body.sena;
+    }
+    if (body.estado !== undefined) {
+      dataToUpdate.estado = body.estado;
+    }
+    if (body.numero !== undefined) {
+      dataToUpdate.numero = body.numero;
+    }
+
     const row = await prisma.reserva.update({
       where: { id },
-      data: {
-        ...(body.fechaReserva !== undefined ? { fechaReserva: new Date(body.fechaReserva) } : {}),
-        ...(body.loteId !== undefined ? { loteId: body.loteId } : {}),
-        ...(body.clienteId !== undefined ? { clienteId: body.clienteId } : {}),
-        ...(body.inmobiliariaId !== undefined ? { inmobiliariaId: body.inmobiliariaId } : {}),
-        ...(body.sena !== undefined ? { sena: body.sena } : {}),
-        ...(body.estado !== undefined ? { estado: body.estado } : {}),
-        ...(body.numero !== undefined ? { numero: body.numero } : {}),
-      },
+      data: dataToUpdate,
       include: {
         cliente: {
           select: { id: true, nombre: true, apellido: true },

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useToast } from "../app/providers/ToastProvider";
@@ -277,16 +277,28 @@ export default function Dashboard() {
     }
   }, [openReservaVer, reservaSel?.id]);
 
-  // Cargar todos los lotes al montar el componente
+  // Centralizamos el fetch de lotes en este componente para evitar
+  // múltiples llamadas al endpoint /lotes (mapa + tabla lo reciben por props).
+  const hasLoadedLotesRef = useRef(false);
   useEffect(() => {
+    // Evitar múltiples cargas (React StrictMode ejecuta 2 veces en desarrollo)
+    if (hasLoadedLotesRef.current) {
+      // Si ya se cargó, asegurar que loading sea false
+      setLoading(false);
+      return;
+    }
+    hasLoadedLotesRef.current = true;
+    
     let alive = true;
+    
     (async () => {
       try {
         setLoading(true);
         const res = await getAllLotes({});
         if (alive) { 
-          const data = res.data || [];
-          setAllLotes(data); 
+          // getAllLotes siempre devuelve { data: Array } según lotes.js
+          const data = res?.data ?? (Array.isArray(res) ? res : []);
+          setAllLotes(Array.isArray(data) ? data : []); 
         }
       } catch (err) {
         if (alive) {
@@ -301,8 +313,12 @@ export default function Dashboard() {
       }
     })();
     
-    return () => { alive = false; };
-  }, [error]);
+    return () => { 
+      alive = false;
+      // Resetear el flag si el componente se desmonta para permitir recarga al volver
+      hasLoadedLotesRef.current = false;
+    };
+  }, []); // Sin dependencias: solo se ejecuta una vez al montar
 
   const lots = useMemo(() => {
     const hasParams = params && Object.keys(params).length > 0;

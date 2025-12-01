@@ -6,6 +6,7 @@ import { getAllPersonas } from "../../../lib/api/personas.js";
 import { uploadArchivo } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
 import { req, positive, normNum } from "../../../lib/forms/validate.js";
+import LoteImageUploader from "./LoteImageUploader.jsx";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
@@ -83,10 +84,26 @@ const SUBESTADOS = [
   { value: "Construido", label: "Construido" },
 ];
 
-const FALLBACK_IMAGE =
-  "/placeholder.svg?width=720&height=360&text=Sin+imagen+disponible";
+
+// Listado de calles disponibles (enum NombreCalle del backend)
+const CALLES_OPTIONS = [
+  { value: "REINAMORA", label: "REINAMORA" },
+  { value: "MACA", label: "MACA" },
+  { value: "ZORZAL", label: "ZORZAL" },
+  { value: "CAUQUEN", label: "CAUQUEN" },
+  { value: "ALONDRA", label: "ALONDRA" },
+  { value: "JACANA", label: "JACANA" },
+  { value: "TACUARITO", label: "TACUARITO" },
+  { value: "JILGUERO", label: "JILGUERO" },
+  { value: "GOLONDRINA", label: "GOLONDRINA" },
+  { value: "CALANDRIA", label: "CALANDRIA" },
+  { value: "AGUILAMORA", label: "AGUILAMORA" },
+  { value: "LORCA", label: "LORCA" },
+  { value: "MILANO", label: "MILANO" },
+];
 
 const LABELS = [
+  "NÚMERO",
   "NÚMERO PARTIDA",
   "TIPO",
   "ESTADO",
@@ -101,6 +118,7 @@ const LABELS = [
 
 const buildInitialForm = () => {
   return {
+    numero: "",
     tipo: "",
     estado: "",
     subestado: "",
@@ -115,6 +133,8 @@ const buildInitialForm = () => {
     descripcion: "",
     nombreEspacioComun: "",
     capacidad: "",
+    calle: "", // Campo para la calle de la ubicación
+    numeroCalle: "", // Campo para el número de la ubicación
     images: [],
   };
 };
@@ -134,7 +154,6 @@ export default function LoteCrearCard({
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
-  const fileInputRef = useRef(null);
 
   // Cargar fracciones y personas al abrir
   useEffect(() => {
@@ -199,20 +218,11 @@ export default function LoteCrearCard({
   // Resetear formulario al abrir/cerrar
   useEffect(() => {
     if (!open) {
-      // Liberar todas las URLs de objeto antes de resetear
-      form.images.forEach((img) => {
-        if (img instanceof File && img.objectURL) {
-          URL.revokeObjectURL(img.objectURL);
-        }
-      });
       setForm(buildInitialForm());
       setError(null);
       setFieldErrors({});
       setShowSuccess(false);
       setSaving(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   }, [open]);
 
@@ -249,105 +259,20 @@ export default function LoteCrearCard({
     setForm(buildInitialForm());
     setError(null);
     setFieldErrors({});
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
-  const handleRemoveImage = (index) => {
-    setForm((prev) => {
-      // Liberar URL de objeto de la imagen que se está eliminando
-      const imgToRemove = prev.images[index];
-      if (imgToRemove instanceof File && imgToRemove.objectURL) {
-        URL.revokeObjectURL(imgToRemove.objectURL);
-      }
-      
-      const nextImages = prev.images.filter((_, idx) => idx !== index);
-      setCurrentImage((curr) => {
-        if (nextImages.length === 0) return 0;
-        if (curr >= nextImages.length) return nextImages.length - 1;
-        return curr;
-      });
-      return { ...prev, images: nextImages };
-    });
-  };
-
-  const handleFileSelect = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
-
-    // Validar que sean imágenes
-    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-    if (imageFiles.length !== files.length) {
-      showError("Solo se pueden subir archivos de imagen");
-      return;
-    }
-
-    // Crear URLs de objeto para preview y agregar a cada File
-    const filesWithPreview = imageFiles.map((file) => {
-      const fileWithPreview = file;
-      fileWithPreview.objectURL = URL.createObjectURL(file);
-      return fileWithPreview;
-    });
-
-    setForm((prev) => ({
-      ...prev,
-      images: [...prev.images, ...filesWithPreview],
-    }));
-
-    // Limpiar el input para permitir seleccionar el mismo archivo nuevamente
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  const [currentImage, setCurrentImage] = useState(0);
-  useEffect(() => {
-    setCurrentImage(0);
-  }, [form.images, open]);
-
-  // Limpiar URLs de objeto al desmontar o cambiar imágenes
-  useEffect(() => {
-    const currentImages = form.images;
-    return () => {
-      currentImages.forEach((img) => {
-        if (img instanceof File && img.objectURL) {
-          URL.revokeObjectURL(img.objectURL);
-        }
-      });
-    };
-  }, [form.images]);
-
-  // Obtener URLs para mostrar previews
-  const displayImages = useMemo(() => {
-    if (form.images.length === 0) return [FALLBACK_IMAGE];
-    return form.images.map((img) => {
-      if (img instanceof File && img.objectURL) {
-        return img.objectURL;
-      }
-      // Fallback para URLs (por si acaso)
-      return typeof img === "string" ? img : FALLBACK_IMAGE;
-    });
-  }, [form.images]);
-
-  const showCarouselControls = form.images.length > 1;
-
-  const handlePrev = () => {
-    setCurrentImage((idx) =>
-      idx === 0 ? displayImages.length - 1 : idx - 1
-    );
-  };
-
-  const handleNext = () => {
-    setCurrentImage((idx) =>
-      idx === displayImages.length - 1 ? 0 : idx + 1
-    );
+  // Callback para manejar cambios en las imágenes desde el componente reutilizable
+  const handleImagesChange = (newImages) => {
+    setForm((prev) => ({ ...prev, images: newImages }));
   };
 
   const buildPayload = () => {
     const payload = {};
 
     // Campos obligatorios
+    const numero = normNum(form.numero);
+    if (numero != null && numero > 0) payload.numero = numero;
+    
     if (form.tipo) payload.tipo = form.tipo;
     if (form.estado) payload.estado = form.estado;
     if (form.subestado) payload.subestado = form.subestado;
@@ -386,6 +311,15 @@ export default function LoteCrearCard({
     const propietarioId = normNum(form.propietarioId);
     if (propietarioId) payload.propietarioId = propietarioId;
 
+    // Ubicación: calle y número (opcionales)
+    if (form.calle && form.calle.trim()) {
+      payload.calle = form.calle.trim();
+    }
+    const numeroCalle = normNum(form.numeroCalle);
+    if (numeroCalle != null && numeroCalle > 0) {
+      payload.numeroCalle = numeroCalle;
+    }
+
     // NO incluir imágenes en el payload - se subirán después de crear el lote
 
     // Campos específicos para Espacio Comun
@@ -404,6 +338,7 @@ export default function LoteCrearCard({
 
   const validateForm = () => {
     const rules = {
+      numero: [req("El número de lote es obligatorio"), positive("El número de lote debe ser un número positivo")],
       numPartido: [req("El número de partida es obligatorio"), positive("El número de partida debe ser un número positivo")],
       tipo: [req("El tipo es obligatorio")],
       estado: [req("El estado es obligatorio")],
@@ -413,11 +348,26 @@ export default function LoteCrearCard({
     };
 
     const errors = {};
+    const camposFaltantes = [];
+    
     for (const [field, validators] of Object.entries(rules)) {
       for (const validate of validators) {
         const err = validate(form[field]);
         if (err) {
           errors[field] = err;
+          // Agregar el nombre del campo a la lista de campos faltantes
+          const nombresCampos = {
+            numero: "Número de lote",
+            numPartido: "Número de partida",
+            tipo: "Tipo",
+            estado: "Estado",
+            subestado: "Sub-estado",
+            fraccionId: "Fracción",
+            propietarioId: "Propietario",
+          };
+          if (!camposFaltantes.includes(nombresCampos[field])) {
+            camposFaltantes.push(nombresCampos[field]);
+          }
           break;
         }
       }
@@ -437,6 +387,9 @@ export default function LoteCrearCard({
     if (form.tipo === "Espacio Comun") {
       if (!form.nombreEspacioComun || !form.nombreEspacioComun.trim()) {
         errors.nombreEspacioComun = "El nombre del espacio común es obligatorio";
+        if (!camposFaltantes.includes("Nombre del espacio común")) {
+          camposFaltantes.push("Nombre del espacio común");
+        }
       }
     }
 
@@ -447,6 +400,15 @@ export default function LoteCrearCard({
     }
 
     setFieldErrors(errors);
+    
+    // Si hay errores, mostrar mensaje detallado
+    if (Object.keys(errors).length > 0) {
+      const mensajeCampos = camposFaltantes.length > 0 
+        ? `Faltan completar los siguientes campos obligatorios: ${camposFaltantes.join(", ")}.`
+        : "Por favor, completa todos los campos obligatorios correctamente.";
+      setError(mensajeCampos);
+    }
+    
     return Object.keys(errors).length === 0;
   };
 
@@ -455,7 +417,7 @@ export default function LoteCrearCard({
     setFieldErrors({});
 
     if (!validateForm()) {
-      setError("Por favor, completa todos los campos obligatorios correctamente.");
+      // El mensaje de error ya se estableció en validateForm
       return;
     }
 
@@ -487,9 +449,8 @@ export default function LoteCrearCard({
         }
       }
       
-      // Mostrar animación de éxito
+      // Mostrar animación de éxito (sin toast)
       setShowSuccess(true);
-      success("Lote creado exitosamente");
       
       // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
@@ -500,7 +461,18 @@ export default function LoteCrearCard({
       }, 1500);
     } catch (err) {
       console.error("Error creando lote:", err);
-      const errorMsg = err?.message || "No se pudo crear el lote. Intenta nuevamente.";
+      let errorMsg = err?.message || "No se pudo crear el lote. Intenta nuevamente.";
+      
+      // Si es un error de conflicto (lote duplicado), mostrar mensaje más claro
+      if (err?.statusCode === 409 || err?.response?.status === 409) {
+        errorMsg = err?.message || "Ya existe un lote con ese número en la fracción seleccionada. Por favor, elige otro número.";
+      }
+      
+      // Si es un error de validación del backend, mostrar el mensaje específico
+      if (err?.statusCode === 400 || err?.response?.status === 400) {
+        errorMsg = err?.message || "Los datos ingresados no son válidos. Verifica los campos obligatorios.";
+      }
+      
       setError(errorMsg);
       showError(errorMsg);
       setSaving(false);
@@ -596,6 +568,25 @@ export default function LoteCrearCard({
           style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}
         >
           <div className="lote-data-col">
+            <div className="field-row">
+              <div className="field-label">Número *</div>
+              <div className="field-value p0">
+                <input
+                  className={`field-input ${fieldErrors.numero ? "is-invalid" : ""}`}
+                  type="number"
+                  inputMode="numeric"
+                  value={form.numero ?? ""}
+                  onChange={(e) => updateForm({ numero: e.target.value })}
+                  placeholder="Número de lote"
+                />
+                {fieldErrors.numero && (
+                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
+                    {fieldErrors.numero}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="field-row">
               <div className="field-label">Número Partida *</div>
               <div className="field-value p0">
@@ -775,6 +766,33 @@ export default function LoteCrearCard({
             </div>
 
             <div className="field-row">
+              <div className="field-label">Calle</div>
+              <div className="field-value p0">
+                <NiceSelect
+                  value={form.calle ?? ""}
+                  options={CALLES_OPTIONS}
+                  placeholder="Seleccionar calle"
+                  onChange={(value) => {
+                    updateForm({ calle: value || "" });
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
+              <div className="field-label">Número</div>
+              <div className="field-value p0">
+                <input
+                  className="field-input"
+                  type="text"
+                  value={form.numeroCalle ?? ""}
+                  onChange={(e) => updateForm({ numeroCalle: e.target.value })}
+                  placeholder="Ej. 202"
+                />
+              </div>
+            </div>
+
+            <div className="field-row">
               <div className="field-label">Superficie</div>
               <div className="field-value p0">
                 <input
@@ -843,127 +861,13 @@ export default function LoteCrearCard({
           </div>
 
           <div className="lote-media-col">
-            <div className="lote-image-manager">
-              <div className="lote-carousel">
-                <img
-                  src={displayImages[currentImage]}
-                  alt={`Imagen lote ${currentImage + 1}`}
-                  className="lote-carousel__image"
-                />
-
-                {showCarouselControls && (
-                  <>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--prev"
-                      onClick={handlePrev}
-                      aria-label="Imagen anterior"
-                    >
-                      ‹
-                    </button>
-                    <button
-                      type="button"
-                      className="lote-carousel__nav lote-carousel__nav--next"
-                      onClick={handleNext}
-                      aria-label="Imagen siguiente"
-                    >
-                      ›
-                    </button>
-                    <div className="lote-carousel__indicator">
-                      {displayImages.map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`lote-carousel__dot ${
-                            idx === currentImage ? "is-active" : ""
-                          }`}
-                        />
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div className="lote-image-actions">
-                <label
-                  htmlFor="file-input-lote-crear"
-                  style={{
-                    display: "inline-block",
-                    padding: "8px 16px",
-                    background: "#2563eb",
-                    color: "white",
-                    borderRadius: "6px",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: "500",
-                    border: "none",
-                    textAlign: "center",
-                  }}
-                >
-                  Seleccionar imágenes
-                </label>
-                <input
-                  ref={fileInputRef}
-                  id="file-input-lote-crear"
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  style={{ display: "none" }}
-                />
-                {form.images.length > 0 && (
-                  <button
-                    type="button"
-                    className="lote-add-btn"
-                    style={{ background: "#b91c1c", borderColor: "#b91c1c" }}
-                    onClick={() => handleRemoveImage(currentImage)}
-                  >
-                    Quitar imagen actual
-                  </button>
-                )}
-                {form.images.length > 0 && (
-                  <div style={{ marginTop: "8px", fontSize: "13px", color: "#6b7280" }}>
-                    {form.images.length} imagen{form.images.length !== 1 ? "es" : ""} seleccionada{form.images.length !== 1 ? "s" : ""}
-                  </div>
-                )}
-              </div>
-
-              {form.images.length > 0 && (
-                <div className="lote-image-list">
-                  {form.images.map((img, idx) => {
-                    const fileName = img instanceof File ? img.name : `Imagen ${idx + 1}`;
-                    return (
-                      <div key={idx} className="lote-image-chip">
-                        <button
-                          type="button"
-                          onClick={() => setCurrentImage(idx)}
-                          style={{
-                            border: "none",
-                            background: "transparent",
-                            color: "#1f2937",
-                            cursor: "pointer",
-                            fontSize: "13px",
-                            maxWidth: "200px",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                            whiteSpace: "nowrap",
-                          }}
-                          title={fileName}
-                        >
-                          {fileName}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveImage(idx)}
-                          aria-label={`Eliminar ${fileName}`}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            {/* Reutilizamos el mismo componente de subida de imágenes en Crear y Editar lote
+                para garantizar un comportamiento consistente. */}
+            <LoteImageUploader
+              images={form.images || []}
+              onChange={handleImagesChange}
+              inputId="file-input-lote-crear"
+            />
 
             <div className="lote-description">
               <span className="lote-description__icon">ℹ️</span>

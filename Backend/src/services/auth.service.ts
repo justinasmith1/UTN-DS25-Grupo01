@@ -8,12 +8,14 @@ type JWTPayload = {
     sub: number;
     email: string; 
     role: Role;
+    inmobiliariaId?: number;
 };
 
 export async function login(data: LoginRequest): Promise<LoginResponse> {
-  // 1. Buscar usuario
+  // 1. Buscar usuario con su inmobiliaria incluida
   const user = await prisma.user.findUnique({
-    where: { email: data.email }
+    where: { email: data.email },
+    include: { inmobiliaria: true }
   });
 
   if (!user) {
@@ -31,24 +33,34 @@ export async function login(data: LoginRequest): Promise<LoginResponse> {
   }
 
   // 3. Generar JWT
-    const JWT_SECRET = process.env.JWT_SECRET as Secret | undefined;
+  const JWT_SECRET = process.env.JWT_SECRET as Secret | undefined;
   if (!JWT_SECRET) {
     throw new Error('Falta JWT_SECRET en .env');
   }
   const EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? '2h';
 
+  // Obtener inmobiliariaId desde la relación incluida
+  const inmobiliariaId = user.inmobiliaria?.id ?? null;
+
+  // Incluir inmobiliariaId en el JWT si el rol es INMOBILIARIA
+  // Esto evita consultar la BD en cada request en el middleware
   const payload: JWTPayload = {
     sub: user.id,
     email: user.email,
-    // No agrego el name asi queda mas chico, supuestamente es una buena practica
     role: user.role as Role,
+    ...(inmobiliariaId != null && { inmobiliariaId }),
   };
 
   const token = jwt.sign(payload, JWT_SECRET, { expiresIn: EXPIRES_IN } as SignOptions);
-  // 4. Retornar sin password
-  const { password: _, ...userWithoutPassword } = user;
+  
+  // 4. Retornar sin password, pero incluyendo inmobiliariaId e inmobiliariaNombre
+  const { password: _, inmobiliaria, ...userWithoutPassword } = user;
   return {
-    user: userWithoutPassword,
+    user: {
+      ...userWithoutPassword,
+      inmobiliariaId: inmobiliaria?.id ?? null,
+      inmobiliariaNombre: inmobiliaria?.nombre ?? null,
+    },
     token,
   };
 }

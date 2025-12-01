@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 // Para crear un nuevo Lote
 export const baseLoteSchema = z.object({
+  numero: z.coerce.number().int('El número de lote debe ser un número entero').positive('El número de lote debe ser positivo'),
   fraccionId: z.coerce.number().int('La fracción debe ser un número entero').positive('La fracción debe ser positiva'),
   numPartido: z.coerce.number().int().default(62),
   frente: z.coerce.number().min(0, 'El frente no puede ser negativo').optional(),
@@ -20,6 +21,9 @@ export const baseLoteSchema = z.object({
   descripcion: z.string().optional(),
   propietarioId: z.coerce.number().int('El ID del propietario debe ser un número entero').positive('El ID del propietario debe ser positivo'),
   ubicacionId: z.coerce.number().int('El ID de la ubicación debe ser un número entero').positive('El ID de la ubicación debe ser positivo').optional(),
+  // Campos para crear ubicación: calle (enum) y numeroCalle (número)
+  calle: z.enum(['REINAMORA', 'MACA', 'ZORZAL', 'CAUQUEN', 'ALONDRA', 'JACANA', 'TACUARITO', 'JILGUERO', 'GOLONDRINA', 'CALANDRIA', 'AGUILAMORA', 'LORCA', 'MILANO']).optional(),
+  numeroCalle: z.coerce.number().int('El número de calle debe ser un número entero').positive('El número de calle debe ser positivo').optional(),
 });
 
 // Para crear un nuevo Lote
