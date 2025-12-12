@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import { createLote } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { uploadArchivo } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
-import { req, positive, normNum } from "../../../lib/forms/validate.js";
+import { normNum } from "../../../lib/forms/validate.js";
+import { loteCreateSchema } from "../../../lib/validations/loteCreate.schema.js";
 import LoteImageUploader from "./LoteImageUploader.jsx";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
@@ -110,8 +113,6 @@ const LABELS = [
   "SUB-ESTADO",
   "FRACCIÓN",
   "SUPERFICIE",
-  "FRENTE",
-  "FONDO",
   "PRECIO",
   "DESCRIPCIÓN",
 ];
@@ -127,14 +128,12 @@ const buildInitialForm = () => {
     fraccionNumero: "",
     propietarioId: "",
     superficie: "",
-    frente: "",
-    fondo: "",
     precio: "",
     descripcion: "",
     nombreEspacioComun: "",
     capacidad: "",
-    calle: "", // Campo para la calle de la ubicación
-    numeroCalle: "", // Campo para el número de la ubicación
+    calle: "",
+    numeroCalle: "",
     images: [],
   };
 };
@@ -145,7 +144,6 @@ export default function LoteCrearCard({
   onCreated,
 }) {
   const { success, error: showError } = useToast();
-  const [form, setForm] = useState(buildInitialForm());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [fracciones, setFracciones] = useState([]);
@@ -153,7 +151,26 @@ export default function LoteCrearCard({
   const [personas, setPersonas] = useState([]);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [fieldErrors, setFieldErrors] = useState({});
+  const [images, setImages] = useState([]);
+
+  // React Hook Form setup
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    setValue,
+    watch,
+    reset,
+    setError: setFormError,
+    clearErrors,
+  } = useForm({
+    resolver: zodResolver(loteCreateSchema),
+    defaultValues: buildInitialForm(),
+    mode: "onChange", // Validar al cambiar campos para feedback inmediato
+    reValidateMode: "onChange",
+  });
+
+  const formValues = watch();
 
   // Cargar fracciones y personas al abrir
   useEffect(() => {
@@ -218,213 +235,71 @@ export default function LoteCrearCard({
   // Resetear formulario al abrir/cerrar
   useEffect(() => {
     if (!open) {
-      setForm(buildInitialForm());
+      reset(buildInitialForm());
       setError(null);
-      setFieldErrors({});
       setShowSuccess(false);
       setSaving(false);
+      setImages([]);
+      clearErrors();
     }
-  }, [open]);
-
-  const updateForm = (patch) => {
-    setForm((prev) => {
-      const updated = { ...prev, ...patch };
-      
-      // Calcular superficie automáticamente cuando cambian frente o fondo
-      if ('frente' in patch || 'fondo' in patch) {
-        const frente = normNum(updated.frente);
-        const fondo = normNum(updated.fondo);
-        if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
-          updated.superficie = String(frente * fondo);
-        } else {
-          updated.superficie = "";
-        }
-      }
-      
-      return updated;
-    });
-    // Limpiar error del campo cuando se modifica
-    if (patch && Object.keys(patch).length > 0) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        Object.keys(patch).forEach((key) => {
-          delete next[key];
-        });
-        return next;
-      });
-    }
-  };
+  }, [open, reset, clearErrors]);
 
   const handleReset = () => {
-    setForm(buildInitialForm());
+    reset(buildInitialForm());
     setError(null);
-    setFieldErrors({});
+    setImages([]);
+    clearErrors();
   };
 
-  // Callback para manejar cambios en las imágenes desde el componente reutilizable
+  // Callback para manejar cambios en las imágenes
   const handleImagesChange = (newImages) => {
-    setForm((prev) => ({ ...prev, images: newImages }));
+    setImages(newImages);
   };
 
-  const buildPayload = () => {
-    const payload = {};
-
-    // Campos obligatorios
-    const numero = normNum(form.numero);
-    if (numero != null && numero > 0) payload.numero = numero;
-    
-    if (form.tipo) payload.tipo = form.tipo;
-    if (form.estado) payload.estado = form.estado;
-    if (form.subestado) payload.subestado = form.subestado;
-
-    // numPartido: si no se proporciona, usar default del backend (62)
-    const numPartido = normNum(form.numPartido);
-    payload.numPartido = numPartido != null ? numPartido : 62;
-
-    // Calcular superficie automáticamente si hay frente y fondo
-    const frente = normNum(form.frente);
-    const fondo = normNum(form.fondo);
-    let superficie = normNum(form.superficie);
-    
-    if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
-      superficie = frente * fondo;
-    }
-    
-    if (superficie != null && superficie >= 0) {
-      payload.superficie = superficie;
-    }
-
-    if (frente != null) payload.frente = frente;
-    if (fondo != null) payload.fondo = fondo;
-
-    const precio = normNum(form.precio);
-    if (precio != null) payload.precio = precio;
-
-    if (form.descripcion != null && form.descripcion.trim()) {
-      payload.descripcion = form.descripcion.trim();
-    }
-
-    const fraccionId = normNum(form.fraccionId);
-    if (fraccionId) payload.fraccionId = fraccionId;
-
-    // Propietario es obligatorio
-    const propietarioId = normNum(form.propietarioId);
-    if (propietarioId) payload.propietarioId = propietarioId;
-
-    // Ubicación: calle y número (opcionales)
-    if (form.calle && form.calle.trim()) {
-      payload.calle = form.calle.trim();
-    }
-    const numeroCalle = normNum(form.numeroCalle);
-    if (numeroCalle != null && numeroCalle > 0) {
-      payload.numeroCalle = numeroCalle;
-    }
-
-    // NO incluir imágenes en el payload - se subirán después de crear el lote
-
-    // Campos específicos para Espacio Comun
-    if (form.tipo === "Espacio Comun") {
-      if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
-        payload.nombreEspacioComun = form.nombreEspacioComun.trim();
-      }
-      const capacidad = normNum(form.capacidad);
-      if (capacidad != null && capacidad >= 0) {
-        payload.capacidad = capacidad;
-      }
-    }
-
-    return payload;
-  };
-
-  const validateForm = () => {
-    const rules = {
-      numero: [req("El número de lote es obligatorio"), positive("El número de lote debe ser un número positivo")],
-      numPartido: [req("El número de partida es obligatorio"), positive("El número de partida debe ser un número positivo")],
-      tipo: [req("El tipo es obligatorio")],
-      estado: [req("El estado es obligatorio")],
-      subestado: [req("El sub-estado es obligatorio")],
-      fraccionId: [req("La fracción es obligatoria")],
-      propietarioId: [req("El propietario es obligatorio"), positive("El propietario debe ser válido")],
-    };
-
-    const errors = {};
-    const camposFaltantes = [];
-    
-    for (const [field, validators] of Object.entries(rules)) {
-      for (const validate of validators) {
-        const err = validate(form[field]);
-        if (err) {
-          errors[field] = err;
-          // Agregar el nombre del campo a la lista de campos faltantes
-          const nombresCampos = {
-            numero: "Número de lote",
-            numPartido: "Número de partida",
-            tipo: "Tipo",
-            estado: "Estado",
-            subestado: "Sub-estado",
-            fraccionId: "Fracción",
-            propietarioId: "Propietario",
-          };
-          if (!camposFaltantes.includes(nombresCampos[field])) {
-            camposFaltantes.push(nombresCampos[field]);
-          }
-          break;
-        }
-      }
-    }
-
-    // Validar que frente y fondo sean positivos si están presentes
-    const frente = normNum(form.frente);
-    const fondo = normNum(form.fondo);
-    if (frente != null && frente < 0) {
-      errors.frente = "El frente debe ser un número positivo";
-    }
-    if (fondo != null && fondo < 0) {
-      errors.fondo = "El fondo debe ser un número positivo";
-    }
-
-    // Validar nombreEspacioComun si el tipo es "Espacio Comun"
-    if (form.tipo === "Espacio Comun") {
-      if (!form.nombreEspacioComun || !form.nombreEspacioComun.trim()) {
-        errors.nombreEspacioComun = "El nombre del espacio común es obligatorio";
-        if (!camposFaltantes.includes("Nombre del espacio común")) {
-          camposFaltantes.push("Nombre del espacio común");
-        }
-      }
-    }
-
-    // Validar capacidad si está presente (debe ser positiva)
-    const capacidad = normNum(form.capacidad);
-    if (capacidad != null && capacidad < 0) {
-      errors.capacidad = "La capacidad debe ser un número positivo";
-    }
-
-    setFieldErrors(errors);
-    
-    // Si hay errores, mostrar mensaje detallado
-    if (Object.keys(errors).length > 0) {
-      const mensajeCampos = camposFaltantes.length > 0 
-        ? `Faltan completar los siguientes campos obligatorios: ${camposFaltantes.join(", ")}.`
-        : "Por favor, completa todos los campos obligatorios correctamente.";
-      setError(mensajeCampos);
-    }
-    
-    return Object.keys(errors).length === 0;
-  };
-
-  const handleSave = async () => {
+  const onSubmit = async (data) => {
     setError(null);
-    setFieldErrors({});
-
-    if (!validateForm()) {
-      // El mensaje de error ya se estableció en validateForm
-      return;
-    }
+    clearErrors();
 
     setSaving(true);
     try {
-      // 1. Crear el lote primero
-      const payload = buildPayload();
+      // Construir payload desde los datos validados
+      const payload = {
+        numero: Number(data.numero),
+        numPartido: data.numPartido ?? 62,
+        tipo: data.tipo,
+        estado: data.estado,
+        subestado: data.subestado,
+        fraccionId: Number(data.fraccionId),
+        propietarioId: Number(data.propietarioId),
+      };
+
+      // Campos opcionales
+      if (data.superficie != null && data.superficie !== "") {
+        payload.superficie = Number(data.superficie);
+      }
+      if (data.precio != null && data.precio !== "") {
+        payload.precio = Number(data.precio);
+      }
+      if (data.descripcion != null && data.descripcion.trim()) {
+        payload.descripcion = data.descripcion.trim();
+      }
+      if (data.calle) {
+        payload.calle = data.calle;
+      }
+      if (data.numeroCalle != null && data.numeroCalle !== "") {
+        payload.numeroCalle = Number(data.numeroCalle);
+      }
+
+      // Campos específicos para Espacio Comun
+      if (data.tipo === "Espacio Comun") {
+        if (data.nombreEspacioComun) {
+          payload.nombreEspacioComun = data.nombreEspacioComun.trim();
+        }
+        if (data.capacidad != null && data.capacidad !== "") {
+          payload.capacidad = Number(data.capacidad);
+        }
+      }
+
       console.log("📤 Payload a enviar:", payload);
       const resp = await createLote(payload);
       const created = resp?.data ?? resp ?? {};
@@ -434,9 +309,9 @@ export default function LoteCrearCard({
       }
 
       // 2. Subir las imágenes si hay
-      if (form.images.length > 0) {
+      if (images.length > 0) {
         try {
-          const uploadPromises = form.images
+          const uploadPromises = images
             .filter((img) => img instanceof File)
             .map((file) => uploadArchivo(file, created.id, "IMAGEN"));
           
@@ -462,19 +337,27 @@ export default function LoteCrearCard({
     } catch (err) {
       console.error("Error creando lote:", err);
       let errorMsg = err?.message || "No se pudo crear el lote. Intenta nuevamente.";
+      let isDuplicateError = false;
       
       // Si es un error de conflicto (lote duplicado), mostrar mensaje más claro
       if (err?.statusCode === 409 || err?.response?.status === 409) {
-        errorMsg = err?.message || "Ya existe un lote con ese número en la fracción seleccionada. Por favor, elige otro número.";
+        errorMsg = "El lote ya existe.";
+        isDuplicateError = true;
+        // Mostrar también en el campo número usando RHF
+        setFormError("numero", {
+          type: "manual",
+          message: "El lote ya existe.",
+        });
       }
       
       // Si es un error de validación del backend, mostrar el mensaje específico
       if (err?.statusCode === 400 || err?.response?.status === 400) {
         errorMsg = err?.message || "Los datos ingresados no son válidos. Verifica los campos obligatorios.";
       }
-      
       setError(errorMsg);
-      showError(errorMsg);
+      if (!isDuplicateError) {
+        showError(errorMsg);
+      }
       setSaving(false);
     }
   };
@@ -559,7 +442,7 @@ export default function LoteCrearCard({
           onCancel?.();
         }}
         saveButtonText={saving ? "Creando..." : "Crear Lote"}
-        onSave={handleSave}
+        onSave={handleSubmit(onSubmit)}
         onReset={handleReset}
         saving={saving}
       >
@@ -568,212 +451,211 @@ export default function LoteCrearCard({
           style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}
         >
           <div className="lote-data-col">
-            <div className="field-row">
-              <div className="field-label">Número *</div>
-              <div className="field-value p0">
-                <input
-                  className={`field-input ${fieldErrors.numero ? "is-invalid" : ""}`}
-                  type="number"
-                  inputMode="numeric"
-                  value={form.numero ?? ""}
-                  onChange={(e) => updateForm({ numero: e.target.value })}
-                  placeholder="Número de lote"
-                />
-                {fieldErrors.numero && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.numero}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.numero ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Número de Parcela *</div>
+                <div className="field-value p0">
+                  <input
+                    {...register("numero", { valueAsNumber: true })}
+                    className={`field-input ${errors.numero ? "is-invalid" : ""}`}
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="Número de parcela"
+                  />
+                </div>
               </div>
+              {errors.numero && (
+                <div className="fieldError">{errors.numero.message}</div>
+              )}
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Número Partida *</div>
-              <div className="field-value p0">
-                <input
-                  className={`field-input ${fieldErrors.numPartido ? "is-invalid" : ""}`}
-                  type="number"
-                  inputMode="numeric"
-                  value={form.numPartido ?? ""}
-                  onChange={(e) => updateForm({ numPartido: e.target.value })}
-                  placeholder="Número de partida"
-                />
-                {fieldErrors.numPartido && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.numPartido}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.numPartido ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Número Partida *</div>
+                <div className="field-value p0">
+                  <input
+                    {...register("numPartido", { valueAsNumber: true })}
+                    className={`field-input ${errors.numPartido ? "is-invalid" : ""}`}
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="Número de partida"
+                  />
+                </div>
               </div>
+              {errors.numPartido && (
+                <div className="fieldError">{errors.numPartido.message}</div>
+              )}
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Tipo *</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.tipo}
-                  options={TIPOS}
-                  placeholder="Seleccionar tipo"
-                  onChange={(value) => {
-                    // Limpiar campos de espacio común si se cambia a otro tipo
-                    updateForm({ 
-                      tipo: value,
-                      nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "",
-                      capacidad: value === "Espacio Comun" ? form.capacidad : ""
-                    });
-                    // Limpiar errores de validación de estos campos
-                    if (value !== "Espacio Comun") {
-                      setFieldErrors((prev) => {
-                        const next = { ...prev };
-                        delete next.nombreEspacioComun;
-                        delete next.capacidad;
-                        return next;
-                      });
-                    }
-                  }}
-                />
-                {fieldErrors.tipo && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.tipo}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.tipo ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Tipo *</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={formValues.tipo ?? ""}
+                    options={TIPOS}
+                    placeholder="Seleccionar tipo"
+                    onChange={(value) => {
+                      setValue("tipo", value);
+                      // Limpiar campos de espacio común si se cambia a otro tipo
+                      if (value !== "Espacio Comun") {
+                        setValue("nombreEspacioComun", "");
+                        setValue("capacidad", "");
+                        clearErrors(["nombreEspacioComun", "capacidad"]);
+                      }
+                    }}
+                  />
+                </div>
               </div>
+              {errors.tipo && (
+                <div className="fieldError">{errors.tipo.message}</div>
+              )}
             </div>
 
-            {form.tipo === "Espacio Comun" && (
+            {formValues.tipo === "Espacio Comun" && (
               <>
-                <div className="field-row">
-                  <div className="field-label">Nombre del Espacio Común *</div>
-                  <div className="field-value p0">
-                    <input
-                      className={`field-input ${fieldErrors.nombreEspacioComun ? "is-invalid" : ""}`}
-                      type="text"
-                      value={form.nombreEspacioComun ?? ""}
-                      onChange={(e) => updateForm({ nombreEspacioComun: e.target.value })}
-                      placeholder="Ej. Piscina"
-                    />
-                    {fieldErrors.nombreEspacioComun && (
-                      <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                        {fieldErrors.nombreEspacioComun}
-                      </div>
-                    )}
+                <div className={`fieldRow ${errors.nombreEspacioComun ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">Nombre del Espacio Común *</div>
+                    <div className="field-value p0">
+                      <input
+                        {...register("nombreEspacioComun")}
+                        className={`field-input ${errors.nombreEspacioComun ? "is-invalid" : ""}`}
+                        type="text"
+                        placeholder="Ej. Piscina"
+                      />
+                    </div>
                   </div>
+                  {errors.nombreEspacioComun && (
+                    <div className="fieldError">{errors.nombreEspacioComun.message}</div>
+                  )}
                 </div>
 
-                <div className="field-row">
-                  <div className="field-label">Capacidad</div>
-                  <div className="field-value p0">
-                    <input
-                      className={`field-input ${fieldErrors.capacidad ? "is-invalid" : ""}`}
-                      type="number"
-                      inputMode="numeric"
-                      value={form.capacidad ?? ""}
-                      onChange={(e) => updateForm({ capacidad: e.target.value })}
-                      placeholder="Ej. 100"
-                    />
-                    {fieldErrors.capacidad && (
-                      <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                        {fieldErrors.capacidad}
-                      </div>
-                    )}
+                <div className={`fieldRow ${errors.capacidad ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">Capacidad</div>
+                    <div className="field-value p0">
+                      <input
+                        {...register("capacidad", { valueAsNumber: true })}
+                        className={`field-input ${errors.capacidad ? "is-invalid" : ""}`}
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="Ej. 100"
+                      />
+                    </div>
                   </div>
+                  {errors.capacidad && (
+                    <div className="fieldError">{errors.capacidad.message}</div>
+                  )}
                 </div>
               </>
             )}
 
-            <div className="field-row">
-              <div className="field-label">Estado *</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.estado}
-                  options={ESTADOS}
-                  placeholder="Seleccionar estado"
-                  onChange={(value) => updateForm({ estado: value })}
-                />
-                {fieldErrors.estado && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.estado}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.estado ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Estado *</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={formValues.estado ?? ""}
+                    options={ESTADOS}
+                    placeholder="Seleccionar estado"
+                    onChange={(value) => setValue("estado", value)}
+                  />
+                </div>
               </div>
+              {errors.estado && (
+                <div className="fieldError">{errors.estado.message}</div>
+              )}
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Sub-Estado *</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.subestado}
-                  options={SUBESTADOS}
-                  placeholder="Seleccionar sub-estado"
-                  onChange={(value) => updateForm({ subestado: value })}
-                />
-                {fieldErrors.subestado && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.subestado}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.subestado ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Sub-Estado *</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={formValues.subestado ?? ""}
+                    options={SUBESTADOS}
+                    placeholder="Seleccionar sub-estado"
+                    onChange={(value) => setValue("subestado", value)}
+                  />
+                </div>
               </div>
+              {errors.subestado && (
+                <div className="fieldError">{errors.subestado.message}</div>
+              )}
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Fracción *</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.fraccionId ? String(form.fraccionId) : ""}
-                  options={fracciones.map(f => {
-                    const id = f.idFraccion ?? f.id ?? "";
-                    const numero = f.numero ?? id;
-                    return { 
-                      value: String(id), 
-                      label: `Fracción ${numero}` 
-                    };
-                  })}
-                  placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"}
-                  onChange={(value) => {
-                    const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value);
-                    updateForm({ 
-                      fraccionId: value ? Number(value) : "",
-                      fraccionNumero: fraccion?.numero ?? ""
-                    });
-                  }}
-                />
-                {fieldErrors.fraccionId && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.fraccionId}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.fraccionId ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Fracción *</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={formValues.fraccionId ? String(formValues.fraccionId) : ""}
+                    options={fracciones.map(f => {
+                      const id = f.idFraccion ?? f.id ?? "";
+                      const numero = f.numero ?? f.numeroFraccion ?? id;
+                      return { 
+                        value: String(id), 
+                        label: `Fracción ${numero}` 
+                      };
+                    })}
+                    placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"}
+                    onChange={(value) => {
+                      const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value);
+                      const fraccionId = value ? Number(value) : "";
+                      const fraccionNumero = fraccion?.numero ?? fraccion?.numeroFraccion;
+                      
+                      setValue("fraccionId", fraccionId || undefined);
+                      setValue("fraccionNumero", fraccionNumero ? Number(fraccionNumero) : undefined);
+                      
+                      // Trigger validation after setting both values
+                      if (fraccionId && fraccionNumero) {
+                        // Trigger validation for numero field to check range
+                        setTimeout(() => {
+                          const currentNumero = formValues.numero;
+                          if (currentNumero) {
+                            // Re-validate numero field with new fraccionNumero
+                            setValue("numero", currentNumero, { shouldValidate: true });
+                          }
+                        }, 100);
+                      }
+                    }}
+                  />
+                </div>
               </div>
+              {errors.fraccionId && (
+                <div className="fieldError">{errors.fraccionId.message}</div>
+              )}
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Propietario *</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={form.propietarioId ? String(form.propietarioId) : ""}
-                  options={personaOpts}
-                  placeholder={loadingPersonas ? "Cargando..." : "Seleccionar propietario"}
-                  onChange={(value) => {
-                    updateForm({ 
-                      propietarioId: value ? Number(value) : ""
-                    });
-                  }}
-                />
-                {fieldErrors.propietarioId && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.propietarioId}
-                  </div>
-                )}
+            <div className={`fieldRow ${errors.propietarioId ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Propietario *</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={formValues.propietarioId ? String(formValues.propietarioId) : ""}
+                    options={personaOpts}
+                    placeholder={loadingPersonas ? "Cargando..." : "Seleccionar propietario"}
+                    onChange={(value) => {
+                      setValue("propietarioId", value ? Number(value) : "");
+                    }}
+                  />
+                </div>
               </div>
+              {errors.propietarioId && (
+                <div className="fieldError">{errors.propietarioId.message}</div>
+              )}
             </div>
 
             <div className="field-row">
               <div className="field-label">Calle</div>
               <div className="field-value p0">
                 <NiceSelect
-                  value={form.calle ?? ""}
+                  value={formValues.calle ?? ""}
                   options={CALLES_OPTIONS}
                   placeholder="Seleccionar calle"
                   onChange={(value) => {
-                    updateForm({ calle: value || "" });
+                    setValue("calle", value || "");
                   }}
                 />
               </div>
@@ -783,77 +665,41 @@ export default function LoteCrearCard({
               <div className="field-label">Número</div>
               <div className="field-value p0">
                 <input
+                  {...register("numeroCalle", { valueAsNumber: true })}
                   className="field-input"
-                  type="text"
-                  value={form.numeroCalle ?? ""}
-                  onChange={(e) => updateForm({ numeroCalle: e.target.value })}
+                  type="number"
+                  inputMode="numeric"
                   placeholder="Ej. 202"
                 />
               </div>
             </div>
 
-            <div className="field-row">
-              <div className="field-label">Superficie</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input is-readonly"
-                  type="number"
-                  inputMode="decimal"
-                  value={form.superficie ?? ""}
-                  readOnly
-                  placeholder="Se calcula automáticamente"
-                  title="La superficie se calcula automáticamente como frente × fondo"
-                />
+            <div className={`fieldRow ${errors.superficie ? "hasError" : ""}`}>
+              <div className="field-row">
+                <div className="field-label">Superficie</div>
+                <div className="field-value p0">
+                  <input
+                    {...register("superficie", { valueAsNumber: true })}
+                    className={`field-input ${errors.superficie ? "is-invalid" : ""}`}
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="m²"
+                  />
+                </div>
               </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Frente</div>
-              <div className="field-value p0">
-                <input
-                  className={`field-input ${fieldErrors.frente ? "is-invalid" : ""}`}
-                  type="number"
-                  inputMode="decimal"
-                  value={form.frente ?? ""}
-                  onChange={(e) => updateForm({ frente: e.target.value })}
-                  placeholder="Metros"
-                />
-                {fieldErrors.frente && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.frente}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">Fondo</div>
-              <div className="field-value p0">
-                <input
-                  className={`field-input ${fieldErrors.fondo ? "is-invalid" : ""}`}
-                  type="number"
-                  inputMode="decimal"
-                  value={form.fondo ?? ""}
-                  onChange={(e) => updateForm({ fondo: e.target.value })}
-                  placeholder="Metros"
-                />
-                {fieldErrors.fondo && (
-                  <div style={{ color: "#dc2626", fontSize: "12px", marginTop: "4px" }}>
-                    {fieldErrors.fondo}
-                  </div>
-                )}
-              </div>
+              {errors.superficie && (
+                <div className="fieldError">{errors.superficie.message}</div>
+              )}
             </div>
 
             <div className="field-row">
               <div className="field-label">Precio</div>
               <div className="field-value p0">
                 <input
+                  {...register("precio", { valueAsNumber: true })}
                   className="field-input"
                   type="number"
                   inputMode="decimal"
-                  value={form.precio ?? ""}
-                  onChange={(e) => updateForm({ precio: e.target.value })}
                   placeholder="USD"
                 />
               </div>
@@ -864,7 +710,7 @@ export default function LoteCrearCard({
             {/* Reutilizamos el mismo componente de subida de imágenes en Crear y Editar lote
                 para garantizar un comportamiento consistente. */}
             <LoteImageUploader
-              images={form.images || []}
+              images={images || []}
               onChange={handleImagesChange}
               inputId="file-input-lote-crear"
             />
@@ -874,6 +720,7 @@ export default function LoteCrearCard({
               <div className="lote-description__body">
                 <strong>Descripción</strong>
                 <textarea
+                  {...register("descripcion")}
                   style={{ 
                     margin: "8px 0 0", 
                     width: "100%", 
@@ -885,10 +732,6 @@ export default function LoteCrearCard({
                     fontFamily: "inherit",
                     resize: "vertical"
                   }}
-                  value={form.descripcion ?? ""}
-                  onChange={(e) =>
-                    updateForm({ descripcion: e.target.value })
-                  }
                   placeholder="Notas relevantes del lote…"
                 />
               </div>
