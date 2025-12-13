@@ -52,12 +52,18 @@ export default function Header({ onUserClick, user }) {
           transition: background .12s ease, transform .06s ease, box-shadow .12s ease;
         }
         .cclf-tab { color: var(--color-tab-text); }
-        .cclf-tab--active { background: #EBB648; }         /* var(--color-tab-active) */
+        .cclf-tab--active { background: #926F25; }         /* mismo estilo que hover cuando está activo */
         .cclf-tab--idle   { background: #EBB648; }         /* var(--color-tab-inactive) */
 
         /* Hover: un pelín más oscuro + leve elevación */
         .cclf-tab--active:hover { background: #926F25; transform: translateY(-1px); }
         .cclf-tab--idle:hover   { background: #926F25; transform: translateY(-1px); }
+
+        /* Cuando está deshabilitado (activo), no debe tener cursor pointer ni ser clickeable */
+        .cclf-tab:disabled {
+          cursor: not-allowed;
+          opacity: 1;
+        }
 
         /* Logout igual a las tabs inactivas */
         .cclf-logout { background: #EBB648; color: #000; }
@@ -81,6 +87,7 @@ export default function Header({ onUserClick, user }) {
               className={`cclf-tab ${isMap ? "cclf-tab--active" : "cclf-tab--idle"}`}
               style={{ minWidth: 130, padding: "11px 30px" }}
               onClick={() => navigate("/map")}
+              disabled={isMap}
             >
               Mapa
             </button>
@@ -89,8 +96,9 @@ export default function Header({ onUserClick, user }) {
               className={`cclf-tab ${isDashboard ? "cclf-tab--active" : "cclf-tab--idle"}`}
               style={{ minWidth: 130, padding: "11px 30px" }}
               onClick={() => navigate("/")}
+              disabled={isDashboard}
             >
-              Dashboard
+              Lotes
             </button>
           </div>
 

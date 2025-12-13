@@ -163,7 +163,12 @@ async function apiGetById(id) {
 async function apiCreate(payload) {
   const res  = await fetchWithFallback(PRIMARY, { method: "POST", body: payload });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json?.message || "Error al crear lote");
+  if (!res.ok) {
+    const error = new Error(json?.message || "Error al crear lote");
+    error.statusCode = res.status;
+    error.response = { status: res.status };
+    throw error;
+  }
   const row = json?.data ?? json;
   return ok(fromApi(row));
 }

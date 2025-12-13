@@ -264,6 +264,29 @@ select.field { appearance: auto; }
 .field-row{ display: grid; grid-template-columns: var(--sale-label-w, 180px) 1fr; align-items: center; gap: 12px; }
 .field-label{ background: #fff; border: 1px solid rgba(0,0,0,.18); border-radius: 6px; padding: 10px 12px; padding-top: 11.5px; font-size: 13.5px; font-weight: 600; letter-spacing: .3px; box-shadow: 0 2px 4px rgba(0,0,0,.10); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .field-value{ background: #ffffff; border: 1px solid rgba(0,0,0,.18); box-shadow: 0 2px 4px rgba(0,0,0,.10); border-radius: 6px; padding: 9px 12px; min-height: 44px; display: flex; align-items: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Estilos de error - bordes rojos suaves */
+.fieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.fieldRow.hasError .field-label {
+  border: 1px solid rgba(220, 53, 69, 0.6) !important;
+}
+
+.fieldRow.hasError .field-value {
+  border: 1px solid rgba(220, 53, 69, 0.6) !important;
+}
+
+.fieldError {
+  margin-top: 6px;
+  margin-left: calc(var(--sale-label-w, 180px) + 12px);
+  font-size: 12px;
+  color: rgba(220, 53, 69, 0.9);
+  line-height: 1.4;
+}
 .cclf-tab.thin { font-weight: 500; }
 .cclf-card__actions .cclf-tab.thin { padding: 8px 25px; margin-right: 20px; border: 1px solid rgba(0,0,0,.85); border-radius: 6px; background: #EBB648; font-weight: 500; }
 .cclf-card__actions .cclf-tab.thin:hover { background: #cb9828; transform: translateY(-1px); transition: 200ms ease; }

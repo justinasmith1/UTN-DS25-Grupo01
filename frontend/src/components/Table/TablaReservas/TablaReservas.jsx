@@ -192,7 +192,6 @@ export default function TablaReservas({
     const senaId = columnsWithEstado.find(c => c.id === 'seña' || c.titulo === 'Seña')?.id ?? 'seña';
     const inmoId = columnsWithEstado.find(c => c.id === 'inmobiliariaNombre' || c.titulo === 'Inmobiliaria')?.id ?? 'inmobiliariaNombre';
 
-    // 👉 "lotePrecio" y "createdAt" quedan para elegir en el picker
     return [idId, loteId, 'estado', clienteId, fechaId, senaId, inmoId]; // 7 exactas
   }, [columnsWithEstado]);
 
