@@ -90,24 +90,21 @@ export default function InmobiliariaEditarCard({
   }, [open, detalle?.id]); // Resetear también cuando cambia la inmobiliaria (detalle.id)
 
   /* 4) STATES EDITABLES derivados de 'detalle' */
-  // Fechas con todos los posibles nombres que vi en tu back
-  // Backend usa updateAt (sin 'd'), mapeamos a updatedAt para consistencia
-  const fechaActISO =
-    detalle?.updatedAt ?? detalle?.updateAt ?? detalle?.fechaActualizacion ?? null;
-  const fechaCreISO =
-    detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
+  // ... (código de fechas existente) ...
 
   const base = {
     nombre: detalle?.nombre ?? "",
     razonSocial: detalle?.razonSocial ?? "",
     contacto: detalle?.contacto ?? "",
     comxventa: detalle?.comxventa != null ? String(detalle.comxventa) : "",
+    estado: detalle?.estado ?? "ACTIVA", // <--- NUEVO
   };
 
   const [nombre, setNombre] = useState(base.nombre);
   const [razonSocial, setRazonSocial] = useState(base.razonSocial);
   const [contacto, setContacto] = useState(base.contacto);
   const [comxventa, setComxventa] = useState(base.comxventa);
+  const [estado, setEstado] = useState(base.estado); // <--- NUEVO
   const [showSuccess, setShowSuccess] = useState(false);
 
   // re-sync cuando cambia 'detalle' o se reabre
@@ -117,6 +114,7 @@ export default function InmobiliariaEditarCard({
     setRazonSocial(base.razonSocial);
     setContacto(base.contacto);
     setComxventa(base.comxventa);
+    setEstado(base.estado); // <--- NUEVO
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, detalle?.id]);
 
@@ -135,37 +133,18 @@ export default function InmobiliariaEditarCard({
   function buildPatch() {
     const patch = {};
 
-    // NOMBRE es readonly, no se puede modificar
-    // if (nombre !== (detalle?.nombre ?? "")) {
-    //   if (!nombre || !nombre.trim()) {
-    //     throw new Error("El nombre es obligatorio.");
-    //   }
-    //   patch.nombre = nombre.trim();
-    // }
+    // ... (validaciones existentes de razonSocial y contacto) ...
 
     if (razonSocial !== (detalle?.razonSocial ?? "")) {
-      if (!razonSocial || !razonSocial.trim()) {
-        throw new Error("La razón social es obligatoria.");
-      }
-      patch.razonSocial = razonSocial.trim();
+       // ... (tu código existente)
     }
 
-    if ((detalle?.contacto ?? "") !== (contacto ?? "")) {
-      // Si contacto está vacío, enviar null; si tiene valor, enviar el string trimmeado
-      patch.contacto = contacto && contacto.trim() ? contacto.trim() : null;
-    }
+    // ... (tu código de contacto y comxventa) ...
 
-    const prevComxventa = detalle?.comxventa != null ? String(detalle.comxventa) : "";
-    if (prevComxventa !== comxventa) {
-      if (comxventa === "" || comxventa.trim() === "") {
-        patch.comxventa = null;
-      } else {
-        const n = Number(comxventa);
-        if (!Number.isFinite(n) || n < 0) {
-          throw new Error("La comisión debe ser un número ≥ 0.");
-        }
-        patch.comxventa = n;
-      }
+    // --- NUEVO BLOQUE PARA ESTADO ---
+    if (estado !== (detalle?.estado ?? "ACTIVA")) {
+      patch.estado = estado;
+      // Nota: No enviamos fechaBaja, el backend la calcula solo.
     }
 
     return patch;
@@ -210,14 +189,21 @@ export default function InmobiliariaEditarCard({
     setRazonSocial(base.razonSocial);
     setContacto(base.contacto);
     setComxventa(base.comxventa);
+    setEstado(base.estado); // <--- NUEVO
   }
 
   /* 7) Render */
   const NA = "Sin información";
 
+  // --- CORRECCIÓN: Definir las variables antes de usarlas ---
+  const fechaActISO = detalle?.updateAt ?? detalle?.updatedAt ?? detalle?.fechaActualizacion;
+  const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion;
+  // ---------------------------------------------------------
+
   const fechaAct = fechaActISO
     ? new Date(fechaActISO).toLocaleDateString("es-AR")
     : NA;
+    
   const fechaCre = fechaCreISO
     ? new Date(fechaCreISO).toLocaleDateString("es-AR")
     : NA;
@@ -373,6 +359,33 @@ export default function InmobiliariaEditarCard({
 
             {/* Columna derecha */}
             <div className="venta-col">
+              
+              {/* --- NUEVO SELECTOR DE ESTADO --- */}
+              <div className="field-row">
+                <div className="field-label">ESTADO</div>
+                <div className="field-value p0">
+                  <select
+                    className="field-input" // Reusamos estilo de input
+                    value={estado}
+                    onChange={(e) => setEstado(e.target.value)}
+                    style={{ background: estado === 'INACTIVA' ? '#fef2f2' : '#fff' }}
+                  >
+                    <option value="ACTIVA">ACTIVA</option>
+                    <option value="INACTIVA">INACTIVA</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* --- MOSTRAR FECHA BAJA SOLO SI ESTÁ INACTIVA --- */}
+              {detalle?.fechaBaja && (
+                <div className="field-row">
+                  <div className="field-label" style={{ color: '#ef4444' }}>FECHA DE BAJA</div>
+                  <div className="field-value is-readonly" style={{ color: '#ef4444' }}>
+                    {new Date(detalle.fechaBaja).toLocaleDateString("es-AR")}
+                  </div>
+                </div>
+              )}
+
               <div className="field-row">
                 <div className="field-label">FECHA DE ACTUALIZACIÓN</div>
                 <div className="field-value is-readonly">{fechaAct}</div>

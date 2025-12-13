@@ -7,6 +7,7 @@ import { ListTodo, Percent } from "lucide-react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../../../lib/auth/rbac";
 import TablaBase from "../TablaBase";
+import StatusBadge from "./cells/StatusBadge";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
 import {
   fmtComxVenta,
@@ -141,24 +142,44 @@ export default function TablaInmobiliarias({
         return {
           ...col,
           accessor: (row) => {
-            const nombre = row.nombre || '-';
-            return (
-              <span style={{ 
-                display: 'inline-block', 
-                maxWidth: '100%',
-                lineHeight: '1.2',
-                wordBreak: 'break-word',
-                hyphens: 'auto'
-              }}>
-                {nombre}
-              </span>
-            );
+             // Opcional: Podrías poner el texto en gris si está inactiva
+             const style = row.estado === 'INACTIVA' ? { color: '#9ca3af' } : {};
+             return (
+               <span style={{ 
+                 display: 'inline-block', 
+                 maxWidth: '100%',
+                 lineHeight: '1.2',
+                 wordBreak: 'break-word',
+                 hyphens: 'auto',
+                 ...style
+               }}>
+                 {row.nombre || '-'}
+               </span>
+             );
           },
         };
       }
+      if (col.id === 'fechaBaja') {
+        return {
+            ...col,
+            accessor: (row) => {
+                if (!row.fechaBaja) return '—';
+                // Usamos tu formatter existente fmtFecha y añadimos color rojo suave
+                return (
+                    <span style={{ color: '#ef4444', fontSize: '0.9em' }}>
+                        {fmtFecha(row.fechaBaja)}
+                    </span>
+                );
+            }
+        }
+      }
+
       return col;
     });
   }, []);
+
+
+  
 
   // -----------------------------------------
   // Acciones por fila (íconos):
