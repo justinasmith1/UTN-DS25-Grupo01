@@ -2,6 +2,7 @@
 import { Navbar, Container } from "react-bootstrap";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
+import logo from "../assets/logoCompleto.png";
 
 export default function Header({ onUserClick, user }) {
   const navigate = useNavigate();
@@ -73,11 +74,12 @@ export default function Header({ onUserClick, user }) {
       <Container fluid style={{ paddingLeft: PADDING_L, paddingRight: PADDING_R }}>
         <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
           {/* IZQ: brand */}
-          <div className="d-flex align-items-center" style={{ gap: 8 }}>
-            <i className="bi bi-house-door" style={{ fontSize: "1.4rem" }} />
-            <span style={{ fontSize: "1.1rem", fontWeight: 600 }}>
-              Club de Campo La Federala
-            </span>
+          <div className="d-flex align-items-center">
+            <img 
+              src={logo} 
+              alt="Club de Campo La Federala" 
+              style={{ height: '55px', width: 'auto' }} 
+            />
           </div>
 
           {/* CENTRO: tabs (acercadas al brand) */}
