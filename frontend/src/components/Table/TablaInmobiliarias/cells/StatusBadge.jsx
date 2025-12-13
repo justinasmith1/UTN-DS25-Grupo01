@@ -9,7 +9,16 @@ export default function StatusBadge({ value, type = 'default' }) {
   if (!value) return badge('—', 'muted');
   
   const label = String(value);
-  
+
+  // --- NUEVO BLOQUE: Para estado de inmobiliaria ---
+  if (type === 'estado') {
+    // Asignamos colores según el valor exacto
+    if (label === 'ACTIVA') return badge('ACTIVA', 'success');
+    if (label === 'INACTIVA') return badge('INACTIVA', 'danger');
+    return badge(label, 'muted');
+  }
+  // ------------------------------------------------
+
   // Para comxventa (porcentaje)
   if (type === 'comxventa') {
     const num = Number(value);

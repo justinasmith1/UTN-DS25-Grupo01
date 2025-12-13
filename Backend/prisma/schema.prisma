@@ -76,6 +76,11 @@ enum TiposArchivos {
   IMAGEN
 }
 
+enum EstadoInmobiliaria {
+  ACTIVA
+  INACTIVA
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -227,13 +232,21 @@ model Inmobiliaria {
   razonSocial String
   comxventa   Decimal?  @db.Decimal(5, 2)
   contacto    String?
+  estado      EstadoInmobiliaria  @default(ACTIVA)
+  fechaBaja   DateTime?
+
+  // Fechas de auditoria
   createdAt   DateTime  @default(now())
   updateAt    DateTime?
+
+
   reservas    Reserva[]
   ventas      Venta[]
 
   userId Int?  @unique
   user   User? @relation(fields: [userId], references: [id])
+
+  @@index([estado])
 }
 
 // Archivos

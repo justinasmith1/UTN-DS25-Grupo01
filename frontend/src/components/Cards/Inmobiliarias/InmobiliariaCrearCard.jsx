@@ -15,24 +15,36 @@ export default function InmobiliariaCrearCard({ open, onCancel, onCreated }) {
     setSaving(true);
     setError(null);
     try {
+      // 1. VALIDACIÓN: Coincidir con Zod (Nombre y Razón Social requeridos)
       if (!nombre.trim()) throw new Error("El nombre es obligatorio");
+      if (!razonSocial.trim()) throw new Error("La razón social es obligatoria");
+
       const body = {
         nombre: nombre.trim(),
-        razonSocial: razonSocial.trim() || null,
-        contacto: contacto.trim() || null,
+        // 2. DATOS: Enviamos el string limpio. 
+        // Ya no enviamos "|| null" en razonSocial porque es obligatoria.
+        razonSocial: razonSocial.trim(), 
+        contacto: contacto.trim() || null, // Este sí es opcional en Zod
         comxventa: comxventa === "" ? null : Number(comxventa),
+        // userId: null // Opcional: Si tuvieras un select de usuarios, iría aquí.
       };
+
       const resp = await createInmobiliaria(body);
       const created = resp?.data ?? resp ?? null;
+      
       setShowSuccess(true);
-      onCreated?.(created);
+      onCreated?.(created); // Callback para actualizar la tabla padre
+      
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
         onCancel?.();
       }, 1500);
+      
     } catch (e) {
-      setError(e?.message || "No se pudo crear la inmobiliaria");
+      // Manejo de error mejorado para capturar mensajes del backend
+      const msg = e.response?.data?.message || e.message || "No se pudo crear la inmobiliaria";
+      setError(msg);
       setSaving(false);
     }
   }
