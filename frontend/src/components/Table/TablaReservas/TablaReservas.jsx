@@ -341,11 +341,6 @@ export default function TablaReservas({
           <Edit size={18} strokeWidth={2} />
         </button>
       )}
-      {can('verDocumentos') && (
-        <button className="tl-icon tl-icon--docs" aria-label="Ver Documentos" data-tooltip="Ver Documentos" onClick={() => onVerDocumentos?.(row)}>
-          <FileText size={18} strokeWidth={2} />
-        </button>
-      )}
       {can('eliminarReserva') && (
         <button className="tl-icon tl-icon--delete" aria-label="Eliminar Reserva" data-tooltip="Eliminar Reserva" onClick={() => onEliminar?.(row)}>
           <Trash2 size={18} strokeWidth={2} />

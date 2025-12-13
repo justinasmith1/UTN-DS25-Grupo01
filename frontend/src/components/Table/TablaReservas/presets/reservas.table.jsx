@@ -84,13 +84,6 @@ export const reservasTablePreset = {
       align: 'right'
     },
 
-    // La columna sigue existiendo (no la oculto)
-    {
-      id: 'createdAt',
-      titulo: 'Fecha Creación',
-      accessor: (r) => (r?.createdAt ? new Date(r.createdAt).toLocaleDateString('es-AR') : '—'),
-      width: '130px'
-    },
   ],
 
   // Para ordenar/filtrar con consistencia
