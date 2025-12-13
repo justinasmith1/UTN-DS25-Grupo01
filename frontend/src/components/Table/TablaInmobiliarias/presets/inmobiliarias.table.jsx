@@ -14,12 +14,32 @@ export const inmobiliariasTablePreset = {
       align: 'center',
     },
     {
+      id: 'estado',
+      header: 'Estado',
+      accessor: (row) => row.estado || 'ACTIVA',
+      width: 120,
+      sortable: true,
+      align: 'center',
+    },
+    {
       id: 'razonSocial',
       header: 'Razón Social',
       accessor: (row) => row.razonSocial || '-',
       width: 160,
       sortable: true,
       align: 'center',
+
+    },
+    // --- NUEVA COLUMNA: FECHA BAJA ---
+    // Solo mostramos algo si existe fechaBaja
+    {
+        id: 'fechaBaja',
+        header: 'Fecha Baja',
+        accessor: (row) => row.fechaBaja || null, 
+        width: 140,
+        sortable: true,
+        align: 'center',
+
     },
     {
       id: 'comxventa',

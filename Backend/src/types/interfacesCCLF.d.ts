@@ -15,6 +15,7 @@ export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
 export type TipoLote = "Lote Venta" | "Espacio Comun";
 export type EstadoReserva = "ACTIVA" | "CANCELADA" | "ACEPTADA";
+export type EstadoInmbobiliaria = "ACTIVA" | "INACTIVA";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---
@@ -116,6 +117,8 @@ export interface Inmobiliaria {
     reservas?: Reserva[];
     venta?: Venta;
     user?: Usuario;
+    estado: EstadoInmbobiliaria;
+    fechaBaja?: string;
 }
 
 export interface Reserva {
@@ -340,6 +343,7 @@ export interface PostInmobiliariaRequest{
   reservas?: Reserva[]; //Reservas asociadas (opcional)
   ventaId?: number; //Ventas asociadas (opcional)
   userId?: number; //Usuario asociado (opcional)
+  estado: EstadoInmbobiliaria; //Estado de la inmobiliaria (opcional)
 }
 
 // Response para crear una nueva inmobiliaria
@@ -359,6 +363,11 @@ export interface GetInmobiliariaResponse {
   message?: string;         // Mensaje opcional
 }
 
+export interface GetInmobiliariasResponse {
+    inmobiliarias: Inmobiliaria[];
+    total: number;
+}
+
 // Request para actualizar una inmobiliaria
 export interface PutInmobiliariaRequest {
   nombre?: string; //Nombre de la inmobiliaria
@@ -368,10 +377,13 @@ export interface PutInmobiliariaRequest {
   userId?: number; //Usuario asociado (opcional)
   reservas?: Reserva[]; //Reservas asociadas (opcional)
   ventaId?: number; //Ventas asociadas (opcional)
+  estado?: EstadoInmbobiliaria; //Estado de la inmobiliaria (opcional)
+  fechaBaja?: string; //Fecha de baja (opcional)
 }
 
 // Response para actualizar una inmobiliaria
 export interface PutInmobiliariaResponse {
+  inmobiliaria: Inmobiliaria;  // La inmobiliaria actualizada
   message: string;          // Mensaje de confirmacion o error
 }
 

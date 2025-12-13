@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import * as inmobiliariaService from '../services/inmobiliaria.service';
 import {
-    GetInmobiliariaRequest,
     PostInmobiliariaRequest,
-    PutInmobiliariaRequest
+    // PutInmobiliariaRequest // No se estaba usando explícitamente en el código anterior, pero está bien tenerlo
 } from '../types/interfacesCCLF';
 
 // ==============================
@@ -11,11 +10,16 @@ import {
 // ==============================
 export async function getAllInmobiliariasController(req: Request, res: Response, next: NextFunction) {
     try {
-        // Llamo al servicio para obtener todas las Inmobiliarias
-        const result = await inmobiliariaService.getAllInmobiliarias();
-        res.json({success: true,data:result});
+        // CAMBIO 1: Capturamos los query params (ej: ?estado=ACTIVA)
+        // Nota: Asegúrate de actualizar la firma de tu servicio para recibir esto.
+        const filters = req.query; 
+        
+        // Pasamos los filtros al servicio
+        const result = await inmobiliariaService.getAllInmobiliarias(filters);
+        
+        res.json({ success: true, data: result });
     } catch (error) {
-        next(error); // Paso el error al middleware de manejo
+        next(error); 
     }
 }
 
@@ -25,14 +29,17 @@ export async function getAllInmobiliariasController(req: Request, res: Response,
 export async function getInmobiliariaByIdController(req: Request, res: Response, next: NextFunction) {
     try {
         const idInmobiliaria = parseInt(req.params.id, 10);
-        const result = await inmobiliariaService.getInmobiliariaById({idInmobiliaria});  
+        const result = await inmobiliariaService.getInmobiliariaById({ idInmobiliaria });  
 
-        // Si no encuentra la Inmobiliaria, devuelvo 404
-        if (!result) {
-            res.status(404).json(result);
+        // CAMBIO 2: Corrección de lógica 404.
+        // El servicio devuelve un objeto, por lo que !result siempre era falso.
+        // Debemos verificar si la propiedad interna inmobiliaria es null.
+        if (!result.inmobiliaria) {
+            res.status(404).json({ success: false, message: result.message });
             return;
         }
-        res.json({success: true,data:result});
+        
+        res.json({ success: true, data: result });
     } catch (error) {
         next(error);
     }
@@ -43,16 +50,15 @@ export async function getInmobiliariaByIdController(req: Request, res: Response,
 // ==============================
 export async function createInmobiliariaController(req: Request, res: Response, next: NextFunction) {
     try {
-        // Creo el objeto tipado a partir del body
         const data: PostInmobiliariaRequest = req.body;
         const result = await inmobiliariaService.createInmobiliaria(data);
 
-        // Si no se crea por validacion, devuelvo 400
+        // Validación simple de seguridad
         if (!result) {
-            res.status(400).json(result);
+            res.status(400).json({ success: false, message: "No se pudo crear la inmobiliaria" });
             return;
         }
-        res.status(201).json({success: true,message: "Inmobiliaria creada exitosamente",data:result});
+        res.status(201).json({ success: true, message: "Inmobiliaria creada exitosamente", data: result });
     } catch (error) {
         next(error);
     }
@@ -64,30 +70,32 @@ export async function createInmobiliariaController(req: Request, res: Response, 
 export async function updateInmobiliariaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number(req.params.id);
-    const data = req.body; // ya validado por zod
+    const data = req.body; 
+    
+    // NOTA: No hace falta cambiar nada aquí. 
+    // La lógica de cambiar estado -> fechaBaja la maneja el servicio automáticamente.
     const result = await inmobiliariaService.updateInmobiliaria(id, data);
+    
     res.json({ success: true, message: 'Inmobiliaria actualizada exitosamente', data: result });
   } catch (error) {
     next(error);
   }
 }
 
-
 // ==============================
-// Eliminar Inmobiliaria
+// Eliminar Inmobiliaria (Hard Delete)
 // ==============================
 export async function deleteInmobiliariaController(req: Request, res: Response, next: NextFunction) {
     try {
-        // Construyo el request con el ID de la Inmobiliaria
         const idInmobiliaria = Number(req.params.id);
-        const result = await inmobiliariaService.deleteInmobiliaria({idInmobiliaria});
+        const result = await inmobiliariaService.deleteInmobiliaria({ idInmobiliaria });
 
-        // Si no existe la Inmobiliaria, devuelvo 404
+        // Aquí la lógica sí funcionaba porque el servicio lanzaba error o mensaje específico
         if (result.message === 'Inmobiliaria no encontrada') {
             res.status(404).json(result);
             return;
         }
-        res.json({success: true,message: "Inmobiliaria eliminada exitosamente",data:result});
+        res.json({ success: true, message: "Inmobiliaria eliminada exitosamente", data: result });
     } catch (error) {
         next(error);
     }
