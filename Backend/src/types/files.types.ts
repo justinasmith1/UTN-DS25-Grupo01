@@ -1,4 +1,4 @@
-export type TipoFile =  'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN';
+export type TipoFile =  'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN' | 'OTRO';
 export interface FileMetadata {
     id: number;
     filename: string;
