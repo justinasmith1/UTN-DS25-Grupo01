@@ -11,7 +11,7 @@ export const fileMetadataSchema = z.object({
 
 export const createFileMetadataSchema = z.object({
     idLoteAsociado: z.preprocess((val) => Number(val), z.number().int().positive()),
-    tipo: z.enum(['BOLETO', 'ESCRITURA', 'PLANO', 'IMAGEN']),
+    tipo: z.enum(['BOLETO', 'ESCRITURA', 'PLANO', 'IMAGEN', 'OTRO']),
 });
 
 export const updateFileMetadataSchema = z.object({

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import "../../../styles/tokens.css";
 import "../Base/cards.css";
 import { getArchivosByLote } from "../../../lib/api/archivos";
+import { loadLocalDocs } from "../../../lib/storage/docsLocal";
 
 // Placeholder URLs - estas se pueden reemplazar con URLs reales
 const PLACEHOLDER_URLS = {
@@ -36,6 +37,7 @@ export default function DocumentoVerCard({
   loteNumero,
   documentoUrl,
   documentoArchivo,
+  selectedDoc, // para custom/local docs
   onModificar,
   onDescargar,
 }) {
@@ -55,25 +57,37 @@ export default function DocumentoVerCard({
 
   // Cargar archivos del lote cuando se abre el modal
   useEffect(() => {
-    if (open && tipoDocumento && loteId) {
+    if (open && loteId) {
       setLoadingArchivos(true);
       (async () => {
         try {
           const archivosDelLote = await getArchivosByLote(loteId);
-          setArchivos(archivosDelLote);
-          
-          // Buscar el documento del tipo seleccionado
-          const tipoBackend = TIPO_MAP[tipoDocumento];
-          const docEncontrado = archivosDelLote.find(
-            (a) => a.tipo === tipoBackend
-          );
-          
+          const locales = loadLocalDocs(loteId).map((d) => ({
+            id: d.id,
+            filename: d.nombre,
+            url: d.link,
+            tipo: d.tipo || "OTRO",
+            uploadedAt: d.createdAt,
+            uploadedBy: "Local",
+            idLoteAsociado: loteId,
+            isLocal: true,
+          }));
+          const merged = [...archivosDelLote, ...locales];
+          setArchivos(merged);
+
+          let docEncontrado = null;
+          if (selectedDoc && selectedDoc.id) {
+            docEncontrado = merged.find((a) => a.id === selectedDoc.id || a.filename === selectedDoc.nombre);
+          } else if (tipoDocumento) {
+            const tipoBackend = TIPO_MAP[tipoDocumento] || tipoDocumento;
+            docEncontrado = merged.find((a) => a.tipo === tipoBackend);
+          }
+
           if (docEncontrado) {
             setDocumentoActual(docEncontrado);
             setCurrentImageUrl(docEncontrado.url);
             setTempImageUrl(docEncontrado.url);
           } else {
-            // No hay documento de este tipo, usar placeholder
             setDocumentoActual(null);
             setCurrentImageUrl("");
             setTempImageUrl("");
@@ -102,9 +116,9 @@ export default function DocumentoVerCard({
     }
   }, [open]);
 
-  if (!open || !tipoDocumento) return null;
+  if (!open) return null;
 
-  const info = DOC_INFO[tipoDocumento] || DOC_INFO.BOLETO;
+  const info = DOC_INFO[tipoDocumento] || { title: selectedDoc?.nombre || "Documento", description: "" };
   
   // Función para limpiar el mapId (eliminar "Lote" del inicio si está presente)
   const limpiarMapId = (mapId) => {
@@ -117,7 +131,9 @@ export default function DocumentoVerCard({
   const numeroLote = limpiarMapId(loteNumero) || loteId || "XXXX";
   
   // Título dinámico según el tipo de documento
-  const titulo = tipoDocumento === "BOLETO"
+  const titulo = selectedDoc?.nombre
+    ? `${selectedDoc.nombre} - Lote N° ${numeroLote}`
+    : tipoDocumento === "BOLETO"
     ? `Boleto de CompraVenta de Lote N° ${numeroLote}`
     : tipoDocumento === "ESCRITURA"
     ? `Escritura de Lote N° ${numeroLote}`
@@ -259,18 +275,26 @@ export default function DocumentoVerCard({
                   <div style={{ marginBottom: "12px" }}>Cargando documento...</div>
                 </div>
               ) : documentoActual && currentImageUrl ? (
-                <img
-                  src={currentImageUrl}
-                  alt={info.title}
-                  style={{
-                    maxWidth: "100%",
-                    maxHeight: "100%",
-                    objectFit: "contain",
-                  }}
-                  onError={(e) => {
-                    e.target.src = PLACEHOLDER_URLS[tipoDocumento] || PLACEHOLDER_URLS.BOLETO;
-                  }}
-                />
+                currentImageUrl.toLowerCase().includes("pdf") || currentImageUrl.toLowerCase().includes("application/pdf") ? (
+                  <embed
+                    src={currentImageUrl}
+                    type="application/pdf"
+                    style={{ width: "100%", height: "100%", borderRadius: "8px" }}
+                  />
+                ) : (
+                  <img
+                    src={currentImageUrl}
+                    alt={info.title}
+                    style={{
+                      maxWidth: "100%",
+                      maxHeight: "100%",
+                      objectFit: "contain",
+                    }}
+                    onError={(e) => {
+                      e.target.src = PLACEHOLDER_URLS[tipoDocumento] || PLACEHOLDER_URLS.BOLETO;
+                    }}
+                  />
+                )
               ) : (
                 <div style={{ 
                   padding: "40px", 

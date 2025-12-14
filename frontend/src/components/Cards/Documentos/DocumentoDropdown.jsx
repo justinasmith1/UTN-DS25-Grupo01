@@ -1,6 +1,7 @@
 // src/components/Cards/Documentos/DocumentoDropdown.jsx
-import { useState, useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import "../Base/cards.css";
+import { loadLocalDocs } from "../../../lib/storage/docsLocal";
 
 const TIPOS_DOCUMENTO = [
   { value: "BOLETO", label: "Boleto de Compraventa" },
@@ -13,10 +14,10 @@ export default function DocumentoDropdown({
   onClose,
   onSelectTipo,
   loteId,
-  loteNumero,
-  entityType = "Lote", // "Lote" para lotes directos, o puede ser "Venta"/"Reserva"
+  onAddDocumento,
 }) {
   const dropdownRef = useRef(null);
+  const [customDocs, setCustomDocs] = useState([]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -30,7 +31,19 @@ export default function DocumentoDropdown({
     }
   }, [open, onClose]);
 
+  // Cargar documentos locales cuando se abre
+  useEffect(() => {
+    if (open && loteId) {
+      setCustomDocs(loadLocalDocs(loteId));
+    }
+  }, [open, loteId]);
+
   if (!open) return null;
+
+  const allOptions = [
+    ...TIPOS_DOCUMENTO.map((t) => ({ ...t, custom: false })),
+    ...customDocs.map((d) => ({ value: `CUSTOM_${d.id}`, label: d.nombre, custom: true, doc: d })),
+  ];
 
   return (
     <div className="c-backdrop" onClick={onClose}>
@@ -39,7 +52,7 @@ export default function DocumentoDropdown({
         ref={dropdownRef}
         onClick={(e) => e.stopPropagation()}
         style={{
-          width: "min(400px, 90vw)",
+          width: "min(420px, 90vw)",
           maxHeight: "auto",
         }}
       >
@@ -63,13 +76,17 @@ export default function DocumentoDropdown({
               gap: "12px",
             }}
           >
-            {TIPOS_DOCUMENTO.map((tipo) => (
+            {allOptions.map((tipo) => (
               <button
                 key={tipo.value}
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => {
-                  onSelectTipo?.(tipo.value, tipo.label);
+                  if (tipo.custom && tipo.doc) {
+                    onSelectTipo?.("CUSTOM", tipo.doc.nombre, tipo.doc);
+                  } else {
+                    onSelectTipo?.(tipo.value, tipo.label);
+                  }
                   onClose?.();
                 }}
                 style={{
@@ -92,10 +109,29 @@ export default function DocumentoDropdown({
                 {tipo.label}
               </button>
             ))}
+
+            <button
+              type="button"
+              className="tl-btn tl-btn--soft"
+              onClick={() => {
+                onAddDocumento?.();
+                onClose?.();
+              }}
+              style={{
+                marginTop: "4px",
+                alignSelf: "flex-start",
+                width: "100%",
+                textAlign: "center",
+                padding: "12px 16px",
+                fontSize: "15px",
+                fontWeight: 500,
+              }}
+            >
+              + Agregar documento
+            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
