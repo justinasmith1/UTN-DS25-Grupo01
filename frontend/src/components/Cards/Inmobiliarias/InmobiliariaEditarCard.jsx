@@ -278,7 +278,7 @@ export default function InmobiliariaEditarCard({
 
       <EditarBase
         open={open}
-        title={`Inmobiliaria N° ${detalle?.id ?? "—"}`}
+        title={`${detalle?.nombre ?? "—"}`}
         onCancel={() => {
           // Siempre resetear estados antes de cerrar
           setSaving(false);

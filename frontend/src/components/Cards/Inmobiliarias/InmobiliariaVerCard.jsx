@@ -114,7 +114,7 @@ export default function InmobiliariaVerCard({
         style={{ ["--sale-label-w"]: `${labelW}px` }}
       >
         <div className="cclf-card__header">
-          <h2 className="cclf-card__title">{`Inmobiliaria N° ${inmob?.id ?? "—"}`}</h2>
+          <h2 className="cclf-card__title">{` ${inmob?.nombre ?? "—"}`}</h2>
           <div className="cclf-card__actions">
             <button
               type="button"
