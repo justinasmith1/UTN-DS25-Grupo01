@@ -182,18 +182,17 @@ export default function TablaReservas({
     return cols;
   }, []);
 
-  // 6) Visibles por defecto (7): id, lote, estado, cliente, fecha, seña, inmobiliaria
+  // 6) Visibles por defecto (7): id, lote, estado, cliente, fecha, inmobiliaria, plazo
   const defaultVisibleIds = useMemo(() => {
     // resuelve los ids efectivos en tu preset
     const idId = 'id';
     const loteId = columnsWithEstado.find(c => c.id === 'loteInfo' || c.titulo === 'Lote')?.id ?? 'loteInfo';
     const clienteId = columnsWithEstado.find(c => c.id === 'clienteCompleto' || c.titulo === 'Cliente')?.id ?? 'clienteCompleto';
     const fechaId = columnsWithEstado.find(c => c.id === 'fechaReserva' || c.titulo === 'Fecha Reserva')?.id ?? 'fechaReserva';
-    const senaId = columnsWithEstado.find(c => c.id === 'seña' || c.titulo === 'Seña')?.id ?? 'seña';
     const inmoId = columnsWithEstado.find(c => c.id === 'inmobiliariaNombre' || c.titulo === 'Inmobiliaria')?.id ?? 'inmobiliariaNombre';
     const plazoId = columnsWithEstado.find(c => c.id === 'fechaFinReserva' || c.titulo === 'Plazo Reserva')?.id ?? 'fechaFinReserva';
 
-    return [idId, loteId, 'estado', clienteId, fechaId, senaId, inmoId, plazoId]; // 7 exactas
+    return [idId, loteId, 'estado', clienteId, fechaId, inmoId, plazoId]; // 7 exactas, Seña queda deseleccionada
   }, [columnsWithEstado]);
 
   // 7) Alineación global para esta tabla (no tocamos preset/TablaBase)
@@ -456,7 +455,7 @@ export default function TablaReservas({
         columns={columnsAligned}
         widthFor={tablePreset.widthFor}
         defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
-        maxVisible={8}                        // no permite activar una 8va
+        maxVisible={7}                        // tope en 7 columnas visibles
         renderRowActions={renderRowActions}
         toolbarRight={toolbarRight}
         defaultPageSize={25}

@@ -28,6 +28,7 @@ export default function TablaBase({
   defaultPageSize = 25,
   selected,
   onSelectedChange,
+  allowHorizontalScroll = false,
 }) {
   const rowsNorm = useMemo(() => toArray(rows), [rows]);
 
@@ -167,7 +168,7 @@ export default function TablaBase({
       </div>
 
       {/* Tabla */}
-      <div className="tl-table">
+      <div className={`tl-table${allowHorizontalScroll ? ' tl-table--scroll' : ''}`}>
         {/* Head */}
         <div className="tl-thead">
           <div className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
