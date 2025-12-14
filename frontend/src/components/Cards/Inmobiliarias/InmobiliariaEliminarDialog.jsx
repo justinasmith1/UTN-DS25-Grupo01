@@ -10,10 +10,10 @@ export default function InmobiliariaEliminarDialog({
 }) {
   if (!open || !inmobiliaria) return null;
 
-  const title = `Eliminar Inmobiliaria N° ${inmobiliaria?.id ?? "—"}`;
+  const title = `Eliminar Inmobiliaria: ${inmobiliaria?.nombre ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la inmobiliaria #${inmobiliaria?.id ?? "—"}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas eliminar la inmobiliaria #${inmobiliaria?.nombre ?? "—"}?. Esta acción es irreversible.`;
 
   // Detalles listados con bullets
   const details = [

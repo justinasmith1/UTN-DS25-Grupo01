@@ -103,7 +103,17 @@
 
 
 /* ===== Tabla ===== */
-.tl-table{ border:1px solid #e6ebf2; border-radius:12px; overflow:hidden; background:#fff; }
+.tl-table{
+  border:1px solid #e6ebf2;
+  border-radius:12px;
+  overflow-x:auto;
+  overflow-y:hidden;
+  background:#fff;
+}
+.tl-thead,
+.tl-tbody{
+  min-width: max-content; /* permite scroll horizontal cuando las columnas exceden el contenedor */
+}
 .tl-thead{ position:sticky; top:0; z-index:5; background:#f7fafc; border-bottom:1px solid #e6ebf2; }
 
 .tl-tr{ display:grid; column-gap: 20px; } /* <- más espacio entre columnas (no acciones) */
@@ -143,21 +153,25 @@
 .tl-th--actions, .tl-td--actions{ gap:10px; }
 .tl-th--actions,
 [data-col="actions"].tl-th {
-  justify-self: stretch;
-  width: 100%;
+  position: sticky;
+  right: 0;
+  z-index: 5;
+  background: #f7fafc;
+  width: max-content;
   min-width: 220px;
-  text-align: initial;
+  text-align: center;
   justify-content: center;
-  padding-right: 55px;           
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {
-  justify-self: stretch;
-  width: 100%;
+  position: sticky;
+  right: 0;
+  z-index: 4;
+  background: #fff;
+  width: max-content;
   min-width: 220px;
-  text-align: initial;
+  text-align: center;
   justify-content: center;  
-  padding-right: 55px;           
 }
 /* --------------------------------------------- */
 
