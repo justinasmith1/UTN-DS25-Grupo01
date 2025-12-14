@@ -521,6 +521,19 @@ const mockFilterSortPage = (data, params = {}) => {
     });
   }
 
+  if (params.fechaFinReserva?.min || params.fechaFinReserva?.max) {
+    filtered = filtered.filter(r => {
+      // Si la reserva no tiene fecha fin, la descartamos (o la mostramos, depende tu lógica. Aquí asumo estricto)
+      if (!r.fechaFinReserva) return false; 
+      
+      const fecha = new Date(r.fechaFinReserva);
+      // Validamos rango
+      if (params.fechaFinReserva.min && fecha < new Date(params.fechaFinReserva.min)) return false;
+      if (params.fechaFinReserva.max && fecha > new Date(params.fechaFinReserva.max)) return false;
+      return true;
+    });
+  }
+
   if (params.seña?.min || params.seña?.max) {
     filtered = filtered.filter(r => {
       const sena = Number(r.seña);

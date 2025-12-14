@@ -19,6 +19,9 @@ const getInmobiliariaNombre = (row) => {
 const getLotePrecio = (row) =>
   row?.lote?.precio ?? row?.lotePrecio ?? null;
 
+const getFechaFinReserva = (row) =>
+  row?.fechaFinReserva ?? row?.fecha_fin_reserva ?? null;
+
 const getFechaReserva = (row) =>
   row?.fechaReserva ?? row?.fecha_reserva ?? row?.fecha ?? null;
 
@@ -47,6 +50,13 @@ export const reservasTablePreset = {
       id: 'fechaReserva',
       titulo: 'Fecha Reserva',
       accessor: (r) => (getFechaReserva(r) ? new Date(getFechaReserva(r)).toLocaleDateString('es-AR') : '—'),
+      width: '140px'
+    },
+
+    {
+      id: 'fechaFinReserva',
+      titulo: 'Plazo Reserva',
+      accessor: (r) => (getFechaFinReserva(r) ? new Date(getFechaFinReserva(r)).toLocaleDateString('es-AR') : '—'),
       width: '140px'
     },
 
@@ -112,6 +122,7 @@ export const reservasTablePreset = {
       loteInfo: '120px',
       clienteCompleto: '220px',
       fechaReserva: '140px',
+      fechaFinReserva: '140px',
       seña: '120px',
       inmobiliariaNombre: '200px',
       lotePrecio: '130px',
