@@ -8,7 +8,10 @@ export const reservasFilterPreset = {
     ESTADOS: [
       "ACTIVA",
       "CANCELADA",
-      "ACEPTADA"
+      "ACEPTADA",
+      "RECHAZADA",
+      "EXPIRADA",
+      "CONTRAOFERTA",
     ],
     // Reutilizamos los nombres tal cual, así no sale [Object Object]
     INMOBILIARIAS: [
@@ -29,7 +32,7 @@ export const reservasFilterPreset = {
       unit: "",
     },
     // NUEVO: fecha de creación
-    fechaCreacion: {
+    fechaFinReserva: {
       minLimit: new Date("2020-01-01").getTime(),
       maxLimit: new Date("2030-12-31").getTime(),
       step: 86400000,
@@ -50,7 +53,7 @@ export const reservasFilterPreset = {
     estado: [],
     inmobiliarias: [],
     fechaReserva: { min: null, max: null },
-    fechaCreacion: { min: null, max: null },
+    fechaFinReserva: { min: null, max: null },
     seña: { min: null, max: null },
   },
 };

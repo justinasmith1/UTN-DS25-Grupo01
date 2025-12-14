@@ -55,6 +55,7 @@ const fromApi = (row = {}) => {
     fechaReserva: row.fechaReserva ?? row.fecha ?? row.createdAt,
     seña: row.seña ?? row.sena ?? row.signal ?? row.amount,
     estado: row.estado ?? null, // Preservar estado para el badge
+    fechaFinReserva: row.fechaFinReserva ?? row.fecha_fin_reserva ?? null,
     inmobiliariaId:
       row.inmobiliariaId ?? row.inmobiliaria?.id ?? row.inmobiliaria?.idInmobiliaria,
     inmobiliariaNombre:
@@ -75,6 +76,7 @@ const toApi = (data = {}) => ({
   inmobiliariaId: data.inmobiliariaId ?? null,
   numero: data.numero, // Número de reserva editable por el usuario. Usamos reserva.numero como identificador de negocio y mostramos el input arriba a la derecha. El placeholder sugiere el formato RES-AAAA-NN, pero no lo forzamos.
   // estado no se envía en create, se asigna automáticamente como ACTIVA en el backend
+  fechaFinReserva: data.fechaFinReserva,
 });
 
 // ===== MOCK DATA =====
@@ -360,6 +362,9 @@ export const updateReserva = async (id, payload) => {
   if (payload.fechaReserva !== undefined && payload.fechaReserva !== null) {
     body.fechaReserva = payload.fechaReserva;
   }
+  if (payload.fechaFinReserva !== undefined && payload.fechaFinReserva !== null) {
+    body.fechaFinReserva = payload.fechaFinReserva;
+  }
   if (payload.estado !== undefined && payload.estado !== null && payload.estado !== "") {
     body.estado = payload.estado;
   }
@@ -512,6 +517,19 @@ const mockFilterSortPage = (data, params = {}) => {
       const fecha = new Date(r.fechaReserva);
       if (params.fechaReserva.min && fecha < new Date(params.fechaReserva.min)) return false;
       if (params.fechaReserva.max && fecha > new Date(params.fechaReserva.max)) return false;
+      return true;
+    });
+  }
+
+  if (params.fechaFinReserva?.min || params.fechaFinReserva?.max) {
+    filtered = filtered.filter(r => {
+      // Si la reserva no tiene fecha fin, la descartamos (o la mostramos, depende tu lógica. Aquí asumo estricto)
+      if (!r.fechaFinReserva) return false; 
+      
+      const fecha = new Date(r.fechaFinReserva);
+      // Validamos rango
+      if (params.fechaFinReserva.min && fecha < new Date(params.fechaFinReserva.min)) return false;
+      if (params.fechaFinReserva.max && fecha > new Date(params.fechaFinReserva.max)) return false;
       return true;
     });
   }

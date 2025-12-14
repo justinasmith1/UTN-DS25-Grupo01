@@ -49,11 +49,11 @@ export function reservasChipsFrom(applied, catalogs) {
   }
 
   // Fecha de Creación
-  if (applied.fechaCreacion && (applied.fechaCreacion.min !== null || applied.fechaCreacion.max !== null)) {
-    const { min, max } = applied.fechaCreacion;
+  if (applied.fechaFinReserva && (applied.fechaFinReserva.min !== null || applied.fechaFinReserva.max !== null)) {
+    const { min, max } = applied.fechaFinReserva;
     const minStr = min !== null ? new Date(min).toLocaleDateString("es-AR") : "∞";
     const maxStr = max !== null ? new Date(max).toLocaleDateString("es-AR") : "∞";
-    chips.push({ k: "fechaCreacion", v: { min, max }, label: `Fecha Creación: ${minStr} - ${maxStr}` });
+    chips.push({ k: "fechaFinReserva", v: { min, max }, label: `Plazo Reserva: ${minStr} - ${maxStr}` });
   }
 
   // Seña (USD)

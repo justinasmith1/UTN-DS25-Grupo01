@@ -14,7 +14,7 @@ export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
 export type TipoLote = "Lote Venta" | "Espacio Comun";
-export type EstadoReserva = "ACTIVA" | "CANCELADA" | "ACEPTADA";
+export type EstadoReserva = "ACTIVA" | "CANCELADA" | "ACEPTADA" | "RECHAZADA" | "CONTRAOFERTA" | 'EXPIRADA';
 export type EstadoInmbobiliaria = "ACTIVA" | "INACTIVA";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
@@ -127,8 +127,10 @@ export interface Reserva {
     estado: EstadoReserva;
     cliente: Persona;
     fechaReserva: string; 
+    numero: string;
     seña?: number;
     inmobiliaria?: Inmobiliaria;
+    fechaFinReserva: string;
 }
 
 
@@ -280,7 +282,9 @@ export interface PostReservaRequest {
   idCliente: number;        // ID del cliente que hace la reserva
   fechaReserva: string;     // Fecha de la reserva (ISO string)
   seña?: number;            // Monto de la seña (opcional)
+  numero: string;        // Número de reserva
   idInmobiliaria?: number;  // ID de la inmobiliaria (opcional)
+  fechaFinReserva: string; // Fecha de fin de la reserva (ISO string)
 }
 
 // Response para crear una nueva reserva
@@ -309,6 +313,8 @@ export interface PutReservaRequest {
   fechaReserva?: string;    // Fecha de reserva (opcional)
   seña?: number;            // Seña (opcional)
   idInmobiliaria?: number;  // ID inmobiliaria (opcional)
+  fechaFinReserva?: string; // Fecha de fin de la reserva (ISO string) (opcional)
+  numero?: string;        // Número de reserva (opcional)
 }
 
 // Response para actualizar una reserva

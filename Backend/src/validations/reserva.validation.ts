@@ -34,7 +34,8 @@ export const createReservaSchema = z.object({
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
   sena: dinero.optional(),
   numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim(),
-}).strict(); // rechaza campos adicionales que por ahi se manden
+  fechaFinReserva: isoDate, // Fecha de fin de la reserva
+});
 
 
 /* Body: actualizar (PUT)
@@ -48,8 +49,9 @@ export const updateReservaSchema = z.object({
   clienteId: idInt.optional(),                      // FK obligatoria
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
   sena: dinero.optional().nullable(), // Permitir null para eliminar la seña
-  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
+  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA', 'RECHAZADA', 'CONTRAOFERTA', 'EXPIRADA']).optional(),
   numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim().optional(),
+  fechaFinReserva: isoDate.optional(), // Fecha de fin de la reserva
 }).refine((data) => {
   // Asegurar que al menos un campo está presente
   return Object.keys(data).length > 0;
@@ -72,11 +74,13 @@ export const deleteReservaParamsSchema = getReservaParamsSchema;
 export const queryReservasSchema = z.object({
   desde: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "desde" inválida').optional(),
   hasta: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "hasta" inválida').optional(),
-  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA']).optional(),
+  estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA', 'RECHAZADA', 'CONTRAOFERTA', 'EXPIRADA']).optional(),
   loteId: idInt.optional(),
   clienteId: idInt.optional(),
   inmobiliariaId: idInt.optional(),
-  sena: dinero.optional(), 
+  sena: dinero.optional(),
+  fechaFinReservaDesde: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha de fin de reserva "desde" inválida').optional(),
+  fechaFinReservaHasta: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha de fin de reserva "hasta" inválida').optional(),
 }).refine((q) => {
   if (q.desde && q.hasta) return new Date(q.desde) <= new Date(q.hasta);
   return true;

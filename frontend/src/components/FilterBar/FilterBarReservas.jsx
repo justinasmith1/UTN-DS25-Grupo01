@@ -37,7 +37,7 @@ export default function FilterBarReservas({
       { id: "estado",         type: "multiSelect",label: "Estado",             defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect",label: "Inmobiliaria",       defaultValue: [] },
       { id: "fechaReserva",   type: "dateRange",  label: "Fecha de Reserva",   defaultValue: { min: null, max: null } },
-      { id: "fechaCreacion",  type: "dateRange",  label: "Fecha de Creación",  defaultValue: { min: null, max: null } },
+      { id: "fechaFinReserva",  type: "dateRange",  label: "Plazo Reserva",  defaultValue: { min: null, max: null } },
       { id: "seña",           type: "range",      label: "Seña",               defaultValue: { min: null, max: null } },
       ];
       // Filtrar el campo de inmobiliaria si el usuario es INMOBILIARIA
@@ -76,7 +76,7 @@ export default function FilterBarReservas({
   const ranges = useMemo(
     () => ({
       fechaReserva:  reservasFilterPreset?.ranges?.fechaReserva,
-      fechaCreacion: reservasFilterPreset?.ranges?.fechaCreacion,
+      fechaFinReserva: reservasFilterPreset?.ranges?.fechaFinReserva,
       seña:          reservasFilterPreset?.ranges?.seña,
     }),
     []
@@ -88,7 +88,7 @@ export default function FilterBarReservas({
       q: "",
       estado: [],
       fechaReserva:  { min: null, max: null },
-      fechaCreacion: { min: null, max: null },
+      fechaFinReserva: { min: null, max: null },
       seña:          { min: null, max: null },
       };
       // Para INMOBILIARIA: no incluir inmobiliarias en defaults
@@ -128,9 +128,9 @@ export default function FilterBarReservas({
     const frMin = p?.fechaReserva?.min ?? null;
     const frMax = p?.fechaReserva?.max ?? null;
 
-    // Fechas creación
-    const fcMin = p?.fechaCreacion?.min ?? null;
-    const fcMax = p?.fechaCreacion?.max ?? null;
+    // Fechas Plazo reserva
+    const ffrMin = p?.fechaFinReserva?.min ?? null;
+    const ffrMax = p?.fechaFinReserva?.max ?? null;
 
     // Seña
     const sMin = p?.seña?.min ?? null;
@@ -142,7 +142,7 @@ export default function FilterBarReservas({
       estado,                       // ["ACTIVA", ...]
       inmobiliarias: inmoIds,       // IMPORTANTE: por ID
       fechaReserva:  { min: frMin, max: frMax },
-      fechaCreacion: { min: fcMin, max: fcMax },
+      fechaFinReserva: { min: ffrMin, max: ffrMax },
       seña:          { min: sMin,  max: sMax  },
 
       // ===== LEGACY / BACKEND (alias) =====
@@ -158,13 +158,8 @@ export default function FilterBarReservas({
       fechaReservaDesde: toISO(frMin),
       fechaReservaHasta: toISO(frMax),
 
-      // Creación (ms + ISO + nombres comunes)
-      fechaCreacionMin: fcMin,
-      fechaCreacionMax: fcMax,
-      createdAtMin: fcMin,
-      createdAtMax: fcMax,
-      createdAtDesde: toISO(fcMin),
-      createdAtHasta: toISO(fcMax),
+      fechaFinReservaDesde: toISO(ffrMin),
+      fechaFinReservaHasta: toISO(ffrMax),
 
       // Seña (sin ñ)
       seniaMin: sMin,
@@ -184,9 +179,9 @@ export default function FilterBarReservas({
         min: pick(v?.fechaReserva?.min, v?.fechaReservaMin) ?? null,
         max: pick(v?.fechaReserva?.max, v?.fechaReservaMax) ?? null,
       },
-      fechaCreacion: {
-        min: pick(v?.fechaCreacion?.min, v?.fechaCreacionMin ?? v?.createdAtMin) ?? null,
-        max: pick(v?.fechaCreacion?.max, v?.fechaCreacionMax ?? v?.createdAtMax) ?? null,
+      fechaFinReserva: {
+        min: pick(v?.fechaFinReserva?.min, v?.fechaFinReservaDesde) ?? null,
+        max: pick(v?.fechaFinReserva?.max, v?.fechaFinReservaHasta) ?? null,
       },
       seña: {
         min: pick(v?.seña?.min, v?.seniaMin) ?? null,

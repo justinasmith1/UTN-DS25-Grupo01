@@ -6,6 +6,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
  * – Labels con el mismo ancho (se calcula por el más largo).
  * – Fallbacks: dinero/fechas/strings y "Sin información".
  * – Usa `reserva` (detalle) cuando está; si no, busca por `reservaId` en `reservas`.
+ * - Se agregó visualización de "PLAZO DE RESERVA" (fechaFinReserva).
+ * - Se eliminaron "FECHA DE ACTUALIZACIÓN" y "FECHA DE CREACIÓN".
  */
 export default function ReservaVerCard({
   open,
@@ -14,9 +16,8 @@ export default function ReservaVerCard({
   reserva,
   reservaId,
   reservas,
-  fromSidePanel = false, // Si viene del side panel, ocultar botón Editar
+  fromSidePanel = false,
 }) {
-  // Elegimos primero el objeto de detalle; si no llegó, buscamos en la lista
   const res = useMemo(() => {
     if (reserva) return reserva;
     if (reservaId != null && Array.isArray(reservas)) {
@@ -77,7 +78,6 @@ export default function ReservaVerCard({
   const loteInfo = (() => {
     const mapId = res?.lote?.mapId ?? res?.lotMapId ?? null;
     if (mapId) {
-      // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
       if (String(mapId).toLowerCase().startsWith('lote')) {
         return mapId;
       }
@@ -90,14 +90,12 @@ export default function ReservaVerCard({
     return res?.loteId ? `Lote N° ${res.loteId}` : NA;
   })();
 
-  // Fechas
+  // --- FECHAS ---
   const fechaReserva = fmtDate(res?.fechaReserva);
-  const fechaActualizacion = fmtDate(
-    res?.updatedAt ?? res?.updateAt ?? res?.fechaActualizacion
-  );
-  const fechaCreacion = fmtDate(
-    res?.createdAt ?? res?.fechaCreacion
-  );
+  // Agregamos el Plazo (fechaFinReserva)
+  const plazoReserva = fmtDate(res?.fechaFinReserva);
+  
+  // (Se eliminaron fechaActualizacion y fechaCreacion)
 
   const leftPairs = [
     ["LOTE", loteInfo],
@@ -109,12 +107,13 @@ export default function ReservaVerCard({
 
   const rightPairs = [
     ["NÚMERO DE RESERVA", safe(res?.numero)],
+    // Agregamos el plazo aquí
+    ["PLAZO DE RESERVA", plazoReserva], 
     ["SEÑA", res?.seña != null ? fmtMoney(res.seña) : NA],
-    ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
-    ["FECHA DE CREACIÓN", fechaCreacion],
+    // Se quitaron las filas de fechas de actualización/creación
   ];
 
-  // Un solo ancho de label, calculado por el más largo
+  // Un solo ancho de label
   const containerRef = useRef(null);
   const [labelW, setLabelW] = useState(180);
   useEffect(() => {
@@ -126,7 +125,6 @@ export default function ReservaVerCard({
 
   if (!open) return null;
 
-  // Contraste: gris para NA, casi negro para valor real
   const valueStyle = (val) => ({ color: val === NA ? "#6B7280" : "#111827" });
 
   return (
@@ -137,7 +135,6 @@ export default function ReservaVerCard({
         ref={containerRef}
         style={{ ["--sale-label-w"]: `${labelW}px` }}
       >
-        {/* Header */}
         <div className="cclf-card__header">
           <h2 className="cclf-card__title">{`Reserva N° ${res?.numero ?? res?.id ?? "—"}`}</h2>
 
@@ -158,7 +155,6 @@ export default function ReservaVerCard({
           </div>
         </div>
 
-        {/* Body */}
         <div className="cclf-card__body">
           <h3 className="venta-section-title">Información de la reserva</h3>
 
@@ -190,4 +186,3 @@ export default function ReservaVerCard({
     </div>
   );
 }
-

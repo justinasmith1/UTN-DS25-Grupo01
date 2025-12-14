@@ -6,12 +6,16 @@ import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
+import { set } from "zod";
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
   { value: "ACTIVA", label: "Activa" },
   { value: "CANCELADA", label: "Cancelada" },
   { value: "ACEPTADA", label: "Aceptada" },
+  { value: "RECHAZADA", label: "Rechazada" },
+  { value: "EXPIRADA", label: "Expirada" },
+  { value: "CONTRAOFERTA", label: "Contraoferta" },
 ];
 
 /* -------------------------- Helpers fechas -------------------------- */
@@ -329,6 +333,7 @@ export default function ReservaEditarCard({
 
   /* 5) STATES EDITABLES derivados de 'detalle' */
   const fechaReservaISO = detalle?.fechaReserva ?? null;
+  const plazoReservaISO = detalle?.fechaFinReserva ?? null;
   const fechaActISO = detalle?.updatedAt ?? detalle?.updateAt ?? detalle?.fechaActualizacion ?? null;
   const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
 
@@ -343,6 +348,7 @@ export default function ReservaEditarCard({
     inmobiliariaId: initialInmobId,
     clienteId: initialClienteId,
     numero: initialNumero,
+    fechaFinReserva: toDateInputValue(plazoReservaISO),
   };
 
   const [estado, setEstado] = useState(base.estado);
@@ -351,6 +357,7 @@ export default function ReservaEditarCard({
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
   const [clienteId, setClienteId] = useState(base.clienteId);
   const [numero, setNumero] = useState(base.numero);
+  const [fechaFinReserva, setFechaFinReserva] = useState(base.fechaFinReserva);
   const [numeroError, setNumeroError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
 
@@ -363,6 +370,7 @@ export default function ReservaEditarCard({
     setInmobiliariaId(base.inmobiliariaId);
     setClienteId(base.clienteId);
     setNumero(base.numero);
+    setFechaFinReserva(base.fechaFinReserva);
     setNumeroError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, detalle?.id]);
@@ -371,7 +379,7 @@ export default function ReservaEditarCard({
   useEffect(() => {
     const labels = [
       "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
-      "FECHA RESERVA", "FECHA DE ACTUALIZACIÓN", "FECHA DE CREACIÓN"
+      "FECHA RESERVA", "FECHA DE ACTUALIZACIÓN", "PLAZO DE RESERVA"
     ];
     const longest = Math.max(...labels.map(s => s.length));
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
@@ -404,6 +412,15 @@ export default function ReservaEditarCard({
     const prevFR = toDateInputValue(fechaReservaISO);
     if (prevFR !== fechaReserva) {
       patch.fechaReserva = fechaReserva ? fromDateInputToISO(fechaReserva) : null;
+    }
+
+    const prevPlazo = toDateInputValue(plazoReservaISO);
+    if (prevPlazo !== fechaFinReserva) {
+      if (!fechaFinReserva) {
+        throw new Error("El plazo de reserva no puede quedar vacío.");
+      }
+      // Convertimos el string del input (YYYY-MM-DD) a ISO para el backend
+      patch.fechaFinReserva = fromDateInputToISO(fechaFinReserva);
     }
 
     const prevSena = detalle?.seña != null ? String(detalle.seña) : detalle?.sena != null ? String(detalle.sena) : "";
@@ -516,6 +533,7 @@ export default function ReservaEditarCard({
     setInmobiliariaId(base.inmobiliariaId);
     setClienteId(base.clienteId);
     setNumero(base.numero);
+    setFechaFinReserva(base.fechaFinReserva);
     setNumeroError(null);
   }
 
@@ -784,6 +802,20 @@ export default function ReservaEditarCard({
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="field-row">
+                <div className="field-label">PLAZO DE RESERVA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={fechaFinReserva}
+                    onChange={(e) => setFechaFinReserva(e.target.value)}
+                    // Deshabilitar si es inmobiliaria y está cancelada (misma lógica que los otros campos)
+                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                  />
+                </div>
               </div>
 
               <div className="field-row">

@@ -191,8 +191,9 @@ export default function TablaReservas({
     const fechaId = columnsWithEstado.find(c => c.id === 'fechaReserva' || c.titulo === 'Fecha Reserva')?.id ?? 'fechaReserva';
     const senaId = columnsWithEstado.find(c => c.id === 'seña' || c.titulo === 'Seña')?.id ?? 'seña';
     const inmoId = columnsWithEstado.find(c => c.id === 'inmobiliariaNombre' || c.titulo === 'Inmobiliaria')?.id ?? 'inmobiliariaNombre';
+    const plazoId = columnsWithEstado.find(c => c.id === 'fechaFinReserva' || c.titulo === 'Plazo Reserva')?.id ?? 'fechaFinReserva';
 
-    return [idId, loteId, 'estado', clienteId, fechaId, senaId, inmoId]; // 7 exactas
+    return [idId, loteId, 'estado', clienteId, fechaId, senaId, inmoId, plazoId]; // 7 exactas
   }, [columnsWithEstado]);
 
   // 7) Alineación global para esta tabla (no tocamos preset/TablaBase)
@@ -455,7 +456,7 @@ export default function TablaReservas({
         columns={columnsAligned}
         widthFor={tablePreset.widthFor}
         defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
-        maxVisible={7}                        // no permite activar una 8va
+        maxVisible={8}                        // no permite activar una 8va
         renderRowActions={renderRowActions}
         toolbarRight={toolbarRight}
         defaultPageSize={25}
