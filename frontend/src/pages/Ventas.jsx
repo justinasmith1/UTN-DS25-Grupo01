@@ -27,6 +27,7 @@ import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
+import DocumentoFormCard from "../components/Cards/Documentos/DocumentoFormCard.jsx";
 
 /* Util: toma el array “correcto” dentro de una respuesta heterogénea */
 const pickArray = (resp, candidates = []) => {
@@ -290,8 +291,10 @@ export default function VentasPage() {
   // Estados para documentos
   const [openDocumentoDropdown, setOpenDocumentoDropdown] = useState(false);
   const [openDocumentoVer, setOpenDocumentoVer] = useState(false);
+  const [openDocumentoForm, setOpenDocumentoForm] = useState(false);
   const [tipoDocumentoSeleccionado, setTipoDocumentoSeleccionado] = useState(null);
   const [labelDocumentoSeleccionado, setLabelDocumentoSeleccionado] = useState(null);
+  const [docCustomSeleccionado, setDocCustomSeleccionado] = useState(null);
 
   const onVerDocumentos = useCallback((venta) => {
     if (!venta) return;
@@ -299,10 +302,24 @@ export default function VentasPage() {
     setOpenDocumentoDropdown(true);
   }, []);
 
-  const handleSelectTipoDocumento = useCallback((tipo, label) => {
+  const handleSelectTipoDocumento = useCallback((tipo, label, doc) => {
     setTipoDocumentoSeleccionado(tipo);
     setLabelDocumentoSeleccionado(label);
+    setDocCustomSeleccionado(doc || null);
     setOpenDocumentoDropdown(false);
+    setOpenDocumentoVer(true);
+  }, []);
+
+  const handleAbrirFormularioDoc = useCallback(() => {
+    setOpenDocumentoDropdown(false);
+    setOpenDocumentoForm(true);
+  }, []);
+
+  const handleDocumentoGuardado = useCallback((doc) => {
+    setDocCustomSeleccionado(doc);
+    setTipoDocumentoSeleccionado("CUSTOM");
+    setLabelDocumentoSeleccionado(doc?.nombre || "Documento");
+    setOpenDocumentoForm(false);
     setOpenDocumentoVer(true);
   }, []);
 
@@ -529,8 +546,16 @@ export default function VentasPage() {
         open={openDocumentoDropdown}
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
+        onAddDocumento={handleAbrirFormularioDoc}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
-        loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
+      />
+
+      {/* Formulario de documento (modal) */}
+      <DocumentoFormCard
+        open={openDocumentoForm}
+        onClose={() => setOpenDocumentoForm(false)}
+        loteId={ventaSel?.loteId || ventaSel?.lote?.id}
+        onSaved={handleDocumentoGuardado}
       />
 
       {/* Modal de visualización de documento */}
@@ -545,6 +570,7 @@ export default function VentasPage() {
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
         loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
         documentoUrl={null}
+        selectedDoc={docCustomSeleccionado}
         onModificar={(url) => {
           console.log("Modificar documento:", url);
         }}
