@@ -136,6 +136,7 @@ export async function createReserva(
     inmobiliariaId?: number | null;
     sena?: number;                  // Zod ya garantiza >= 0 si viene
     numero: string;                 // Número de reserva (obligatorio y único)
+    fechaFinReserva: string;     // Fecha de fin de la reserva
   },
   user?: { role: string; inmobiliariaId?: number | null }
 ): Promise<any> {
@@ -167,6 +168,7 @@ export async function createReserva(
         ...(body.sena !== undefined ? { sena: body.sena } : {}),
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
         numero: body.numero, // Número de reserva
+        fechaFinReserva: new Date(body.fechaFinReserva), // ISO -> Date
       },
     });
 
@@ -190,6 +192,7 @@ export async function updateReserva(
     inmobiliariaId: number | null;
     sena: number;
     numero: string;
+    fechaFinReserva: string;
   }>,
   user?: { role: string; inmobiliariaId?: number | null }
 ): Promise<any> {
@@ -230,7 +233,7 @@ export async function updateReserva(
       }
 
       // Filtrar campos permitidos para INMOBILIARIA (similar a TECNICO en updatedLote)
-      const allowedFields = ['fechaReserva', 'clienteId', 'sena', 'estado'];
+      const allowedFields = ['fechaReserva', 'clienteId', 'sena', 'estado', 'fechaFinReserva'];
       const filtered: Record<string, any> = {};
       Object.keys(body || {}).forEach((field) => {
         if (allowedFields.includes(field)) {
@@ -263,6 +266,9 @@ export async function updateReserva(
     if (body.numero !== undefined) {
       dataToUpdate.numero = body.numero;
     }
+    if (body.fechaFinReserva !== undefined) {
+      dataToUpdate.fechaFinReserva = new Date(body.fechaFinReserva);
+    }
 
     const row = await prisma.reserva.update({
       where: { id },
@@ -282,7 +288,7 @@ export async function updateReserva(
 
     // Sincronizar estado del lote con el estado de la reserva
     if (body.estado !== undefined) {
-      if (body.estado === EstadoReserva.CANCELADA) {
+      if (body.estado === EstadoReserva.CANCELADA || body.estado === EstadoReserva.RECHAZADA || body.estado === EstadoReserva.EXPIRADA) {
         // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
         await updateLoteState(row.loteId, 'Disponible'); 
       } else if (body.estado === EstadoReserva.ACTIVA) {

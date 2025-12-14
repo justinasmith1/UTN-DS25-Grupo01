@@ -262,7 +262,6 @@ export default function ReservaCrearCard({
       return;
     }
 
-
     if (!fechaReserva || !fechaReserva.trim()) {
       setError("La fecha de reserva es obligatoria.");
       setSaving(false);
@@ -277,6 +276,12 @@ export default function ReservaCrearCard({
 
     if (!clienteId || !clienteId.trim()) {
       setError("El cliente es obligatorio.");
+      setSaving(false);
+      return;
+    }
+
+    if (!plazoReserva || !plazoReserva.trim()) {
+      setError("El plazo de reserva es obligatorio.");
       setSaving(false);
       return;
     }
@@ -301,30 +306,60 @@ export default function ReservaCrearCard({
         return;
       }
 
+      const fechaFinISO = fromDateInputToISO(plazoReserva);
+      if (!fechaFinISO) {
+        setError("La fecha de plazo es inválida.");
+        setSaving(false);
+        return;
+      }
+
+      if (new Date(fechaFinISO) < new Date(fechaISO)) {
+         setError("El plazo de reserva no puede ser anterior a la fecha de inicio.");
+         setSaving(false);
+         return;
+      }
+
+      // Normalizar IDs numéricos
+      const loteIdNum = Number(loteId);
+      const clienteIdNum = Number(clienteId);
+
       const payload = {
         fechaReserva: fechaISO,
-        loteId: Number(loteId),
-        clienteId: Number(clienteId),
-        // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
+        loteId: loteIdNum,
+        clienteId: clienteIdNum,
+       // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
+
         // Para ADMIN/GESTOR: enviar inmobiliariaId si fue seleccionada
+
         ...(isInmobiliaria ? {} : {
+
           inmobiliariaId: inmobiliariaId && inmobiliariaId.trim() ? Number(inmobiliariaId) : null,
+
         }),
         sena: senaNum,
-        numero: numeroTrim, // Incluir numero en el payload
+        numero: numeroTrim,
+        fechaFinReserva: fechaFinISO,
       };
+
+      // Debug: mostrar payload para detectar discrepancias
+      // (Quitar console.log en producción)
+      console.debug("➡️ createReserva payload:", payload);
 
       const response = await createReserva(payload);
 
+      console.debug("⬅️ createReserva response:", response);
+
+      // Manejar respuesta del backend de forma más informativa
       if (!response || !response.success) {
+
         throw new Error(response?.message || "Error al crear la reserva");
+
       }
 
-      // Mostrar animación de éxito
+      // Éxito
       setShowSuccess(true);
       onCreated?.(response.data);
 
-      // Esperar un momento y luego cerrar
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
@@ -332,9 +367,10 @@ export default function ReservaCrearCard({
       }, 1500);
     } catch (err) {
       console.error("Error creando reserva:", err);
+
       let errorMessage = err?.message || "No se pudo crear la reserva. Intenta nuevamente.";
-      
-      // Manejar errores de unicidad de numero
+
+      // Manejar errores específicos (unicidad numero)
       if (err?.response?.data?.errors && Array.isArray(err.response.data.errors)) {
         const mensajes = err.response.data.errors.map((e) => {
           if (typeof e === 'string') return e;
@@ -353,7 +389,7 @@ export default function ReservaCrearCard({
       } else if (typeof errorMessage === "string" && /numero/i.test(errorMessage)) {
         setNumeroError("Ya existe una reserva con este número");
       } else if (err?.response?.data?.message) {
-        if (err.response.data.message.toLowerCase().includes('número') || err.response.data.message.toLowerCase().includes('numero')) {
+        if (String(err.response.data.message).toLowerCase().includes('número') || String(err.response.data.message).toLowerCase().includes('numero')) {
           setNumeroError("Ya existe una reserva con este número");
         }
         errorMessage = err.response.data.message;
