@@ -60,6 +60,9 @@ enum EstadoReserva {
   ACTIVA
   CANCELADA
   ACEPTADA
+  RECHAZADA
+  CONTRAOFERTA
+  EXPIRADA
 }
 
 enum EstadoVenta {
@@ -125,22 +128,23 @@ model Persona {
 
 // Reserva
 model Reserva {
-  id             Int      @id @default(autoincrement())
-  numero         String  @unique
-  fechaReserva   DateTime
-  estado         EstadoReserva @default(ACTIVA)
-  loteId         Int
-  clienteId      Int
-  inmobiliariaId Int?
-  sena           Decimal? @db.Decimal(12, 2) // “seña” opcional, pero al parecer asi es mejor
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id                    Int      @id @default(autoincrement())
+  numero                String  @unique
+  fechaReserva          DateTime
+  estado                EstadoReserva @default(ACTIVA)
+  loteId                Int
+  clienteId             Int
+  inmobiliariaId        Int?
+  sena                  Decimal? @db.Decimal(12, 2)
+  fechaFinReserva       DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   // relaciones
-  lote         Lote          @relation(fields: [loteId], references: [id])
-  cliente      Persona       @relation(fields: [clienteId], references: [id])
-  inmobiliaria Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
-  Venta        Venta[]
+  lote                 Lote          @relation(fields: [loteId], references: [id])
+  cliente              Persona       @relation(fields: [clienteId], references: [id])
+  inmobiliaria         Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
+  Venta                Venta[]
 
   // Esto evita duplicados logicos de la misma reserva pero habria que ver si hace falta o no
   @@unique([clienteId, loteId, fechaReserva], name: "uq_reserva_cliente_lote_fecha")
