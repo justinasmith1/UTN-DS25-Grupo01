@@ -6,10 +6,10 @@ import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 
 /** Estados: value técnico + label Title Case */
 const ESTADOS = [
-  { value: "INICIADA",   label: "Iniciada" },
+  { value: "INICIADA", label: "Iniciada" },
   { value: "CON_BOLETO", label: "Con Boleto" },
   { value: "FINALIZADA", label: "Finalizada" },
-  { value: "CANCELADA",  label: "Cancelada" },
+  { value: "CANCELADA", label: "Cancelada" },
 ];
 
 /* -------------------------- Helpers fechas -------------------------- */
@@ -38,7 +38,7 @@ function fmtMoney(val) {
     v === null ||
     v === undefined ||
     (typeof v === "string" && v.trim().length === 0);
-  
+
   if (isBlank(val)) return NA;
   const n =
     typeof val === "number"
@@ -68,12 +68,12 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
     return () => document.removeEventListener("mousedown", onDoc);
   }, []);
 
-  const label = value 
+  const label = value
     ? (options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder)
     : placeholder;
 
   // Solo incluir placeholder como opción si showPlaceholderOption es true
-  const optionsToShow = showPlaceholderOption && placeholder 
+  const optionsToShow = showPlaceholderOption && placeholder
     ? [{ value: "", label: placeholder }, ...options]
     : options;
 
@@ -146,16 +146,16 @@ export default function VentaEditarCard({
       if (!open) return;
 
       // Si viene venta por props, usarla (esto se ejecuta también cuando venta cambia)
-      if (venta) { 
-        setDetalle(venta); 
-        return; 
+      if (venta) {
+        setDetalle(venta);
+        return;
       }
 
       if (ventaId != null && Array.isArray(ventas)) {
         const found = ventas.find(v => `${v.id}` === `${ventaId}`);
-        if (found) { 
-          setDetalle(found); 
-          return; 
+        if (found) {
+          setDetalle(found);
+          return;
         }
       }
 
@@ -193,7 +193,7 @@ export default function VentaEditarCard({
     function normalizeList(raw) {
       // getAllInmobiliarias devuelve { data: [...], meta: {...} }
       let list = [];
-      
+
       if (raw?.data && Array.isArray(raw.data)) {
         list = raw.data;
       } else if (Array.isArray(raw)) {
@@ -205,7 +205,7 @@ export default function VentaEditarCard({
       } else if (raw?.inmobiliarias && Array.isArray(raw.inmobiliarias)) {
         list = raw.inmobiliarias;
       }
-      
+
       const arr = Array.isArray(list) ? list : [];
       return arr
         .map(x => ({
@@ -297,8 +297,8 @@ export default function VentaEditarCard({
   /* 6) ancho de label como en VerCard */
   useEffect(() => {
     const labels = [
-      "LOTE N°","MONTO","ESTADO DE VENTA","INMOBILIARIA","COMPRADOR","PROPIETARIO",
-      "NÚMERO DE VENTA","FECHA VENTA","TIPO DE PAGO","PLAZO ESCRITURA","FECHA DE ACTUALIZACIÓN","FECHA DE CREACIÓN"
+      "LOTE N°", "MONTO", "ESTADO DE VENTA", "INMOBILIARIA", "COMPRADOR", "PROPIETARIO",
+      "NÚMERO DE VENTA", "FECHA VENTA", "TIPO DE PAGO", "PLAZO ESCRITURA", "FECHA DE ACTUALIZACIÓN", "FECHA DE CREACIÓN"
     ];
     const longest = Math.max(...labels.map(s => s.length));
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
@@ -340,8 +340,8 @@ export default function VentaEditarCard({
     const prevPE = toDateInputValue(detalle?.plazoEscritura);
     if (prevPE !== plazoEscritura) {
       // Si el campo está vacío, enviamos null; si tiene valor, lo convertimos a ISO
-      patch.plazoEscritura = plazoEscritura && plazoEscritura.trim() !== "" 
-        ? fromDateInputToISO(plazoEscritura) 
+      patch.plazoEscritura = plazoEscritura && plazoEscritura.trim() !== ""
+        ? fromDateInputToISO(plazoEscritura)
         : null;
     }
 
@@ -358,22 +358,22 @@ export default function VentaEditarCard({
       setSaving(true);
       setNumeroError(null);
       const patch = buildPatch();
-      
-      if (Object.keys(patch).length === 0) { 
+
+      if (Object.keys(patch).length === 0) {
         setSaving(false);
-        onCancel?.(); 
-        return; 
+        onCancel?.();
+        return;
       }
-      
+
       const response = await updateVenta(detalle.id, patch);
       const updated = response?.data ?? response;
-      
+
       // Actualizar estado del padre inmediatamente
       onSaved?.(updated);
-      
+
       // Mostrar animación de éxito
       setShowSuccess(true);
-      
+
       // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
         setShowSuccess(false);
@@ -494,183 +494,183 @@ export default function VentaEditarCard({
                 <polyline points="20 6 9 17 4 12"></polyline>
               </svg>
             </div>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: "20px",
-                  fontWeight: 600,
-                  color: "#111",
-                }}
-              >
-                ¡{entityType} guardada exitosamente!
-              </h3>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "20px",
+                fontWeight: 600,
+                color: "#111",
+              }}
+            >
+              ¡{entityType} guardada exitosamente!
+            </h3>
           </div>
         </div>
       )}
 
       <EditarBase
         open={open}
-        title={`Venta N° ${detalle?.id ?? "—"}`}
+        title={`Venta N° ${detalle?.numero ?? detalle?.id ?? "—"}`}
         onCancel={() => {
           // Siempre resetear estados antes de cerrar
-      setSaving(false);
-      setShowSuccess(false);
-      setNumeroError(null);
+          setSaving(false);
+          setShowSuccess(false);
+          setNumeroError(null);
           onCancel?.();
         }}
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
       >
-      {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
-      <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
-        <h3 className="venta-section-title">Información de la venta</h3>
+        {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
+        <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
+          <h3 className="venta-section-title">Información de la venta</h3>
 
-        <div className="venta-grid" ref={containerRef}>
-          {/* Columna izquierda */}
-          <div className="venta-col">
-            <div className="field-row">
-              <div className="field-label">LOTE N°</div>
-              <div className="field-value is-readonly">{detalle?.lote?.mapId ?? detalle?.lotMapId ?? detalle?.loteId ?? NA}</div>
-            </div>
+          <div className="venta-grid" ref={containerRef}>
+            {/* Columna izquierda */}
+            <div className="venta-col">
+              <div className="field-row">
+                <div className="field-label">LOTE N°</div>
+                <div className="field-value is-readonly">{detalle?.lote?.mapId ?? detalle?.lotMapId ?? detalle?.loteId ?? NA}</div>
+              </div>
 
-            <div className="field-row">
-              <div className="field-label">MONTO</div>
-              <div className="field-value p0" style={{ position: "relative" }}>
-                <input
-                  className="field-input"
-                  type="number"
-                  inputMode="decimal"
-                  min="0"
-                  value={monto}
-                  onChange={(e) => setMonto(e.target.value)}
-                  style={{ paddingRight: "50px" }}
-                />
-                {/* Mostrar USD como símbolo al final */}
-                <span style={{ 
-                  position: "absolute", 
-                  right: "12px", 
-                  top: "50%", 
-                  transform: "translateY(-50%)",
-                  color: "#6B7280",
-                  fontSize: "13px",
-                  pointerEvents: "none",
-                  fontWeight: 500
-                }}>
-                  {monto && Number(monto) > 0 ? "USD" : ""}
-                </span>
+              <div className="field-row">
+                <div className="field-label">MONTO</div>
+                <div className="field-value p0" style={{ position: "relative" }}>
+                  <input
+                    className="field-input"
+                    type="number"
+                    inputMode="decimal"
+                    min="0"
+                    value={monto}
+                    onChange={(e) => setMonto(e.target.value)}
+                    style={{ paddingRight: "50px" }}
+                  />
+                  {/* Mostrar USD como símbolo al final */}
+                  <span style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "#6B7280",
+                    fontSize: "13px",
+                    pointerEvents: "none",
+                    fontWeight: 500
+                  }}>
+                    {monto && Number(monto) > 0 ? "USD" : ""}
+                  </span>
+                </div>
+              </div>
+
+              <div className="field-row">
+                <div className="field-label">ESTADO DE VENTA</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={estado}
+                    options={ESTADOS}
+                    placeholder="Seleccionar estado"
+                    onChange={setEstado}
+                    showPlaceholderOption={false}
+                  />
+                </div>
+              </div>
+
+              <div className="field-row">
+                <div className="field-label">INMOBILIARIA</div>
+                <div className="field-value p0">
+                  <NiceSelect
+                    value={inmobiliariaId || ""}
+                    options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+                    placeholder="La Federala"
+                    onChange={setInmobiliariaId}
+                  />
+                </div>
+              </div>
+
+              <div className="field-row">
+                <div className="field-label">COMPRADOR</div>
+                <div className="field-value is-readonly">{compradorNombre}</div>
+              </div>
+
+              <div className="field-row">
+                <div className="field-label">PROPIETARIO</div>
+                <div className="field-value is-readonly">{propietarioNombre}</div>
               </div>
             </div>
 
-            <div className="field-row">
-              <div className="field-label">ESTADO DE VENTA</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={estado}
-                  options={ESTADOS}
-                  placeholder="Seleccionar estado"
-                  onChange={setEstado}
-                  showPlaceholderOption={false}
-                />
+            {/* Columna derecha */}
+            <div className="venta-col">
+              <div className="field-row">
+                <div className="field-label">NÚMERO DE VENTA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="text"
+                    value={numero}
+                    onChange={(e) => {
+                      setNumero(e.target.value);
+                      if (numeroError) setNumeroError(null);
+                    }}
+                    placeholder="Ej: CCLF-2025-01"
+                  />
+                  {numeroError && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                      {numeroError}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
 
-            <div className="field-row">
-              <div className="field-label">INMOBILIARIA</div>
-              <div className="field-value p0">
-                <NiceSelect
-                  value={inmobiliariaId || ""}
-                  options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                  placeholder="La Federala"
-                  onChange={setInmobiliariaId}
-                />
+              <div className="field-row">
+                <div className="field-label">FECHA VENTA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={fechaVenta}
+                    onChange={(e) => setFechaVenta(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="field-row">
-              <div className="field-label">COMPRADOR</div>
-              <div className="field-value is-readonly">{compradorNombre}</div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">PROPIETARIO</div>
-              <div className="field-value is-readonly">{propietarioNombre}</div>
-            </div>
-          </div>
-
-          {/* Columna derecha */}
-          <div className="venta-col">
-            <div className="field-row">
-              <div className="field-label">NÚMERO DE VENTA</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="text"
-                  value={numero}
-                  onChange={(e) => {
-                    setNumero(e.target.value);
-                    if (numeroError) setNumeroError(null);
-                  }}
-                  placeholder="Ej: CCLF-2025-01"
-                />
-                {numeroError && (
-                  <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
-                    {numeroError}
-                  </div>
-                )}
+              <div className="field-row">
+                <div className="field-label">TIPO DE PAGO</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="text"
+                    value={tipoPago}
+                    onChange={(e) => setTipoPago(e.target.value)}
+                    placeholder="Contado, Transferencia, Cuotas…"
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="field-row">
-              <div className="field-label">FECHA VENTA</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="date"
-                  value={fechaVenta}
-                  onChange={(e) => setFechaVenta(e.target.value)}
-                />
+              <div className="field-row">
+                <div className="field-label">PLAZO ESCRITURA</div>
+                <div className="field-value p0">
+                  <input
+                    className="field-input"
+                    type="date"
+                    value={plazoEscritura}
+                    onChange={(e) => setPlazoEscritura(e.target.value)}
+                  />
+                </div>
               </div>
-            </div>
 
-            <div className="field-row">
-              <div className="field-label">TIPO DE PAGO</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="text"
-                  value={tipoPago}
-                  onChange={(e) => setTipoPago(e.target.value)}
-                  placeholder="Contado, Transferencia, Cuotas…"
-                />
+              <div className="field-row">
+                <div className="field-label">FECHA DE ACTUALIZACIÓN</div>
+                <div className="field-value is-readonly">{fechaAct}</div>
               </div>
-            </div>
 
-            <div className="field-row">
-              <div className="field-label">PLAZO ESCRITURA</div>
-              <div className="field-value p0">
-                <input
-                  className="field-input"
-                  type="date"
-                  value={plazoEscritura}
-                  onChange={(e) => setPlazoEscritura(e.target.value)}
-                />
+              <div className="field-row">
+                <div className="field-label">FECHA DE CREACIÓN</div>
+                <div className="field-value is-readonly">{fechaCre}</div>
               </div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">FECHA DE ACTUALIZACIÓN</div>
-              <div className="field-value is-readonly">{fechaAct}</div>
-            </div>
-
-            <div className="field-row">
-              <div className="field-label">FECHA DE CREACIÓN</div>
-              <div className="field-value is-readonly">{fechaCre}</div>
             </div>
           </div>
         </div>
-      </div>
-    </EditarBase>
+      </EditarBase>
     </>
   );
 }

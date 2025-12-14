@@ -1,4 +1,4 @@
-// Diálogo de confirmación para eliminar una inmobiliaria.
+// Diálogo de confirmación para desactivar una inmobiliaria (baja lógica).
 import EliminarBase from "../Base/EliminarBase.jsx";
 
 export default function InmobiliariaEliminarDialog({
@@ -10,10 +10,10 @@ export default function InmobiliariaEliminarDialog({
 }) {
   if (!open || !inmobiliaria) return null;
 
-  const title = `Eliminar Inmobiliaria: ${inmobiliaria?.nombre ?? "—"}`;
+  const title = `Desactivar Inmobiliaria: ${inmobiliaria?.nombre ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la inmobiliaria #${inmobiliaria?.nombre ?? "—"}?. Esta acción es irreversible.`;
+  const message = `¿Seguro que deseas desactivar la inmobiliaria "${inmobiliaria?.nombre ?? "—"}"? Pasará a estado INACTIVA y dejará de aparecer en la lista activa.`;
 
   // Detalles listados con bullets
   const details = [
@@ -22,7 +22,7 @@ export default function InmobiliariaEliminarDialog({
   ].filter(Boolean);
 
   // Nota final en negrita
-  const noteBold = "Esta acción es irreversible.";
+  const noteBold = "La inmobiliaria se conservará en el historial y podrá consultarse posteriormente.";
 
   return (
     <EliminarBase
@@ -31,11 +31,12 @@ export default function InmobiliariaEliminarDialog({
       message={message}
       details={details}
       noteBold={noteBold}
-      confirmLabel="Eliminar Inmobiliaria"
+      confirmLabel="Desactivar Inmobiliaria"
       loading={loading}
       onCancel={onCancel}
-      onConfirm={onConfirm} 
+      onConfirm={onConfirm}
     />
   );
 }
+
 

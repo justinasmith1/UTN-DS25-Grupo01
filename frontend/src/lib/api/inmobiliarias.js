@@ -19,19 +19,30 @@ const fromApi = (row = {}) => ({
   razonSocial: row.razonSocial ?? row.razon_social ?? "",
   comxventa: row.comxventa ?? row.comision ?? null,
   contacto: row.contacto ?? row.phone ?? row.telefono ?? "",
+  estado: row.estado ?? "ACTIVA", // ACTIVA o INACTIVA
+  fechaBaja: row.fechaBaja ?? row.fecha_baja ?? null,
   cantidadVentas: row.cantidadVentas ?? row.ventas_count ?? 0,
   cantidadReservas: row.cantidadReservas ?? row.reservas_count ?? row._count?.reservas ?? 0,
   createdAt: row.createdAt ?? row.created_at ?? null,
   updateAt: row.updateAt ?? row.updated_at ?? null,
 });
 
-const toApi = (form = {}) => ({
-  // Enviamos en español según el schema de Prisma
-  nombre: (form.nombre ?? "").trim(),
-  razonSocial: (form.razonSocial ?? "").trim(),
-  comxventa: form.comxventa ? Number(form.comxventa) : null,
-  contacto: (form.contacto ?? "").trim(),
-});
+const toApi = (form = {}) => {
+  const payload = {
+    // Enviamos en español según el schema de Prisma
+    nombre: (form.nombre ?? "").trim(),
+    razonSocial: (form.razonSocial ?? "").trim(),
+    comxventa: form.comxventa ? Number(form.comxventa) : null,
+    contacto: (form.contacto ?? "").trim(),
+  };
+
+  // Incluir estado si está presente (para baja lógica)
+  if (form.estado !== undefined) {
+    payload.estado = form.estado;
+  }
+
+  return payload;
+};
 
 // ---------- Utilitarios ----------
 function qs(params = {}) {
@@ -62,9 +73,9 @@ const nextId = () => `I${String(INMOS.length + 1).padStart(3, "0")}`;
 function ensureSeed() {
   if (seeded) return;
   INMOS = [
-    { 
-      id: "I001", 
-      nombre: "López Propiedades", 
+    {
+      id: "I001",
+      nombre: "López Propiedades",
       razonSocial: "López Propiedades S.A.",
       comxventa: 3.5,
       contacto: "11-5555-0001",
@@ -72,9 +83,9 @@ function ensureSeed() {
       cantidadReservas: 5,
       createdAt: "2023-01-15T10:00:00Z"
     },
-    { 
-      id: "I002", 
-      nombre: "Delta Real Estate", 
+    {
+      id: "I002",
+      nombre: "Delta Real Estate",
       razonSocial: "Delta Real Estate S.R.L.",
       comxventa: 4.0,
       contacto: "11-5555-0002",
@@ -82,9 +93,9 @@ function ensureSeed() {
       cantidadReservas: 3,
       createdAt: "2023-03-20T14:30:00Z"
     },
-    { 
-      id: "I003", 
-      nombre: "Inmobiliaria Central", 
+    {
+      id: "I003",
+      nombre: "Inmobiliaria Central",
       razonSocial: "Inmobiliaria Central S.A.",
       comxventa: 2.8,
       contacto: "11-5555-0003",
@@ -125,10 +136,10 @@ function mockFilterSortPage(list, params = {}) {
 }
 
 async function mockGetAll(params = {}) { ensureSeed(); const { data, meta } = mockFilterSortPage(INMOS, params); return { data, meta }; }
-async function mockGetById(id)        { ensureSeed(); return ok(INMOS.find((x) => String(x.id) === String(id))); }
-async function mockCreate(payload)     { ensureSeed(); const row = { id: nextId(), ...fromApi(toApi(payload)) }; INMOS.unshift(row); return ok(row); }
+async function mockGetById(id) { ensureSeed(); return ok(INMOS.find((x) => String(x.id) === String(id))); }
+async function mockCreate(payload) { ensureSeed(); const row = { id: nextId(), ...fromApi(toApi(payload)) }; INMOS.unshift(row); return ok(row); }
 async function mockUpdate(id, payload) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], ...fromApi(toApi(payload)) }; return ok(INMOS[i]); }
-async function mockDelete(id)          { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS.splice(i, 1); return ok(true); }
+async function mockDeactivate(id) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], estado: "INACTIVA", fechaBaja: new Date().toISOString() }; return ok(INMOS[i]); }
 
 /* ------------------------------- API --------------------------------- */
 async function apiGetAll(params = {}) {
@@ -152,12 +163,12 @@ async function apiGetAll(params = {}) {
       }
     }
   }
-  
+
   const arr = normalizeApiListResponse(data);
-  
+
   // Usar el array manual si el normalizado está vacío
   const finalArray = arr.length > 0 ? arr : inmobiliariasArray;
-  
+
   const mapped = finalArray.map((row) => {
     const base = fromApi(row);
     // Preservar cantidadVentas, cantidadReservas y fechas si vienen del backend
@@ -169,7 +180,7 @@ async function apiGetAll(params = {}) {
       updatedAt: row?.updateAt ?? row?.updatedAt ?? row?.updated_at ?? base.updateAt ?? null,
     };
   });
-  
+
   const meta = data?.meta ?? { total: arr.length, page: Number(params.page || 1), pageSize: Number(params.pageSize || arr.length) };
   return { data: mapped, meta };
 }
@@ -178,10 +189,10 @@ async function apiGetById(id) {
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al obtener inmobiliaria");
-  
+
   // El backend devuelve { success: true, data: { inmobiliaria: {...} } }
   const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
-  
+
   // Normalizar manteniendo las fechas, cantidadVentas y cantidadReservas correctamente mapeadas
   const normalized = {
     ...fromApi(raw),
@@ -192,7 +203,7 @@ async function apiGetById(id) {
     cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? 0,
     cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? 0,
   };
-  
+
   return ok(normalized);
 }
 
@@ -204,12 +215,12 @@ async function apiCreate(payload) {
 }
 
 async function apiUpdate(id, payload) {
-  // El payload ya viene con los campos correctos del componente (nombre, razonSocial, contacto, comxventa)
+  // El payload ya viene con los campos correctos del componente (nombre, razonSocial, contacto, comxventa, estado)
   // Construir el body validando que cumpla con el schema del backend
   const body = {};
-  
+
   // Mapear campos que pueden venir (todos opcionales para PATCH)
-  // El schema espera: nombre (string, min 1), razonSocial (string, min 1), contacto (string, max 100, opcional), comxventa (number, 0-100, opcional)
+  // El schema espera: nombre (string, min 1), razonSocial (string, min 1), contacto (string, max 100, opcional), comxventa (number, 0-100, opcional), estado (ACTIVA/INACTIVA)
   if (payload.nombre !== undefined && payload.nombre !== null && String(payload.nombre).trim().length > 0) {
     const nombreTrim = String(payload.nombre).trim();
     if (nombreTrim.length > 100) {
@@ -217,7 +228,7 @@ async function apiUpdate(id, payload) {
     }
     body.nombre = nombreTrim;
   }
-  
+
   if (payload.razonSocial !== undefined && payload.razonSocial !== null && String(payload.razonSocial).trim().length > 0) {
     const razonTrim = String(payload.razonSocial).trim();
     if (razonTrim.length > 150) {
@@ -225,7 +236,7 @@ async function apiUpdate(id, payload) {
     }
     body.razonSocial = razonTrim;
   }
-  
+
   if (payload.contacto !== undefined && payload.contacto !== null && payload.contacto !== "") {
     const contactoTrim = String(payload.contacto).trim();
     if (contactoTrim.length > 100) {
@@ -235,7 +246,7 @@ async function apiUpdate(id, payload) {
       body.contacto = contactoTrim;
     }
   }
-  
+
   if (payload.comxventa !== undefined && payload.comxventa !== null) {
     // Asegurar que sea un número válido
     const num = typeof payload.comxventa === 'number' ? payload.comxventa : Number(payload.comxventa);
@@ -250,12 +261,21 @@ async function apiUpdate(id, payload) {
     }
     body.comxventa = num;
   }
-  
+
+  // Soporte para cambio de estado (baja lógica)
+  if (payload.estado !== undefined && payload.estado !== null) {
+    const estadoUpper = String(payload.estado).toUpperCase();
+    if (estadoUpper !== "ACTIVA" && estadoUpper !== "INACTIVA") {
+      throw new Error("El estado debe ser ACTIVA o INACTIVA");
+    }
+    body.estado = estadoUpper;
+  }
+
   // Validar que al menos haya un campo (como requiere el schema: .refine((d) => Object.keys(d).length > 0))
   if (Object.keys(body).length === 0) {
     throw new Error("Debe enviar al menos un campo para actualizar");
   }
-  
+
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -266,10 +286,10 @@ async function apiUpdate(id, payload) {
     error.errors = data?.errors;
     throw error;
   }
-  
+
   // El backend devuelve { success: true, data: { inmobiliaria: {...}, message: '...' } }
   const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
-  
+
   // Normalizar manteniendo las fechas, cantidadVentas y cantidadReservas correctamente mapeadas
   const base = fromApi(raw);
   const normalized = {
@@ -281,22 +301,43 @@ async function apiUpdate(id, payload) {
     cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
     cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? base.cantidadReservas ?? 0,
   };
-  
+
   return ok(normalized);
 }
 
-async function apiDelete(id) {
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "DELETE" });
-  if (!res.ok && res.status !== 204) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data?.message || "Error al eliminar inmobiliaria");
+async function apiDeactivate(id) {
+  // Baja lógica: cambiar estado a INACTIVA en lugar de DELETE
+  const body = { estado: "INACTIVA" };
+  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || "Error al desactivar inmobiliaria");
   }
-  return ok(true);
+
+  // El backend devuelve la inmobiliaria actualizada
+  const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
+  const base = fromApi(raw);
+  const normalized = {
+    ...base,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? base.createdAt ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? base.updateAt ?? null,
+    estado: raw?.estado ?? "INACTIVA",
+    fechaBaja: raw?.fechaBaja ?? raw?.fecha_baja ?? new Date().toISOString(),
+    cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
+    cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? base.cantidadReservas ?? 0,
+  };
+
+  return ok(normalized);
 }
 
 /* --------------------------- EXPORT PÚBLICO --------------------------- */
-export function getAllInmobiliarias(params) { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
-export function getInmobiliariaById(id)     { return USE_MOCK ? mockGetById(id)     : apiGetById(id); }
+export function getAllInmobiliarias(params) { return USE_MOCK ? mockGetAll(params) : apiGetAll(params); }
+export function getInmobiliariaById(id) { return USE_MOCK ? mockGetById(id) : apiGetById(id); }
 export function createInmobiliaria(payload) { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
-export function updateInmobiliaria(id, p)   { return USE_MOCK ? mockUpdate(id, p)   : apiUpdate(id, p); }
-export function deleteInmobiliaria(id)      { return USE_MOCK ? mockDelete(id)      : apiDelete(id); }
+export function updateInmobiliaria(id, p) { return USE_MOCK ? mockUpdate(id, p) : apiUpdate(id, p); }
+export function deactivateInmobiliaria(id) { return USE_MOCK ? mockDeactivate(id) : apiDeactivate(id); }
+// Reactivar: cambiar estado de INACTIVA a ACTIVA
+export function reactivateInmobiliaria(id) { return updateInmobiliaria(id, { estado: "ACTIVA" }); }
+// Mantener deleteInmobiliaria por compatibilidad (ahora hace soft delete)
+export function deleteInmobiliaria(id) { return deactivateInmobiliaria(id); }
+

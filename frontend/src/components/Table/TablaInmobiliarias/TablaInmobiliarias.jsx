@@ -2,6 +2,7 @@
 // Wrapper de la tabla de inmobiliarias que usa TablaBase
 
 import { useMemo, useCallback, useState, useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import { ListTodo, Percent } from "lucide-react";
 import { useAuth } from "../../../app/providers/AuthProvider";
@@ -42,13 +43,14 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
     setOpen(false);
   };
 
+
   const handleVerReservas = () => {
     navigate(`/reservas?inmobiliariaId=${inmobiliariaId}`);
     setOpen(false);
   };
 
   return (
-    <div style={{ position: "relative", zIndex: open ? 9999 : "auto" }}>
+    <>
       <button
         ref={btnRef}
         className="tl-icon tl-icon--money"
@@ -59,7 +61,7 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
       >
         <ListTodo size={18} />
       </button>
-      {open && (
+      {open && createPortal(
         <div
           ref={menuRef}
           style={{
@@ -70,8 +72,8 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
             border: "1px solid rgba(0,0,0,.14)",
             borderRadius: "8px",
             boxShadow: "0 4px 12px rgba(0,0,0,.15)",
-            zIndex: 9999,
-            minWidth: "120px",
+            zIndex: 99999,
+            minWidth: "200px",
             overflow: "hidden",
           }}
         >
@@ -112,9 +114,10 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
           >
             Ver reservas asociadas
           </button>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
@@ -124,6 +127,7 @@ export default function TablaInmobiliarias({
   onAgregarInmobiliaria,
   onEditarInmobiliaria,
   onEliminarInmobiliaria,
+  onReactivarInmobiliaria,
   onVerInmobiliaria,
   onAplicarBonificacion,
   selectedRows = [],
@@ -142,35 +146,35 @@ export default function TablaInmobiliarias({
         return {
           ...col,
           accessor: (row) => {
-             // Opcional: Podrías poner el texto en gris si está inactiva
-             const style = row.estado === 'INACTIVA' ? { color: '#9ca3af' } : {};
-             return (
-               <span style={{ 
-                 display: 'inline-block', 
-                 maxWidth: '100%',
-                 lineHeight: '1.2',
-                 wordBreak: 'break-word',
-                 hyphens: 'auto',
-                 ...style
-               }}>
-                 {row.nombre || '-'}
-               </span>
-             );
+            // Opcional: Podrías poner el texto en gris si está inactiva
+            const style = row.estado === 'INACTIVA' ? { color: '#9ca3af' } : {};
+            return (
+              <span style={{
+                display: 'inline-block',
+                maxWidth: '100%',
+                lineHeight: '1.2',
+                wordBreak: 'break-word',
+                hyphens: 'auto',
+                ...style
+              }}>
+                {row.nombre || '-'}
+              </span>
+            );
           },
         };
       }
       if (col.id === 'fechaBaja') {
         return {
-            ...col,
-            accessor: (row) => {
-                if (!row.fechaBaja) return '—';
-                // Usamos tu formatter existente fmtFecha y añadimos color rojo suave
-                return (
-                    <span style={{ color: '#ef4444', fontSize: '0.9em' }}>
-                        {fmtFecha(row.fechaBaja)}
-                    </span>
-                );
-            }
+          ...col,
+          accessor: (row) => {
+            if (!row.fechaBaja) return '—';
+            // Usamos tu formatter existente fmtFecha y añadimos color rojo suave
+            return (
+              <span style={{ color: '#ef4444', fontSize: '0.9em' }}>
+                {fmtFecha(row.fechaBaja)}
+              </span>
+            );
+          }
         }
       }
 
@@ -178,8 +182,20 @@ export default function TablaInmobiliarias({
     });
   }, []);
 
+  // Columnas visibles por defecto (7 columnas - excluyendo cantidadReservas)
+  const defaultVisibleIds = useMemo(() => [
+    'nombre',
+    'estado',
+    'razonSocial',
+    'fechaBaja',
+    'comxventa',
+    'contacto',
+    'cantidadVentas'
+    // 'cantidadReservas' excluida para mostrar solo 7
+  ], []);
 
-  
+
+
 
   // -----------------------------------------
   // Acciones por fila (íconos):
@@ -249,35 +265,67 @@ export default function TablaInmobiliarias({
         );
       }
 
-      if (can(user, PERMISSIONS.AGENCY_DELETE)) {
-        actions.push(
-          <button
-            key="delete"
-            className="tl-icon tl-icon--delete"
-            aria-label="Eliminar Inmobiliaria"
-            data-tooltip="Eliminar Inmobiliaria"
-            onClick={() => onEliminarInmobiliaria?.(row)}
-          >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+      // Mostrar botón de eliminar O reactivar según el estado
+      if (row.estado === 'INACTIVA') {
+        // Inmobiliaria inactiva: mostrar botón de REACTIVAR
+        if (can(user, PERMISSIONS.AGENCY_EDIT) && onReactivarInmobiliaria) {
+          actions.push(
+            <button
+              key="reactivate"
+              className="tl-icon tl-icon--success"
+              aria-label="Reactivar Inmobiliaria"
+              data-tooltip="Reactivar Inmobiliaria"
+              onClick={() => onReactivarInmobiliaria?.(row)}
+              style={{ color: '#10b981' }}
             >
-              <polyline points="3,6 5,6 21,6" />
-              <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2" />
-              <line x1="10" y1="11" x2="10" y2="17" />
-              <line x1="14" y1="11" x2="14" y2="17" />
-            </svg>
-          </button>
-        );
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+            </button>
+          );
+        }
+      } else {
+        // Inmobiliaria activa: mostrar botón de ELIMINAR (desactivar)
+        if (can(user, PERMISSIONS.AGENCY_DELETE) && onEliminarInmobiliaria) {
+          actions.push(
+            <button
+              key="delete"
+              className="tl-icon tl-icon--delete"
+              aria-label="Desactivar Inmobiliaria"
+              data-tooltip="Desactivar Inmobiliaria"
+              onClick={() => onEliminarInmobiliaria?.(row)}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="3,6 5,6 21,6" />
+                <path d="M19,6v14a2,2 0 0,1 -2,2H7a2,2 0 0,1 -2,-2V6m3,0V4a2,2 0 0,1 2,-2h4a2,2 0 0,1 2,2v2" />
+                <line x1="10" y1="11" x2="10" y2="17" />
+                <line x1="14" y1="11" x2="14" y2="17" />
+              </svg>
+            </button>
+          );
+        }
       }
 
       return actions.length > 0 ? actions : null;
     },
-    [user, onVerInmobiliaria, onEditarInmobiliaria, onEliminarInmobiliaria, navigate]
+    [user, onVerInmobiliaria, onEditarInmobiliaria, onEliminarInmobiliaria, onReactivarInmobiliaria, navigate]
   );
 
   // -----------------------------------------
@@ -401,6 +449,8 @@ export default function TablaInmobiliarias({
       onSelectedChange={onSelectionChange}
       selectable={config.selectable}
       rowKey="id"
+      defaultVisibleIds={defaultVisibleIds}
+      maxVisible={7}
     />
   );
 }

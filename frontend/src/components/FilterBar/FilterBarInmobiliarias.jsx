@@ -1,7 +1,7 @@
 // src/components/FilterBar/FilterBarInmobiliarias.jsx
 // Wrapper del FilterBar para inmobiliarias
 
-import { useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import FilterBarBase from "./FilterBarBase";
 import { inmobiliariasFilterPreset } from "./presets/inmobiliarias.preset";
 import { inmobiliariasChipsFrom, nice } from "./utils/inmobiliariasChips";
@@ -11,37 +11,48 @@ export default function FilterBarInmobiliarias({
   userRole = "GENERAL",
   onParamsChange,
 }) {
-  // Configuración de campos para inmobiliarias
+  // Configuración de campos para inmobiliarias (siguiendo patrón de FilterBarVentas)
   const fields = useMemo(() => [
-    { 
-      id: 'q', 
-      type: 'search', 
-      label: 'Búsqueda', 
-      placeholder: 'ID, nombre, razón social, contacto...', 
-      defaultValue: '' 
+    {
+      id: 'q',
+      type: 'search',
+      label: 'Búsqueda',
+      placeholder: 'ID, nombre, razón social, contacto...',
+      defaultValue: ''
     },
-    { 
-      id: 'comxventa', 
-      type: 'range', 
-      label: 'Comisión x Venta', 
-      defaultValue: { min: null, max: null } 
+    {
+      id: 'estado',
+      type: 'multiSelect', // Siguiendo patrón de ventas/reservas
+      label: 'Estado',
+      defaultValue: []
     },
-    { 
-      id: 'cantidadVentas', 
-      type: 'range', 
-      label: 'Cantidad de Ventas', 
-      defaultValue: { min: null, max: null } 
+    {
+      id: 'comxventa',
+      type: 'range',
+      label: 'Comisión x Venta',
+      defaultValue: { min: null, max: null }
     },
-    { 
-      id: 'createdAt', 
-      type: 'dateRange', 
-      label: 'Fecha de Creación', 
-      defaultValue: { min: null, max: null } 
+    {
+      id: 'cantidadVentas',
+      type: 'range',
+      label: 'Cantidad de Ventas',
+      defaultValue: { min: null, max: null }
+    },
+    {
+      id: 'createdAt',
+      type: 'dateRange',
+      label: 'Fecha de Creación',
+      defaultValue: { min: null, max: null }
     },
   ], []);
 
-  // Catálogos (vacío - solo usamos búsqueda general)
-  const catalogs = useMemo(() => ({}), []);
+  // Catálogos para el filtro de estado
+  const catalogs = useMemo(() => ({
+    estado: [
+      { value: 'ACTIVA', label: 'Activa' },
+      { value: 'INACTIVA', label: 'Inactiva' },
+    ]
+  }), []);
 
   // Rangos para los filtros numéricos
   const ranges = useMemo(() => ({
@@ -50,17 +61,22 @@ export default function FilterBarInmobiliarias({
     createdAt: inmobiliariasFilterPreset.ranges.createdAt,
   }), []);
 
-  // Valores por defecto
-  const defaults = useMemo(() => inmobiliariasFilterPreset.defaults, []);
-
-  // Configuración de vistas (por ahora sin restricciones específicas)
-  const viewsConfig = useMemo(() => ({
-    isInmo: false, // No hay restricciones de inmobiliaria en este módulo
-    sanitizeForRole: (filters) => filters // Sin sanitización por ahora
+  // Valores por defecto - estado vacío significa mostrar solo ACTIVAS
+  const defaults = useMemo(() => ({
+    ...inmobiliariasFilterPreset.defaults,
+    estado: [], // Vacío por defecto
   }), []);
 
-  // Formateador de opciones (vacío - no hay filtros de selección múltiple)
-  const optionFormatter = useMemo(() => ({}), []);
+  // Configuración de vistas
+  const viewsConfig = useMemo(() => ({
+    isInmo: false,
+    sanitizeForRole: (filters) => filters
+  }), []);
+
+  // Formateador de opciones para estado
+  const optionFormatter = useMemo(() => ({
+    // estado: nice, // Temporalmente comentado para debugging
+  }), []);
 
   return (
     <FilterBarBase
