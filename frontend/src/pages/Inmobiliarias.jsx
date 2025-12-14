@@ -7,17 +7,19 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarInmobiliarias from "../components/FilterBar/FilterBarInmobiliarias";
 import TablaInmobiliarias from "../components/Table/TablaInmobiliarias/TablaInmobiliarias";
-import { 
+import {
   getAllInmobiliarias,
   getInmobiliariaById,
   updateInmobiliaria,
-  deleteInmobiliaria
+  deleteInmobiliaria,
+  reactivateInmobiliaria
 } from "../lib/api/inmobiliarias";
 import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
 
 import InmobiliariaVerCard from "../components/Cards/Inmobiliarias/InmobiliariaVerCard.jsx";
 import InmobiliariaEditarCard from "../components/Cards/Inmobiliarias/InmobiliariaEditarCard.jsx";
 import InmobiliariaEliminarDialog from "../components/Cards/Inmobiliarias/InmobiliariaEliminarDialog.jsx";
+import InmobiliariaReactivarDialog from "../components/Cards/Inmobiliarias/InmobiliariaReactivarDialog.jsx";
 import InmobiliariaCrearCard from "../components/Cards/Inmobiliarias/InmobiliariaCrearCard.jsx";
 
 import { useSearchParams } from "react-router-dom";
@@ -27,13 +29,13 @@ export default function Inmobiliarias() {
   const { success, error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const crearParam = searchParams.get('crear') === 'true';
-  
+
   // Estado de filtros
   const [params, setParams] = useState({});
   const handleParamsChange = useCallback((patch) => {
-    if (!patch || Object.keys(patch).length === 0) { 
-      setParams({}); 
-      return; 
+    if (!patch || Object.keys(patch).length === 0) {
+      setParams({});
+      return;
     }
     setParams((prev) => ({ ...prev, ...patch }));
   }, []);
@@ -49,9 +51,9 @@ export default function Inmobiliarias() {
       try {
         setLoading(true);
         const res = await getAllInmobiliarias({});
-        if (alive) { 
+        if (alive) {
           const data = res.data || [];
-          setAllInmobiliarias(data); 
+          setAllInmobiliarias(data);
         }
       } catch (err) {
         if (alive) {
@@ -65,7 +67,7 @@ export default function Inmobiliarias() {
         }
       }
     })();
-    
+
     return () => { alive = false; };
   }, []); // Dependencias vacías para ejecutar solo una vez
 
@@ -91,9 +93,12 @@ export default function Inmobiliarias() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
+  const [openReactivar, setOpenReactivar] = useState(false);
   const [openCrear, setOpenCrear] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [lastAction, setLastAction] = useState(null); // 'deactivate' o 'reactivate'
 
   // Ver: abre con la fila y luego refina con getInmobiliariaById(id) para traer fechas/etc.
   const handleVerInmobiliaria = useCallback((inmobiliaria) => {
@@ -135,6 +140,11 @@ export default function Inmobiliarias() {
     setOpenEliminar(true);
   }, []);
 
+  const handleReactivarInmobiliaria = useCallback((inmobiliaria) => {
+    setInmobiliariaSel(inmobiliaria);
+    setOpenReactivar(true);
+  }, []);
+
   const handleAgregarInmobiliaria = useCallback(() => {
     setOpenCrear(true);
   }, []);
@@ -167,22 +177,30 @@ export default function Inmobiliarias() {
     []
   );
 
-  // DELETE (Eliminar)
+  // DELETE (Eliminar - ahora hace baja lógica)
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const handleDelete = useCallback(async () => {
     if (!inmobiliariaSel?.id) return;
     try {
       setDeleting(true);
-      await deleteInmobiliaria(inmobiliariaSel.id);
-      setAllInmobiliarias((prev) => prev.filter((i) => i.id !== inmobiliariaSel.id));
+      const response = await deleteInmobiliaria(inmobiliariaSel.id);
+      // La API ahora devuelve la inmobiliaria con estado INACTIVA
+      const updated = response?.data ?? response;
+
+      // Actualizar el estado de la inmobiliaria en lugar de eliminarla
+      setAllInmobiliarias((prev) => prev.map((i) =>
+        i.id === inmobiliariaSel.id ? { ...i, estado: "INACTIVA", fechaBaja: updated?.fechaBaja ?? new Date().toISOString() } : i
+      ));
+
       setOpenEliminar(false);
+      setLastAction('deactivate');
       setShowDeleteSuccess(true);
       setTimeout(() => {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error eliminando inmobiliaria:", e);
-      alert(e?.message || "No se pudo eliminar la inmobiliaria.");
+      console.error("Error desactivando inmobiliaria:", e);
+      alert(e?.message || "No se pudo desactivar la inmobiliaria.");
     } finally {
       setDeleting(false);
     }
@@ -193,6 +211,7 @@ export default function Inmobiliarias() {
   const canCreate = can(user, PERMISSIONS.AGENCY_CREATE);
   const canEdit = can(user, PERMISSIONS.AGENCY_EDIT);
   const canDelete = can(user, PERMISSIONS.AGENCY_DELETE);
+  const canReactivate = can(user, PERMISSIONS.AGENCY_EDIT); // Reactivar requiere permisos de edición
 
   if (!canView) {
     return (
@@ -232,15 +251,16 @@ export default function Inmobiliarias() {
         onAgregarInmobiliaria={canCreate ? handleAgregarInmobiliaria : undefined}
         onEditarInmobiliaria={canEdit ? handleEditarInmobiliaria : undefined}
         onEliminarInmobiliaria={canDelete ? handleEliminarInmobiliaria : undefined}
+        onReactivarInmobiliaria={canReactivate ? handleReactivarInmobiliaria : undefined}
         onVerInmobiliaria={canView ? handleVerInmobiliaria : undefined}
         selectedRows={selectedRows}
         onSelectionChange={handleSelectionChange}
       />
 
       {/* Modales */}
-      <InmobiliariaVerCard 
-        open={openVer} 
-        inmobiliaria={inmobiliariaSel} 
+      <InmobiliariaVerCard
+        open={openVer}
+        inmobiliaria={inmobiliariaSel}
         inmobiliarias={allInmobiliarias}
         onClose={() => setOpenVer(false)}
         onEdit={(inmobiliaria) => {
@@ -248,7 +268,7 @@ export default function Inmobiliarias() {
           // Abrir el modal de editar con la misma inmobiliaria
           setInmobiliariaSel(inmobiliaria);
           setOpenEditar(true);
-          
+
           // Cargar datos completos
           (async () => {
             try {
@@ -277,6 +297,39 @@ export default function Inmobiliarias() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <InmobiliariaReactivarDialog
+        open={openReactivar}
+        inmobiliaria={inmobiliariaSel}
+        loading={reactivating}
+        onCancel={() => setOpenReactivar(false)}
+        onConfirm={async () => {
+          if (!inmobiliariaSel?.id) return;
+          try {
+            setReactivating(true);
+            const response = await reactivateInmobiliaria(inmobiliariaSel.id);
+            const updated = response?.data ?? response;
+
+            // Actualizar el estado de la inmobiliaria
+            setAllInmobiliarias((prev) => prev.map((i) =>
+              i.id === inmobiliariaSel.id ? { ...i, estado: "ACTIVA" } : i
+            ));
+
+            setOpenReactivar(false);
+            setLastAction('reactivate');
+            // Mostrar mensaje de éxito (reutilizar el mismo estado)
+            setShowDeleteSuccess(true);
+            setTimeout(() => {
+              setShowDeleteSuccess(false);
+            }, 1500);
+          } catch (e) {
+            console.error("Error reactivando inmobiliaria:", e);
+            alert(e?.message || "No se pudo reactivar la inmobiliaria.");
+          } finally {
+            setReactivating(false);
+          }
+        }}
       />
 
       <InmobiliariaCrearCard
@@ -344,7 +397,9 @@ export default function Inmobiliarias() {
                 color: "#111",
               }}
             >
-              ¡Inmobiliaria eliminada exitosamente!
+              {lastAction === 'reactivate'
+                ? "¡Inmobiliaria reactivada exitosamente!"
+                : "¡Inmobiliaria desactivada exitosamente!"}
             </h3>
           </div>
         </div>

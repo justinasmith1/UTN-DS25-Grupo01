@@ -33,12 +33,12 @@ export const inmobiliariasTablePreset = {
     // --- NUEVA COLUMNA: FECHA BAJA ---
     // Solo mostramos algo si existe fechaBaja
     {
-        id: 'fechaBaja',
-        header: 'Fecha Baja',
-        accessor: (row) => row.fechaBaja || null, 
-        width: 140,
-        sortable: true,
-        align: 'center',
+      id: 'fechaBaja',
+      header: 'Fecha Baja',
+      accessor: (row) => row.fechaBaja || null,
+      width: 140,
+      sortable: true,
+      align: 'center',
 
     },
     {
@@ -74,16 +74,16 @@ export const inmobiliariasTablePreset = {
       align: 'center',
     },
   ],
-  
+
   // Configuración por defecto
   defaultSort: { field: 'nombre', direction: 'asc' },
   defaultPageSize: 10,
   pageSizeOptions: [5, 10, 20, 50],
-  
+
   // Configuración de selección
   selectable: true,
   selectKey: 'id',
-  
+
   // Configuración de acciones
   actions: {
     view: {
