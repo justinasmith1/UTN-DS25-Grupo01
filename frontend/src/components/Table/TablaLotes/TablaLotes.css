@@ -106,13 +106,12 @@
 .tl-table{
   border:1px solid #e6ebf2;
   border-radius:12px;
-  overflow-x:auto;
-  overflow-y:hidden;
+  overflow:hidden;
   background:#fff;
 }
-.tl-thead,
-.tl-tbody{
-  min-width: max-content; /* permite scroll horizontal cuando las columnas exceden el contenedor */
+.tl-table--scroll{
+  overflow-x:auto;
+  overflow-y:hidden;
 }
 .tl-thead{ position:sticky; top:0; z-index:5; background:#f7fafc; border-bottom:1px solid #e6ebf2; }
 
