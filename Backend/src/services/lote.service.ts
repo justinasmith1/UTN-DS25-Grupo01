@@ -27,6 +27,7 @@ const estadoLoteToPrisma = (e: EstadoLoteDto | undefined): EstadoLotePrisma | un
     'No Disponible': 'NO_DISPONIBLE',
     'Alquilado': 'ALQUILADO',
     'En Promoción': 'EN_PROMOCION',
+    'Con Prioridad': 'CON_PRIORIDAD',
   };
   return map[e];
 };

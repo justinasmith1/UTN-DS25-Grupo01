@@ -145,7 +145,8 @@ export async function createReserva(
     if (!lote) {
       throw new Error("Lote no encontrado.");
     }
-    if (lote.estado !== EstadoLote.DISPONIBLE) {
+    // Permitir reservar si el lote está DISPONIBLE o EN_PROMOCION
+    if (lote.estado !== EstadoLote.DISPONIBLE && lote.estado !== EstadoLote.EN_PROMOCION) {
       throw new Error("El lote no está disponible para reservar.");
     }
 
@@ -158,6 +159,7 @@ export async function createReserva(
       inmobiliariaIdFinal = user.inmobiliariaId;
     }
 
+    // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
     const row = await prisma.reserva.create({
       data: {
         fechaReserva: new Date(body.fechaReserva), // ISO -> Date
@@ -169,6 +171,7 @@ export async function createReserva(
         estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
         numero: body.numero, // Número de reserva
         fechaFinReserva: new Date(body.fechaFinReserva), // ISO -> Date
+        loteEstadoAlCrear: lote.estado, // Guardamos el estado original del lote
       },
     });
 
@@ -200,13 +203,22 @@ export async function updateReserva(
     // Obtener reserva actual para validaciones
     const reservaActual = await prisma.reserva.findUnique({
       where: { id },
-      select: { estado: true, inmobiliariaId: true, loteId: true }
+      select: { estado: true, inmobiliariaId: true, loteId: true, loteEstadoAlCrear: true }
     });
 
     if (!reservaActual) {
       const err: any = new Error('La reserva no existe');
       err.status = 404;
       throw err;
+    }
+
+    // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA
+    if (body.estado !== undefined && body.estado === EstadoReserva.EXPIRADA) {
+      if (reservaActual.estado !== EstadoReserva.ACTIVA) {
+        const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA');
+        err.status = 400;
+        throw err;
+      }
     }
 
     // Validar permisos y restricciones para INMOBILIARIA
@@ -289,8 +301,9 @@ export async function updateReserva(
     // Sincronizar estado del lote con el estado de la reserva
     if (body.estado !== undefined) {
       if (body.estado === EstadoReserva.CANCELADA || body.estado === EstadoReserva.RECHAZADA || body.estado === EstadoReserva.EXPIRADA) {
-        // Si la reserva se cancela, cambiar el estado del lote asociado a "DISPONIBLE"
-        await updateLoteState(row.loteId, 'Disponible'); 
+        // Si la reserva termina, restauramos el estado original (Disponible/EnPromocion)
+        const estadoARestaurar = reservaActual.loteEstadoAlCrear === EstadoLote.EN_PROMOCION ? 'En Promoción' : 'Disponible';
+        await updateLoteState(row.loteId, estadoARestaurar); 
       } else if (body.estado === EstadoReserva.ACTIVA) {
         // Si la reserva se establece como ACTIVA, cambiar el estado del lote a "RESERVADO"
         await updateLoteState(row.loteId, 'Reservado');
@@ -311,7 +324,7 @@ export async function deleteReserva(id: number): Promise<void> {
   try {
     const reserva = await prisma.reserva.findUnique({
       where: { id },
-      select: { estado: true, loteId: true },
+      select: { estado: true, loteId: true, loteEstadoAlCrear: true },
     });
 
     if (!reserva) {
@@ -322,8 +335,10 @@ export async function deleteReserva(id: number): Promise<void> {
 
     await prisma.reserva.delete({ where: { id } });
 
+    // Si la reserva estaba activa, restauramos el estado original del lote
     if (reserva.estado === EstadoReserva.ACTIVA && reserva.loteId) {
-      await updateLoteState(reserva.loteId, 'Disponible');
+      const estadoARestaurar = reserva.loteEstadoAlCrear === EstadoLote.EN_PROMOCION ? 'En Promoción' : 'Disponible';
+      await updateLoteState(reserva.loteId, estadoARestaurar);
     }
   } catch (e) {
     throw mapPrismaError(e);
