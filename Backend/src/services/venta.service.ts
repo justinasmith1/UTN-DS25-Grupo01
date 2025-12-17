@@ -1,5 +1,5 @@
 import prisma from '../config/prisma';
-import { Venta, EstadoReserva } from '../generated/prisma';
+import { Venta, EstadoReserva, EstadoPrioridad } from '../generated/prisma';
 import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
 import { updateLoteState } from './lote.service';
 
@@ -117,6 +117,18 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
 
     // Actualizar el estado del lote a "VENDIDO" (siempre, ya que las validaciones previas filtran casos inválidos)
     await updateLoteState(data.loteId, 'Vendido');
+    
+    // Si había prioridad activa, se finaliza al concretar la venta
+    const prioridadActiva = await prisma.prioridad.findFirst({
+        where: { loteId: data.loteId, estado: EstadoPrioridad.ACTIVA },
+    });
+    if (prioridadActiva) {
+        await prisma.prioridad.update({
+            where: { id: prioridadActiva.id },
+            data: { estado: EstadoPrioridad.FINALIZADA },
+        });
+    }
+    
     // Asgignar la reservaId si existe una reserva ACEPTADA
     if (reserva) {
         await prisma.venta.update({

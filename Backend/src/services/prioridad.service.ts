@@ -61,6 +61,24 @@ export async function createPrioridad(
       err.status = 400;
       throw err;
     }
+    
+    // Validar límite de prioridades activas para INMOBILIARIA
+    const inm = await prisma.inmobiliaria.findUnique({
+      where: { id: user.inmobiliariaId },
+      select: { maxPrioridadesActivas: true },
+    });
+    const limite = inm?.maxPrioridadesActivas ?? 5;
+    
+    const activas = await prisma.prioridad.count({
+      where: { inmobiliariaId: user.inmobiliariaId, estado: EstadoPrioridad.ACTIVA },
+    });
+    
+    if (activas >= limite) {
+      const err: any = new Error(`La inmobiliaria alcanzó el límite de prioridades activas (${limite}).`);
+      err.status = 400;
+      throw err;
+    }
+    
     ownerType = OwnerPrioridad.INMOBILIARIA;
     inmobiliariaIdFinal = user.inmobiliariaId;
   } else if (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') {
