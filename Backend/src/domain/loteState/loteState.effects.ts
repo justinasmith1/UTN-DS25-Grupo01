@@ -1,0 +1,73 @@
+// domain/loteState/loteState.effects.ts
+// Side effects centralizados para cambios de estado de lote
+
+import prisma from '../../config/prisma';
+import { EstadoVenta, EstadoReserva, EstadoPrioridad } from '../../generated/prisma';
+
+/**
+ * Cancela todas las operaciones activas cuando un lote pasa a NO_DISPONIBLE
+ * - Ventas no finalizadas (INICIADA, CON_BOLETO, ESCRITURA_PROGRAMADA) → CANCELADA
+ * - Reservas ACTIVA → CANCELADA
+ * - Prioridades ACTIVA → CANCELADA
+ * No toca reservas ACEPTADA ni ventas finalizadas (ESCRITURADO)
+ */
+export async function cancelActivesOnNoDisponible(loteId: number): Promise<void> {
+  // Cancelar ventas no finalizadas
+  await prisma.venta.updateMany({
+    where: {
+      loteId: loteId,
+      estado: { in: [EstadoVenta.INICIADA, EstadoVenta.CON_BOLETO, EstadoVenta.ESCRITURA_PROGRAMADA] },
+    },
+    data: { estado: EstadoVenta.CANCELADA },
+  });
+
+  // Cancelar reservas ACTIVA
+  await prisma.reserva.updateMany({
+    where: {
+      loteId: loteId,
+      estado: EstadoReserva.ACTIVA,
+    },
+    data: { estado: EstadoReserva.CANCELADA },
+  });
+
+  // Cancelar prioridades ACTIVA
+  await prisma.prioridad.updateMany({
+    where: {
+      loteId: loteId,
+      estado: EstadoPrioridad.ACTIVA,
+    },
+    data: { estado: EstadoPrioridad.CANCELADA },
+  });
+}
+
+/**
+ * Finaliza la prioridad activa del lote cuando se crea una venta
+ */
+export async function finalizePrioridadActivaOnVenta(loteId: number): Promise<void> {
+  const prioridadActiva = await prisma.prioridad.findFirst({
+    where: { loteId: loteId, estado: EstadoPrioridad.ACTIVA },
+  });
+  
+  if (prioridadActiva) {
+    await prisma.prioridad.update({
+      where: { id: prioridadActiva.id },
+      data: { estado: EstadoPrioridad.FINALIZADA },
+    });
+  }
+}
+
+/**
+ * Cancela la prioridad activa del lote cuando se crea una reserva (reserva consume prioridad)
+ */
+export async function cancelPrioridadActivaOnReserva(loteId: number): Promise<void> {
+  const prioridadActiva = await prisma.prioridad.findFirst({
+    where: { loteId: loteId, estado: EstadoPrioridad.ACTIVA },
+  });
+  
+  if (prioridadActiva) {
+    await prisma.prioridad.update({
+      where: { id: prioridadActiva.id },
+      data: { estado: EstadoPrioridad.CANCELADA },
+    });
+  }
+}
