@@ -2,6 +2,9 @@ import prisma from '../config/prisma';
 import { Venta, EstadoReserva, EstadoPrioridad } from '../generated/prisma';
 import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
 import { updateLoteState } from './lote.service';
+import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
+import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
+import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
 
 
 export async function getAllVentas(): Promise<Venta[]> {
@@ -58,11 +61,8 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         (error as any).statusCode = 400;
         throw error;
     }
-    if (loteExists.estado == 'NO_DISPONIBLE') {
-        const error = new Error('El lote no está disponible para la venta');
-        (error as any).statusCode = 400;
-        throw error;
-    }
+    // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
+    assertLoteOperableFor('crear venta', loteExists.estado);
     if (loteExists.estado === 'ALQUILADO') {
         const error = new Error('No se puede vender un lote que está alquilado');
         (error as any).statusCode = 400;
@@ -116,18 +116,10 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     });
 
     // Actualizar el estado del lote a "VENDIDO" (siempre, ya que las validaciones previas filtran casos inválidos)
-    await updateLoteState(data.loteId, 'Vendido');
+    await updateLoteState(data.loteId, ESTADO_LOTE_OP.VENDIDO);
     
-    // Si había prioridad activa, se finaliza al concretar la venta
-    const prioridadActiva = await prisma.prioridad.findFirst({
-        where: { loteId: data.loteId, estado: EstadoPrioridad.ACTIVA },
-    });
-    if (prioridadActiva) {
-        await prisma.prioridad.update({
-            where: { id: prioridadActiva.id },
-            data: { estado: EstadoPrioridad.FINALIZADA },
-        });
-    }
+    // Si había prioridad activa, se finaliza al concretar la venta (efecto centralizado)
+    await finalizePrioridadActivaOnVenta(data.loteId);
     
     // Asgignar la reservaId si existe una reserva ACEPTADA
     if (reserva) {
@@ -206,7 +198,7 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
 
         // Side effect: si la venta se cancela, restaurar el lote a DISPONIBLE (siempre)
         if (updateData.estado === 'CANCELADA') {
-            await updateLoteState(ventaActual.loteId, 'Disponible');
+            await updateLoteState(ventaActual.loteId, ESTADO_LOTE_OP.DISPONIBLE);
         }
 
         return updatedVenta;

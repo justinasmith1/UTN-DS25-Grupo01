@@ -2,6 +2,8 @@
 import prisma from '../config/prisma';
 import { EstadoLote, EstadoPrioridad, OwnerPrioridad } from '../generated/prisma';
 import { updateLoteState } from './lote.service';
+import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
+import { assertLoteOperableFor, assertPrioridadUnicaActiva, computeRestoreStateFromPrioridad } from '../domain/loteState/loteState.rules';
 
 // ==============================
 // Crear prioridad
@@ -21,6 +23,9 @@ export async function createPrioridad(
     throw err;
   }
 
+  // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
+  assertLoteOperableFor('crear prioridad', lote.estado);
+
   // Validar que el lote esté DISPONIBLE o EN_PROMOCION
   if (lote.estado !== EstadoLote.DISPONIBLE && lote.estado !== EstadoLote.EN_PROMOCION) {
     const err: any = new Error('Solo se puede crear una prioridad para lotes DISPONIBLE o EN_PROMOCION');
@@ -28,19 +33,8 @@ export async function createPrioridad(
     throw err;
   }
 
-  // Validar que no exista prioridad ACTIVA para ese lote
-  const prioridadActiva = await prisma.prioridad.findFirst({
-    where: {
-      loteId: body.loteId,
-      estado: EstadoPrioridad.ACTIVA,
-    },
-  });
-
-  if (prioridadActiva) {
-    const err: any = new Error('Ya existe una prioridad ACTIVA para este lote');
-    err.status = 409;
-    throw err;
-  }
+  // Validar unicidad: solo puede haber 1 prioridad ACTIVA por lote
+  await assertPrioridadUnicaActiva(body.loteId);
 
   // Validar fechas: fechaFin debe ser posterior a ahora
   const fechaFinDate = new Date(body.fechaFin);
@@ -104,7 +98,7 @@ export async function createPrioridad(
   });
 
   // Cambiar lote a CON_PRIORIDAD
-  await updateLoteState(body.loteId, 'Con Prioridad');
+  await updateLoteState(body.loteId, ESTADO_LOTE_OP.CON_PRIORIDAD);
 
   return prioridad;
 }
@@ -151,9 +145,16 @@ export async function cancelPrioridad(
     data: { estado: EstadoPrioridad.CANCELADA },
   });
 
-  // Restaurar el estado original del lote
-  const estadoARestaurar = prioridad.loteEstadoAlCrear === EstadoLote.EN_PROMOCION ? 'En Promoción' : 'Disponible';
-  await updateLoteState(prioridad.loteId, estadoARestaurar);
+  // Restaurar el estado original del lote solo si está actualmente CON_PRIORIDAD (regla segura)
+  const loteActual = await prisma.lote.findUnique({
+    where: { id: prioridad.loteId },
+    select: { estado: true },
+  });
+
+  if (loteActual && loteActual.estado === EstadoLote.CON_PRIORIDAD) {
+    const estadoARestaurar = computeRestoreStateFromPrioridad(prioridad.loteEstadoAlCrear);
+    await updateLoteState(prioridad.loteId, estadoARestaurar);
+  }
 
   return updated;
 }
@@ -200,9 +201,16 @@ export async function finalizePrioridad(
     data: { estado: EstadoPrioridad.FINALIZADA },
   });
 
-  // Restaurar el estado original del lote
-  const estadoARestaurar = prioridad.loteEstadoAlCrear === EstadoLote.EN_PROMOCION ? 'En Promoción' : 'Disponible';
-  await updateLoteState(prioridad.loteId, estadoARestaurar);
+  // Restaurar el estado original del lote solo si está actualmente CON_PRIORIDAD (regla segura)
+  const loteActual = await prisma.lote.findUnique({
+    where: { id: prioridad.loteId },
+    select: { estado: true },
+  });
+
+  if (loteActual && loteActual.estado === EstadoLote.CON_PRIORIDAD) {
+    const estadoARestaurar = computeRestoreStateFromPrioridad(prioridad.loteEstadoAlCrear);
+    await updateLoteState(prioridad.loteId, estadoARestaurar);
+  }
 
   return updated;
 }
@@ -238,10 +246,17 @@ export async function expirePrioridadesManual(): Promise<{ expired: number }> {
     },
   });
 
-  // Restaurar el estado original de cada lote
+  // Restaurar el estado original de cada lote solo si está actualmente CON_PRIORIDAD (regla segura)
   for (const prioridad of prioridadesVencidas) {
-    const estadoARestaurar = prioridad.loteEstadoAlCrear === EstadoLote.EN_PROMOCION ? 'En Promoción' : 'Disponible';
-    await updateLoteState(prioridad.loteId, estadoARestaurar);
+    const loteActual = await prisma.lote.findUnique({
+      where: { id: prioridad.loteId },
+      select: { estado: true },
+    });
+
+    if (loteActual && loteActual.estado === EstadoLote.CON_PRIORIDAD) {
+      const estadoARestaurar = computeRestoreStateFromPrioridad(prioridad.loteEstadoAlCrear);
+      await updateLoteState(prioridad.loteId, estadoARestaurar);
+    }
   }
 
   return { expired: prioridadesVencidas.length };
