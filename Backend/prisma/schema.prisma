@@ -105,6 +105,19 @@ enum EstadoInmobiliaria {
   INACTIVA
 }
 
+enum IdentificadorTipo {
+  DNI
+  CUIL
+  CUIT
+  PASAPORTE
+  OTRO
+}
+
+enum EstadoPersona {
+  ACTIVA
+  INACTIVA
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -124,27 +137,48 @@ model User {
 
 // Persona
 model Persona {
-  id        Int       @id @default(autoincrement())
-  nombre    String
-  apellido  String
-  cuil      String
-  contacto  String?
-  userId    Int?      @unique
-  user      User?     @relation(fields: [userId], references: [id])
+  id                Int              @id @default(autoincrement())
+  // Identificador nuevo (principal)
+  identificadorTipo IdentificadorTipo
+  identificadorValor String
+  // Datos personales (para personas físicas)
+  nombre            String?
+  apellido          String?
+  // Datos para personas jurídicas
+  razonSocial       String?
+  // Estado
+  estado            EstadoPersona    @default(ACTIVA)
+  // Contacto
+  contacto          String?
+  // Relación con User (opcional)
+  userId            Int?             @unique
+  user              User?            @relation(fields: [userId], references: [id])
+  // Relación con Inmobiliaria (para clientes de inmobiliaria)
+  inmobiliariaId    Int?
+  inmobiliaria      Inmobiliaria?    @relation(fields: [inmobiliariaId], references: [id])
+  // Legacy: campo cuil (mantener para compatibilidad, no usar en lógica nueva)
+  cuil              String?
+  
   // Relación con Lote como propietario
-  lotesPropios    Lote[]    @relation("PropietarioLotes")
+  lotesPropios      Lote[]           @relation("PropietarioLotes")
 
   // --- Grupo familiar (auto-relación) ---
-  jefeDeFamiliaId Int?
-  jefeDeFamilia   Persona?  @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  miembrosFamilia Persona[] @relation("GrupoFamiliar")
+  jefeDeFamiliaId   Int?
+  jefeDeFamilia     Persona?         @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  miembrosFamilia   Persona[]        @relation("GrupoFamiliar")
 
   // Relación con Lote como inquilino (alquilados)
-  lotesAlquilados Lote[]    @relation("InquilinoLotes")
-  createdAt DateTime  @default(now())
-  updateAt  DateTime
-  Venta     Venta[]
-  Reserva   Reserva[]
+  lotesAlquilados   Lote[]           @relation("InquilinoLotes")
+  
+  createdAt         DateTime         @default(now())
+  updateAt          DateTime
+  
+  Venta             Venta[]
+  Reserva           Reserva[]
+
+  @@unique([identificadorTipo, identificadorValor])
+  @@index([estado])
+  @@index([inmobiliariaId])
 }
 
 // Reserva
@@ -272,6 +306,7 @@ model Inmobiliaria {
   reservas    Reserva[]
   ventas      Venta[]
   prioridades Prioridad[]
+  clientes    Persona[]  // Personas que son clientes de esta inmobiliaria
 
   userId Int?  @unique
   user   User? @relation(fields: [userId], references: [id])

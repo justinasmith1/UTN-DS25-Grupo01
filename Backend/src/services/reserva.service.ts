@@ -203,6 +203,21 @@ export async function createReserva(
       }
     }
 
+    // Validar que el cliente exista y esté ACTIVA (soft delete)
+    const clienteExists = await prisma.persona.findUnique({
+      where: { id: body.clienteId },
+    });
+    if (!clienteExists) {
+      const err: any = new Error('Cliente no encontrado');
+      err.status = 404;
+      throw err;
+    }
+    if (clienteExists.estado !== 'ACTIVA') {
+      const err: any = new Error('No se puede crear una reserva con un cliente inactivo');
+      err.status = 400;
+      throw err;
+    }
+
     // Si el usuario es INMOBILIARIA, usar siempre su inmobiliariaId
     let inmobiliariaIdFinal = body.inmobiliariaId ?? null;
     if (user?.role === 'INMOBILIARIA') {

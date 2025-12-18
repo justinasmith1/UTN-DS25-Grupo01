@@ -1,367 +1,656 @@
 import prisma from '../config/prisma';
-import type { Persona as PrismaPersona } from "../generated/prisma";
-import type { Identificador, Persona, DeletePersonaResponse,  DeletePersonaRequest, GetPersonaRequest, GetPersonasResponse, PutPersonaResponse,  PostPersonaRequest,  PostPersonaResponse, } from '../types/interfacesCCLF';
+import type { Persona as PrismaPersona, IdentificadorTipo, EstadoPersona } from "../generated/prisma";
+import type { Identificador, Persona, DeletePersonaResponse, GetPersonaRequest, GetPersonasResponse, PutPersonaResponse, PostPersonaRequest, PostPersonaResponse } from '../types/interfacesCCLF';
+import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
+// Tipos para views
+export type PersonaView = 'ALL' | 'PROPIETARIOS' | 'INQUILINOS' | 'CLIENTES' | 'MIS_CLIENTES';
 
-    // DTOs
-    export interface CreatePersonaDto {
-    nombre: string;
-    apellido: string;
-    identificador: string; 
-    telefono?: number;
-    email?: string;
-    jefeDeFamiliaId?: number; // NUEVO
+// DTOs
+export interface CreatePersonaDto {
+  identificadorTipo: IdentificadorTipo;
+  identificadorValor: string;
+  nombre?: string;
+  apellido?: string;
+  razonSocial?: string;
+  telefono?: number;
+  email?: string;
+  jefeDeFamiliaId?: number;
+}
+
+export interface UpdatePersonaDto {
+  identificadorTipo?: IdentificadorTipo;
+  identificadorValor?: string;
+  nombre?: string;
+  apellido?: string;
+  razonSocial?: string;
+  telefono?: number;
+  email?: string;
+  jefeDeFamiliaId?: number;
+}
+
+// Tipo local para incluir relaciones y conteos
+type PersonaWithRelations = PrismaPersona & {
+  _count?: { lotesPropios?: number; lotesAlquilados?: number };
+  jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'> | null;
+  miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'>>;
+  inmobiliaria?: { id: number; nombre: string } | null;
+};
+
+// Helper para formatear contacto
+const formatContacto = (email?: string, telefono?: number): string | undefined => {
+  if (email && telefono) {
+    return `${email},${telefono}`;
+  }
+  return email || telefono?.toString();
+};
+
+// Helper para parsear contacto
+const parseEmail = (contacto: string | null): string | undefined => {
+  if (!contacto) return undefined;
+  const emailMatch = contacto.match(/^[^\s@]+@[^\s@]+\.[^\s@]+/);
+  return emailMatch ? emailMatch[0] : undefined;
+};
+
+const parseTelefono = (contacto: string | null): number | undefined => {
+  if (!contacto) return undefined;
+  const phoneMatch = contacto.match(/\d+/g);
+  if (phoneMatch) {
+    return parseInt(phoneMatch.join(''));
+  }
+  return undefined;
+};
+
+// Helper para normalizar identificadorValor (garantiza consistencia antes de persistir)
+function normalizeIdentificador(tipo: IdentificadorTipo, valor: string): string {
+  let normalized = valor.trim();
+  
+  // Para CUIL/CUIT, eliminar guiones, espacios y puntos
+  if (tipo === 'CUIL' || tipo === 'CUIT') {
+    normalized = normalized.replace(/[-.\s]/g, '');
+  }
+  
+  // Para otros tipos, solo trim
+  return normalized;
+}
+
+// Helper para mapear IdentificadorTipo a Identificador (DTO)
+const getTipoIdentificador = (tipo: IdentificadorTipo): Identificador => {
+  switch (tipo) {
+    case 'DNI':
+      return 'DNI';
+    case 'CUIL':
+      return 'CUIL';
+    case 'CUIT':
+      return 'CUIT';
+    case 'PASAPORTE':
+      return 'Pasaporte';
+    case 'OTRO':
+      return 'CUIL'; // Por defecto para compatibilidad
+    default:
+      return 'CUIL';
+  }
+};
+
+// Mapeo de PrismaPersona a Persona (DTO)
+const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOverride?: string): Persona => {
+  const contacto = p.contacto;
+  const email = emailOverride || parseEmail(contacto);
+  const telefono = telefonoOverride || parseTelefono(contacto);
+
+  const esPropietario = (p._count?.lotesPropios ?? 0) > 0;
+  const esInquilino = (p._count?.lotesAlquilados ?? 0) > 0;
+
+  const jefeDeFamilia = p.jefeDeFamilia
+    ? {
+        idPersona: p.jefeDeFamilia.id,
+        nombre: p.jefeDeFamilia.nombre || '',
+        apellido: p.jefeDeFamilia.apellido || '',
+        cuil: p.jefeDeFamilia.identificadorValor || '',
+      }
+    : null;
+
+  const miembrosFamilia = (p.miembrosFamilia ?? []).map((m) => ({
+    idPersona: m.id,
+    nombre: m.nombre || '',
+    apellido: m.apellido || '',
+    cuil: m.identificadorValor || '',
+  }));
+
+  const esJefeDeFamilia = (p.miembrosFamilia?.length ?? 0) > 0;
+
+  return {
+    idPersona: p.id,
+    nombre: p.nombre || '',
+    apellido: p.apellido || '',
+    identificador: getTipoIdentificador(p.identificadorTipo),
+    email: email,
+    telefono: telefono,
+    esPropietario,
+    esInquilino,
+    jefeDeFamilia,
+    miembrosFamilia,
+    esJefeDeFamilia,
+  };
+};
+
+// Construir where clause según view
+function buildWhereClause(
+  view: PersonaView,
+  user?: { role: string; inmobiliariaId?: number | null },
+  q?: string,
+  includeInactive?: boolean
+) {
+  const where: any = {};
+
+  // Filtro de estado (solo activas por defecto, salvo que includeInactive=true)
+  if (!includeInactive) {
+    where.estado = 'ACTIVA';
+  }
+
+  // Filtro por view
+  switch (view) {
+    case 'PROPIETARIOS':
+      where.lotesPropios = { some: {} };
+      break;
+
+    case 'INQUILINOS':
+      where.lotesAlquilados = {
+        some: {
+          estado: 'ALQUILADO',
+        },
+      };
+      break;
+
+    case 'CLIENTES':
+      where.lotesPropios = { none: {} };
+      where.lotesAlquilados = {
+        none: {
+          estado: 'ALQUILADO',
+        },
+      };
+      break;
+
+    case 'MIS_CLIENTES':
+      // CLIENTES + filtro por inmobiliariaId
+      where.lotesPropios = { none: {} };
+      where.lotesAlquilados = {
+        none: {
+          estado: 'ALQUILADO',
+        },
+      };
+      if (user?.inmobiliariaId) {
+        where.inmobiliariaId = user.inmobiliariaId;
+      } else {
+        // Si no tiene inmobiliariaId, no devolver nada
+        where.id = -1; // Imposible
+      }
+      break;
+
+    case 'ALL':
+    default:
+      // Sin filtro adicional de view
+      break;
+  }
+
+  // Buscador q
+  if (q && q.trim()) {
+    const searchTerm = q.trim();
+    where.OR = [
+      { nombre: { contains: searchTerm, mode: 'insensitive' } },
+      { apellido: { contains: searchTerm, mode: 'insensitive' } },
+      { razonSocial: { contains: searchTerm, mode: 'insensitive' } },
+      { identificadorValor: { contains: searchTerm, mode: 'insensitive' } },
+      { contacto: { contains: searchTerm, mode: 'insensitive' } },
+    ];
+  }
+
+  return where;
+}
+
+// Obtener todas las personas con filtros
+export async function getAllPersonas(
+  user?: { role: string; inmobiliariaId?: number | null },
+  query?: {
+    view?: PersonaView;
+    q?: string;
+    includeInactive?: boolean;
+    limit?: number;
+  }
+): Promise<GetPersonasResponse> {
+  const view = query?.view || 'ALL';
+  const q = query?.q;
+  const includeInactive = query?.includeInactive === true;
+  const limit = query?.limit || 100;
+
+  // RBAC: INMOBILIARIA solo puede ver MIS_CLIENTES (forzar view, ignorar query)
+  if (user?.role === 'INMOBILIARIA') {
+    // Validar que tenga inmobiliariaId
+    if (!user.inmobiliariaId) {
+      const error = new Error('INMOBILIARIA debe tener inmobiliariaId asociado') as any;
+      error.statusCode = 403;
+      throw error;
     }
+    // Forzar view = MIS_CLIENTES (ignorar lo que venga en query)
+    const effectiveView = 'MIS_CLIENTES';
+    // includeInactive solo para ADMIN/GESTOR
+    const effectiveIncludeInactive = false;
+    const where = buildWhereClause(effectiveView, user, q, effectiveIncludeInactive);
 
-    export interface UpdatePersonaDto {
-    nombre?: string;
-    apellido?: string;
-    identificador?: string; 
-    telefono?: number;
-    email?: string;
-    }
-
-    // Tipo local para incluir relaciones y conteos
-    type PersonaWithRelations = PrismaPersona & {
-      _count?: { lotesPropios?: number; lotesAlquilados?: number };
-      jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'cuil'> | null;
-      miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'cuil'>>;
-    };
-
-    // mapeo de PrismaPersona a Persona
-    const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOverride?: string): Persona => {
-    const contacto = p.contacto;
-    const email = emailOverride || parseEmail(contacto);
-    const telefono = telefonoOverride || parseTelefono(contacto);
-
-    const esPropietario = (p._count?.lotesPropios ?? 0) > 0;
-    const esInquilino = (p._count?.lotesAlquilados ?? 0) > 0;
-
-    const jefeDeFamilia = p.jefeDeFamilia
-      ? {
-          idPersona: p.jefeDeFamilia.id,
-          nombre: p.jefeDeFamilia.nombre,
-          apellido: p.jefeDeFamilia.apellido,
-          cuil: p.jefeDeFamilia.cuil,
-        }
-      : null;
-
-    const miembrosFamilia = (p.miembrosFamilia ?? []).map((m) => ({
-      idPersona: m.id,
-      nombre: m.nombre,
-      apellido: m.apellido,
-      cuil: m.cuil,
-    }));
-
-    const esJefeDeFamilia = (p.miembrosFamilia?.length ?? 0) > 0;
-
-    return {
-        idPersona: p.id,
-        nombre: p.nombre,
-        apellido: p.apellido,
-        identificador: getTipoIdentificador(p.cuil),
-        email: email,
-        telefono: telefono,
-        esPropietario,
-        esInquilino,
-        jefeDeFamilia,
-        miembrosFamilia,
-        esJefeDeFamilia,
-    };
-    };
-
-    // Funciones auxiliares
-    const formatContacto = (email?: string, telefono?: number): string | undefined => {
-    if (email && telefono) {
-        return `${email},${telefono}`;
-    }
-    return email || telefono?.toString();
-    };
-
-    const parseEmail = (contacto: string | null): string | undefined => {
-    if (!contacto) return undefined;
-    const emailMatch = contacto.match(/^[^\s@]+@[^\s@]+\.[^\s@]+/);
-    return emailMatch ? emailMatch[0] : undefined;
-    };
-
-    const parseTelefono = (contacto: string | null): number | undefined => {
-    if (!contacto) return undefined;
-    const phoneMatch = contacto.match(/\d+/g);
-    if (phoneMatch) {
-        return parseInt(phoneMatch.join(''));
-    }
-    return undefined;
-    };
-
-    const getTipoIdentificador = (valor: string): Identificador => {
-    if (/^\d{8}$/.test(valor)) {
-        return 'DNI';
-    } else if (/^\d{2}-?\d{8}-?\d{1}$/.test(valor)) {
-        return valor.startsWith('20') || valor.startsWith('27') || valor.startsWith('30') ? 'CUIT' : 'CUIL';
-    } else if (/^[A-Z0-9]{6,9}$/.test(valor)) {
-        return 'Pasaporte';
-    }
-    return 'CUIL'; // Por defecto
-    };
-
-    // obtener todas las personas
-    export async function getAllPersonas(limit: number = 10): Promise<GetPersonasResponse> {
     const personas = await prisma.persona.findMany({
-        orderBy: { createdAt: 'desc' },
-        take: limit,
-        include: {
-          user: { select: { id: true, username: true, email: true, role: true } },
-          _count: { select: { lotesPropios: true, lotesAlquilados: true } },
-          jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-          miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-        }
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, username: true, email: true, role: true } },
+        _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+        jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+        miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+        inmobiliaria: { select: { id: true, nombre: true } },
+      },
     });
 
     return {
-        personas: personas.map(p => toPersona(p as PersonaWithRelations)),
-        total: await prisma.persona.count()
+      personas: personas.map((p) => toPersona(p as PersonaWithRelations)),
+      total: await prisma.persona.count({ where }),
     };
+  }
+
+  // ADMINISTRADOR/GESTOR/TECNICO pueden ver todas las views
+  // includeInactive solo para ADMIN/GESTOR
+  const effectiveIncludeInactive = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
+    ? includeInactive 
+    : false;
+  const where = buildWhereClause(view, user, q, effectiveIncludeInactive);
+
+  const personas = await prisma.persona.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+    include: {
+      user: { select: { id: true, username: true, email: true, role: true } },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      inmobiliaria: { select: { id: true, nombre: true } },
+    },
+  });
+
+  return {
+    personas: personas.map((p) => toPersona(p as PersonaWithRelations)),
+    total: await prisma.persona.count({ where }),
+  };
+}
+
+// Obtener persona por ID
+export async function getPersonaById(
+  id: number,
+  user?: { role: string }
+): Promise<Persona> {
+  const persona = await prisma.persona.findUnique({
+    where: { id },
+    include: {
+      user: { select: { id: true, username: true, email: true, role: true } },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      inmobiliaria: { select: { id: true, nombre: true } },
+    },
+  });
+
+  if (!persona) {
+    const error = new Error('Persona no encontrada');
+    (error as any).statusCode = 404;
+    throw error;
+  }
+
+  // Soft delete: solo ADMIN/GESTOR pueden ver personas INACTIVAS
+  if (persona.estado === 'INACTIVA') {
+    if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
+      const error = new Error('Persona no encontrada') as any;
+      error.statusCode = 404; // 404 para no revelar existencia
+      throw error;
     }
+  }
 
-    // obtener persona por ID
-    export async function getPersonaById(id: number): Promise<Persona> {
-    const persona = await prisma.persona.findUnique({
-        where: { id },
-        include: {
-          user: { select: { id: true, username: true, email: true, role: true } },
-          _count: { select: { lotesPropios: true, lotesAlquilados: true } },
-          jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-          miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-        }
-    });
+  return toPersona(persona as PersonaWithRelations);
+}
 
-    if (!persona) {
-        const error = new Error('Persona no encontrada');
-        (error as any).statusCode = 404;
-        throw error;
-    }
+// Crear persona
+export async function createPersona(
+  req: CreatePersonaDto,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<Persona> {
+  // Normalizar identificadorValor antes de verificar existencia
+  const identificadorValorNormalized = normalizeIdentificador(req.identificadorTipo, req.identificadorValor);
+  
+  // Verificar si ya existe una persona con el mismo identificador
+  const exists = await prisma.persona.findUnique({
+    where: {
+      identificadorTipo_identificadorValor: {
+        identificadorTipo: req.identificadorTipo,
+        identificadorValor: identificadorValorNormalized,
+      },
+    },
+  });
 
-    return toPersona(persona as PersonaWithRelations);
-    }
+  if (exists) {
+    const error = new Error('Ya existe una persona con ese identificador') as any;
+    error.statusCode = 409;
+    throw error;
+  }
 
-    // crear persona
-    export async function createPersona(req: CreatePersonaDto): Promise<Persona> {
-    // 1. Extraer tipo y valor del identificador
-    const parts = (req.identificador || '').split(':');
-    const identificadorValor = parts.length > 1 ? parts[1] : req.identificador;
+  // Si user.role === 'INMOBILIARIA', setear inmobiliariaId automáticamente
+  const inmobiliariaId = user?.role === 'INMOBILIARIA' && user?.inmobiliariaId
+    ? user.inmobiliariaId
+    : undefined;
 
-    // 2. Verificar si ya existe una persona con el mismo identificador
-    const exists = await prisma.persona.findFirst({ where: { cuil: identificadorValor } });
-    if (exists) {
-        const error = new Error('Ya existe una persona con este identificador') as any;
-        error.statusCode = 409;
-        throw error;
-    }
+  // Construir data (usar valor normalizado)
+  const createData: any = {
+    identificadorTipo: req.identificadorTipo,
+    identificadorValor: identificadorValorNormalized,
+    nombre: req.nombre?.trim(),
+    apellido: req.apellido?.trim(),
+    razonSocial: req.razonSocial?.trim(),
+    contacto: formatContacto(req.email, req.telefono),
+    updateAt: new Date(),
+    estado: 'ACTIVA',
+  };
 
-    // 3. Crear persona
-    // Construir data evitando depender de tipos generados aún no actualizados
-    const createData: any = {
-      nombre: req.nombre.trim(),
-      apellido: req.apellido.trim(),
-      cuil: identificadorValor,
-      contacto: formatContacto(req.email, req.telefono),
-      updateAt: new Date()
-    };
-    // Normalizar jefe de familia (si llega)
-    const jefeIdNormalized = (req.jefeDeFamiliaId !== undefined && req.jefeDeFamiliaId !== null && !Number.isNaN(Number(req.jefeDeFamiliaId)))
+  if (inmobiliariaId) {
+    createData.inmobiliariaId = inmobiliariaId;
+  }
+
+  // Normalizar jefe de familia
+  const jefeIdNormalized =
+    req.jefeDeFamiliaId !== undefined &&
+    req.jefeDeFamiliaId !== null &&
+    !Number.isNaN(Number(req.jefeDeFamiliaId))
       ? Number(req.jefeDeFamiliaId)
       : undefined;
 
-    const created = await prisma.persona.create({ data: createData });
+  let created;
+  try {
+    created = await prisma.persona.create({ data: createData });
 
-    // Si vino jefeDeFamiliaId, vincularlo por update/connect (fallback seguro)
+    // Si vino jefeDeFamiliaId, vincularlo
     if (jefeIdNormalized !== undefined) {
       await prisma.persona.update({
         where: { id: created.id },
         data: { jefeDeFamilia: { connect: { id: jefeIdNormalized } } },
       });
     }
+  } catch (e: any) {
+    if (e instanceof PrismaClientKnownRequestError) {
+      if (e.code === 'P2002') {
+        const error = new Error('Ya existe una persona con ese identificador') as any;
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+    throw e;
+  }
 
-    // Releer con includes para asegurar relaciones pobladas
-    const full = await prisma.persona.findUnique({
-      where: { id: created.id },
-      include: {
-        user: { select: { id: true, username: true, email: true, role: true } },
-        _count: { select: { lotesPropios: true, lotesAlquilados: true } },
-        jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-        miembrosFamilia: { select: { id: true, nombre: true, apellido: true, cuil: true } },
-      },
+  // Releer con includes
+  const full = await prisma.persona.findUnique({
+    where: { id: created.id },
+    include: {
+      user: { select: { id: true, username: true, email: true, role: true } },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
+      inmobiliaria: { select: { id: true, nombre: true } },
+    },
+  });
+
+  return toPersona(full as PersonaWithRelations, req.telefono, req.email);
+}
+
+// Actualizar persona
+export async function updatePersona(idActual: number, req: UpdatePersonaDto): Promise<PutPersonaResponse> {
+  try {
+    const existingPersona = await prisma.persona.findUnique({
+      where: { id: idActual },
     });
 
-    return toPersona(full as PersonaWithRelations, req.telefono, req.email);
+    if (!existingPersona) {
+      const error = new Error('Persona no encontrada') as any;
+      error.statusCode = 404;
+      throw error;
     }
 
-    // actualizar persona
-    export async function updatePersona(idActual: number, req: UpdatePersonaDto): Promise<PutPersonaResponse> {
-    try {
-        const existingPersona = await prisma.persona.findUnique({
-        where: { id: idActual }
+    const updateData: any = {
+      updateAt: new Date(),
+    };
+
+    if (req.nombre !== undefined) updateData.nombre = req.nombre.trim();
+    if (req.apellido !== undefined) updateData.apellido = req.apellido.trim();
+    if (req.razonSocial !== undefined) updateData.razonSocial = req.razonSocial.trim();
+
+    // Si viene identificador, normalizar y validar unicidad
+    if (req.identificadorTipo && req.identificadorValor) {
+      const identificadorValorNormalized = normalizeIdentificador(req.identificadorTipo, req.identificadorValor);
+      const nuevoIdentificador = {
+        identificadorTipo: req.identificadorTipo,
+        identificadorValor: identificadorValorNormalized,
+      };
+
+      // Verificar si cambió el identificador
+      if (
+        existingPersona.identificadorTipo !== nuevoIdentificador.identificadorTipo ||
+        existingPersona.identificadorValor !== nuevoIdentificador.identificadorValor
+      ) {
+        // Verificar que no exista otra persona con el mismo identificador
+        const duplicate = await prisma.persona.findUnique({
+          where: {
+            identificadorTipo_identificadorValor: nuevoIdentificador,
+          },
         });
 
-        if (!existingPersona) {
-        const error = new Error('Persona no encontrada') as any;
-        error.statusCode = 404;
-        throw error;
+        if (duplicate && duplicate.id !== idActual) {
+          const error = new Error('Ya existe una persona con ese identificador') as any;
+          error.statusCode = 409;
+          throw error;
         }
 
-        const updateData: any = {
-        updateAt: new Date()
-        };
-
-        if (req.nombre) updateData.nombre = req.nombre.trim();
-        if (req.apellido) updateData.apellido = req.apellido.trim();
-
-        if (req.identificador) {
-        const [tipo, valor] = req.identificador.split(':');
-        const nuevoIdentificador = valor;
-        
-        if (nuevoIdentificador !== existingPersona.cuil) {
-            // Verificar que no exista otra persona con el mismo identificador
-            const duplicate = await prisma.persona.findFirst({
-            where: { cuil: nuevoIdentificador }
-            });
-            if (duplicate) {
-            const error = new Error('Ya existe una persona con este identificador') as any;
-            error.statusCode = 409;
-            throw error;
-            }
-            updateData.cuil = nuevoIdentificador;
-        }
-        }
-
-        if (req.email !== undefined || req.telefono !== undefined) {
-        updateData.contacto = formatContacto(
-            req.email !== undefined ? req.email : parseEmail(existingPersona.contacto),
-            req.telefono !== undefined ? req.telefono : parseTelefono(existingPersona.contacto)
-        );
-        }
-
-        const updated = await prisma.persona.update({
-        where: { id: idActual },
-        data: updateData,
-        include: {
-            user: {
-            select: {
-                id: true,
-                username: true,
-                email: true,
-                role: true
-            }
-            }
-        }
-        });
-
-        return {
-        persona: toPersona(updated, req.telefono, req.email),
-        message: "La persona se actualizó con éxito"
-        };
-    } catch (e: any) {
-        if (e.code === 'P2025') {
-        const error = new Error('Persona no encontrada') as any;
-        error.statusCode = 404;
-        throw error;
-        }
-        throw e;
-    }
+        updateData.identificadorTipo = nuevoIdentificador.identificadorTipo;
+        updateData.identificadorValor = nuevoIdentificador.identificadorValor;
+      }
     }
 
-    // eliminar persona
-    export async function deletePersona(id: number): Promise<DeletePersonaResponse> {
-    try {
-        const existingPersona = await prisma.persona.findUnique({
-        where: { id }
-        });
-
-        if (!existingPersona) {
-        const error = new Error('Persona no encontrada') as any;
-        error.statusCode = 404;
-        throw error;
-        }
-
-        // Verificar si la persona tiene relaciones que impidan la eliminación
-        const lotes = await prisma.lote.count({
-        where: { propietarioId: id }
-        });
-
-        const ventas = await prisma.venta.count({
-        where: { compradorId: id }
-        });
-
-        const reservas = await prisma.reserva.count({
-        where: { clienteId: id }
-        });
-
-        if (lotes > 0 || ventas > 0 || reservas > 0) {
-        const error = new Error('No se puede eliminar la persona porque tiene relaciones activas') as any;
-        error.statusCode = 400;
-        throw error;
-        }
-
-        await prisma.persona.delete({ where: { id } });
-        return { message: 'Persona eliminada con éxito' };
-    } catch (e: any) {
-        if (e.code === 'P2025') {
-        const error = new Error('Persona no encontrada') as any;
-        error.statusCode = 404;
-        throw error;
-        }
-        throw e;
-    }
+    if (req.email !== undefined || req.telefono !== undefined) {
+      updateData.contacto = formatContacto(
+        req.email !== undefined ? req.email : parseEmail(existingPersona.contacto),
+        req.telefono !== undefined ? req.telefono : parseTelefono(existingPersona.contacto)
+      );
     }
 
-    // buscar persona por CUIL
-    export async function getPersonaByCuil(cuil: string): Promise<Persona | null> {
-    const persona = await prisma.persona.findFirst({
-        where: { cuil },
-        include: {
+    const updated = await prisma.persona.update({
+      where: { id: idActual },
+      data: updateData,
+      include: {
         user: {
-            select: {
+          select: {
             id: true,
             username: true,
             email: true,
-            role: true
-            }
-        }
-        }
+            role: true,
+          },
+        },
+        inmobiliaria: { select: { id: true, nombre: true } },
+      },
     });
 
-    if (!persona) return null;
+    return {
+      persona: toPersona(updated, req.telefono, req.email),
+      message: 'La persona se actualizó con éxito',
+    };
+  } catch (e: any) {
+    if (e instanceof PrismaClientKnownRequestError) {
+      if (e.code === 'P2025') {
+        const error = new Error('Persona no encontrada') as any;
+        error.statusCode = 404;
+        throw error;
+      }
+      if (e.code === 'P2002') {
+        const error = new Error('Ya existe una persona con ese identificador') as any;
+        error.statusCode = 409;
+        throw error;
+      }
+    }
+    throw e;
+  }
+}
 
-    return toPersona(persona);
+// Eliminar persona (soft delete)
+export async function deletePersona(id: number): Promise<DeletePersonaResponse> {
+  try {
+    const existingPersona = await prisma.persona.findUnique({
+      where: { id },
+    });
+
+    if (!existingPersona) {
+      const error = new Error('Persona no encontrada') as any;
+      error.statusCode = 404;
+      throw error;
     }
 
-    // Clase de servicio para mantener compatibilidad
-    export class PersonaService {
-    async create( data: CreatePersonaDto) {
-        return createPersona(data);
+    // Soft delete: setear estado = INACTIVA
+    await prisma.persona.update({
+      where: { id },
+      data: {
+        estado: 'INACTIVA',
+        updateAt: new Date(),
+      },
+    });
+
+    return { message: 'Persona eliminada con éxito' };
+  } catch (e: any) {
+    if (e instanceof PrismaClientKnownRequestError) {
+      if (e.code === 'P2025') {
+        const error = new Error('Persona no encontrada') as any;
+        error.statusCode = 404;
+        throw error;
+      }
     }
+    throw e;
+  }
+}
 
-    async findAll() {
-        const result = await getAllPersonas();
-        return result;
-    }
+// Buscar persona por identificador (nuevo método)
+export async function getPersonaByIdentificador(
+  tipo: IdentificadorTipo,
+  valor: string
+): Promise<Persona | null> {
+  const valorNormalized = normalizeIdentificador(tipo, valor);
+  
+  const persona = await prisma.persona.findUnique({
+    where: {
+      identificadorTipo_identificadorValor: {
+        identificadorTipo: tipo,
+        identificadorValor: valorNormalized,
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+        },
+      },
+      inmobiliaria: { select: { id: true, nombre: true } },
+    },
+  });
 
-    async findById(id: number) {
-        return getPersonaById(id);
-    }
+  if (!persona) return null;
 
-    async update(id: number, data: UpdatePersonaDto) {
-        return updatePersona(id, data);
-    }
+  return toPersona(persona);
+}
 
-    async delete(id: number) {
-        return deletePersona(id);
-    }
+// Buscar persona por CUIL (legacy endpoint - compatibilidad)
+export async function getPersonaByCuil(cuil: string): Promise<Persona | null> {
+  // Normalizar CUIL (quitar guiones, espacios, puntos)
+  const cuilNormalized = cuil.trim().replace(/[-.\s]/g, '');
+  
+  // 1. Buscar primero por identificadorTipo=CUIL con valor normalizado
+  let persona = await prisma.persona.findUnique({
+    where: {
+      identificadorTipo_identificadorValor: {
+        identificadorTipo: 'CUIL',
+        identificadorValor: cuilNormalized,
+      },
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          role: true,
+        },
+      },
+      inmobiliaria: { select: { id: true, nombre: true } },
+    },
+  });
 
-    async findByCuil(cuil: string) {
-        return getPersonaByCuil(cuil);
-    }
-    }
+  // 2. Si no se encuentra, fallback al campo legacy cuil
+  if (!persona) {
+    persona = await prisma.persona.findFirst({
+      where: {
+        cuil: cuilNormalized,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            role: true,
+          },
+        },
+        inmobiliaria: { select: { id: true, nombre: true } },
+      },
+    });
+  }
 
+  if (!persona) return null;
 
+  return toPersona(persona);
+}
 
+// Clase de servicio para mantener compatibilidad
+export class PersonaService {
+  async create(data: CreatePersonaDto, user?: { role: string; inmobiliariaId?: number | null }) {
+    return createPersona(data, user);
+  }
+
+  async findAll(
+    user?: { role: string; inmobiliariaId?: number | null },
+    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; limit?: number }
+  ) {
+    const result = await getAllPersonas(user, query);
+    return result;
+  }
+
+  async findById(id: number, user?: { role: string }) {
+    return getPersonaById(id, user);
+  }
+
+  async update(id: number, data: UpdatePersonaDto) {
+    return updatePersona(id, data);
+  }
+
+  async delete(id: number) {
+    return deletePersona(id);
+  }
+
+  async findByIdentificador(tipo: IdentificadorTipo, valor: string) {
+    return getPersonaByIdentificador(tipo, valor);
+  }
+
+  async findByCuil(cuil: string) {
+    return getPersonaByCuil(cuil);
+  }
+}
