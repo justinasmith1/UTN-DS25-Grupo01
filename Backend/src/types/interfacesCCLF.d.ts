@@ -36,6 +36,13 @@ export interface Persona {
     identificador: Identificador;
     telefono?: number;
     email?: string;
+    razonSocial?: string;
+    identificadorTipo?: string;
+    identificadorValor?: string;
+    contacto?: string;
+    estado?: string;
+    inmobiliariaId?: number | null;
+    inmobiliaria?: { id: number; nombre: string } | null;
 
     // Extensiones para módulo Propietarios/Inquilinos y Grupo Familiar
     esPropietario?: boolean;

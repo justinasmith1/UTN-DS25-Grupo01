@@ -10,18 +10,35 @@ import { http, normalizeApiListResponse } from '../http/http';
 export const fromApi = (apiPersona) => {
   if (!apiPersona) return null;
 
+  // DisplayName: razonSocial o nombre+apellido
+  const displayName = apiPersona.razonSocial 
+    ? apiPersona.razonSocial 
+    : `${apiPersona.nombre || ''} ${apiPersona.apellido || ''}`.trim();
+
+  // Identificador: usar identificadorTipo e identificadorValor (nuevo) o fallback a legacy
+  const identificadorTipo = apiPersona.identificadorTipo || apiPersona.identificador || 'CUIL';
+  const identificadorValor = apiPersona.identificadorValor || apiPersona.cuil || '';
+
   return {
     id: apiPersona.idPersona,
     nombre: apiPersona.nombre || '',
     apellido: apiPersona.apellido || '',
-    nombreCompleto: `${apiPersona.nombre || ''} ${apiPersona.apellido || ''}`.trim(),
-    identificador: apiPersona.identificador || 'CUIL',
+    razonSocial: apiPersona.razonSocial || '',
+    nombreCompleto: displayName,
+    displayName: displayName,
+    identificador: identificadorTipo,
+    identificadorTipo: identificadorTipo,
+    identificadorValor: identificadorValor,
     telefono: apiPersona.telefono || null,
     email: apiPersona.email || null,
-    cuil: apiPersona.cuil || '',
+    contacto: apiPersona.contacto || null,
+    cuil: apiPersona.cuil || identificadorValor, // Legacy
+    estado: apiPersona.estado || 'ACTIVA',
     createdAt: apiPersona.createdAt || new Date().toISOString(),
     esPropietario: Boolean(apiPersona.esPropietario),
     esInquilino: Boolean(apiPersona.esInquilino),
+    inmobiliariaId: apiPersona.inmobiliariaId || null,
+    inmobiliaria: apiPersona.inmobiliaria || null,
   };
 };
 
@@ -50,9 +67,23 @@ export const toApi = (frontendPersona) => {
 export const getAllPersonas = async (params = {}) => {
   try {
     // Construir query string si hay parámetros
-    const queryString = Object.keys(params).length > 0 
-      ? '?' + new URLSearchParams(params).toString() 
-      : '';
+    // Asegurar que view, q, includeInactive se envíen correctamente
+    const queryParams = new URLSearchParams();
+    
+    if (params.view) {
+      queryParams.append('view', params.view);
+    }
+    if (params.q) {
+      queryParams.append('q', params.q);
+    }
+    if (params.includeInactive === true || params.includeInactive === 'true') {
+      queryParams.append('includeInactive', 'true');
+    }
+    if (params.limit) {
+      queryParams.append('limit', params.limit.toString());
+    }
+    
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     
     const response = await http(`/personas${queryString}`, { method: 'GET' });
     const data = await response.json().catch(() => ({}));

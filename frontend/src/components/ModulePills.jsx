@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../app/providers/AuthProvider';
 import { visibleModulesForUser, MODULES } from '../lib/auth/rbac.ui';
+
+// Hook para obtener rol del usuario (helper)
+function useUserRole() {
+  const { user } = useAuth();
+  return (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
+}
 
 // Meta UI local para rótulos y rutas (independiente de cómo exporte rbac.ui MODULES)
 const MODULES_META = {
@@ -14,9 +20,20 @@ const MODULES_META = {
   // usuarios:  { label: 'Usuarios',       path: '/usuarios' },
 };
 
+// Mapeo de vistas a labels (para Personas)
+const VIEW_LABELS = {
+  ALL: 'Todos',
+  PROPIETARIOS: 'Propietarios',
+  INQUILINOS: 'Inquilinos',
+  CLIENTES: 'Clientes',
+  MIS_CLIENTES: 'Mis Clientes',
+};
+
 export default function ModulePills() {
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
+  const userRole = useUserRole();
 
   // Visibilidad por RBAC (si auth no cargó, fallback a todos)
   let modules = visibleModulesForUser(user);
@@ -25,6 +42,18 @@ export default function ModulePills() {
     : Object.keys(MODULES);               // fallback: todas las claves definidas en rbac.ui
 
   // Contenido del menú por módulo (acciones del panel)
+  // Personas: diferentes opciones según rol
+  const personasMenu = userRole === 'INMOBILIARIA' 
+    ? [
+        { label: 'Ver Mis Clientes', to: '/personas?view=MIS_CLIENTES', disabled: false },
+      ]
+    : [
+        { label: 'Ver Todos', to: '/personas?view=ALL', disabled: false },
+        { label: 'Ver Propietarios', to: '/personas?view=PROPIETARIOS', disabled: false },
+        { label: 'Ver Inquilinos', to: '/personas?view=INQUILINOS', disabled: false },
+        { label: 'Ver Clientes', to: '/personas?view=CLIENTES', disabled: false },
+      ];
+
   const MENU = useMemo(() => ({
     ventas: [
       { label: 'Ver Ventas', to: '/ventas', disabled: false },
@@ -42,15 +71,11 @@ export default function ModulePills() {
       { label: 'Ver Reportes', to: '/reportes', disabled: false },
       { label: 'Descargar Reporte', to: null, disabled: true },
     ],
-    personas: [
-      { label: 'Ver Todos', to: '/personas', disabled: false },
-      { label: 'Ver Propietarios', to: '/personas?tipo=propietario', disabled: false },
-      { label: 'Ver Inquilinos', to: '/personas?tipo=inquilino', disabled: false },
-    ],
+    personas: personasMenu,
     lotes: [
       { label: 'Ver Lotes', to: '/dashboard', disabled: false },
     ],
-  }), []);
+  }), [personasMenu]);
 
   // UI: panel abierto
   const [openKey, setOpenKey] = useState(null);
@@ -254,6 +279,12 @@ export default function ModulePills() {
             // 🔸 NUEVO: solo marcamos en amarillo los módulos definidos en HIGHLIGHT_KEYS
             const isHighlight = active && HIGHLIGHT_KEYS.has(key);
 
+            // Obtener view actual para Personas
+            const currentView = key === 'personas' && active 
+              ? (searchParams.get('view') || (userRole === 'INMOBILIARIA' ? 'MIS_CLIENTES' : 'ALL'))
+              : null;
+            const viewLabel = currentView ? VIEW_LABELS[currentView] || currentView : null;
+
             return (
               <div
                 key={key}
@@ -276,9 +307,24 @@ export default function ModulePills() {
                     width: '100%',
                     padding: `0 ${PADDING_X}px`,
                     color: 'inherit',
+                    gap: '8px',
                   }}
                 >
                   <span>{meta.label}</span>
+                  {viewLabel && (
+                    <span 
+                      style={{
+                        fontSize: '0.75rem',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        background: 'rgba(255, 255, 255, 0.2)',
+                        border: '1px solid rgba(255, 255, 255, 0.3)',
+                        fontWeight: 500,
+                      }}
+                    >
+                      Viendo: {viewLabel}
+                    </span>
+                  )}
                   <span className="mods-caret" aria-hidden>▾</span>
                 </button>
 

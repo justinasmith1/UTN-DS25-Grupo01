@@ -14,9 +14,30 @@ const TablaPersonas = ({
   onAgregarPersona,
   selectedIds = [],
   onSelectedChange,
-  className = ''
+  className = '',
+  userRole
 }) => {
   const { user } = useAuth();
+  const effectiveUserRole = userRole || (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
+  
+  // Determinar columnas visibles por defecto (sin ID, estado solo Admin/Gestor)
+  const defaultVisibleIds = useMemo(() => {
+    const base = personasTablePreset.defaultVisibleIds || [];
+    // Agregar estado solo si es Admin/Gestor
+    if (effectiveUserRole === 'ADMINISTRADOR' || effectiveUserRole === 'GESTOR') {
+      return [...base, 'estado'];
+    }
+    return base;
+  }, [effectiveUserRole]);
+  
+  // Filtrar columnas disponibles según rol (estado solo Admin/Gestor)
+  const availableColumns = useMemo(() => {
+    if (effectiveUserRole === 'ADMINISTRADOR' || effectiveUserRole === 'GESTOR') {
+      return personasTablePreset.columns;
+    }
+    // Para otros roles, excluir columna estado
+    return personasTablePreset.columns.filter(col => col.id !== 'estado');
+  }, [effectiveUserRole]);
 
   // Función para renderizar acciones de fila
   const renderRowActions = useCallback((persona) => {
@@ -125,8 +146,9 @@ const TablaPersonas = ({
     <div className={`tabla-personas ${className}`}>
       <TablaBase
         rows={personas}
-        columns={personasTablePreset.columns}
+        columns={availableColumns}
         widthFor={personasTablePreset.widthFor}
+        defaultVisibleIds={defaultVisibleIds}
         renderRowActions={renderRowActions}
         toolbarRight={topActions}
         selected={selectedIds}
