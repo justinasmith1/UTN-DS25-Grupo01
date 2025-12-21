@@ -50,14 +50,13 @@ export default function FilterBarPersonas({
       { value: 'FEDERALA', label: 'La Federala' }
     ];
     
-    // Agregar inmobiliarias dinámicamente
+    // Agregar inmobiliarias dinámicamente, por si hay mas de 4 en algun momento cuando creemos alguna otra, funciona ya chequeado
     inmobiliarias.forEach(inm => {
       options.push({
-        value: inm.value, // ID numérico
+        value: inm.value,
         label: inm.label
       });
     });
-    
     return options;
   }, [userRole, inmobiliarias]);
 
@@ -73,7 +72,7 @@ export default function FilterBarPersonas({
         placeholder: 'Nombre, apellido, identificador...',
         defaultValue: ''
       },
-      // Estado (solo Admin/Gestor) - default "ALL" (Todas)
+      // Estado (solo Admin/Gestor)
       ...(isAdminOrGestor ? [{
         id: 'estado',
         type: 'singleSelect',

@@ -1,3 +1,5 @@
+// Archivo destinado a definir las columnas y presets para la tabla de Personas
+
 import { fmtNombreCompleto, fmtIdentificador, fmtContacto, fmtFecha, fmtEstadoPersona } from '../utils/formatters';
 
 // Helper para parsear contacto (email/teléfono desde string contacto)
@@ -10,11 +12,9 @@ const parseContacto = (contacto) => {
   return { email, telefono };
 };
 
-// Helper para parsear contacto ya está arriba, fmtEstadoPersona viene de formatters
-
 // Columnas base (siempre disponibles)
 const baseColumns = [
-  // NO incluir columna ID
+  // NO ponemos el ID xq nunca se muestra
   {
     id: 'nombreCompleto',
     header: 'Nombre Completo',
@@ -30,7 +30,7 @@ const baseColumns = [
     width: 120,
     sortable: true,
     align: 'center',
-    // Esta columna solo se mostrará para Admin/Gestor (se filtra en TablaPersonas)
+    // Esta columna solo se muestra solo para Admin/Gestor
   },
   {
     id: 'identificador',
@@ -58,7 +58,7 @@ const baseColumns = [
     width: 200,
     sortable: true,
     align: 'center',
-    // Esta columna solo se mostrará para Admin/Gestor (se filtra en TablaPersonas)
+    // Esta columna solo se muestra solo para Admin/Gestor
   },
   {
     id: 'createdAt',
@@ -68,7 +68,8 @@ const baseColumns = [
     sortable: true,
     align: 'center',
   },
-  // Columnas opcionales (no visibles por defecto)
+
+  // Columnas opcionales, las otras que puede elegit el usuario
   {
     id: 'lotes',
     header: 'Lotes',

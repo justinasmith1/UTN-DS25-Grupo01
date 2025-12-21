@@ -1,3 +1,6 @@
+// frontend/src/components/Table/TablaPersonas/TablaPersonas.jsx
+// Tablero de personas con columnas dinámicas según rol y acciones basadas en permisos
+
 import React, { useMemo, useCallback } from 'react';
 import { Eye, Edit, Trash2, UserPlus } from 'lucide-react';
 import TablaBase from '../TablaBase';

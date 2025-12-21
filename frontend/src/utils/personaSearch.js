@@ -1,37 +1,24 @@
 // ===================
-// Helpers para búsqueda de personas (client-side)
+// Helpers para búsqueda de personas
 // ===================
 
-/**
- * Normaliza texto: lower, sin tildes, trim, colapsa espacios múltiples
- */
+/** Normaliza texto: lower, sin tildes, trim, colapsa espacios múltiples */
 export const normalizeText = (str) => {
   if (!str) return '';
-  
-  return String(str)
-    .toLowerCase()
-    .normalize('NFD') // Descompone caracteres con tildes
-    .replace(/[\u0300-\u036f]/g, '') // Elimina diacríticos (tildes)
-    .trim()
-    .replace(/\s+/g, ' '); // Colapsa espacios múltiples
+  return String(str).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
 };
 
-/**
- * Divide el texto de búsqueda en tokens
- */
+/** Divide el texto de búsqueda en tokens */
 export const tokenizeSearch = (searchText) => {
   if (!searchText) return [];
-  
   const normalized = normalizeText(searchText);
-  return normalized
-    .split(/\s+/)
-    .filter(token => token.length > 0);
+  return normalized.split(/\s+/).filter(token => token.length > 0);
 };
 
 /**
  * Verifica si un token matchea contra un campo
  * - includes sobre el string completo normalizado
- * - startsWith por palabra (para que "p" matchee con "perez")
+ * - startsWith por palabra (para que "p" matchee con "perez" por ejemplo)
  */
 export const tokenMatchesField = (token, fieldValue) => {
   if (!fieldValue) return false;
@@ -46,9 +33,7 @@ export const tokenMatchesField = (token, fieldValue) => {
   return words.some(word => word.startsWith(token));
 };
 
-/**
- * Verifica si una persona matchea con el texto de búsqueda
- */
+/** Verifica si una persona matchea con el texto de búsqueda */
 export const matchesSearch = (persona, searchText) => {
   if (!searchText || !searchText.trim()) return true;
   
@@ -81,9 +66,7 @@ export const matchesSearch = (persona, searchText) => {
   );
 };
 
-/**
- * Aplica búsqueda a una lista de personas
- */
+/** Aplica búsqueda a una lista de personas */
 export const applySearch = (personas, searchText) => {
   if (!personas || !Array.isArray(personas)) return [];
   if (!searchText || !searchText.trim()) return personas;

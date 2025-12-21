@@ -12,9 +12,6 @@ export const applyPersonaFilters = (personas, filters = {}) => {
   }
 
   return personas.filter(persona => {
-    // Búsqueda (q) ya NO se maneja aquí - se aplica por separado en Personas.jsx
-    // usando applySearch() para mantener búsqueda 100% frontend
-
     // Filtro por estado (solo si no es "ALL" o "TODAS")
     if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
       if (persona.estado !== filters.estado) {
@@ -22,7 +19,7 @@ export const applyPersonaFilters = (personas, filters = {}) => {
       }
     }
 
-    // Filtro por cliente de (unificado - soporta múltiples selecciones)
+    // Filtro por "cliente de" (puede elegir mas de una)
     if (filters.clienteDe && Array.isArray(filters.clienteDe) && filters.clienteDe.length > 0) {
       const personaInmobiliariaId = persona.inmobiliariaId 
         ? (typeof persona.inmobiliariaId === 'number' ? persona.inmobiliariaId : parseInt(String(persona.inmobiliariaId), 10))
@@ -31,7 +28,7 @@ export const applyPersonaFilters = (personas, filters = {}) => {
       // Verificar si la persona coincide con alguna de las selecciones
       const matches = filters.clienteDe.some(selected => {
         // Si es "FEDERALA" o "LA_FEDERALA"
-        if (selected === 'FEDERALA' || selected === 'LA_FEDERALA') {
+        if (selected === 'FEDERALA') {
           return personaInmobiliariaId === null || personaInmobiliariaId === undefined;
         }
         
@@ -69,7 +66,7 @@ export const applyPersonaFilters = (personas, filters = {}) => {
         const fechaCreacion = persona.createdAt ? new Date(persona.createdAt) : null;
         
         if (!fechaCreacion || isNaN(fechaCreacion.getTime())) {
-          // Si no tiene fecha válida y se está filtrando por fecha, excluir
+          // Si no tiene fecha válida y se está filtrando por fecha no debería incluirse supuestamente
           return false;
         }
         
@@ -96,9 +93,7 @@ export const applyPersonaFilters = (personas, filters = {}) => {
   });
 };
 
-/**
- * Aplica ordenamiento a una lista de personas
- */
+/** Aplica ordenamiento a una lista de personas */
 export const applyPersonaSorting = (personas, sort) => {
   if (!personas || !Array.isArray(personas) || !sort?.field) {
     return personas;
@@ -138,9 +133,7 @@ export const applyPersonaSorting = (personas, sort) => {
   });
 };
 
-/**
- * Aplica paginación a una lista de personas
- */
+/** Aplica paginación a una lista de personas */
 export const applyPersonaPagination = (personas, pagination) => {
   if (!personas || !Array.isArray(personas) || !pagination) {
     return personas;
@@ -153,9 +146,7 @@ export const applyPersonaPagination = (personas, pagination) => {
   return personas.slice(start, end);
 };
 
-/**
- * Aplica filtros, ordenamiento y paginación a una lista de personas
- */
+/** Aplica filtros, ordenamiento y paginación a una lista de personas */
 export const applyPersonaFiltersAndPagination = (personas, filters, sort, pagination) => {
   let filtered = applyPersonaFilters(personas, filters);
   let sorted = applyPersonaSorting(filtered, sort);
