@@ -2,10 +2,7 @@
 // Formatters para Personas
 // ===================
 
-/**
- * Formatea el nombre completo de una persona (displayName)
- * Usa razonSocial si existe, sino nombre + apellido
- */
+/** Formatea el nombre completo de una persona (depende de que sea ), usa razonSocial si existe, sino nombre + apellido */
 export const fmtNombreCompleto = (persona) => {
   // Acepta objeto persona o (nombre, apellido, razonSocial)
   let razonSocial, nombre, apellido;
@@ -14,13 +11,8 @@ export const fmtNombreCompleto = (persona) => {
     razonSocial = persona.razonSocial;
     nombre = persona.nombre;
     apellido = persona.apellido;
-  } else {
-    // Legacy: acepta (nombre, apellido) como parámetros separados
-    nombre = persona;
-    apellido = arguments[1];
-    razonSocial = arguments[2];
-  }
-  
+  } 
+
   const displayName = razonSocial 
     ? razonSocial 
     : `${nombre || ''} ${apellido || ''}`.trim();
@@ -32,10 +24,7 @@ export const fmtNombreCompleto = (persona) => {
   );
 };
 
-/**
- * Formatea el identificador (DNI, CUIT, CUIL, Pasaporte)
- * Muestra [BADGE TIPO] + valor con colores profesionales
- */
+/** Formatea el identificador (DNI, CUIT, CUIL, Pasaporte) */
 export const fmtIdentificador = (personaOrTipo, valor) => {
   // Acepta objeto persona o (tipo, valor) como parámetros separados
   let tipo, identificadorValor;
@@ -66,8 +55,6 @@ export const fmtIdentificador = (personaOrTipo, valor) => {
     if (tipoUpper === 'PASAPORTE' || tipoUpper === 'Pasaporte') return 'warn'; // amarillo
     return 'muted';
   };
-
-  
   const minWidth = '125px'; // Suficiente para "CUIL 20123456789" o "CUIT 30123456789"
 
   return (
@@ -82,10 +69,8 @@ export const fmtIdentificador = (personaOrTipo, valor) => {
   );
 };
 
-/**
- * Formatea la información de contacto (email y teléfono)
- * Si ambos son null/empty, muestra "—"
- */
+/** Formatea la información de contacto (email y teléfono)
+ * Si ambos son null/empty, muestra "—" */
 export const fmtContacto = (email, telefono) => {
   if (!email && !telefono) {
     return <span className="text-muted">—</span>;
@@ -116,26 +101,23 @@ export const fmtContacto = (email, telefono) => {
 /**
  * Formatea un número de teléfono
  */
-export const fmtTelefono = (telefono) => {
+  export const fmtTelefono = (telefono) => {
   if (!telefono) return '';
   
   const str = telefono.toString();
   if (str.length === 10) {
     // Formato: 1123456789 -> 11-2345-6789
-    return `${str.slice(0, 2)}-${str.slice(2, 6)}-${str.slice(6)}`;
+    return `${str.slice(0, 3)}-${str.slice(3, 7)}-${str.slice(7)}`;
   } else if (str.length === 11) {
     // Formato: 11234567890 -> 11-2345-67890
-    return `${str.slice(0, 2)}-${str.slice(2, 6)}-${str.slice(6)}`;
+    return `${str.slice(0, 3)}-${str.slice(3, 7)}-${str.slice(7)}`;
   }
   return str;
 };
 
-/**
- * Formatea una fecha
- */
+/** Formatea una fecha */
 export const fmtFecha = (fecha) => {
   if (!fecha) return <span className="text-muted">Sin fecha</span>;
-  
   try {
     const date = new Date(fecha);
     return (
@@ -152,9 +134,7 @@ export const fmtFecha = (fecha) => {
   }
 };
 
-/**
- * Formatea el estado de contacto (si tiene email, teléfono, ambos o ninguno)
- */
+/** Formatea el estado de contacto (si tiene email, teléfono, ambos o ninguno) */
 export const fmtEstadoContacto = (email, telefono) => {
   const tieneEmail = !!email;
   const tieneTelefono = !!telefono;
@@ -168,29 +148,8 @@ export const fmtEstadoContacto = (email, telefono) => {
   }
 };
 
-/**
- * Formatea el tipo de identificador con color
- */
-export const fmtTipoIdentificador = (tipo) => {
-  const tipos = {
-    'DNI': { color: 'primary', icon: '🆔' },
-    'CUIT': { color: 'success', icon: '🏢' },
-    'CUIL': { color: 'info', icon: '👤' },
-    'Pasaporte': { color: 'warning', icon: '📘' }
-  };
 
-  const config = tipos[tipo] || { color: 'secondary', icon: '📄' };
-
-  return (
-    <span className={`badge bg-${config.color}`}>
-      {config.icon} {tipo}
-    </span>
-  );
-};
-
-/**
- * Formatea el valor del identificador con formato específico
- */
+/** Formatea el valor del identificador con formato específico */
 export const fmtValorIdentificador = (tipo, valor) => {
   if (!valor) return '';
 
@@ -219,10 +178,7 @@ export const fmtValorIdentificador = (tipo, valor) => {
   return valor;
 };
 
-/**
- * Formatea el estado de persona (ACTIVA/INACTIVA)
- * Usa el mismo badge que Lotes (tl-badge)
- */
+/** Formatea el estado de persona (ACTIVA/INACTIVA), usa el mismo badge que usasmo para los Lotes */
 export const fmtEstadoPersona = (estado) => {
   if (!estado) return <span className="text-muted">—</span>;
   

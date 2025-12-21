@@ -4,17 +4,10 @@ import { TIPOS_IDENTIFICADOR, ESTADOS_PERSONA } from '../presets/personas.preset
 // Utilidades para chips de filtros de Personas
 // ===================
 
-/**
- * Convierte los filtros de personas a chips para mostrar
- */
+/** Convierte los filtros de personas a chips para mostrar */
 export const personasChipsFrom = (filters, catalogs = {}) => {
   const chips = [];
-
-  // NO mostrar chip de búsqueda (el buscador ya es visible en la UI)
-  // La búsqueda se maneja por separado y no necesita chip
-
-  // Estado (solo Admin/Gestor) - NO mostrar si es "ALL" o "TODAS"
-  // El chip muestra solo el valor seleccionado, no "Estado: ..."
+  // Estado (solo Admin/Gestor)
   if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
     const estado = ESTADOS_PERSONA.find(e => e.value === filters.estado);
     const displayValue = estado ? estado.label : filters.estado;
@@ -29,7 +22,6 @@ export const personasChipsFrom = (filters, catalogs = {}) => {
   }
 
   // Cliente de (solo Admin/Gestor) - unificado (multiSelect)
-  // El chip debe mostrar solo el valor seleccionado, no "Cliente de: ..."
   // Soporta múltiples selecciones: cada una genera su propio chip
   if (filters.clienteDe && Array.isArray(filters.clienteDe) && filters.clienteDe.length > 0) {
     filters.clienteDe.forEach(selected => {
@@ -56,33 +48,30 @@ export const personasChipsFrom = (filters, catalogs = {}) => {
           displayValue = String(selected);
         }
       }
-      
       // Cada selección genera su propio chip
       chips.push({
         id: `clienteDe-${selected}`,
         k: 'clienteDe',
-        label: displayValue, // Mostrar solo el valor seleccionado
+        label: displayValue,
         value: displayValue,
-        v: selected, // Valor individual para poder removerlo
+        v: selected, 
         color: 'info'
       });
     });
   }
 
   // Tipo de identificador (multiSelect)
-  // El chip muestra solo el valor seleccionado, no "Tipo ID: ..."
-  // Soporta múltiples selecciones: cada una genera su propio chip
+  // Tambien soporta varias
   if (filters.identificadorTipo && Array.isArray(filters.identificadorTipo) && filters.identificadorTipo.length > 0) {
     filters.identificadorTipo.forEach(selected => {
       const tipo = TIPOS_IDENTIFICADOR.find(t => t.value === selected);
       const displayValue = tipo ? tipo.label : selected;
-      
       chips.push({
         id: `identificadorTipo-${selected}`,
         k: 'identificadorTipo',
-        label: displayValue, // Mostrar solo el valor seleccionado (ej: "DNI", "CUIL")
+        label: displayValue, 
         value: displayValue,
-        v: selected, // Valor individual para poder removerlo
+        v: selected, 
         color: 'warning'
       });
     });
@@ -105,7 +94,7 @@ export const personasChipsFrom = (filters, catalogs = {}) => {
       chips.push({
         id: 'fechaCreacion',
         k: 'fechaCreacion',
-        label: fechaText, // Mostrar solo el rango de fechas
+        label: fechaText, 
         value: fechaText,
         v: filters.fechaCreacion,
         color: 'secondary'
@@ -116,9 +105,7 @@ export const personasChipsFrom = (filters, catalogs = {}) => {
   return chips;
 };
 
-/**
- * Formatea una fecha para mostrar en chips
- */
+/** Formatea una fecha para mostrar en chips */
 export const nice = (dateString) => {
   if (!dateString) return '';
   
