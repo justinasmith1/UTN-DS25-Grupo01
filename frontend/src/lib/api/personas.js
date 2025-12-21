@@ -39,6 +39,7 @@ export const fromApi = (apiPersona) => {
     esInquilino: Boolean(apiPersona.esInquilino),
     inmobiliariaId: apiPersona.inmobiliariaId || null,
     inmobiliaria: apiPersona.inmobiliaria || null,
+    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
   };
 };
 
@@ -67,20 +68,38 @@ export const toApi = (frontendPersona) => {
 export const getAllPersonas = async (params = {}) => {
   try {
     // Construir query string si hay parámetros
-    // Asegurar que view, q, includeInactive se envíen correctamente
     const queryParams = new URLSearchParams();
     
+    // Parámetros básicos
     if (params.view) {
       queryParams.append('view', params.view);
     }
-    if (params.q) {
-      queryParams.append('q', params.q);
-    }
+    // q (búsqueda) ya NO se envía al backend - se maneja 100% en frontend
     if (params.includeInactive === true || params.includeInactive === 'true') {
       queryParams.append('includeInactive', 'true');
     }
     if (params.limit) {
       queryParams.append('limit', params.limit.toString());
+    }
+    
+    // Nuevos filtros
+    if (params.estado) {
+      queryParams.append('estado', params.estado);
+    }
+    if (params.clienteDe) {
+      queryParams.append('clienteDe', params.clienteDe);
+    }
+    if (params.inmobiliariaId) {
+      queryParams.append('inmobiliariaId', String(params.inmobiliariaId));
+    }
+    if (params.identificadorTipo) {
+      queryParams.append('identificadorTipo', params.identificadorTipo);
+    }
+    if (params.createdFrom) {
+      queryParams.append('createdFrom', params.createdFrom);
+    }
+    if (params.createdTo) {
+      queryParams.append('createdTo', params.createdTo);
     }
     
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';

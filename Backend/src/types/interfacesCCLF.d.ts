@@ -43,6 +43,7 @@ export interface Persona {
     estado?: string;
     inmobiliariaId?: number | null;
     inmobiliaria?: { id: number; nombre: string } | null;
+    _count?: { lotesPropios?: number; lotesAlquilados?: number; Reserva?: number; Venta?: number };
 
     // Extensiones para módulo Propietarios/Inquilinos y Grupo Familiar
     esPropietario?: boolean;

@@ -27,6 +27,7 @@ export default function FilterBarBase({
   
   // Callbacks
   onParamsChange,
+  onSearchChange, // Callback opcional para búsqueda (si no se pasa, usa onParamsChange)
   
   // Configuración de vistas
   viewsConfig = null, // { isInmo, variant, sanitizeForRole }
@@ -111,6 +112,7 @@ export default function FilterBarBase({
   }, [initialValue]);
 
   // Debounce de búsqueda (solo para búsqueda inmediata)
+  // Si hay onSearchChange, usarlo en lugar de onParamsChange para búsqueda
   const searchField = fields.find(f => f.type === 'search');
   const searchValue = searchField ? filterState[searchField.id] : '';
   
@@ -119,20 +121,29 @@ export default function FilterBarBase({
     
     const timeoutId = setTimeout(() => {
       setAppliedFilters((prev) => ({ ...prev, [searchField.id]: searchValue }));
-      onParamsChange?.({ [searchField.id]: searchValue });
+      
+      // Si hay onSearchChange, usarlo para búsqueda (no dispara fetch)
+      // Si no, usar onParamsChange (comportamiento por defecto)
+      if (onSearchChange) {
+        onSearchChange(searchValue);
+      } else {
+        onParamsChange?.({ [searchField.id]: searchValue });
+      }
     }, DEBOUNCE_MS);
     
     return () => clearTimeout(timeoutId);
-  }, [searchValue, searchField]);
+  }, [searchValue, searchField, onSearchChange, onParamsChange]);
 
   const toggle = (fieldId, value) => {
     const currentValue = filterState[fieldId];
     const field = fields.find(f => f.id === fieldId);
     
     if (field?.type === 'multiSelect') {
-      const newValue = currentValue.includes(value) 
-        ? currentValue.filter(v => v !== value)
-        : [...currentValue, value];
+      // Asegurar que currentValue sea un array
+      const currentArray = Array.isArray(currentValue) ? currentValue : [];
+      const newValue = currentArray.includes(value) 
+        ? currentArray.filter(v => v !== value)
+        : [...currentArray, value];
       setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
     } else if (field?.type === 'singleSelect') {
       const newValue = currentValue === value ? null : value;
@@ -181,7 +192,18 @@ export default function FilterBarBase({
     
     if (field.type === 'multiSelect' && Array.isArray(newAppliedFilters[key])) {
       // Para multiSelect, remover el valor específico
-      newAppliedFilters[key] = newAppliedFilters[key].filter(v => v !== valueToRemove);
+      // Comparar considerando que puede venir como número o string
+      newAppliedFilters[key] = newAppliedFilters[key].filter(v => {
+        // Comparación estricta primero
+        if (v === valueToRemove) return false;
+        // Si no coincide, intentar comparación numérica
+        const vNum = typeof v === 'number' ? v : parseInt(String(v), 10);
+        const removeNum = typeof valueToRemove === 'number' ? valueToRemove : parseInt(String(valueToRemove), 10);
+        if (!isNaN(vNum) && !isNaN(removeNum)) {
+          return vNum !== removeNum;
+        }
+        return true; // Mantener si no coincide
+      });
     } else if (field.type === 'singleSelect') {
       // Para singleSelect, resetear al valor por defecto
       newAppliedFilters[key] = defaults[key] ?? field.defaultValue ?? getDefaultValueForType(field.type);

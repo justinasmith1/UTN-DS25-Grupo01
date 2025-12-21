@@ -34,7 +34,7 @@ export const fmtNombreCompleto = (persona) => {
 
 /**
  * Formatea el identificador (DNI, CUIT, CUIL, Pasaporte)
- * Muestra TIPO + VALOR como texto simple (sin badges de colores)
+ * Muestra [BADGE TIPO] + valor con colores profesionales
  */
 export const fmtIdentificador = (personaOrTipo, valor) => {
   // Acepta objeto persona o (tipo, valor) como parámetros separados
@@ -53,15 +53,32 @@ export const fmtIdentificador = (personaOrTipo, valor) => {
     return <span className="text-muted">—</span>;
   }
 
-  // Mostrar como texto simple: "TIPO VALOR" (sin badges)
   if (!identificadorValor) {
     return <span className="text-muted">—</span>;
   }
 
+  // Colores para badges según tipo
+  const getBadgeVariant = (tipo) => {
+    const tipoUpper = String(tipo).toUpperCase();
+    if (tipoUpper === 'DNI') return 'info'; // azul
+    if (tipoUpper === 'CUIL') return 'indigo'; // violeta
+    if (tipoUpper === 'CUIT') return 'muted'; // gris
+    if (tipoUpper === 'PASAPORTE' || tipoUpper === 'Pasaporte') return 'warn'; // amarillo
+    return 'muted';
+  };
+
+  
+  const minWidth = '125px'; // Suficiente para "CUIL 20123456789" o "CUIT 30123456789"
+
   return (
-    <span className="font-monospace">
-      {tipo} {identificadorValor}
-    </span>
+    <div className="d-flex align-items-center" style={{ justifyContent: 'center' }}>
+      <span 
+        className={`tl-badge tl-badge--${getBadgeVariant(tipo)}`}
+        style={{ minWidth, textAlign: 'center', display: 'inline-block' }}
+      >
+        {tipo} {identificadorValor}
+      </span>
+    </div>
   );
 };
 

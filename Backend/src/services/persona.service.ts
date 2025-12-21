@@ -31,7 +31,7 @@ export interface UpdatePersonaDto {
 
 // Tipo local para incluir relaciones y conteos
 type PersonaWithRelations = PrismaPersona & {
-  _count?: { lotesPropios?: number; lotesAlquilados?: number };
+  _count?: { lotesPropios?: number; lotesAlquilados?: number; Reserva?: number; Venta?: number };
   jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'> | null;
   miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'>>;
   inmobiliaria?: { id: number; nombre: string } | null;
@@ -138,6 +138,12 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     jefeDeFamilia,
     miembrosFamilia,
     esJefeDeFamilia,
+    _count: p._count ? {
+      lotesPropios: p._count.lotesPropios ?? 0,
+      lotesAlquilados: p._count.lotesAlquilados ?? 0,
+      Reserva: p._count.Reserva ?? 0,
+      Venta: p._count.Venta ?? 0,
+    } : { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
   };
 };
 
@@ -250,7 +256,7 @@ export async function getAllPersonas(
       take: limit,
       include: {
         user: { select: { id: true, username: true, email: true, role: true } },
-        _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+        _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
         jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
         miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
         inmobiliaria: { select: { id: true, nombre: true } },
@@ -276,7 +282,7 @@ export async function getAllPersonas(
     take: limit,
     include: {
       user: { select: { id: true, username: true, email: true, role: true } },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
       jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       inmobiliaria: { select: { id: true, nombre: true } },

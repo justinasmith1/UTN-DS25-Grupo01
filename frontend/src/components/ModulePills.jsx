@@ -315,11 +315,14 @@ export default function ModulePills() {
                     <span 
                       style={{
                         fontSize: '0.75rem',
+                        marginLeft: '2px',
                         padding: '2px 6px',
                         borderRadius: '4px',
                         background: 'rgba(255, 255, 255, 0.2)',
                         border: '1px solid rgba(255, 255, 255, 0.3)',
                         fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        flexShrink: 0,
                       }}
                     >
                       Viendo: {viewLabel}
