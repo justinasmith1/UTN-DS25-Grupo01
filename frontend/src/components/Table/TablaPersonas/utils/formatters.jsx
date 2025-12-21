@@ -3,85 +3,112 @@
 // ===================
 
 /**
- * Formatea el nombre completo de una persona
+ * Formatea el nombre completo de una persona (displayName)
+ * Usa razonSocial si existe, sino nombre + apellido
  */
-export const fmtNombreCompleto = (nombre, apellido) => {
-  const nombreCompleto = `${nombre || ''} ${apellido || ''}`.trim();
+export const fmtNombreCompleto = (persona) => {
+  // Acepta objeto persona o (nombre, apellido, razonSocial)
+  let razonSocial, nombre, apellido;
+  
+  if (typeof persona === 'object' && persona !== null) {
+    razonSocial = persona.razonSocial;
+    nombre = persona.nombre;
+    apellido = persona.apellido;
+  } else {
+    // Legacy: acepta (nombre, apellido) como parámetros separados
+    nombre = persona;
+    apellido = arguments[1];
+    razonSocial = arguments[2];
+  }
+  
+  const displayName = razonSocial 
+    ? razonSocial 
+    : `${nombre || ''} ${apellido || ''}`.trim();
+  
   return (
     <span className="fw-medium">
-      {nombreCompleto || 'Sin nombre'}
+      {displayName || '—'}
     </span>
   );
 };
 
 /**
  * Formatea el identificador (DNI, CUIT, CUIL, Pasaporte)
+ * Muestra [BADGE TIPO] + valor con colores profesionales
  */
-export const fmtIdentificador = (tipo, valor) => {
+export const fmtIdentificador = (personaOrTipo, valor) => {
+  // Acepta objeto persona o (tipo, valor) como parámetros separados
+  let tipo, identificadorValor;
+  
+  if (typeof personaOrTipo === 'object' && personaOrTipo !== null) {
+    tipo = personaOrTipo.identificadorTipo || personaOrTipo.identificador;
+    identificadorValor = personaOrTipo.identificadorValor || personaOrTipo.cuil || '';
+  } else {
+    // Legacy: acepta (tipo, valor) como parámetros separados
+    tipo = personaOrTipo;
+    identificadorValor = valor || '';
+  }
+  
   if (!tipo) {
-    return <span className="text-muted">Sin identificador</span>;
+    return <span className="text-muted">—</span>;
   }
 
-  const getTipoColor = (tipo) => {
-    switch (tipo) {
-      case 'DNI': return 'primary';
-      case 'CUIT': return 'success';
-      case 'CUIL': return 'info';
-      case 'Pasaporte': return 'warning';
-      default: return 'secondary';
-    }
+  if (!identificadorValor) {
+    return <span className="text-muted">—</span>;
+  }
+
+  // Colores para badges según tipo
+  const getBadgeVariant = (tipo) => {
+    const tipoUpper = String(tipo).toUpperCase();
+    if (tipoUpper === 'DNI') return 'info'; // azul
+    if (tipoUpper === 'CUIL') return 'indigo'; // violeta
+    if (tipoUpper === 'CUIT') return 'muted'; // gris
+    if (tipoUpper === 'PASAPORTE' || tipoUpper === 'Pasaporte') return 'warn'; // amarillo
+    return 'muted';
   };
 
-  const getTipoIcon = (tipo) => {
-    switch (tipo) {
-      case 'DNI': return '🆔';
-      case 'CUIT': return '🏢';
-      case 'CUIL': return '👤';
-      case 'Pasaporte': return '📘';
-      default: return '📄';
-    }
-  };
+  
+  const minWidth = '125px'; // Suficiente para "CUIL 20123456789" o "CUIT 30123456789"
 
   return (
-    <div className="d-flex align-items-center gap-2">
-      <span className="badge bg-light text-dark border">
-        {getTipoIcon(tipo)} {tipo}
+    <div className="d-flex align-items-center" style={{ justifyContent: 'center' }}>
+      <span 
+        className={`tl-badge tl-badge--${getBadgeVariant(tipo)}`}
+        style={{ minWidth, textAlign: 'center', display: 'inline-block' }}
+      >
+        {tipo} {identificadorValor}
       </span>
-      {valor && (
-        <span className="font-monospace small">
-          {valor}
-        </span>
-      )}
     </div>
   );
 };
 
 /**
  * Formatea la información de contacto (email y teléfono)
+ * Si ambos son null/empty, muestra "—"
  */
 export const fmtContacto = (email, telefono) => {
   if (!email && !telefono) {
-    return <span className="text-muted">Sin contacto</span>;
+    return <span className="text-muted">—</span>;
   }
 
   return (
     <div className="d-flex flex-column gap-1">
-      {email && (
+      {email ? (
         <div className="d-flex align-items-center gap-1">
           <span className="text-primary">📧</span>
           <span className="small text-truncate" style={{ maxWidth: '150px' }}>
             {email}
           </span>
         </div>
-      )}
-      {telefono && (
+      ) : null}
+      {telefono ? (
         <div className="d-flex align-items-center gap-1">
           <span className="text-success">📞</span>
           <span className="small font-monospace">
             {fmtTelefono(telefono)}
           </span>
         </div>
-      )}
+      ) : null}
     </div>
   );
 };
@@ -181,6 +208,7 @@ export const fmtValorIdentificador = (tipo, valor) => {
         return `${valor.slice(0, 2)}-${valor.slice(2, 10)}-${valor.slice(10)}`;
       }
       break;
+    case 'PASAPORTE':
     case 'Pasaporte':
       // Pasaporte: mantener como está
       return valor.toUpperCase();
@@ -189,4 +217,20 @@ export const fmtValorIdentificador = (tipo, valor) => {
   }
   
   return valor;
+};
+
+/**
+ * Formatea el estado de persona (ACTIVA/INACTIVA)
+ * Usa el mismo badge que Lotes (tl-badge)
+ */
+export const fmtEstadoPersona = (estado) => {
+  if (!estado) return <span className="text-muted">—</span>;
+  
+  // Usar el mismo estilo que StatusBadge de Lotes
+  const variant = estado === 'ACTIVA' ? 'success' : 'danger';
+  return (
+    <span className={`tl-badge tl-badge--${variant}`}>
+      {estado}
+    </span>
+  );
 };

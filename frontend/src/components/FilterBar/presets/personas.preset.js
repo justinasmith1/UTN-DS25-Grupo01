@@ -4,10 +4,24 @@
 
 // Catálogos para filtros
 export const TIPOS_IDENTIFICADOR = [
+  { value: 'ALL', label: 'Todos' },
   { value: 'DNI', label: 'DNI' },
   { value: 'CUIT', label: 'CUIT' },
   { value: 'CUIL', label: 'CUIL' },
-  { value: 'Pasaporte', label: 'Pasaporte' }
+  { value: 'PASAPORTE', label: 'Pasaporte' },
+  { value: 'OTRO', label: 'Otro' }
+];
+
+export const ESTADOS_PERSONA = [
+  { value: 'ALL', label: 'Todas' },
+  { value: 'ACTIVA', label: 'Activa' },
+  { value: 'INACTIVA', label: 'Inactiva' }
+];
+
+export const CLIENTE_DE_OPTIONS = [
+  { value: 'ALL', label: 'Todos' },
+  { value: 'FEDERALA', label: 'La Federala' },
+  { value: 'INMOBILIARIA', label: 'Inmobiliaria específica' }
 ];
 
 // Configuración de campos de filtro
@@ -20,7 +34,33 @@ export const personasFilterFields = [
     width: 'col-12'
   },
   {
-    id: 'tipoIdentificador',
+    id: 'estado',
+    label: 'Estado',
+    type: 'select',
+    options: ESTADOS_PERSONA,
+    width: 'col-md-6',
+    visibleForRoles: ['ADMINISTRADOR', 'GESTOR'] // Solo Admin/Gestor
+  },
+  {
+    id: 'clienteDe',
+    label: 'Cliente de',
+    type: 'select',
+    options: CLIENTE_DE_OPTIONS,
+    width: 'col-md-6',
+    visibleForRoles: ['ADMINISTRADOR', 'GESTOR'] // Solo Admin/Gestor
+  },
+  {
+    id: 'inmobiliariaId',
+    label: 'Inmobiliaria',
+    type: 'select',
+    options: [], // Se poblará dinámicamente
+    width: 'col-md-6',
+    visibleForRoles: ['ADMINISTRADOR', 'GESTOR'], // Solo Admin/Gestor
+    dependsOn: 'clienteDe', // Solo visible si clienteDe === 'INMOBILIARIA'
+    dependsOnValue: 'INMOBILIARIA'
+  },
+  {
+    id: 'identificadorTipo',
     label: 'Tipo de Identificador',
     type: 'select',
     options: TIPOS_IDENTIFICADOR,
@@ -37,11 +77,15 @@ export const personasFilterFields = [
 // Valores por defecto
 export const personasFilterDefaults = {
   q: '',
-  tipoIdentificador: '',
-  fechaCreacion: { min: '', max: '' }
+  estado: 'ALL', // Sin filtro por defecto (Todas)
+  clienteDe: 'ALL', // Sin filtro por defecto (Todos)
+  identificadorTipo: 'ALL',
+  fechaCreacion: { min: null, max: null }
 };
 
 // Catálogos para el FilterBar
 export const personasCatalogs = {
-  TIPOS_IDENTIFICADOR
+  TIPOS_IDENTIFICADOR,
+  ESTADOS_PERSONA,
+  CLIENTE_DE_OPTIONS
 };

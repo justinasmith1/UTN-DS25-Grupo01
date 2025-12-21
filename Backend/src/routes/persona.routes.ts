@@ -7,9 +7,9 @@ import { validate, validateParams } from '../middlewares/validation.middleware';
 const router = Router();
 const personaController = new PersonaController(); 
 
-// GET /api/personas
+// GET /api/personas?view=ALL|PROPIETARIOS|INQUILINOS|CLIENTES|MIS_CLIENTES&q=...&includeInactive=true
 // Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
-// INMOBILIARIA necesita ver clientes para crear reservas
+// INMOBILIARIA solo puede usar view=MIS_CLIENTES o view=ALL (que se aplica como MIS_CLIENTES)
 router.get(
     '/', 
     authenticate,

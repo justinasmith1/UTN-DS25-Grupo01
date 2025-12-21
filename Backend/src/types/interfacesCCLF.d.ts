@@ -9,7 +9,7 @@ import { EstadoVenta } from "../generated/prisma";
 
 export type Identificador = "DNI" | "CUIT" | "CUIL" | "Pasaporte";
 export type Calle = "Reinamora" | "Maca" | "Zorzal" | "Cauquén" | "Alondra" | "Jacana" | "Tacuarito" | "Jilguero" | "Golondrina" | "Calandria" | "Aguilamora" | "Lorca" | "Milano";
-export type EstadoLoteOpc = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción";
+export type EstadoLoteOpc = "Disponible" | "Reservado" | "Vendido" | "No Disponible" | "Alquilado" | "En Promoción" | "Con Prioridad";
 export type SubestadoLote = "En Construccion" | "No Construido" | "Construido";
 export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
@@ -36,6 +36,14 @@ export interface Persona {
     identificador: Identificador;
     telefono?: number;
     email?: string;
+    razonSocial?: string;
+    identificadorTipo?: string;
+    identificadorValor?: string;
+    contacto?: string;
+    estado?: string;
+    inmobiliariaId?: number | null;
+    inmobiliaria?: { id: number; nombre: string } | null;
+    _count?: { lotesPropios?: number; lotesAlquilados?: number; Reserva?: number; Venta?: number };
 
     // Extensiones para módulo Propietarios/Inquilinos y Grupo Familiar
     esPropietario?: boolean;
@@ -86,10 +94,10 @@ export interface Venta {
     fechaVenta: string;
     monto: number;
     estado: EstadoVenta;
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
     plazoEscritura?: DateTime;
     tipoPago: string;
     compradorId: number;
-    fechaVenta: DateTime;
     inmobiliariaId?: number;
     createdAt?: DateTime;
     updateAt?: DateTime;
@@ -217,7 +225,8 @@ export interface PostVentaRequest {
     lote: Lote;
     fechaVenta: DateTime;
     monto: number;
-    estado: EstadoVenta;
+    estado?: EstadoVenta;
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
     plazoEscritura?: DateTime;
     tipoPago: string;
     compradorId: number;  
@@ -249,6 +258,7 @@ export interface PutVentaRequest {
     compradorId?: number; // Es mejor enviar solo el ID
     fechaVenta?: DateTime
     estado?: EstadoVenta;
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
     plazoEscritura?: DateTime;
     tipoPago?: string;
     inmobiliariaId?: number;

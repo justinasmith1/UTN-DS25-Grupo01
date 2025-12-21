@@ -27,6 +27,7 @@ enum TipoLote {
 
 enum EstadoLote {
   ALQUILADO
+  CON_PRIORIDAD
   DISPONIBLE
   EN_PROMOCION
   NO_DISPONIBLE
@@ -65,11 +66,30 @@ enum EstadoReserva {
   EXPIRADA
 }
 
+enum EstadoCobro {
+  PENDIENTE
+  EN_CURSO
+  COMPLETADA
+}
+
 enum EstadoVenta {
   INICIADA
   CON_BOLETO
   ESCRITURA_PROGRAMADA
   ESCRITURADO
+  CANCELADA
+}
+
+enum EstadoPrioridad {
+  ACTIVA
+  CANCELADA
+  FINALIZADA
+  EXPIRADA
+}
+
+enum OwnerPrioridad {
+  INMOBILIARIA
+  CCLF
 }
 
 enum TiposArchivos {
@@ -81,6 +101,19 @@ enum TiposArchivos {
 }
 
 enum EstadoInmobiliaria {
+  ACTIVA
+  INACTIVA
+}
+
+enum IdentificadorTipo {
+  DNI
+  CUIL
+  CUIT
+  PASAPORTE
+  OTRO
+}
+
+enum EstadoPersona {
   ACTIVA
   INACTIVA
 }
@@ -104,27 +137,48 @@ model User {
 
 // Persona
 model Persona {
-  id        Int       @id @default(autoincrement())
-  nombre    String
-  apellido  String
-  cuil      String
-  contacto  String?
-  userId    Int?      @unique
-  user      User?     @relation(fields: [userId], references: [id])
+  id                Int              @id @default(autoincrement())
+  // Identificador nuevo (principal)
+  identificadorTipo IdentificadorTipo
+  identificadorValor String
+  // Datos personales (para personas físicas)
+  nombre            String?
+  apellido          String?
+  // Datos para personas jurídicas
+  razonSocial       String?
+  // Estado
+  estado            EstadoPersona    @default(ACTIVA)
+  // Contacto
+  contacto          String?
+  // Relación con User (opcional)
+  userId            Int?             @unique
+  user              User?            @relation(fields: [userId], references: [id])
+  // Relación con Inmobiliaria (para clientes de inmobiliaria)
+  inmobiliariaId    Int?
+  inmobiliaria      Inmobiliaria?    @relation(fields: [inmobiliariaId], references: [id])
+  // Legacy: campo cuil (mantener para compatibilidad, no usar en lógica nueva)
+  cuil              String?
+  
   // Relación con Lote como propietario
-  lotesPropios    Lote[]    @relation("PropietarioLotes")
+  lotesPropios      Lote[]           @relation("PropietarioLotes")
 
   // --- Grupo familiar (auto-relación) ---
-  jefeDeFamiliaId Int?
-  jefeDeFamilia   Persona?  @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  miembrosFamilia Persona[] @relation("GrupoFamiliar")
+  jefeDeFamiliaId   Int?
+  jefeDeFamilia     Persona?         @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  miembrosFamilia   Persona[]        @relation("GrupoFamiliar")
 
   // Relación con Lote como inquilino (alquilados)
-  lotesAlquilados Lote[]    @relation("InquilinoLotes")
-  createdAt DateTime  @default(now())
-  updateAt  DateTime
-  Venta     Venta[]
-  Reserva   Reserva[]
+  lotesAlquilados   Lote[]           @relation("InquilinoLotes")
+  
+  createdAt         DateTime         @default(now())
+  updateAt          DateTime
+  
+  Venta             Venta[]
+  Reserva           Reserva[]
+
+  @@unique([identificadorTipo, identificadorValor])
+  @@index([estado])
+  @@index([inmobiliariaId])
 }
 
 // Reserva
@@ -138,6 +192,7 @@ model Reserva {
   inmobiliariaId        Int?
   sena                  Decimal? @db.Decimal(12, 2)
   fechaFinReserva       DateTime @default(now())
+  loteEstadoAlCrear     EstadoLote @default(DISPONIBLE) // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
@@ -187,6 +242,7 @@ model Lote {
   inquilino   Persona? @relation("InquilinoLotes", fields: [inquilinoId], references: [id])
 
   reserva Reserva[]
+  prioridad Prioridad[]
 
   createdAt DateTime  @default(now())
   updateAt  DateTime?
@@ -218,6 +274,7 @@ model Venta {
   fechaVenta     DateTime
   monto          Decimal       @db.Decimal(12, 2)
   estado         EstadoVenta   @default(INICIADA)
+  estadoCobro    EstadoCobro   @default(PENDIENTE)
   plazoEscritura DateTime?
   tipoPago       String
   compradorId    Int
@@ -232,13 +289,14 @@ model Venta {
 
 // Inmobiliaria
 model Inmobiliaria {
-  id          Int       @id @default(autoincrement())
-  nombre      String
-  razonSocial String
-  comxventa   Decimal?  @db.Decimal(5, 2)
-  contacto    String?
-  estado      EstadoInmobiliaria  @default(ACTIVA)
-  fechaBaja   DateTime?
+  id                   Int       @id @default(autoincrement())
+  nombre               String
+  razonSocial          String
+  comxventa            Decimal?  @db.Decimal(5, 2)
+  contacto             String?
+  estado               EstadoInmobiliaria  @default(ACTIVA)
+  fechaBaja            DateTime?
+  maxPrioridadesActivas Int      @default(5)
 
   // Fechas de auditoria
   createdAt   DateTime  @default(now())
@@ -247,11 +305,33 @@ model Inmobiliaria {
 
   reservas    Reserva[]
   ventas      Venta[]
+  prioridades Prioridad[]
+  clientes    Persona[]  // Personas que son clientes de esta inmobiliaria
 
   userId Int?  @unique
   user   User? @relation(fields: [userId], references: [id])
 
   @@index([estado])
+}
+
+// Prioridad
+model Prioridad {
+  id                Int            @id @default(autoincrement())
+  loteId            Int
+  lote              Lote           @relation(fields: [loteId], references: [id])
+  estado            EstadoPrioridad @default(ACTIVA)
+  ownerType         OwnerPrioridad
+  inmobiliariaId    Int?
+  inmobiliaria      Inmobiliaria?  @relation(fields: [inmobiliariaId], references: [id])
+  fechaInicio       DateTime       @default(now())
+  fechaFin          DateTime
+  loteEstadoAlCrear EstadoLote     @default(DISPONIBLE) // Guardamos el estado original del lote para restaurarlo al finalizar la prioridad
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  @@index([loteId], name: "idx_prioridad_lote")
+  @@index([estado], name: "idx_prioridad_estado")
+  @@index([fechaFin], name: "idx_prioridad_fecha_fin")
 }
 
 // Archivos

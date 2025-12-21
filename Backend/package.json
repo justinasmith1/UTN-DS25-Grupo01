@@ -8,7 +8,9 @@
     "start": "node dist/app.js",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "seed:core": "npx ts-node --transpile-only prisma/seed.users_inmobiliarias.ts",
+    "seed:personas": "npx ts-node --transpile-only prisma/seeds/seed-personas.ts"
   },
   "keywords": [],
   "author": "",

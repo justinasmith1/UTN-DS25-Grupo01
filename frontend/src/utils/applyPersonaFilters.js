@@ -1,46 +1,63 @@
 // ===================
-// Lógica de filtrado para Personas
+// Lógica de filtrado para Personas (client-side)
 // ===================
 
 /**
- * Aplica filtros a una lista de personas
+ * Aplica filtros a una lista de personas (client-side)
+ * Función pura que filtra el array localmente sin consultar al backend
  */
-export const applyPersonaFilters = (personas, filters) => {
+export const applyPersonaFilters = (personas, filters = {}) => {
   if (!personas || !Array.isArray(personas)) {
     return [];
   }
 
   return personas.filter(persona => {
-    // Búsqueda general
-    if (filters.q) {
-      const query = filters.q.toLowerCase();
-      const searchFields = [
-        persona.nombre,
-        persona.apellido,
-        persona.nombreCompleto,
-        persona.cuil,
-        persona.email,
-        persona.telefono?.toString()
-      ].filter(Boolean);
+    // Búsqueda (q) ya NO se maneja aquí - se aplica por separado en Personas.jsx
+    // usando applySearch() para mantener búsqueda 100% frontend
 
-      const matchesSearch = searchFields.some(field => 
-        field.toLowerCase().includes(query)
-      );
-
-      if (!matchesSearch) return false;
+    // Filtro por estado (solo si no es "ALL" o "TODAS")
+    if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
+      if (persona.estado !== filters.estado) {
+        return false;
+      }
     }
 
-    if (filters?.tipo === 'propietario' && !persona.esPropietario) {
-      return false;
+    // Filtro por cliente de (unificado - soporta múltiples selecciones)
+    if (filters.clienteDe && Array.isArray(filters.clienteDe) && filters.clienteDe.length > 0) {
+      const personaInmobiliariaId = persona.inmobiliariaId 
+        ? (typeof persona.inmobiliariaId === 'number' ? persona.inmobiliariaId : parseInt(String(persona.inmobiliariaId), 10))
+        : null;
+      
+      // Verificar si la persona coincide con alguna de las selecciones
+      const matches = filters.clienteDe.some(selected => {
+        // Si es "FEDERALA" o "LA_FEDERALA"
+        if (selected === 'FEDERALA' || selected === 'LA_FEDERALA') {
+          return personaInmobiliariaId === null || personaInmobiliariaId === undefined;
+        }
+        
+        // Es un ID de inmobiliaria (puede venir como número o string numérico)
+        const inmobiliariaIdFilter = typeof selected === 'number' 
+          ? selected 
+          : parseInt(String(selected), 10);
+        
+        if (!isNaN(inmobiliariaIdFilter)) {
+          return personaInmobiliariaId === inmobiliariaIdFilter;
+        }
+        
+        return false;
+      });
+      
+      if (!matches) {
+        return false;
+      }
     }
 
-    if (filters?.tipo === 'inquilino' && !persona.esInquilino) {
-      return false;
-    }
-
-    // Filtro por tipo de identificador
-    if (filters.tipoIdentificador) {
-      if (persona.identificador !== filters.tipoIdentificador) {
+    // Filtro por tipo de identificador (soporta múltiples selecciones)
+    if (filters.identificadorTipo && Array.isArray(filters.identificadorTipo) && filters.identificadorTipo.length > 0) {
+      const tipoPersona = persona.identificadorTipo || persona.identificador;
+      // Verificar si el tipo de la persona coincide con alguna de las selecciones
+      const matches = filters.identificadorTipo.some(selected => tipoPersona === selected);
+      if (!matches) {
         return false;
       }
     }
@@ -49,7 +66,12 @@ export const applyPersonaFilters = (personas, filters) => {
     if (filters.fechaCreacion) {
       const { min, max } = filters.fechaCreacion;
       if (min || max) {
-        const fechaCreacion = new Date(persona.createdAt);
+        const fechaCreacion = persona.createdAt ? new Date(persona.createdAt) : null;
+        
+        if (!fechaCreacion || isNaN(fechaCreacion.getTime())) {
+          // Si no tiene fecha válida y se está filtrando por fecha, excluir
+          return false;
+        }
         
         if (min) {
           const fechaMin = new Date(min);
@@ -58,6 +80,8 @@ export const applyPersonaFilters = (personas, filters) => {
         
         if (max) {
           const fechaMax = new Date(max);
+          // Incluir el día completo
+          fechaMax.setHours(23, 59, 59, 999);
           if (fechaCreacion > fechaMax) return false;
         }
       }

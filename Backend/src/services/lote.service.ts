@@ -2,6 +2,7 @@ import { DeleteLoteResponse, TipoLote as TipoLoteDto, EstadoLoteOpc as EstadoLot
 import { Lote, TipoLote as TipoLotePrisma, EstadoLote as EstadoLotePrisma, SubestadoLote as SubestadoLotePrisma} from '../generated/prisma';
 import prisma from '../config/prisma';
 import { Prisma } from '../generated/prisma';
+import { cancelActivesOnNoDisponible } from '../domain/loteState/loteState.effects';
 
 // --------- DTO <-> PRISMA maps ----------
 const tipoLoteToPrisma = (t: TipoLoteDto | undefined): TipoLotePrisma => {
@@ -27,6 +28,7 @@ const estadoLoteToPrisma = (e: EstadoLoteDto | undefined): EstadoLotePrisma | un
     'No Disponible': 'NO_DISPONIBLE',
     'Alquilado': 'ALQUILADO',
     'En Promoción': 'EN_PROMOCION',
+    'Con Prioridad': 'CON_PRIORIDAD',
   };
   return map[e];
 };
@@ -310,6 +312,19 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
 
   // Asignar el resto de los campos
   Object.assign(dataToUpdate, rest);
+
+  // Detectar transición a NO_DISPONIBLE y cancelar operaciones activas (efecto centralizado)
+  if (estado && estadoLoteToPrisma(estado) === EstadoLotePrisma.NO_DISPONIBLE) {
+    const loteActual = await prisma.lote.findUnique({
+      where: { id },
+      select: { estado: true },
+    });
+
+    // Solo cancelar si el lote no estaba ya en NO_DISPONIBLE
+    if (loteActual && loteActual.estado !== EstadoLotePrisma.NO_DISPONIBLE) {
+      await cancelActivesOnNoDisponible(id);
+    }
+  }
 
   try {
     return await prisma.lote.update({

@@ -1,7 +1,10 @@
 import prisma from '../config/prisma';
-import { Venta, EstadoReserva } from '../generated/prisma';
+import { Venta, EstadoReserva, EstadoPrioridad } from '../generated/prisma';
 import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
 import { updateLoteState } from './lote.service';
+import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
+import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
+import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
 
 
 export async function getAllVentas(): Promise<Venta[]> {
@@ -58,8 +61,10 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         (error as any).statusCode = 400;
         throw error;
     }
-    if (loteExists.estado == 'NO_DISPONIBLE') {
-        const error = new Error('El lote no está disponible para la venta');
+    // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
+    assertLoteOperableFor('crear venta', loteExists.estado);
+    if (loteExists.estado === 'ALQUILADO') {
+        const error = new Error('No se puede vender un lote que está alquilado');
         (error as any).statusCode = 400;
         throw error;
     }
@@ -99,6 +104,7 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
             fechaVenta: new Date(data.fechaVenta),
             monto: data.monto,
             estado: data.estado || 'INICIADA',
+            estadoCobro: data.estadoCobro || 'PENDIENTE', // Si viene en request, usarlo; si no, PENDIENTE
             plazoEscritura: data.plazoEscritura ? new Date(data.plazoEscritura) : null,
             tipoPago: data.tipoPago,
             compradorId: data.compradorId,
@@ -109,10 +115,12 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         include: { comprador: true }, // Incluir datos del comprador
     });
 
-    // Actualizar el estado del lote a "VENDIDO"
-    if (loteExists.estado == 'DISPONIBLE' || loteExists.estado == 'RESERVADO'){
-        await updateLoteState(data.loteId, 'Vendido');
-    }
+    // Actualizar el estado del lote a "VENDIDO" (siempre, ya que las validaciones previas filtran casos inválidos)
+    await updateLoteState(data.loteId, ESTADO_LOTE_OP.VENDIDO);
+    
+    // Si había prioridad activa, se finaliza al concretar la venta (efecto centralizado)
+    await finalizePrioridadActivaOnVenta(data.loteId);
+    
     // Asgignar la reservaId si existe una reserva ACEPTADA
     if (reserva) {
         await prisma.venta.update({
@@ -125,6 +133,25 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
 }
 
 export async function updateVenta(id: number, updateData: PutVentaRequest): Promise<Venta> {
+    // Obtener venta actual para validaciones y side effects
+    const ventaActual = await prisma.venta.findUnique({
+        where: { id },
+        select: { estado: true, loteId: true }
+    });
+
+    if (!ventaActual) {
+        const error = new Error('Venta no encontrada');
+        (error as any).statusCode = 404;
+        throw error;
+    }
+
+    // Validar cancelación: no se puede cancelar una venta ESCRITURADO
+    if (updateData.estado === 'CANCELADA' && ventaActual.estado === 'ESCRITURADO') {
+        const error = new Error('No se puede cancelar una venta que ya está escriturada');
+        (error as any).statusCode = 400;
+        throw error;
+    }
+
     if (updateData.loteId) {
         const loteExists = await prisma.lote.findUnique({
             where: { id: updateData.loteId },
@@ -168,6 +195,12 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
                 inmobiliaria: true 
             }, // Incluir todas las relaciones como en getVentaById
         });
+
+        // Side effect: si la venta se cancela, restaurar el lote a DISPONIBLE (siempre)
+        if (updateData.estado === 'CANCELADA') {
+            await updateLoteState(ventaActual.loteId, ESTADO_LOTE_OP.DISPONIBLE);
+        }
+
         return updatedVenta;
     } catch (e: any) {
         if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"

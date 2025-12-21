@@ -1,4 +1,4 @@
-import { TIPOS_IDENTIFICADOR } from '../presets/personas.preset';
+import { TIPOS_IDENTIFICADOR, ESTADOS_PERSONA } from '../presets/personas.preset';
 
 // ===================
 // Utilidades para chips de filtros de Personas
@@ -7,32 +7,89 @@ import { TIPOS_IDENTIFICADOR } from '../presets/personas.preset';
 /**
  * Convierte los filtros de personas a chips para mostrar
  */
-export const personasChipsFrom = (filters) => {
+export const personasChipsFrom = (filters, catalogs = {}) => {
   const chips = [];
 
-  // Búsqueda general
-  if (filters.q) {
+  // NO mostrar chip de búsqueda (el buscador ya es visible en la UI)
+  // La búsqueda se maneja por separado y no necesita chip
+
+  // Estado (solo Admin/Gestor) - NO mostrar si es "ALL" o "TODAS"
+  // El chip muestra solo el valor seleccionado, no "Estado: ..."
+  if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
+    const estado = ESTADOS_PERSONA.find(e => e.value === filters.estado);
+    const displayValue = estado ? estado.label : filters.estado;
     chips.push({
-      key: 'q',
-      label: 'Búsqueda',
-      value: filters.q,
-      color: 'primary'
+      id: 'estado',
+      k: 'estado',
+      label: displayValue, // Mostrar solo el valor seleccionado
+      value: displayValue,
+      v: filters.estado,
+      color: filters.estado === 'ACTIVA' ? 'success' : 'danger'
     });
   }
 
-  // Tipo de identificador
-  if (filters.tipoIdentificador) {
-    const tipo = TIPOS_IDENTIFICADOR.find(t => t.value === filters.tipoIdentificador);
-    chips.push({
-      key: 'tipoIdentificador',
-      label: 'Tipo ID',
-      value: tipo ? tipo.label : filters.tipoIdentificador,
-      color: 'info'
+  // Cliente de (solo Admin/Gestor) - unificado (multiSelect)
+  // El chip debe mostrar solo el valor seleccionado, no "Cliente de: ..."
+  // Soporta múltiples selecciones: cada una genera su propio chip
+  if (filters.clienteDe && Array.isArray(filters.clienteDe) && filters.clienteDe.length > 0) {
+    filters.clienteDe.forEach(selected => {
+      let displayValue = '';
+      
+      // Si es "FEDERALA" o "LA_FEDERALA"
+      if (selected === 'FEDERALA' || selected === 'LA_FEDERALA') {
+        displayValue = 'La Federala';
+      } else {
+        // Es un ID de inmobiliaria (número o string numérico)
+        const inmobiliariaId = typeof selected === 'number' 
+          ? selected 
+          : parseInt(selected, 10);
+        
+        if (!isNaN(inmobiliariaId)) {
+          // Buscar en el catálogo de inmobiliarias
+          const inmobiliaria = catalogs?.clienteDe?.find(i => {
+            const iId = typeof i.value === 'number' ? i.value : parseInt(i.value, 10);
+            return iId === inmobiliariaId;
+          });
+          
+          displayValue = inmobiliaria ? inmobiliaria.label : `Inmobiliaria ${inmobiliariaId}`;
+        } else {
+          displayValue = String(selected);
+        }
+      }
+      
+      // Cada selección genera su propio chip
+      chips.push({
+        id: `clienteDe-${selected}`,
+        k: 'clienteDe',
+        label: displayValue, // Mostrar solo el valor seleccionado
+        value: displayValue,
+        v: selected, // Valor individual para poder removerlo
+        color: 'info'
+      });
     });
   }
 
+  // Tipo de identificador (multiSelect)
+  // El chip muestra solo el valor seleccionado, no "Tipo ID: ..."
+  // Soporta múltiples selecciones: cada una genera su propio chip
+  if (filters.identificadorTipo && Array.isArray(filters.identificadorTipo) && filters.identificadorTipo.length > 0) {
+    filters.identificadorTipo.forEach(selected => {
+      const tipo = TIPOS_IDENTIFICADOR.find(t => t.value === selected);
+      const displayValue = tipo ? tipo.label : selected;
+      
+      chips.push({
+        id: `identificadorTipo-${selected}`,
+        k: 'identificadorTipo',
+        label: displayValue, // Mostrar solo el valor seleccionado (ej: "DNI", "CUIL")
+        value: displayValue,
+        v: selected, // Valor individual para poder removerlo
+        color: 'warning'
+      });
+    });
+  }
 
   // Rango de fechas
+  // El chip muestra solo el rango de fechas, no "Fecha Creación: ..."
   if (filters.fechaCreacion) {
     const { min, max } = filters.fechaCreacion;
     if (min || max) {
@@ -46,9 +103,11 @@ export const personasChipsFrom = (filters) => {
       }
       
       chips.push({
-        key: 'fechaCreacion',
-        label: 'Fecha Creación',
+        id: 'fechaCreacion',
+        k: 'fechaCreacion',
+        label: fechaText, // Mostrar solo el rango de fechas
         value: fechaText,
+        v: filters.fechaCreacion,
         color: 'secondary'
       });
     }
@@ -75,28 +134,3 @@ export const nice = (dateString) => {
   }
 };
 
-/**
- * Obtiene el color del chip basado en el tipo de filtro
- */
-export const getChipColor = (filterKey) => {
-  const colors = {
-    q: 'primary',
-    tipoIdentificador: 'info',
-    fechaCreacion: 'secondary'
-  };
-  
-  return colors[filterKey] || 'secondary';
-};
-
-/**
- * Obtiene el ícono del chip basado en el tipo de filtro
- */
-export const getChipIcon = (filterKey) => {
-  const icons = {
-    q: '🔍',
-    tipoIdentificador: '🆔',
-    fechaCreacion: '📅'
-  };
-  
-  return icons[filterKey] || '🏷️';
-};

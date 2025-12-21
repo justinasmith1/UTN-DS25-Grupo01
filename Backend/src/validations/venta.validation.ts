@@ -4,7 +4,8 @@ export const createVentaSchema = z.object({
     loteId: z.coerce.number().int('El ID del lote debe ser un número entero').positive('El ID del lote debe ser un número positivo'),
     fechaVenta: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Fecha de venta inválida' }),
     monto: z.coerce.number().min(0, 'El monto no puede ser negativo'),
-    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO']),
+    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO', 'CANCELADA']).optional(),
+    estadoCobro: z.enum(['PENDIENTE', 'EN_CURSO', 'COMPLETADA']).optional(),
     plazoEscritura: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Fecha de plazo de escritura inválida' }).optional(),
     tipoPago: z.string().min(1, 'Se requiere un tipo de pago').trim(),
     compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo'),
@@ -23,7 +24,7 @@ export const getVentaSchema = z.object({
 export const deleteVentaSchema = getVentaSchema;
 
 export const queryVentaSchema = z.object({
-    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO']).optional(),
+    estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO', 'CANCELADA']).optional(),
     compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo').optional(),
     vendedorId: z.coerce.number().int('El ID del vendedor debe ser un número entero').positive('El ID del vendedor debe ser un número positivo').optional(),
     loteId: z.coerce.number().int('El ID del lote debe ser un número entero').positive('El ID del lote debe ser un número positivo').optional(),

@@ -10,18 +10,36 @@ import { http, normalizeApiListResponse } from '../http/http';
 export const fromApi = (apiPersona) => {
   if (!apiPersona) return null;
 
+  // DisplayName: razonSocial o nombre+apellido
+  const displayName = apiPersona.razonSocial 
+    ? apiPersona.razonSocial 
+    : `${apiPersona.nombre || ''} ${apiPersona.apellido || ''}`.trim();
+
+  // Identificador: usar identificadorTipo e identificadorValor (nuevo) o fallback a legacy
+  const identificadorTipo = apiPersona.identificadorTipo || apiPersona.identificador || 'CUIL';
+  const identificadorValor = apiPersona.identificadorValor || apiPersona.cuil || '';
+
   return {
     id: apiPersona.idPersona,
     nombre: apiPersona.nombre || '',
     apellido: apiPersona.apellido || '',
-    nombreCompleto: `${apiPersona.nombre || ''} ${apiPersona.apellido || ''}`.trim(),
-    identificador: apiPersona.identificador || 'CUIL',
+    razonSocial: apiPersona.razonSocial || '',
+    nombreCompleto: displayName,
+    displayName: displayName,
+    identificador: identificadorTipo,
+    identificadorTipo: identificadorTipo,
+    identificadorValor: identificadorValor,
     telefono: apiPersona.telefono || null,
     email: apiPersona.email || null,
-    cuil: apiPersona.cuil || '',
+    contacto: apiPersona.contacto || null,
+    cuil: apiPersona.cuil || identificadorValor, // Legacy
+    estado: apiPersona.estado || 'ACTIVA',
     createdAt: apiPersona.createdAt || new Date().toISOString(),
     esPropietario: Boolean(apiPersona.esPropietario),
     esInquilino: Boolean(apiPersona.esInquilino),
+    inmobiliariaId: apiPersona.inmobiliariaId || null,
+    inmobiliaria: apiPersona.inmobiliaria || null,
+    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
   };
 };
 
@@ -50,9 +68,41 @@ export const toApi = (frontendPersona) => {
 export const getAllPersonas = async (params = {}) => {
   try {
     // Construir query string si hay parámetros
-    const queryString = Object.keys(params).length > 0 
-      ? '?' + new URLSearchParams(params).toString() 
-      : '';
+    const queryParams = new URLSearchParams();
+    
+    // Parámetros básicos
+    if (params.view) {
+      queryParams.append('view', params.view);
+    }
+    // q (búsqueda) ya NO se envía al backend - se maneja 100% en frontend
+    if (params.includeInactive === true || params.includeInactive === 'true') {
+      queryParams.append('includeInactive', 'true');
+    }
+    if (params.limit) {
+      queryParams.append('limit', params.limit.toString());
+    }
+    
+    // Nuevos filtros
+    if (params.estado) {
+      queryParams.append('estado', params.estado);
+    }
+    if (params.clienteDe) {
+      queryParams.append('clienteDe', params.clienteDe);
+    }
+    if (params.inmobiliariaId) {
+      queryParams.append('inmobiliariaId', String(params.inmobiliariaId));
+    }
+    if (params.identificadorTipo) {
+      queryParams.append('identificadorTipo', params.identificadorTipo);
+    }
+    if (params.createdFrom) {
+      queryParams.append('createdFrom', params.createdFrom);
+    }
+    if (params.createdTo) {
+      queryParams.append('createdTo', params.createdTo);
+    }
+    
+    const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
     
     const response = await http(`/personas${queryString}`, { method: 'GET' });
     const data = await response.json().catch(() => ({}));
