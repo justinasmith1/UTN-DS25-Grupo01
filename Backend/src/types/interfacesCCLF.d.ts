@@ -51,6 +51,12 @@ export interface Persona {
     esJefeDeFamilia?: boolean;
     jefeDeFamilia?: { idPersona: number; nombre: string; apellido: string; cuil?: string } | null;
     miembrosFamilia?: Array<{ idPersona: number; nombre: string; apellido: string; cuil?: string }>;
+    
+    // Arrays mínimos para mini detalles
+    lotesPropios?: Array<{ id: number; numero: number | null; mapId: string | null; fraccionNumero: number }>;
+    lotesAlquilados?: Array<{ id: number; numero: number | null; mapId: string | null; fraccionNumero: number; estado: string }>;
+    reservas?: Array<{ id: number; numero: string; createdAt: Date; loteId: number }>;
+    ventas?: Array<{ id: number; numero: string }>;
 }
 
 

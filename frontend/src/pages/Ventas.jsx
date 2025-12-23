@@ -2,7 +2,7 @@
 // Página de Ventas: lista, filtra y abre modales de Ver / Editar / Eliminar.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 
@@ -266,6 +266,36 @@ export default function VentasPage() {
       });
     }
   }, [crearParam, setSearchParams]);
+
+  // Abrir automáticamente el modal "Ver" cuando viene openId desde navegación (query param o state)
+  useEffect(() => {
+    // Prioridad: location.state > query param
+    const stateId = location.state?.openId;
+    const idToUse = stateId != null ? stateId : (openIdParam ? parseInt(openIdParam, 10) : null);
+    
+    if (idToUse && ventas.length > 0) {
+      const ventaId = typeof idToUse === 'number' ? idToUse : parseInt(idToUse, 10);
+      if (!isNaN(ventaId)) {
+        const venta = ventas.find(v => v.id === ventaId);
+        if (venta) {
+          setVentaSel(venta);
+          setOpenVer(true);
+          // Limpiar query param si existe
+          if (openIdParam) {
+            setSearchParams((prev) => {
+              const newParams = new URLSearchParams(prev);
+              newParams.delete('openId');
+              return newParams;
+            }, { replace: true });
+          }
+          // Limpiar state
+          if (stateId != null) {
+            window.history.replaceState({}, document.title);
+          }
+        }
+      }
+    }
+  }, [openIdParam, location.state, ventas, setSearchParams]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 

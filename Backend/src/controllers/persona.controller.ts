@@ -84,12 +84,14 @@ export class PersonaController {
       const view = (req.query.view as PersonaView) || 'ALL';
       const q = req.query.q as string | undefined;
       const includeInactive = req.query.includeInactive === 'true';
+      const estado = req.query.estado as 'ACTIVA' | 'INACTIVA' | undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
 
       const result = await personaService.findAll(user, {
         view,
         q,
         includeInactive,
+        estado,
         limit,
       });
 
@@ -160,6 +162,8 @@ export class PersonaController {
         telefono: validatedData.telefono,
         email: validatedData.email,
         jefeDeFamiliaId: validatedData.jefeDeFamiliaId,
+        estado: validatedData.estado,
+        inmobiliariaId: validatedData.inmobiliariaId,
       };
 
       const result = await personaService.update(id, updateData);

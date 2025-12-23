@@ -150,6 +150,8 @@ model Persona {
   estado            EstadoPersona    @default(ACTIVA)
   // Contacto
   contacto          String?
+  // Email (campo propio, separado de contacto)
+  email             String?
   // Relación con User (opcional)
   userId            Int?             @unique
   user              User?            @relation(fields: [userId], references: [id])

@@ -1,16 +1,6 @@
 // Archivo destinado a definir las columnas y presets para la tabla de Personas
 
-import { fmtNombreCompleto, fmtIdentificador, fmtContacto, fmtFecha, fmtEstadoPersona } from '../utils/formatters';
-
-// Helper para parsear contacto (email/teléfono desde string contacto)
-const parseContacto = (contacto) => {
-  if (!contacto) return { email: null, telefono: null };
-  const emailMatch = contacto.match(/^[^\s@]+@[^\s@]+\.[^\s@]+/);
-  const email = emailMatch ? emailMatch[0] : null;
-  const phoneMatch = contacto.match(/\d+/g);
-  const telefono = phoneMatch ? parseInt(phoneMatch.join('')) : null;
-  return { email, telefono };
-};
+import { fmtNombreCompleto, fmtIdentificador, fmtFecha, fmtEstadoPersona, fmtTelefonoIndividual, fmtEmailIndividual } from '../utils/formatters';
 
 // Columnas base (siempre disponibles)
 const baseColumns = [
@@ -41,13 +31,18 @@ const baseColumns = [
     align: 'center',
   },
   {
-    id: 'contacto',
-    header: 'Contacto',
-    accessor: (row) => {
-      const { email, telefono } = parseContacto(row.contacto);
-      return fmtContacto(email || row.email, telefono || row.telefono);
-    },
-    width: 180,
+    id: 'telefono',
+    header: 'Teléfono',
+    accessor: (row) => fmtTelefonoIndividual(row.telefono, row.contacto),
+    width: 150,
+    sortable: false,
+    align: 'center',
+  },
+  {
+    id: 'mail',
+    header: 'Mail',
+    accessor: (row) => fmtEmailIndividual(row.email, row.contacto),
+    width: 200,
     sortable: false,
     align: 'center',
   },
@@ -111,12 +106,24 @@ export const getColumnsForRole = (userRole) => {
 
 const columns = baseColumns;
 
-// Columnas por defecto visibles (sin ID, sin estado/inmobiliaria por defecto, sin columnas opcionales)
-const DEFAULT_VISIBLE_IDS = ['nombreCompleto', 'identificador', 'contacto', 'createdAt'];
+// Columnas por defecto visibles según rol
+// Admin/Gestor: teléfono por defecto, mail disponible en picker
+// Inmobiliaria: ambos teléfono y mail por defecto
+export const getDefaultVisibleIds = (userRole) => {
+  const roleUpper = (userRole || '').toString().trim().toUpperCase();
+  
+  if (roleUpper === 'INMOBILIARIA') {
+    // Inmobiliaria: nombreCompleto, identificador, telefono, mail, createdAt
+    return ['nombreCompleto', 'identificador', 'telefono', 'mail', 'createdAt'];
+  } else {
+    // Admin/Gestor: nombreCompleto, identificador, telefono, createdAt (estado e inmobiliaria se insertan después)
+    return ['nombreCompleto', 'identificador', 'telefono', 'createdAt'];
+  }
+};
 
 export const personasTablePreset = {
   columns,
-  defaultVisibleIds: DEFAULT_VISIBLE_IDS,
+  defaultVisibleIds: getDefaultVisibleIds(), // Por defecto sin rol (se ajusta en TablaPersonas.jsx)
   widthFor(id) {
     const col = columns.find((c) => c.id === id);
     if (col?.width) {

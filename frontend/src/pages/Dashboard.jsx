@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
@@ -25,6 +25,7 @@ export default function Dashboard() {
   const { error } = useToast();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const authRaw = localStorage.getItem("auth:user");
   const authUser = authRaw ? JSON.parse(authRaw) : null;
@@ -46,6 +47,10 @@ export default function Dashboard() {
   const [loteParaVenta, setLoteParaVenta] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  
+  // Declarar allLotes y loading antes de usarlos en los useEffects
+  const [allLotes, setAllLotes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const goRegistrarVenta = useCallback((lot) => {
     if (!lot) return;
@@ -129,6 +134,22 @@ export default function Dashboard() {
         },
         [fetchAndMergeLote]
       );
+
+  // Abrir automáticamente el modal "Ver" cuando viene openLoteId desde navegación
+  useEffect(() => {
+    const state = location.state;
+    if (state?.openLoteId && state?.openMode === 'view' && allLotes.length > 0) {
+      const loteId = state.openLoteId;
+      const lote = allLotes.find(l => l.id === loteId || String(l.id) === String(loteId));
+      if (lote) {
+        setLoteSel(lote);
+        setOpenVer(true);
+        fetchAndMergeLote(lote);
+        // Limpiar el state para que no se reabra si refresco
+        window.history.replaceState({}, document.title);
+      }
+    }
+  }, [location.state, allLotes, fetchAndMergeLote]);
     
       const onEditar = useCallback(
         (lot) => {
@@ -257,10 +278,7 @@ export default function Dashboard() {
       
       return { ...cleaned, ...convertedParams };
     });
-  }, []);
-
-  const [allLotes, setAllLotes] = useState([]);
-  const [loading, setLoading] = useState(true);
+  }, []); // Sin dependencias: solo se ejecuta una vez al montar
 
   // Cargar datos completos de la reserva cuando se abre el modal
   useEffect(() => {

@@ -10,6 +10,8 @@ import { applyPersonaFilters } from "../utils/applyPersonaFilters";
 import { applySearch } from "../utils/personaSearch";
 import TablaPersonas from "../components/Table/TablaPersonas/TablaPersonas";
 import FilterBarPersonas from "../components/FilterBar/FilterBarPersonas";
+import PersonaVerCard from "../components/Cards/Personas/PersonaVerCard";
+import PersonaEditarCard from "../components/Cards/Personas/PersonaEditarCard";
 
 /**
  * Personas
@@ -57,6 +59,14 @@ export default function Personas() {
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Estado para modal "Ver Persona"
+  const [verPersonaOpen, setVerPersonaOpen] = useState(false);
+  const [personaSeleccionada, setPersonaSeleccionada] = useState(null);
+  
+  // Estado para modal "Editar Persona"
+  const [editarPersonaOpen, setEditarPersonaOpen] = useState(false);
+  const [personaAEditar, setPersonaAEditar] = useState(null);
+
   // Sincronizar view en URL si no está presente
   useEffect(() => {
     if (!searchParams.get('view')) {
@@ -67,17 +77,22 @@ export default function Personas() {
     }
   }, [searchParams, setSearchParams, userRole]);
 
-  // Cargar personas desde backend solo con view (sin q, sin otros filtros)
+  // Cargar personas desde backend con view y estado (si hay filtro de estado)
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         setLoading(true);
         
-        // Solo enviar view al backend (búsqueda es 100% frontend)
+        // Enviar view y estado al backend (igual que inmobiliarias)
         const params = {
           view: currentView
         };
+        
+        // Si hay filtro de estado, enviarlo al backend
+        if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
+          params.estado = filters.estado;
+        }
         
         const res = await getAllPersonas(params);
         if (alive) {
@@ -91,17 +106,20 @@ export default function Personas() {
       }
     })();
     return () => { alive = false; };
-  }, [currentView]);
+  }, [currentView, filters.estado]);
 
-  // Pipeline de filtrado: primero filtros del modal, luego búsqueda
+  // Pipeline de filtrado: solo búsqueda (estado se filtra en backend)
   const personasFiltered = useMemo(() => {
-    // Paso 1: Aplicar filtros del modal (estado, clienteDe, tipoIdent, fecha)
-    const personasFiltradasPorModal = applyPersonaFilters(personasRaw, filters);
+    // Aplicar búsqueda (100% frontend, sin tocar backend)
+    // Estado ya viene filtrado del backend
+    const personasFiltradasFinal = applySearch(personasRaw, searchText);
     
-    // Paso 2: Aplicar búsqueda (100% frontend, sin tocar backend)
-    const personasFiltradasFinal = applySearch(personasFiltradasPorModal, searchText);
+    // Aplicar otros filtros que no son estado (clienteDe, tipoIdent, fecha)
+    const otrosFiltros = { ...filters };
+    delete otrosFiltros.estado; // Estado ya se filtró en backend
+    const personasFiltradasPorModal = applyPersonaFilters(personasFiltradasFinal, otrosFiltros);
     
-    return personasFiltradasFinal;
+    return personasFiltradasPorModal;
   }, [personasRaw, filters, searchText]);
 
   // Handler para cambios en filtros desde FilterBar (solo actualiza estado local)
@@ -140,14 +158,41 @@ export default function Personas() {
 
   // Handlers de acciones
   const handleVerPersona = (persona) => {
-    // Lógica de visualización
-    console.log('Ver persona:', persona.id);
+    setPersonaSeleccionada(persona);
+    setVerPersonaOpen(true);
   };
 
-  const handleEditarPersona = (persona) => {
-    // Lógica de edición
-    console.log('Editar persona:', persona.id);
-  };
+  // Editar: abre el modal de edición
+  const handleEditarPersona = useCallback((persona) => {
+    if (!persona) return;
+    setPersonaAEditar(persona);
+    setEditarPersonaOpen(true);
+  }, []);
+
+  // Actualizar: cuando se guarda una persona editada, actualizar la lista
+  const handlePersonaActualizada = useCallback((persona) => {
+    if (persona && persona.id) {
+      // Cerrar modal de editar
+      setEditarPersonaOpen(false);
+      setPersonaAEditar(null);
+      
+      // Actualizar la lista
+      setPersonasRaw(prev => {
+        const index = prev.findIndex(p => p.id === persona.id);
+        if (index >= 0) {
+          const updated = [...prev];
+          updated[index] = persona;
+          return updated;
+        }
+        return prev;
+      });
+      
+      // Actualizar persona seleccionada si está abierta
+      if (personaSeleccionada?.id === persona.id) {
+        setPersonaSeleccionada(persona);
+      }
+    }
+  }, [personaSeleccionada]);
 
   const handleEliminarPersona = (persona) => {
     // Lógica de eliminación
@@ -198,6 +243,37 @@ export default function Personas() {
         onAgregarPersona={can(user, PERMISSIONS.PEOPLE_CREATE) ? handleAgregarPersona : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+      />
+
+      {/* Modal "Ver Persona" */}
+      <PersonaVerCard
+        open={verPersonaOpen}
+        onClose={() => {
+          setVerPersonaOpen(false);
+          setPersonaSeleccionada(null);
+        }}
+        onEdit={canPersonaEdit ? (persona) => {
+          // Cerrar modal de ver y abrir modal de editar
+          setVerPersonaOpen(false);
+          setPersonaAEditar(persona);
+          setEditarPersonaOpen(true);
+        } : null}
+        persona={personaSeleccionada}
+        personaId={personaSeleccionada?.id}
+        personas={personasFiltered}
+      />
+
+      {/* Modal "Editar Persona" */}
+      <PersonaEditarCard
+        open={editarPersonaOpen}
+        onCancel={() => {
+          setEditarPersonaOpen(false);
+          setPersonaAEditar(null);
+        }}
+        onUpdated={handlePersonaActualizada}
+        persona={personaAEditar}
+        personaId={personaAEditar?.id}
+        personas={personasFiltered}
       />
     </>
   );

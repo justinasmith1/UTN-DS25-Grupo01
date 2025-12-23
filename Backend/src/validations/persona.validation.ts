@@ -117,6 +117,8 @@ export const updatePersonaSchema = z.object({
   telefono: z.number().int().positive().optional(),
   email: z.string().email("Email invalido").optional(),
   jefeDeFamiliaId: z.number().int().positive().optional(),
+  estado: z.enum(["ACTIVA", "INACTIVA"]).optional(),
+  inmobiliariaId: z.number().int().positive().nullable().optional(),
 })
 .refine(
   (data) => {

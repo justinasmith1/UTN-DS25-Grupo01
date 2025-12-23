@@ -2,9 +2,9 @@
 // Tablero de personas con columnas dinámicas según rol y acciones basadas en permisos
 
 import React, { useMemo, useCallback } from 'react';
-import { Eye, Edit, Trash2, UserPlus } from 'lucide-react';
+import { Eye, Edit, Trash2 } from 'lucide-react';
 import TablaBase from '../TablaBase';
-import { personasTablePreset, getColumnsForRole } from './presets/personas.table';
+import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { can } from '../../../lib/auth/rbac';
 
@@ -23,31 +23,36 @@ const TablaPersonas = ({
   const { user } = useAuth();
   const effectiveUserRole = userRole || (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
   
-  // Determinar columnas visibles por defecto (sin ID, estado/inmobiliaria solo Admin/Gestor en posiciones correctas)
+  // Determinar columnas visibles por defecto según rol
   const defaultVisibleIds = useMemo(() => {
-    const base = personasTablePreset.defaultVisibleIds || [];
-    // Agregar estado en 2da posición solo si es Admin/Gestor
+    // Usar función que retorna columnas por defecto según rol
+    let base = getDefaultVisibleIds(effectiveUserRole) || [];
+    
+    // Agregar estado e inmobiliaria en posiciones específicas solo si es Admin/Gestor
     if (effectiveUserRole === 'ADMINISTRADOR' || effectiveUserRole === 'GESTOR') {
       // Insertar 'estado' después de 'nombreCompleto' (posición 1)
-      const index = base.indexOf('nombreCompleto');
-      let result = base;
-      if (index !== -1) {
-        result = [...base.slice(0, index + 1), 'estado', ...base.slice(index + 1)];
+      const nombreIndex = base.indexOf('nombreCompleto');
+      if (nombreIndex !== -1) {
+        base = [...base.slice(0, nombreIndex + 1), 'estado', ...base.slice(nombreIndex + 1)];
       } else {
-        result = ['estado', ...base];
+        base = ['estado', ...base];
       }
-      // Agregar 'inmobiliaria' (Cliente de) si no está
-      if (!result.includes('inmobiliaria')) {
-        const contactoIndex = result.indexOf('contacto');
-        if (contactoIndex !== -1) {
-          result = [...result.slice(0, contactoIndex + 1), 'inmobiliaria', ...result.slice(contactoIndex + 1)];
+      
+      // Insertar 'inmobiliaria' (Cliente de) después de 'telefono'
+      const telefonoIndex = base.indexOf('telefono');
+      if (telefonoIndex !== -1 && !base.includes('inmobiliaria')) {
+        base = [...base.slice(0, telefonoIndex + 1), 'inmobiliaria', ...base.slice(telefonoIndex + 1)];
+      } else if (!base.includes('inmobiliaria')) {
+        // Si no hay telefono, insertar después de identificador
+        const identificadorIndex = base.indexOf('identificador');
+        if (identificadorIndex !== -1) {
+          base = [...base.slice(0, identificadorIndex + 1), 'inmobiliaria', ...base.slice(identificadorIndex + 1)];
         } else {
-          result.push('inmobiliaria');
+          base.push('inmobiliaria');
         }
       }
-      return result;
     }
-    // INMOBILIARIA: no incluir estado ni inmobiliaria
+    // INMOBILIARIA: ya tiene teléfono y mail por defecto, no incluir estado ni inmobiliaria
     return base;
   }, [effectiveUserRole]);
   

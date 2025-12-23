@@ -27,6 +27,8 @@ export interface UpdatePersonaDto {
   telefono?: number;
   email?: string;
   jefeDeFamiliaId?: number;
+  estado?: EstadoPersona;
+  inmobiliariaId?: number | null;
 }
 
 // Tipo local para incluir relaciones y conteos
@@ -35,6 +37,10 @@ type PersonaWithRelations = PrismaPersona & {
   jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'> | null;
   miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'>>;
   inmobiliaria?: { id: number; nombre: string } | null;
+  lotesPropios?: Array<{ id: number; numero: number | null; fraccion: { numero: number } }>;
+  lotesAlquilados?: Array<{ id: number; numero: number | null; fraccion: { numero: number }; estado: string }>;
+  Reserva?: Array<{ id: number; numero: string; createdAt: Date; loteId: number }>;
+  Venta?: Array<{ id: number; numero: string }>;
 };
 
 // Helper para formatear contacto
@@ -93,9 +99,11 @@ const getTipoIdentificador = (tipo: IdentificadorTipo): Identificador => {
 };
 
 // Mapeo de PrismaPersona a Persona (DTO)
+// Nota: El tipo de retorno incluye campos adicionales para mini detalles
 const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOverride?: string): Persona => {
   const contacto = p.contacto;
-  const email = emailOverride || parseEmail(contacto);
+  // Usar email del campo propio primero, luego override, luego parsear de contacto
+  const email = emailOverride || p.email || parseEmail(contacto);
   const telefono = telefonoOverride || parseTelefono(contacto);
 
   const esPropietario = (p._count?.lotesPropios ?? 0) > 0;
@@ -144,7 +152,29 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
       Reserva: p._count.Reserva ?? 0,
       Venta: p._count.Venta ?? 0,
     } : { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
-  };
+    // Arrays mínimos para mini detalles (campos adicionales al tipo Persona)
+    lotesPropios: (p.lotesPropios || []).map(l => ({
+      id: l.id,
+      numero: l.numero,
+      fraccionNumero: l.fraccion?.numero,
+    })),
+    lotesAlquilados: (p.lotesAlquilados || []).map(l => ({
+      id: l.id,
+      numero: l.numero,
+      fraccionNumero: l.fraccion?.numero,
+      estado: l.estado,
+    })),
+    reservas: (p.Reserva || []).map(r => ({
+      id: r.id,
+      numero: r.numero,
+      createdAt: r.createdAt,
+      loteId: r.loteId,
+    })),
+    ventas: (p.Venta || []).map(v => ({
+      id: v.id,
+      numero: v.numero,
+    })),
+  } as Persona & { lotesPropios?: any[]; lotesAlquilados?: any[]; reservas?: any[]; ventas?: any[] };
 };
 
 // Construir where clause según view
@@ -152,12 +182,16 @@ function buildWhereClause(
   view: PersonaView,
   user?: { role: string; inmobiliariaId?: number | null },
   q?: string,
-  includeInactive?: boolean
+  includeInactive?: boolean,
+  estado?: 'ACTIVA' | 'INACTIVA'
 ) {
   const where: any = {};
 
-  // Filtro de estado (solo activas por defecto, salvo que includeInactive=true)
-  if (!includeInactive) {
+  // Filtro de estado (simple, igual que inmobiliarias)
+  if (estado) {
+    where.estado = estado;
+  } else if (!includeInactive) {
+    // Por defecto, solo activas si no se especifica estado
     where.estado = 'ACTIVA';
   }
 
@@ -221,6 +255,10 @@ function buildWhereClause(
   return where;
 }
 
+// ------------------------------------------------------
+// Aca comienza el crud
+// ------------------------------------------------------
+
 // Obtener todas las personas con filtros
 export async function getAllPersonas(
   user?: { role: string; inmobiliariaId?: number | null },
@@ -228,12 +266,14 @@ export async function getAllPersonas(
     view?: PersonaView;
     q?: string;
     includeInactive?: boolean;
+    estado?: 'ACTIVA' | 'INACTIVA';
     limit?: number;
   }
 ): Promise<GetPersonasResponse> {
   const view = query?.view || 'ALL';
   const q = query?.q;
   const includeInactive = query?.includeInactive === true;
+  const estado = query?.estado;
   const limit = query?.limit || 100;
 
   // RBAC: INMOBILIARIA solo puede ver MIS_CLIENTES (forzar view, ignorar query)
@@ -248,6 +288,7 @@ export async function getAllPersonas(
     const effectiveView = 'MIS_CLIENTES';
     // includeInactive solo para ADMIN/GESTOR
     const effectiveIncludeInactive = false;
+    // INMOBILIARIA no puede filtrar por estado específico, solo ve activas
     const where = buildWhereClause(effectiveView, user, q, effectiveIncludeInactive);
 
     const personas = await prisma.persona.findMany({
@@ -274,7 +315,11 @@ export async function getAllPersonas(
   const effectiveIncludeInactive = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
     ? includeInactive 
     : false;
-  const where = buildWhereClause(view, user, q, effectiveIncludeInactive);
+  // Solo ADMIN/GESTOR pueden filtrar por estado específico
+  const effectiveEstado = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
+    ? estado 
+    : undefined;
+  const where = buildWhereClause(view, user, q, effectiveIncludeInactive, effectiveEstado);
 
   const personas = await prisma.persona.findMany({
     where,
@@ -304,10 +349,30 @@ export async function getPersonaById(
     where: { id },
     include: {
       user: { select: { id: true, username: true, email: true, role: true } },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
       jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       inmobiliaria: { select: { id: true, nombre: true } },
+      // Arrays mínimos para mini detalles
+      lotesPropios: {
+        select: { id: true, numero: true, mapId: true, fraccion: { select: { numero: true } } },
+        take: 10, // Límite razonable para el mini detalle
+      },
+      lotesAlquilados: {
+        select: { id: true, numero: true, mapId: true, estado: true, fraccion: { select: { numero: true } } },
+        where: { estado: 'ALQUILADO' }, // Solo inquilinos vigentes
+        take: 10,
+      },
+      Reserva: {
+        select: { id: true, numero: true, createdAt: true, loteId: true },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      },
+      Venta: {
+        select: { id: true, numero: true },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+      },
     },
   });
 
@@ -471,11 +536,27 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       }
     }
 
+    // Actualizar email si viene
+    if (req.email !== undefined) {
+      updateData.email = req.email?.trim() || null;
+    }
+    
+    // Actualizar contacto si viene telefono o email
     if (req.email !== undefined || req.telefono !== undefined) {
       updateData.contacto = formatContacto(
-        req.email !== undefined ? req.email : parseEmail(existingPersona.contacto),
+        req.email !== undefined ? req.email : (existingPersona.email || parseEmail(existingPersona.contacto)),
         req.telefono !== undefined ? req.telefono : parseTelefono(existingPersona.contacto)
       );
+    }
+
+    // Estado solo para ADMIN/GESTOR (validar en controller si es necesario)
+    if (req.estado !== undefined) {
+      updateData.estado = req.estado;
+    }
+
+    // inmobiliariaId solo para ADMIN/GESTOR (validar en controller si es necesario)
+    if (req.inmobiliariaId !== undefined) {
+      updateData.inmobiliariaId = req.inmobiliariaId;
     }
 
     const updated = await prisma.persona.update({
@@ -641,7 +722,7 @@ export class PersonaService {
 
   async findAll(
     user?: { role: string; inmobiliariaId?: number | null },
-    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; limit?: number }
+    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; estado?: 'ACTIVA' | 'INACTIVA'; limit?: number }
   ) {
     const result = await getAllPersonas(user, query);
     return result;

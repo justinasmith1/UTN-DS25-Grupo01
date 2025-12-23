@@ -24,7 +24,9 @@ export default function Reservas() {
   const { user } = useAuth();
   const { success, error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const crearParam = searchParams.get('crear') === 'true';
+  const openIdParam = searchParams.get('openId');
   const searchParamsString = searchParams.toString();
   
   // Detectar inmobiliariaId desde query params
@@ -326,6 +328,36 @@ export default function Reservas() {
       }, { replace: true });
     }
   }, [crearParam, setSearchParams]);
+
+  // Abrir automáticamente el modal "Ver" cuando viene openId desde navegación (query param o state)
+  useEffect(() => {
+    // Prioridad: location.state > query param
+    const stateId = location.state?.openId;
+    const idToUse = stateId != null ? stateId : (openIdParam ? parseInt(openIdParam, 10) : null);
+    
+    if (idToUse && allReservas.length > 0) {
+      const reservaId = typeof idToUse === 'number' ? idToUse : parseInt(idToUse, 10);
+      if (!isNaN(reservaId)) {
+        const reserva = allReservas.find(r => r.id === reservaId);
+        if (reserva) {
+          setReservaSel(reserva);
+          setOpenVer(true);
+          // Limpiar query param si existe
+          if (openIdParam) {
+            setSearchParams((prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete('openId');
+              return next;
+            }, { replace: true });
+          }
+          // Limpiar state
+          if (stateId != null) {
+            window.history.replaceState({}, document.title);
+          }
+        }
+      }
+    }
+  }, [openIdParam, location.state, allReservas, setSearchParams]);
 
   // Ver: abre con la fila y luego refina con getReservaById(id) para traer relaciones/fechas
   const onVer = useCallback((reserva) => {

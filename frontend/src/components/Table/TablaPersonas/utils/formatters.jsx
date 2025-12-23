@@ -2,6 +2,8 @@
 // Formatters para Personas
 // ===================
 
+import { extractEmail, extractTelefono } from '../../../../utils/personaContacto';
+
 /** Formatea el nombre completo de una persona (depende de que sea ), usa razonSocial si existe, sino nombre + apellido */
 export const fmtNombreCompleto = (persona) => {
   // Acepta objeto persona o (nombre, apellido, razonSocial)
@@ -115,6 +117,36 @@ export const fmtContacto = (email, telefono) => {
   return str;
 };
 
+/** Formatea un teléfono individual */
+export const fmtTelefonoIndividual = (telefono, contacto) => {
+  const telefonoNum = extractTelefono(telefono, contacto);
+  
+  if (!telefonoNum) {
+    return <span className="text-muted">Sin información</span>;
+  }
+  
+  return (
+    <span className="small font-monospace">
+      {fmtTelefono(telefonoNum)}
+    </span>
+  );
+};
+
+/** Formatea un email individual */
+export const fmtEmailIndividual = (email, contacto) => {
+  const emailStr = extractEmail(email, contacto);
+  
+  if (!emailStr) {
+    return <span className="text-muted">Sin información</span>;
+  }
+  
+  return (
+    <span className="small text-truncate" style={{ maxWidth: '200px', display: 'inline-block' }}>
+      {emailStr}
+    </span>
+  );
+};
+
 /** Formatea una fecha */
 export const fmtFecha = (fecha) => {
   if (!fecha) return <span className="text-muted">Sin fecha</span>;
@@ -133,21 +165,6 @@ export const fmtFecha = (fecha) => {
     return <span className="text-muted">Fecha inválida</span>;
   }
 };
-
-/** Formatea el estado de contacto (si tiene email, teléfono, ambos o ninguno) */
-export const fmtEstadoContacto = (email, telefono) => {
-  const tieneEmail = !!email;
-  const tieneTelefono = !!telefono;
-  
-  if (tieneEmail && tieneTelefono) {
-    return <span className="badge bg-success">Completo</span>;
-  } else if (tieneEmail || tieneTelefono) {
-    return <span className="badge bg-warning">Parcial</span>;
-  } else {
-    return <span className="badge bg-danger">Sin contacto</span>;
-  }
-};
-
 
 /** Formatea el valor del identificador con formato específico */
 export const fmtValorIdentificador = (tipo, valor) => {

@@ -30,7 +30,7 @@ export const fromApi = (apiPersona) => {
     identificadorTipo: identificadorTipo,
     identificadorValor: identificadorValor,
     telefono: apiPersona.telefono || null,
-    email: apiPersona.email || null,
+    email: apiPersona.email || null, // Campo propio de Persona
     contacto: apiPersona.contacto || null,
     cuil: apiPersona.cuil || identificadorValor, // Legacy
     estado: apiPersona.estado || 'ACTIVA',
@@ -39,7 +39,15 @@ export const fromApi = (apiPersona) => {
     esInquilino: Boolean(apiPersona.esInquilino),
     inmobiliariaId: apiPersona.inmobiliariaId || null,
     inmobiliaria: apiPersona.inmobiliaria || null,
+    jefeDeFamilia: apiPersona.jefeDeFamilia || null,
+    miembrosFamilia: apiPersona.miembrosFamilia || [],
+    esJefeDeFamilia: Boolean(apiPersona.esJefeDeFamilia),
     _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
+    // Arrays mínimos para mini detalles
+    lotesPropios: apiPersona.lotesPropios || [],
+    lotesAlquilados: apiPersona.lotesAlquilados || [],
+    reservas: apiPersona.reservas || [],
+    ventas: apiPersona.ventas || [],
   };
 };
 
@@ -211,22 +219,76 @@ export const createPersona = async (personaData) => {
  */
 export const updatePersona = async (id, personaData) => {
   try {
-    const apiData = toApi(personaData);
-    const response = await http(`/personas/${id}`, { 
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiData)
-    });
-    const data = await response.json().catch(() => ({}));
+    // Construir body limpio (sin undefined)
+    // http() hace JSON.stringify internamente, no lo hagamos aquí
+    const body = {};
     
-    if (!response.ok) {
-      throw new Error(data?.message || 'Error al actualizar persona');
+    if (personaData.identificadorTipo && personaData.identificadorValor) {
+      body.identificadorTipo = personaData.identificadorTipo;
+      body.identificadorValor = personaData.identificadorValor.trim();
     }
     
-    return fromApi(data.persona);
+    if (personaData.nombre !== undefined) {
+      body.nombre = personaData.nombre?.trim() || '';
+    }
+    
+    if (personaData.apellido !== undefined) {
+      body.apellido = personaData.apellido?.trim() || '';
+    }
+    
+    if (personaData.razonSocial !== undefined) {
+      body.razonSocial = personaData.razonSocial?.trim() || null;
+    }
+    
+    if (personaData.telefono !== null && personaData.telefono !== undefined) {
+      body.telefono = personaData.telefono;
+    }
+    
+    if (personaData.email !== undefined && personaData.email !== null) {
+      body.email = personaData.email.trim() || null;
+    }
+    
+    if (personaData.estado !== undefined) {
+      body.estado = personaData.estado;
+    }
+    
+    if (personaData.inmobiliariaId !== undefined) {
+      body.inmobiliariaId = personaData.inmobiliariaId;
+    }
+
+    // Usar http que devuelve Response, luego parsear JSON de manera segura
+    // Este patrón es el mismo que usan reservas.js y lotes.js
+    const res = await http(`/personas/${id}`, { 
+      method: 'PUT',
+      body: body  // http() hace JSON.stringify internamente
+    });
+    
+    // Parsear el JSON de manera segura con .catch() para evitar errores si no es JSON válido
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      // Si hay error, extraer el mensaje de manera segura
+      const errorMsg = data?.message || data?.errors?.[0]?.message || `Error al actualizar persona (${res.status})`;
+      const error = new Error(errorMsg);
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    
+    // El backend puede devolver { persona: {...} } o { data: { persona: {...} } } o directamente el objeto
+    const raw = data?.persona ?? data?.data?.persona ?? data?.data ?? data;
+    
+    return fromApi(raw);
   } catch (error) {
     console.error(`Error al actualizar persona ${id}:`, error);
-    throw error;
+    // Si el error ya tiene status, re-lanzarlo
+    if (error.status) {
+      throw error;
+    }
+    // Si no, crear un error genérico
+    const newError = new Error(error.message || 'Error al actualizar persona');
+    newError.status = error.status || 500;
+    throw newError;
   }
 };
 
