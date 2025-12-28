@@ -127,7 +127,7 @@ export default function FilterBarBase({
       if (onSearchChange) {
         onSearchChange(searchValue);
       } else {
-        onParamsChange?.({ [searchField.id]: searchValue });
+      onParamsChange?.({ [searchField.id]: searchValue });
       }
     }, DEBOUNCE_MS);
     

@@ -66,7 +66,7 @@ export const fmtIdentificador = (personaOrTipo, valor) => {
         style={{ minWidth, textAlign: 'center', display: 'inline-block' }}
       >
         {tipo} {identificadorValor}
-      </span>
+        </span>
     </div>
   );
 };
@@ -103,7 +103,7 @@ export const fmtContacto = (email, telefono) => {
 /**
  * Formatea un número de teléfono
  */
-  export const fmtTelefono = (telefono) => {
+export const fmtTelefono = (telefono) => {
   if (!telefono) return '';
   
   const str = telefono.toString();

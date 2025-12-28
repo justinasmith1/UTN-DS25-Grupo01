@@ -2,7 +2,7 @@
 // Tablero de personas con columnas dinámicas según rol y acciones basadas en permisos
 
 import React, { useMemo, useCallback } from 'react';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, RotateCcw } from 'lucide-react';
 import TablaBase from '../TablaBase';
 import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -14,6 +14,7 @@ const TablaPersonas = ({
   onVerPersona,
   onEditarPersona,
   onEliminarPersona,
+  onEliminarDefinitivo,
   onAgregarPersona,
   selectedIds = [],
   onSelectedChange,
@@ -94,21 +95,38 @@ const TablaPersonas = ({
     }
     
     if (can(user, 'personas.delete') && onEliminarPersona) {
-      actions.push(
-        <button
-          key="delete"
-          className="tl-icon tl-icon--delete"
-          aria-label="Eliminar persona"
-          data-tooltip="Eliminar persona"
-          onClick={() => onEliminarPersona(persona)}
-        >
-          <Trash2 size={18} />
-        </button>
-      );
+      // Si está activa: botón desactivar (basura roja)
+      // Si está inactiva: botón reactivar (refresh verde)
+      if (persona.estado === 'ACTIVA') {
+        actions.push(
+          <button
+            key="delete"
+            className="tl-icon tl-icon--delete"
+            aria-label="Desactivar persona"
+            data-tooltip="Desactivar persona"
+            onClick={() => onEliminarPersona(persona)}
+          >
+            <Trash2 size={18} />
+          </button>
+        );
+      } else if (persona.estado === 'INACTIVA') {
+        actions.push(
+          <button
+            key="reactivate"
+            className="tl-icon tl-icon--edit"
+            style={{ color: '#10b981' }}
+            aria-label="Reactivar persona"
+            data-tooltip="Reactivar persona"
+            onClick={() => onEliminarPersona(persona)}
+          >
+            <RotateCcw size={18} />
+          </button>
+        );
+      }
     }
     
     return actions.length > 0 ? actions : null;
-  }, [user, onVerPersona, onEditarPersona, onEliminarPersona]);
+  }, [user, effectiveUserRole, onVerPersona, onEditarPersona, onEliminarPersona, onEliminarDefinitivo]);
 
   // Acciones de la barra superior
   const topActions = useMemo(() => {

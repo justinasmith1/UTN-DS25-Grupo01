@@ -293,15 +293,55 @@ export const updatePersona = async (id, personaData) => {
 };
 
 /**
- * Elimina una persona
+ * Desactiva una persona (soft delete)
  */
-export const deletePersona = async (id) => {
+export const desactivarPersona = async (id) => {
+  try {
+    const response = await http(`/personas/${id}/desactivar`, { method: 'PATCH' });
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al desactivar persona');
+    }
+    
+    return data;
+  } catch (error) {
+    console.error(`Error al desactivar persona ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Reactiva una persona
+ */
+export const reactivarPersona = async (id) => {
+  try {
+    const response = await http(`/personas/${id}/reactivar`, { method: 'PATCH' });
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al reactivar persona');
+    }
+    
+    return fromApi(data?.persona || data);
+  } catch (error) {
+    console.error(`Error al reactivar persona ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina una persona definitivamente (hard delete) - solo Admin, solo si no tiene asociaciones
+ */
+export const deletePersonaDefinitivo = async (id) => {
   try {
     const response = await http(`/personas/${id}`, { method: 'DELETE' });
     const data = await response.json().catch(() => ({}));
     
     if (!response.ok) {
-      throw new Error(data?.message || 'Error al eliminar persona');
+      const error = new Error(data?.message || 'Error al eliminar persona definitivamente');
+      error.status = response.status;
+      throw error;
     }
     
     return data;
@@ -309,6 +349,13 @@ export const deletePersona = async (id) => {
     console.error(`Error al eliminar persona ${id}:`, error);
     throw error;
   }
+};
+
+/**
+ * Elimina una persona (por compatibilidad, ahora llama a desactivar)
+ */
+export const deletePersona = async (id) => {
+  return desactivarPersona(id);
 };
 
 /**

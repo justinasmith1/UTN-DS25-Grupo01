@@ -13,7 +13,6 @@ export const TIPOS_IDENTIFICADOR = [
 ];
 
 export const ESTADOS_PERSONA = [
-  { value: 'ALL', label: 'Todas' },
   { value: 'ACTIVA', label: 'Activa' },
   { value: 'INACTIVA', label: 'Inactiva' }
 ];
@@ -77,7 +76,7 @@ export const personasFilterFields = [
 // Valores por defecto
 export const personasFilterDefaults = {
   q: '',
-  estado: 'ALL', // Sin filtro por defecto (Todas)
+  estado: 'ACTIVA', // Por defecto mostrar solo activas
   clienteDe: 'ALL', // Sin filtro por defecto (Todos)
   identificadorTipo: 'ALL',
   fechaCreacion: { min: null, max: null }

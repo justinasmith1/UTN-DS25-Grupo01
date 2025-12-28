@@ -77,7 +77,7 @@ export default function FilterBarPersonas({
         id: 'estado',
         type: 'singleSelect',
         label: 'Estado',
-        defaultValue: 'ALL',
+        defaultValue: 'ACTIVA',
         options: ESTADOS_PERSONA
       }] : []),
       // Cliente de (solo Admin/Gestor) - unificado con inmobiliarias (multiSelect)
@@ -131,7 +131,7 @@ export default function FilterBarPersonas({
     if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
       return {
         q: '',
-        estado: 'ALL', // Sin filtro por defecto
+        estado: 'ACTIVA', // Por defecto mostrar solo activas
         clienteDe: [], // Array vacío para multiSelect
         identificadorTipo: [], // Array vacío para multiSelect
         fechaCreacion: { min: null, max: null }
