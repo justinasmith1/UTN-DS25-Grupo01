@@ -148,6 +148,7 @@ model Persona {
   razonSocial       String?
   // Estado
   estado            EstadoPersona    @default(ACTIVA)
+  fechaBaja         DateTime?
   // Contacto
   contacto          String?
   // Email (campo propio, separado de contacto)

@@ -2,7 +2,7 @@
 // Versión con FilterBar genérico usando FilterBarPersonas
 
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { getAllPersonas } from "../lib/api/personas";
@@ -15,6 +15,7 @@ import PersonaEditarCard from "../components/Cards/Personas/PersonaEditarCard";
 import PersonaDesactivarDialog from "../components/Cards/Personas/PersonaDesactivarDialog";
 import PersonaReactivarDialog from "../components/Cards/Personas/PersonaReactivarDialog";
 import PersonaEliminarDefinitivoDialog from "../components/Cards/Personas/PersonaEliminarDefinitivoDialog";
+import PersonaCrearCard from "../components/Cards/Personas/PersonaCrearCard";
 import { desactivarPersona, reactivarPersona, deletePersonaDefinitivo, getPersona } from "../lib/api/personas";
 
 /**
@@ -46,7 +47,6 @@ const getDefaultFilters = (userRole) => {
 export default function Personas() {
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Obtener view de URL (query param) - con default según rol
@@ -66,6 +66,9 @@ export default function Personas() {
   // Estado para modal "Ver Persona"
   const [verPersonaOpen, setVerPersonaOpen] = useState(false);
   const [personaSeleccionada, setPersonaSeleccionada] = useState(null);
+  
+  // Estado para modal "Crear Persona"
+  const [crearPersonaOpen, setCrearPersonaOpen] = useState(false);
   
   // Estado para modal "Editar Persona"
   const [editarPersonaOpen, setEditarPersonaOpen] = useState(false);
@@ -336,9 +339,24 @@ export default function Personas() {
   }, [personaADesactivar, currentView, filters.estado]);
 
   const handleAgregarPersona = () => {
-    // Navegar a formulario de nueva persona
-    navigate('/personas/nueva');
+    setCrearPersonaOpen(true);
   };
+
+  const handlePersonaCreada = useCallback((createdPersona) => {
+    // Refrescar la lista manteniendo filtros
+    (async () => {
+      try {
+        const params = { view: currentView };
+        if (filters.estado) {
+          params.estado = filters.estado;
+        }
+        const res = await getAllPersonas(params);
+        setPersonasRaw(res.personas || []);
+      } catch (err) {
+        console.error('Error al refrescar lista después de crear:', err);
+      }
+    })();
+  }, [currentView, filters.estado]);
 
   // Construir initialValue para FilterBar desde estado local
   // IMPORTANTE: Este hook debe estar ANTES de cualquier early return
@@ -450,6 +468,13 @@ export default function Personas() {
           onConfirm={handleConfirmarEliminarDefinitivo}
         />
       )}
+
+      {/* Modal "Crear Persona" */}
+      <PersonaCrearCard
+        open={crearPersonaOpen}
+        onCancel={() => setCrearPersonaOpen(false)}
+        onCreated={handlePersonaCreada}
+      />
 
       {/* Animación de éxito al desactivar/reactivar */}
       {showDeleteSuccess && (

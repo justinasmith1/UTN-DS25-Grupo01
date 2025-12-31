@@ -54,7 +54,25 @@ router.put(
     personaController.actualizarPersona
 );
 
-// DELETE /api/personas/:id
+// PATCH /api/personas/:id/desactivar
+router.patch(
+    '/:id/desactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(deletePersonaSchema),
+    personaController.desactivarPersona
+);
+
+// PATCH /api/personas/:id/reactivar
+router.patch(
+    '/:id/reactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(deletePersonaSchema),
+    personaController.reactivarPersona
+);
+
+// DELETE /api/personas/:id (hard delete, solo Admin, solo si no tiene asociaciones)
 router.delete(
     '/:id',
     authenticate,

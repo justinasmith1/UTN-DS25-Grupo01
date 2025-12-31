@@ -186,15 +186,20 @@ export const getPersonaByCuil = async (cuil) => {
  */
 export const createPersona = async (personaData) => {
   try {
-    // El backend espera identificador como objeto { tipo, valor }
-    // No usar toApi que espera identificador como string
     const body = {
-      nombre: personaData.nombre?.trim() || '',
-      apellido: personaData.apellido?.trim() || '',
-      identificador: personaData.identificador || null, // Ya viene como { tipo, valor }
+      identificadorTipo: personaData.identificadorTipo,
+      identificadorValor: personaData.identificadorValor || "",
+      ...(personaData.nombre ? { nombre: personaData.nombre.trim() } : {}),
+      ...(personaData.apellido ? { apellido: personaData.apellido.trim() } : {}),
+      ...(personaData.razonSocial ? { razonSocial: personaData.razonSocial.trim() } : {}),
       ...(personaData.telefono !== null && personaData.telefono !== undefined ? { telefono: personaData.telefono } : {}),
       ...(personaData.email && personaData.email.trim ? { email: personaData.email.trim() } : (personaData.email ? { email: personaData.email } : {}))
     };
+    
+    // inmobiliariaId: solo para Admin/Gestor
+    if (personaData.inmobiliariaId !== undefined) {
+      body.inmobiliariaId = personaData.inmobiliariaId;
+    }
 
     const response = await http('/personas', { 
       method: 'POST',

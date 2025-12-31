@@ -100,8 +100,8 @@ export const ROLE_PERMISSIONS = {
     PERMISSIONS.LOT_ACCESS, PERMISSIONS.LOT_VIEW,
     // Reservas: CRUD (con límites de edición, sin delete)
     PERMISSIONS.RES_ACCESS, PERMISSIONS.RES_VIEW, PERMISSIONS.RES_CREATE, PERMISSIONS.RES_EDIT,
-    // Personas: solo lectura
-    PERMISSIONS.PEOPLE_ACCESS, PERMISSIONS.PEOPLE_VIEW,
+    // Personas: acceso, lectura y creación (solo para su inmobiliaria)
+    PERMISSIONS.PEOPLE_ACCESS, PERMISSIONS.PEOPLE_VIEW, PERMISSIONS.PEOPLE_CREATE,
     // Cuenta
     PERMISSIONS.ACCOUNT_ACCESS,
   ],

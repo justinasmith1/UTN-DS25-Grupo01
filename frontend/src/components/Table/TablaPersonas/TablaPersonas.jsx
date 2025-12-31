@@ -152,7 +152,7 @@ const TablaPersonas = ({
         <button
           key="add"
           type="button"
-          className="tl-btn tl-btn--primary"
+          className="tl-btn tl-btn--soft"
           onClick={onAgregarPersona}
           title="Registrar nueva persona"
         >

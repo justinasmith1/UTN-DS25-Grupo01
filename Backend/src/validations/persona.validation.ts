@@ -74,6 +74,8 @@ const baseCreatePersonaSchema = z.object({
   email: z.string().email("Email invalido").optional(),
   // Relaciones
   jefeDeFamiliaId: z.number().int().positive().optional(),
+  // inmobiliariaId: opcional, solo para ADMIN/GESTOR (se valida en service)
+  inmobiliariaId: z.number().int().positive().nullable().optional(),
 })
 .refine(
   (data) => {
