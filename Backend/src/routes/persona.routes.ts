@@ -81,4 +81,31 @@ router.delete(
     personaController.eliminarPersona
 );
 
+// GET /api/personas/:id/grupo-familiar
+router.get(
+    '/:id/grupo-familiar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO'),
+    validateParams(getPersonaSchema),
+    personaController.obtenerGrupoFamiliar
+);
+
+// POST /api/personas/:id/grupo-familiar/miembros
+router.post(
+    '/:id/grupo-familiar/miembros',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(getPersonaSchema),
+    personaController.crearMiembroFamiliar
+);
+
+// DELETE /api/personas/:id/grupo-familiar/miembros/:miembroId
+router.delete(
+    '/:id/grupo-familiar/miembros/:miembroId',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(getPersonaSchema),
+    personaController.eliminarMiembroFamiliar
+);
+
 export const personaRoutes = router;

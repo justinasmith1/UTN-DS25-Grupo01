@@ -300,7 +300,7 @@ export default function PersonaEditarCard({
       return;
     }
 
-    // Validar email si se ingresó
+    // Validar email: si está vacío, enviar null explícitamente
     let emailStr = null;
     if (email && email.trim()) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -311,8 +311,12 @@ export default function PersonaEditarCard({
       }
       emailStr = email.trim();
     }
+    // Si email está vacío o solo espacios, enviar null explícitamente
+    if (!email || !email.trim()) {
+      emailStr = null;
+    }
     
-    // Validar teléfono si se ingresó
+    // Validar teléfono: si está vacío, enviar null explícitamente
     let telefonoNum = null;
     if (telefono && telefono.trim()) {
       if (!/^\d+$/.test(telefono.trim())) {
@@ -327,6 +331,10 @@ export default function PersonaEditarCard({
         return;
       }
       telefonoNum = n;
+    }
+    // Si telefono está vacío o solo espacios, enviar null explícitamente
+    if (!telefono || !telefono.trim()) {
+      telefonoNum = null;
     }
 
     // RBAC: INMOBILIARIA solo puede editar sus clientes
@@ -352,13 +360,13 @@ export default function PersonaEditarCard({
         payload.apellido = apellido.trim();
       }
       
-      // Incluir telefono si hay valor válido
-      if (telefonoNum !== null) {
-        payload.telefono = telefonoNum;
-      }
+      // Incluir telefono siempre (puede ser null para limpiarlo)
+      // IMPORTANTE: enviar null explícitamente cuando está vacío
+      payload.telefono = telefonoNum;
       
       // Incluir email siempre (puede ser null para limpiarlo)
-      payload.email = emailStr || null;
+      // IMPORTANTE: enviar null explícitamente cuando está vacío
+      payload.email = emailStr;
       
       // Solo incluir estado e inmobiliariaId para ADMIN/GESTOR
       // IMPORTANTE: incluir siempre, incluso si es null, para que el backend pueda actualizarlos

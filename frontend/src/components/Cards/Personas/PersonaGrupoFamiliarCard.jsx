@@ -502,6 +502,7 @@ export default function PersonaGrupoFamiliarCard({
                         type="submit"
                         className="btn btn-primary"
                         disabled={saving}
+                        style={{ padding: "6px 12px", fontSize: "13px" }}
                       >
                         {saving ? "Creando..." : "Agregar"}
                       </button>
@@ -514,6 +515,7 @@ export default function PersonaGrupoFamiliarCard({
                           setError(null);
                         }}
                         disabled={saving}
+                        style={{ padding: "6px 12px", fontSize: "13px" }}
                       >
                         Cancelar
                       </button>

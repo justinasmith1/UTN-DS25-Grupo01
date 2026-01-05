@@ -960,3 +960,50 @@ select.field-input {
   }
 }
 
+/* ========================================================================
+   ANIMACIÓN DE ÉXITO (reutilizable)
+   ======================================================================== */
+.success-animation-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-in;
+}
+
+.success-animation-card {
+  background: #fff;
+  padding: 40px;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+  text-align: center;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.success-checkmark {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+  animation: checkmark 0.5s ease-in-out;
+}
+
+.success-message {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #10b981;
+}
+
+/* Animación para miembro eliminándose */
+.miembro-removing {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+

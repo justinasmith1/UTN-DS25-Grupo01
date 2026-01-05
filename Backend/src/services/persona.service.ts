@@ -1,5 +1,5 @@
 import prisma from '../config/prisma';
-import type { Persona as PrismaPersona, IdentificadorTipo, EstadoPersona } from "../generated/prisma";
+import type { Persona as PrismaPersona, IdentificadorTipo, EstadoPersona, PersonaCategoria } from "../generated/prisma";
 import type { Identificador, Persona, DeletePersonaResponse, GetPersonaRequest, GetPersonasResponse, PutPersonaResponse, PostPersonaRequest, PostPersonaResponse } from '../types/interfacesCCLF';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
@@ -45,11 +45,17 @@ type PersonaWithRelations = PrismaPersona & {
 };
 
 // Helper para formatear contacto
-const formatContacto = (email?: string, telefono?: number): string | undefined => {
+const formatContacto = (email?: string | null, telefono?: number | null): string | null => {
   if (email && telefono) {
     return `${email},${telefono}`;
   }
-  return email || telefono?.toString();
+  if (email) {
+    return email;
+  }
+  if (telefono) {
+    return telefono.toString();
+  }
+  return null;
 };
 
 // Helper para parsear contacto
@@ -140,6 +146,7 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     telefono: telefono,
     contacto: p.contacto || '',
     estado: p.estado || 'ACTIVA',
+    createdAt: p.createdAt,
     inmobiliariaId: p.inmobiliariaId || null,
     inmobiliaria: p.inmobiliaria || null,
     esPropietario,
@@ -187,6 +194,9 @@ function buildWhereClause(
   estado?: 'ACTIVA' | 'INACTIVA'
 ) {
   const where: any = {};
+
+  // Excluir MIEMBRO_FAMILIAR por defecto (solo mostrar personas operativas)
+  (where as any).categoria = 'OPERATIVA';
 
   // Filtro de estado (simple, igual que inmobiliarias)
   if (estado) {
@@ -297,7 +307,7 @@ export async function getAllPersonas(
       orderBy: { createdAt: 'desc' },
       take: limit,
       include: {
-        user: { select: { id: true, username: true, email: true, role: true } },
+        user: { select: { id: true, username: true, email: true, role: true, createdAt: true } },
         _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
         jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
         miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
@@ -461,7 +471,7 @@ export async function createPersona(
     estado: 'ACTIVA',
   };
 
-  // Incluir inmobiliariaId solo si está definido (puede ser null para "La Federala")
+  // Incluir inmobiliariaId solo si está definido (puede ser null para "La Federala", ver dsp si esto camnbia a inm)
   if (finalInmobiliariaId !== undefined) {
     createData.inmobiliariaId = finalInmobiliariaId;
   }
@@ -563,16 +573,38 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       }
     }
 
-    // Actualizar email si viene
+    // Actualizar email si viene (puede ser null para limpiarlo)
     if (req.email !== undefined) {
-      updateData.email = req.email?.trim() || null;
+      updateData.email = req.email === null ? null : (req.email?.trim() || null);
     }
     
     // Actualizar contacto si viene telefono o email
+    // El telefono NO es un campo directo en Prisma, se guarda en 'contacto'
     if (req.email !== undefined || req.telefono !== undefined) {
+      // Obtener valores: si viene undefined, mantener el existente; si viene null, limpiar
+      let emailValue: string | null | undefined;
+      let telefonoValue: number | null | undefined;
+      
+      if (req.email !== undefined) {
+        // Si viene email, usar el valor (puede ser null para limpiar)
+        emailValue = req.email === null ? null : (req.email?.trim() || null);
+      } else {
+        // Si no viene email, mantener el existente
+        emailValue = existingPersona.email || parseEmail(existingPersona.contacto) || null;
+      }
+      
+      if (req.telefono !== undefined) {
+        // Si viene telefono, usar el valor (puede ser null para limpiar)
+        telefonoValue = req.telefono === null ? null : req.telefono;
+      } else {
+        // Si no viene telefono, mantener el existente
+        telefonoValue = parseTelefono(existingPersona.contacto) || null;
+      }
+      
+      // Formatear contacto: pasar null como undefined para que formatContacto lo maneje
       updateData.contacto = formatContacto(
-        req.email !== undefined ? req.email : (existingPersona.email || parseEmail(existingPersona.contacto)),
-        req.telefono !== undefined ? req.telefono : parseTelefono(existingPersona.contacto)
+        emailValue === null ? undefined : emailValue,
+        telefonoValue === null ? undefined : telefonoValue
       );
     }
 
@@ -594,12 +626,15 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       fechaBajaCalc = null;
     }
 
+    // Construir data final para Prisma
+    const finalData: any = {
+      ...updateData,
+      ...(fechaBajaCalc !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
+    };
+
     const updated = await prisma.persona.update({
       where: { id: idActual },
-      data: {
-        ...updateData,
-        ...(fechaBajaCalc !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
-      },
+      data: finalData,
       include: {
         user: {
           select: {
@@ -917,4 +952,216 @@ export class PersonaService {
   async deletePersonaDefinitivo(id: number) {
     return deletePersonaDefinitivoFn(id);
   }
+
+  async getGrupoFamiliar(titularId: number) {
+    return getGrupoFamiliarFn(titularId);
+  }
+
+  async crearMiembroFamiliar(titularId: number, data: { nombre: string; apellido: string; identificadorTipo: IdentificadorTipo; identificadorValor: string }) {
+    return crearMiembroFamiliarFn(titularId, data);
+  }
+
+  async eliminarMiembroFamiliar(titularId: number, miembroId: number) {
+    return eliminarMiembroFamiliarFn(titularId, miembroId);
+  }
 }
+
+// ===================
+// Funciones de Grupo Familiar
+// ===================
+
+// Obtener grupo familiar de una persona
+export async function getGrupoFamiliar(titularId: number) {
+  const persona = await prisma.persona.findUnique({
+    where: { id: titularId },
+    include: {
+      jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorTipo: true, identificadorValor: true } },
+      miembrosFamilia: { 
+        where: { categoria: 'MIEMBRO_FAMILIAR' as any },
+        select: { id: true, nombre: true, apellido: true, identificadorTipo: true, identificadorValor: true }
+      },
+      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+    },
+  });
+
+  if (!persona) {
+    const error = new Error('Persona no encontrada') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Determinar titular: si tiene jefeDeFamilia, el titular es el jefe; si no, es la persona misma
+  let titular;
+  if (persona.jefeDeFamiliaId) {
+    titular = persona.jefeDeFamilia;
+    if (!titular) {
+      const error = new Error('Jefe de familia no encontrado') as any;
+      error.statusCode = 404;
+      throw error;
+    }
+  } else {
+    titular = {
+      id: persona.id,
+      nombre: persona.nombre || '',
+      apellido: persona.apellido || '',
+      razonSocial: persona.razonSocial || null,
+      identificadorTipo: persona.identificadorTipo,
+      identificadorValor: persona.identificadorValor,
+    };
+  }
+
+  // Validar que el titular sea aplicable (propietario o inquilino)
+  const esPropietario = (persona._count?.lotesPropios ?? 0) > 0;
+  const esInquilino = (persona._count?.lotesAlquilados ?? 0) > 0;
+  
+  if (!esPropietario && !esInquilino) {
+    const error = new Error('Grupo familiar aplica solo a propietarios o inquilinos') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Validar que el titular sea OPERATIVA y ACTIVA
+  if ((persona as any).categoria !== 'OPERATIVA' || persona.estado !== 'ACTIVA') {
+    const error = new Error('El titular debe ser una persona operativa y activa') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    titular: {
+      id: titular.id,
+      nombre: titular.nombre || '',
+      apellido: titular.apellido || '',
+      razonSocial: (titular as any).razonSocial || null,
+      identificadorTipo: titular.identificadorTipo,
+      identificadorValor: titular.identificadorValor,
+    },
+    miembros: (persona.miembrosFamilia || []).map((m) => ({
+      id: m.id,
+      nombre: m.nombre || '',
+      apellido: m.apellido || '',
+      identificadorTipo: m.identificadorTipo,
+      identificadorValor: m.identificadorValor,
+    })),
+  };
+}
+
+// Crear miembro familiar
+export async function crearMiembroFamiliar(
+  titularId: number,
+  data: { nombre: string; apellido: string; identificadorTipo: IdentificadorTipo; identificadorValor: string }
+) {
+  // Validar titular
+  const titular = await prisma.persona.findUnique({
+    where: { id: titularId },
+    include: {
+      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+    },
+  });
+
+  if (!titular) {
+    const error = new Error('Titular no encontrado') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Validar que el titular sea aplicable
+  const esPropietario = (titular._count?.lotesPropios ?? 0) > 0;
+  const esInquilino = (titular._count?.lotesAlquilados ?? 0) > 0;
+  
+  if (!esPropietario && !esInquilino) {
+    const error = new Error('Grupo familiar aplica solo a propietarios o inquilinos') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Validar que el titular sea OPERATIVA y ACTIVA
+  if ((titular as any).categoria !== 'OPERATIVA' || titular.estado !== 'ACTIVA') {
+    const error = new Error('El titular debe ser una persona operativa y activa') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Normalizar identificadorValor
+  const identificadorValorNormalized = normalizeIdentificador(data.identificadorTipo, data.identificadorValor);
+
+  // Verificar si ya existe una persona con el mismo identificador
+  const exists = await prisma.persona.findUnique({
+    where: {
+      identificadorTipo_identificadorValor: {
+        identificadorTipo: data.identificadorTipo,
+        identificadorValor: identificadorValorNormalized,
+      },
+    },
+  });
+
+  if (exists) {
+    const error = new Error('Ya existe una persona con ese identificador') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  // Crear miembro familiar
+  const miembro = await prisma.persona.create({
+    data: {
+      identificadorTipo: data.identificadorTipo,
+      identificadorValor: identificadorValorNormalized,
+      nombre: data.nombre.trim(),
+      apellido: data.apellido.trim(),
+      categoria: 'MIEMBRO_FAMILIAR',
+      jefeDeFamiliaId: titularId,
+      inmobiliariaId: titular.inmobiliariaId, // Heredar inmobiliariaId del titular
+      estado: 'ACTIVA',
+      updateAt: new Date(),
+    },
+    select: {
+      id: true,
+      nombre: true,
+      apellido: true,
+      identificadorTipo: true,
+      identificadorValor: true,
+    },
+  });
+
+  return miembro;
+}
+
+// Eliminar miembro familiar
+export async function eliminarMiembroFamiliar(titularId: number, miembroId: number) {
+  // Validar miembro
+  const miembro = await prisma.persona.findUnique({
+    where: { id: miembroId },
+  });
+
+  if (!miembro) {
+    const error = new Error('Miembro no encontrado') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Validar que sea MIEMBRO_FAMILIAR
+  if ((miembro as any).categoria !== 'MIEMBRO_FAMILIAR') {
+    const error = new Error('Solo se pueden eliminar miembros familiares') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Validar que pertenezca al titular
+  if (miembro.jefeDeFamiliaId !== titularId) {
+    const error = new Error('El miembro no pertenece a este grupo familiar') as any;
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Eliminar el miembro (hard delete)
+  await prisma.persona.delete({
+    where: { id: miembroId },
+  });
+
+  return { success: true };
+}
+
+// Asignar referencias para la clase
+const getGrupoFamiliarFn = getGrupoFamiliar;
+const crearMiembroFamiliarFn = crearMiembroFamiliar;
+const eliminarMiembroFamiliarFn = eliminarMiembroFamiliar;

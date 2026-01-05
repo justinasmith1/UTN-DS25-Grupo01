@@ -118,6 +118,11 @@ enum EstadoPersona {
   INACTIVA
 }
 
+enum PersonaCategoria {
+  OPERATIVA
+  MIEMBRO_FAMILIAR
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -149,6 +154,8 @@ model Persona {
   // Estado
   estado            EstadoPersona    @default(ACTIVA)
   fechaBaja         DateTime?
+  // Categoría (OPERATIVA o MIEMBRO_FAMILIAR)
+  categoria         PersonaCategoria @default(OPERATIVA)
   // Contacto
   contacto          String?
   // Email (campo propio, separado de contacto)
@@ -182,6 +189,7 @@ model Persona {
   @@unique([identificadorTipo, identificadorValor])
   @@index([estado])
   @@index([inmobiliariaId])
+  @@index([categoria])
 }
 
 // Reserva
