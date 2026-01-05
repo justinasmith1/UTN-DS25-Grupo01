@@ -8,7 +8,7 @@ import { TIPOS_IDENTIFICADOR, ESTADOS_PERSONA } from '../presets/personas.preset
 export const personasChipsFrom = (filters, catalogs = {}) => {
   const chips = [];
   // Estado (solo Admin/Gestor)
-  if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
+  if (filters.estado && filters.estado !== 'ACTIVA') {
     const estado = ESTADOS_PERSONA.find(e => e.value === filters.estado);
     const displayValue = estado ? estado.label : filters.estado;
     chips.push({

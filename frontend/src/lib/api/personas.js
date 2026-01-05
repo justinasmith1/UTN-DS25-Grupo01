@@ -30,7 +30,7 @@ export const fromApi = (apiPersona) => {
     identificadorTipo: identificadorTipo,
     identificadorValor: identificadorValor,
     telefono: apiPersona.telefono || null,
-    email: apiPersona.email || null,
+    email: apiPersona.email || null, // Campo propio de Persona
     contacto: apiPersona.contacto || null,
     cuil: apiPersona.cuil || identificadorValor, // Legacy
     estado: apiPersona.estado || 'ACTIVA',
@@ -39,7 +39,15 @@ export const fromApi = (apiPersona) => {
     esInquilino: Boolean(apiPersona.esInquilino),
     inmobiliariaId: apiPersona.inmobiliariaId || null,
     inmobiliaria: apiPersona.inmobiliaria || null,
+    jefeDeFamilia: apiPersona.jefeDeFamilia || null,
+    miembrosFamilia: apiPersona.miembrosFamilia || [],
+    esJefeDeFamilia: Boolean(apiPersona.esJefeDeFamilia),
     _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
+    // Arrays mínimos para mini detalles
+    lotesPropios: apiPersona.lotesPropios || [],
+    lotesAlquilados: apiPersona.lotesAlquilados || [],
+    reservas: apiPersona.reservas || [],
+    ventas: apiPersona.ventas || [],
   };
 };
 
@@ -178,15 +186,20 @@ export const getPersonaByCuil = async (cuil) => {
  */
 export const createPersona = async (personaData) => {
   try {
-    // El backend espera identificador como objeto { tipo, valor }
-    // No usar toApi que espera identificador como string
     const body = {
-      nombre: personaData.nombre?.trim() || '',
-      apellido: personaData.apellido?.trim() || '',
-      identificador: personaData.identificador || null, // Ya viene como { tipo, valor }
+      identificadorTipo: personaData.identificadorTipo,
+      identificadorValor: personaData.identificadorValor || "",
+      ...(personaData.nombre ? { nombre: personaData.nombre.trim() } : {}),
+      ...(personaData.apellido ? { apellido: personaData.apellido.trim() } : {}),
+      ...(personaData.razonSocial ? { razonSocial: personaData.razonSocial.trim() } : {}),
       ...(personaData.telefono !== null && personaData.telefono !== undefined ? { telefono: personaData.telefono } : {}),
       ...(personaData.email && personaData.email.trim ? { email: personaData.email.trim() } : (personaData.email ? { email: personaData.email } : {}))
     };
+    
+    // inmobiliariaId: solo para Admin/Gestor
+    if (personaData.inmobiliariaId !== undefined) {
+      body.inmobiliariaId = personaData.inmobiliariaId;
+    }
 
     const response = await http('/personas', { 
       method: 'POST',
@@ -211,35 +224,129 @@ export const createPersona = async (personaData) => {
  */
 export const updatePersona = async (id, personaData) => {
   try {
-    const apiData = toApi(personaData);
-    const response = await http(`/personas/${id}`, { 
+    // Construir body limpio (sin undefined)
+    // http() hace JSON.stringify internamente, no lo hagamos aquí
+    const body = {};
+    
+    if (personaData.identificadorTipo && personaData.identificadorValor) {
+      body.identificadorTipo = personaData.identificadorTipo;
+      body.identificadorValor = personaData.identificadorValor.trim();
+    }
+    
+    if (personaData.nombre !== undefined) {
+      body.nombre = personaData.nombre?.trim() || '';
+    }
+    
+    if (personaData.apellido !== undefined) {
+      body.apellido = personaData.apellido?.trim() || '';
+    }
+    
+    if (personaData.razonSocial !== undefined) {
+      body.razonSocial = personaData.razonSocial?.trim() || null;
+    }
+    
+    if (personaData.telefono !== null && personaData.telefono !== undefined) {
+      body.telefono = personaData.telefono;
+    }
+    
+    if (personaData.email !== undefined && personaData.email !== null) {
+      body.email = personaData.email.trim() || null;
+    }
+    
+    if (personaData.estado !== undefined) {
+      body.estado = personaData.estado;
+    }
+    
+    if (personaData.inmobiliariaId !== undefined) {
+      body.inmobiliariaId = personaData.inmobiliariaId;
+    }
+
+    // Usar http que devuelve Response, luego parsear JSON de manera segura
+    // Este patrón es el mismo que usan reservas.js y lotes.js
+    const res = await http(`/personas/${id}`, { 
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(apiData)
+      body: body  // http() hace JSON.stringify internamente
     });
+    
+    // Parsear el JSON de manera segura con .catch() para evitar errores si no es JSON válido
+    const data = await res.json().catch(() => ({}));
+    
+    if (!res.ok) {
+      // Si hay error, extraer el mensaje de manera segura
+      const errorMsg = data?.message || data?.errors?.[0]?.message || `Error al actualizar persona (${res.status})`;
+      const error = new Error(errorMsg);
+      error.status = res.status;
+      error.data = data;
+      throw error;
+    }
+    
+    // El backend puede devolver { persona: {...} } o { data: { persona: {...} } } o directamente el objeto
+    const raw = data?.persona ?? data?.data?.persona ?? data?.data ?? data;
+    
+    return fromApi(raw);
+  } catch (error) {
+    console.error(`Error al actualizar persona ${id}:`, error);
+    // Si el error ya tiene status, re-lanzarlo
+    if (error.status) {
+      throw error;
+    }
+    // Si no, crear un error genérico
+    const newError = new Error(error.message || 'Error al actualizar persona');
+    newError.status = error.status || 500;
+    throw newError;
+  }
+};
+
+/**
+ * Desactiva una persona (soft delete)
+ */
+export const desactivarPersona = async (id) => {
+  try {
+    const response = await http(`/personas/${id}/desactivar`, { method: 'PATCH' });
     const data = await response.json().catch(() => ({}));
     
     if (!response.ok) {
-      throw new Error(data?.message || 'Error al actualizar persona');
+      throw new Error(data?.message || 'Error al desactivar persona');
     }
     
-    return fromApi(data.persona);
+    return data;
   } catch (error) {
-    console.error(`Error al actualizar persona ${id}:`, error);
+    console.error(`Error al desactivar persona ${id}:`, error);
     throw error;
   }
 };
 
 /**
- * Elimina una persona
+ * Reactiva una persona
  */
-export const deletePersona = async (id) => {
+export const reactivarPersona = async (id) => {
+  try {
+    const response = await http(`/personas/${id}/reactivar`, { method: 'PATCH' });
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al reactivar persona');
+    }
+    
+    return fromApi(data?.persona || data);
+  } catch (error) {
+    console.error(`Error al reactivar persona ${id}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Elimina una persona definitivamente (hard delete) - solo Admin, solo si no tiene asociaciones
+ */
+export const deletePersonaDefinitivo = async (id) => {
   try {
     const response = await http(`/personas/${id}`, { method: 'DELETE' });
     const data = await response.json().catch(() => ({}));
     
     if (!response.ok) {
-      throw new Error(data?.message || 'Error al eliminar persona');
+      const error = new Error(data?.message || 'Error al eliminar persona definitivamente');
+      error.status = response.status;
+      throw error;
     }
     
     return data;
@@ -247,6 +354,13 @@ export const deletePersona = async (id) => {
     console.error(`Error al eliminar persona ${id}:`, error);
     throw error;
   }
+};
+
+/**
+ * Elimina una persona (por compatibilidad, ahora llama a desactivar)
+ */
+export const deletePersona = async (id) => {
+  return desactivarPersona(id);
 };
 
 /**

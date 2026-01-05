@@ -24,20 +24,20 @@ function mapPrismaError(e: unknown): any {
 }
 
 export class PersonaController {
-  async create(req: Request, res: Response) {
+    async create(req: Request, res: Response) {
     try {
-      const validatedData = createPersonaSchema.parse(req.body);
+        const validatedData = createPersonaSchema.parse(req.body);
       const user = (req as any).user; // Del middleware de auth
 
       // Tomar jefeDeFamiliaId si viene en el body (opcional)
-      const rawJefe = (req.body as any)?.jefeDeFamiliaId;
+        const rawJefe = (req.body as any)?.jefeDeFamiliaId;
       const jefeDeFamiliaId =
         rawJefe !== undefined && rawJefe !== null && !Number.isNaN(Number(rawJefe))
           ? Number(rawJefe)
           : undefined;
 
       // Construir CreatePersonaDto
-      const createData = {
+        const createData = {
         identificadorTipo: validatedData.identificadorTipo,
         identificadorValor: validatedData.identificadorValor,
         nombre: validatedData.nombre,
@@ -46,37 +46,38 @@ export class PersonaController {
         telefono: validatedData.telefono,
         email: validatedData.email,
         ...(jefeDeFamiliaId !== undefined ? { jefeDeFamiliaId } : {}),
-      };
+        ...(validatedData.inmobiliariaId !== undefined ? { inmobiliariaId: validatedData.inmobiliariaId } : {}),
+        };
 
       const persona = await personaService.create(createData, user);
 
-      const response: PostPersonaResponse = {
-        persona,
+        const response: PostPersonaResponse = {
+            persona,
         message: 'Persona creada exitosamente',
-      };
+        };
 
-      res.status(201).json({
-        success: true,
+        res.status(201).json({
+            success: true,
         ...response,
-      });
+        });
     } catch (error: any) {
       const mappedError = mapPrismaError(error);
       if (mappedError.errors) {
-        res.status(400).json({
-          success: false,
-          message: 'Error de validación',
+            res.status(400).json({
+            success: false,
+            message: 'Error de validación',
           errors: mappedError.errors,
         });
-      } else {
+        } else {
         res.status(mappedError.statusCode || 400).json({
-          success: false,
+                success: false,
           message: mappedError.message || 'Error al crear la persona',
-        });
-      }
+            });
+        }
     }
-  }
+}
 
-  async obtenerTodas(req: Request, res: Response) {
+async obtenerTodas(req: Request, res: Response) {
     try {
       const user = (req as any).user; // Del middleware de auth
       
@@ -84,71 +85,73 @@ export class PersonaController {
       const view = (req.query.view as PersonaView) || 'ALL';
       const q = req.query.q as string | undefined;
       const includeInactive = req.query.includeInactive === 'true';
+      const estado = req.query.estado as 'ACTIVA' | 'INACTIVA' | undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
 
       const result = await personaService.findAll(user, {
         view,
         q,
         includeInactive,
+        estado,
         limit,
       });
 
-      const response: GetPersonasResponse = {
-        personas: result.personas,
+        const response: GetPersonasResponse = {
+            personas: result.personas,
         total: result.total,
-      };
+        };
 
-      res.status(200).json({
-        success: true,
-        message: 'Personas obtenidas exitosamente',
+        res.status(200).json({
+            success: true,
+            message: 'Personas obtenidas exitosamente',
         ...response,
-      });
-    } catch (error: any) {
+        });
+        } catch (error: any) {
       const mappedError = mapPrismaError(error);
       res.status(mappedError.statusCode || 500).json({
-        success: false,
+            success: false,
         message: mappedError.message || 'Error al obtener las personas',
-      });
+        });
     }
-  }
+}
 
-  async obtenerPersonaPorId(req: Request, res: Response) {
+async obtenerPersonaPorId(req: Request, res: Response) {
     try {
-      const { id } = getPersonaSchema.parse(req.params);
+        const { id } = getPersonaSchema.parse(req.params);
       const user = (req as any).user; // Del middleware de auth
 
       const persona = await personaService.findById(id, user);
 
-      const response: GetPersonaResponse = {
-        persona,
+        const response: GetPersonaResponse = {
+            persona,
         message: 'Persona obtenida exitosamente',
-      };
+        };
 
-      res.status(200).json({
-        success: true,
+        res.status(200).json({
+            success: true,
         ...response,
-      });
+        });
     } catch (error: any) {
       const mappedError = mapPrismaError(error);
       if (mappedError.errors) {
-        res.status(400).json({
-          success: false,
-          message: 'Error de validación',
+            res.status(400).json({
+            success: false,
+            message: 'Error de validación',
           errors: mappedError.errors,
-        });
-      } else {
+            });
+        } else {
         res.status(mappedError.statusCode || 404).json({
-          success: false,
+                success: false,
           message: mappedError.message || 'Persona no encontrada',
-        });
-      }
+            });
+        }
     }
-  }
+}
 
-  async actualizarPersona(req: Request, res: Response) {
+async actualizarPersona(req: Request, res: Response) {
     try {
-      const { id } = getPersonaSchema.parse(req.params);
-      const validatedData = updatePersonaSchema.parse(req.body);
+        const { id } = getPersonaSchema.parse(req.params);
+        const validatedData = updatePersonaSchema.parse(req.body);
 
       // Construir UpdatePersonaDto con el nuevo formato
       const updateData: any = {
@@ -160,41 +163,42 @@ export class PersonaController {
         telefono: validatedData.telefono,
         email: validatedData.email,
         jefeDeFamiliaId: validatedData.jefeDeFamiliaId,
+        estado: validatedData.estado,
+        inmobiliariaId: validatedData.inmobiliariaId,
       };
 
-      const result = await personaService.update(id, updateData);
+        const result = await personaService.update(id, updateData);
 
-      const response: PutPersonaResponse = {
-        persona: result.persona,
+        const response: PutPersonaResponse = {
+            persona: result.persona,
         message: result.message,
-      };
+        };
 
-      res.status(200).json({
-        success: true,
+        res.status(200).json({
+            success: true,
         ...response,
-      });
+        });
     } catch (error: any) {
       const mappedError = mapPrismaError(error);
       if (mappedError.errors) {
-        res.status(400).json({
-          success: false,
-          message: 'Error de validación',
+            res.status(400).json({
+            success: false,
+            message: 'Error de validación',
           errors: mappedError.errors,
-        });
-      } else {
+            });
+        } else {
         res.status(mappedError.statusCode || 400).json({
-          success: false,
+                success: false,
           message: mappedError.message || 'Error al actualizar la persona',
-        });
-      }
+            });
+        }
     }
-  }
+}
 
-  async eliminarPersona(req: Request, res: Response) {
+  async desactivarPersona(req: Request, res: Response) {
     try {
       const { id } = deletePersonaSchema.parse(req.params);
-
-      const response: DeletePersonaResponse = await personaService.delete(id);
+      const response: DeletePersonaResponse = await personaService.desactivarPersona(id);
 
       res.status(200).json({
         success: true,
@@ -202,50 +206,85 @@ export class PersonaController {
       });
     } catch (error: any) {
       const mappedError = mapPrismaError(error);
-      if (mappedError.errors) {
-        res.status(400).json({
-          success: false,
-          message: 'Error de validación',
-          errors: mappedError.errors,
-        });
-      } else {
-        res.status(mappedError.statusCode || 400).json({
-          success: false,
-          message: mappedError.message || 'Error al eliminar la persona',
-        });
-      }
+      res.status(mappedError.statusCode || 400).json({
+        success: false,
+        message: mappedError.message || 'Error al desactivar la persona',
+      });
     }
   }
 
-  async obtenerPersonaPorCuil(req: Request, res: Response) {
+  async reactivarPersona(req: Request, res: Response) {
     try {
-      const { cuil } = req.params;
-
-      // Usar método legacy que busca primero por identificadorTipo=CUIL y luego por campo cuil
-      const persona = await personaService.findByCuil(cuil);
-
-      if (!persona) {
-        return res.status(404).json({
-          success: false,
-          message: 'Persona no encontrada',
-        });
-      }
-
-      const response: GetPersonaResponse = {
-        persona,
-        message: 'Persona obtenida exitosamente',
-      };
+      const { id } = deletePersonaSchema.parse(req.params);
+      const response: PutPersonaResponse = await personaService.reactivarPersona(id);
 
       res.status(200).json({
         success: true,
         ...response,
       });
     } catch (error: any) {
+      const mappedError = mapPrismaError(error);
+      res.status(mappedError.statusCode || 400).json({
+        success: false,
+        message: mappedError.message || 'Error al reactivar la persona',
+      });
+    }
+  }
+
+async eliminarPersona(req: Request, res: Response) {
+    try {
+        const { id } = deletePersonaSchema.parse(req.params);
+      const response: DeletePersonaResponse = await personaService.deletePersonaDefinitivo(id);
+
+        res.status(200).json({
+            success: true,
+        ...response,
+        });
+        } catch (error: any) {
+      const mappedError = mapPrismaError(error);
+      if (mappedError.statusCode === 409) {
+        res.status(409).json({
+            success: false,
+          message: mappedError.message || 'No se puede eliminar definitivamente porque tiene asociaciones',
+            });
+        } else {
+        res.status(mappedError.statusCode || 400).json({
+                success: false,
+          message: mappedError.message || 'Error al eliminar la persona',
+            });
+        }
+    }
+}
+
+async obtenerPersonaPorCuil(req: Request, res: Response) {
+    try {
+        const { cuil } = req.params;
+        
+      // Usar método legacy que busca primero por identificadorTipo=CUIL y luego por campo cuil
+        const persona = await personaService.findByCuil(cuil);
+
+        if (!persona) {
+            return res.status(404).json({
+            success: false,
+          message: 'Persona no encontrada',
+            });
+        }
+
+        const response: GetPersonaResponse = {
+            persona,
+        message: 'Persona obtenida exitosamente',
+        };
+
+        res.status(200).json({
+            success: true,
+        ...response,
+        });
+        } catch (error: any) {
       const mappedError = mapPrismaError(error);
       res.status(mappedError.statusCode || 500).json({
-        success: false,
+                success: false,
         message: mappedError.message || 'Error al buscar la persona',
-      });
+            });
+        }
     }
-  }
 }

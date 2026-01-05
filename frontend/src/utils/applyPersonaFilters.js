@@ -12,8 +12,8 @@ export const applyPersonaFilters = (personas, filters = {}) => {
   }
 
   return personas.filter(persona => {
-    // Filtro por estado (solo si no es "ALL" o "TODAS")
-    if (filters.estado && filters.estado !== 'ALL' && filters.estado !== 'TODAS') {
+    // Filtro por estado
+    if (filters.estado) {
       if (persona.estado !== filters.estado) {
         return false;
       }
