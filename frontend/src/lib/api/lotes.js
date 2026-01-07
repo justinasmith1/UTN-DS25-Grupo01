@@ -60,15 +60,18 @@ function fromApi(x = {}) {
     subStatus,
     estado: x.estado ?? null,
     subestado: x.subestado ?? null,
+    tipo: x.tipo ?? null,
     owner,
     location,
     superficie: numOrNull(x.superficie ?? x.superficieM2 ?? x.surface),
     price: numOrNull(x.price ?? x.precio),
     precio: numOrNull(x.precio ?? x.price),
-    frente: numOrNull(x.frente),
-    fondo: numOrNull(x.fondo),
     deuda: x.deuda ?? null,
     descripcion: x.descripcion ?? null,
+    ubicacion: x.ubicacion ?? null,
+    fraccion: x.fraccion ?? null,
+    inquilino: x.inquilino ?? null,
+    numPartido: x.numPartido ?? null,
   };
 }
 

@@ -38,8 +38,8 @@ type PersonaWithRelations = PrismaPersona & {
   jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'> | null;
   miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'>>;
   inmobiliaria?: { id: number; nombre: string } | null;
-  lotesPropios?: Array<{ id: number; numero: number | null; fraccion: { numero: number } }>;
-  lotesAlquilados?: Array<{ id: number; numero: number | null; fraccion: { numero: number }; estado: string }>;
+  lotesPropios?: Array<{ id: number; numero: number | null; mapId: string | null; fraccion: { numero: number } }>;
+  lotesAlquilados?: Array<{ id: number; numero: number | null; mapId: string | null; fraccion: { numero: number }; estado: string }>;
   Reserva?: Array<{ id: number; numero: string; createdAt: Date; loteId: number }>;
   Venta?: Array<{ id: number; numero: string }>;
 };
@@ -164,12 +164,14 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     lotesPropios: (p.lotesPropios || []).map(l => ({
       id: l.id,
       numero: l.numero,
-      fraccionNumero: l.fraccion?.numero,
+      mapId: (l as any).mapId ?? null,
+      fraccionNumero: l.fraccion?.numero ?? 0,
     })),
     lotesAlquilados: (p.lotesAlquilados || []).map(l => ({
       id: l.id,
       numero: l.numero,
-      fraccionNumero: l.fraccion?.numero,
+      mapId: (l as any).mapId ?? null,
+      fraccionNumero: l.fraccion?.numero ?? 0,
       estado: l.estado,
     })),
     reservas: (p.Reserva || []).map(r => ({

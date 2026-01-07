@@ -1,6 +1,5 @@
 // src/components/TablaLotes/presets/lotes.table.jsx
 import React from 'react';
-import { getLoteDisplayId } from '../../../../utils/mapaUtils';
 // Reutiliza helpers y lo que hace es construir la configuración de la tabla para cada rol.
 
 export const lotesTablePreset = {
@@ -9,8 +8,8 @@ export const lotesTablePreset = {
   COLUMN_TEMPLATES_BY_ROLE: {
     admin:        ['id','estado','subestado','propietario','precio','deuda'],
     gestor:       ['id','estado','subestado','propietario','precio'],
-    tecnico:      ['id','estado','subestado','frente','fondo','superficie'],
-    inmobiliaria: ['id','estado','propietario','calle','precio'],
+    tecnico:      ['id','estado','subestado','superficie'],
+    inmobiliaria: ['id','estado','propietario','ubicacion','precio'],
   },
 
   widthFor(id) {
@@ -19,12 +18,13 @@ export const lotesTablePreset = {
       case 'estado':     return '160px';
       case 'subestado':  return '170px';
       case 'propietario':return '220px';
-      case 'calle':      return '220px';
+      case 'ubicacion':  return '180px';
+      case 'tipo':       return '140px';
+      case 'fraccion':   return '120px';
+      case 'inquilino':  return '200px';
+      case 'numPartida': return '120px';
       case 'descripcion':return 'minmax(280px,370px)';
-      case 'numero':     return '120px';
       case 'superficie': return '120px';
-      case 'frente':     return '120px';
-      case 'fondo':      return '120px';
       case 'precio':     return '140px';
       case 'deuda':      return '140px';
       default:           return 'minmax(140px,1fr)';
@@ -41,23 +41,23 @@ export const lotesTablePreset = {
     const fmtM     = fmt.fmtM;
 
     const getPropietarioNombre = getters.getPropietarioNombre;
-    const getCalle             = getters.getCalle;
-    const getNumero            = getters.getNumero;
+    const getUbicacion         = getters.getUbicacion;
+    const getTipo              = getters.getTipo;
+    const getFraccion          = getters.getFraccion;
+    const getInquilino         = getters.getInquilino;
+    const getNumPartida        = getters.getNumPartida;
+    const getLoteIdFormatted   = getters.getLoteIdFormatted;
 
     return [
       {
         id: 'id',
         titulo: 'ID',
-        accessor: (l) => getLoteDisplayId(l) ?? '—',
+        accessor: (l) => getLoteIdFormatted(l),
         align: 'center'
       },
       { id: 'estado',      titulo: 'Estado',      accessor: (l) => estadoBadge(l.estado),               align: 'center' },
+      { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado),         align: 'center' },
       { id: 'propietario', titulo: 'Propietario', accessor: (l) => getPropietarioNombre(l),             align: 'center' },
-      { id: 'calle',       titulo: 'Calle',       accessor: (l) => getCalle(l),                         align: 'center' },
-      { id: 'numero',      titulo: 'Número',      accessor: (l) => getNumero(l),                        align: 'center' },
-      { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
-      { id: 'frente',      titulo: 'Frente',      accessor: (l) => fmtM(l.frente),                      align: 'right' },
-      { id: 'fondo',       titulo: 'Fondo',       accessor: (l) => fmtM(l.fondo),                       align: 'right' },
       { id: 'precio',      titulo: 'Precio',      accessor: (l) => fmtMoney(l.precio),                  align: 'center' },
       {
         id: 'deuda',
@@ -72,8 +72,13 @@ export const lotesTablePreset = {
           ),
         align: 'center',
       },
-      { id: 'subestado',   titulo: 'Subestado',   accessor: (l) => subestadoBadge(l.subestado),         align: 'center' },
+      { id: 'numPartida',  titulo: 'N° Partida',  accessor: (l) => getNumPartida(l),                   align: 'center' },
+      { id: 'tipo',        titulo: 'Tipo',        accessor: (l) => getTipo(l),                          align: 'center' },
+      { id: 'fraccion',    titulo: 'Fracción',    accessor: (l) => getFraccion(l),                      align: 'center' },
+      { id: 'ubicacion',   titulo: 'Ubicación',   accessor: (l) => getUbicacion(l),                      align: 'center' },
+      { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
       { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                align: 'left'   },
+      { id: 'inquilino',   titulo: 'Inquilino',   accessor: (l) => getInquilino(l),                      align: 'center' },
     ];
   },
 };

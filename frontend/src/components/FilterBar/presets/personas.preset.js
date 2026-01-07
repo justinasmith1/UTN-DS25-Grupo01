@@ -4,7 +4,6 @@
 
 // Catálogos para filtros
 export const TIPOS_IDENTIFICADOR = [
-  { value: 'ALL', label: 'Todos' },
   { value: 'DNI', label: 'DNI' },
   { value: 'CUIT', label: 'CUIT' },
   { value: 'CUIL', label: 'CUIL' },

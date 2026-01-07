@@ -181,8 +181,6 @@
 /* ===== Números/Unidades ===== */
 .tl-td[data-col="precio"],
 .tl-td[data-col="superficie"],
-.tl-td[data-col="frente"],
-.tl-td[data-col="fondo"],
 .tl-td[data-col="numero"]{
   font-variant-numeric: tabular-nums; /* columnas numéricas alinean perfecto */
 }

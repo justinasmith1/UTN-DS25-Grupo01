@@ -27,7 +27,7 @@ import ColumnPicker from './parts/ColumnPicker';
 import StatusBadge, { estadoBadge } from './cells/StatusBadge';
 import SubstatusBadge, { subestadoBadge } from './cells/SubstatusBadge';
 import { fmtMoney, fmtM2, fmtM, fmtEstado } from './utils/formatters';
-import { getPropietarioNombre, getCalle, getNumero } from './utils/getters';
+import { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getNumPartida, getLoteIdFormatted } from './utils/getters';
 
 // Preset con columnas/anchos/plantillas
 import { lotesTablePreset as tablePreset } from './presets/lotes.table.jsx';
@@ -73,7 +73,7 @@ export default function TablaLotes({
   const helpers = useMemo(() => ({
     cells: { estadoBadge, subestadoBadge, StatusBadge, SubstatusBadge },
     fmt: { fmtMoney, fmtM2, fmtM, fmtEstado },
-    getters: { getPropietarioNombre, getCalle, getNumero },
+    getters: { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getNumPartida, getLoteIdFormatted },
   }), []);
 
   // ===== catálogo de columnas desde el preset =====

@@ -6,8 +6,7 @@ export function filterDefaultsFromPreset(preset) {
     estado: [],
     subestado: [],
     calle: [],
-    frente: { min: 0, max: 100 },
-    fondo: { min: 0, max: 100 },
+    tipo: null,
     sup: { min: 0, max: 5000 },
     precio: { min: 0, max: 300000 },
     deudor: null,
@@ -20,16 +19,9 @@ export function buildParams(F, D, isInmo) {
     estado: F.estado || [],
     subestado: F.subestado || [],
     calle: F.calle || [],
+    tipo: F.tipo || null,
     deudor: isInmo ? null : (F.deudor ?? null),
   };
-  if (F.frente?.min !== D.frente.min || F.frente?.max !== D.frente.max) {
-    params.frenteMin = F.frente.min;
-    params.frenteMax = F.frente.max;
-  }
-  if (F.fondo?.min !== D.fondo.min || F.fondo?.max !== D.fondo.max) {
-    params.fondoMin = F.fondo.min;
-    params.fondoMax = F.fondo.max;
-  }
   if (F.sup?.min !== D.sup.min || F.sup?.max !== D.sup.max) {
     params.supMin = F.sup.min;
     params.supMax = F.sup.max;

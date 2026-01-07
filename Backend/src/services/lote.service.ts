@@ -104,11 +104,10 @@ export async function getAllLotes(query: any = {}, role?: string) {
       where,
       orderBy: { id: 'asc' },
       include: {
-        // Para mostrar Calle y Número
         ubicacion: { select: { calle: true, numero: true} },
-        // Para mostrar el nombre del Propietario
-        propietario: { select: { nombre: true, apellido: true } },
+        propietario: { select: { nombre: true, apellido: true, razonSocial: true } },
         fraccion: { select: { numero: true } },
+        inquilino: { select: { nombre: true, apellido: true, razonSocial: true } },
       },
     }),
     prisma.lote.count({ where }),
@@ -128,8 +127,9 @@ export async function getLoteById(id: number, role?: string) {
     where: { id: id },
     include: {
       ubicacion: { select: { calle: true, numero: true } },
-      propietario: { select: { nombre: true, apellido: true } },
+      propietario: { select: { nombre: true, apellido: true, razonSocial: true } },
       fraccion: { select: { numero: true } },
+      inquilino: { select: { nombre: true, apellido: true, razonSocial: true } },
     },
   });
   if (!lote) {

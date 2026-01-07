@@ -9,10 +9,9 @@ export function applyLoteFilters(allLots = [], p = {}) {
   const getFraccion = (l) => String(l?.fraccion?.numero ?? "");
   const num = (x) => (x === null || x === undefined || x === "" ? NaN : +x);
 
-  const getFrente = (l) => num(l?.frente ?? l?.anchoFrente ?? l?.frente_m ?? l?.frenteM);
-  const getFondo  = (l) => num(l?.fondo  ?? l?.largoFondo ?? l?.fondo_m  ?? l?.fondoM);
   const getSup    = (l) => num(l?.superficie ?? l?.superficieM2 ?? l?.m2 ?? l?.area);
   const getPrecio = (l) => num(l?.precioUSD ?? l?.priceUSD ?? l?.precio ?? l?.price);
+  const getTipo   = (l) => l?.tipo ?? l?.tipoLote ?? null;
   // El filtro "solo deudores" debe restringir el query a lotes que tengan deuda (deuda === true).
   // El campo en el modelo es `deuda` (Boolean?).
   const getDeudor = (l) => {
@@ -53,6 +52,13 @@ export function applyLoteFilters(allLots = [], p = {}) {
     rows = rows.filter((l) => set.has(getFraccion(l)));
   }
 
+  if (p.tipo) {
+    rows = rows.filter((l) => {
+      const tipoLote = getTipo(l);
+      return tipoLote === p.tipo;
+    });
+  }
+
   const inRange = (val, min, max) => {
     const v = Number.isFinite(val) ? val : NaN;
     if (Number.isNaN(v)) return false;
@@ -61,10 +67,6 @@ export function applyLoteFilters(allLots = [], p = {}) {
     return true;
   };
 
-  if (p.frenteMin !== undefined || p.frenteMax !== undefined)
-    rows = rows.filter((l) => inRange(getFrente(l), p.frenteMin ?? -Infinity, p.frenteMax ?? Infinity));
-  if (p.fondoMin !== undefined || p.fondoMax !== undefined)
-    rows = rows.filter((l) => inRange(getFondo(l), p.fondoMin ?? -Infinity, p.fondoMax ?? Infinity));
   if (p.supMin !== undefined || p.supMax !== undefined)
     rows = rows.filter((l) => inRange(getSup(l), p.supMin ?? -Infinity, p.supMax ?? Infinity));
   if (p.priceMin !== undefined || p.priceMax !== undefined)
