@@ -1,5 +1,6 @@
 import { useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
+import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { createInmobiliaria } from "../../../lib/api/inmobiliarias.js";
 
 export default function InmobiliariaCrearCard({ open, onCancel, onCreated }) {
@@ -53,11 +54,7 @@ export default function InmobiliariaCrearCard({ open, onCancel, onCreated }) {
 
   return (
     <>
-      {showSuccess && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", display: "grid", placeItems: "center", zIndex: 10000 }}>
-          <div style={{ background: "#fff", padding: 32, borderRadius: 12 }}>¡Inmobiliaria creada!</div>
-        </div>
-      )}
+      <SuccessAnimation show={showSuccess} message="¡Inmobiliaria creada exitosamente!" />
       {open && (
         <EditarBase
           open={open}

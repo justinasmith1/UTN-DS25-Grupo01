@@ -7,6 +7,7 @@ import { Trash2 } from "lucide-react";
 import "../Base/cards.css";
 import "../../Table/TablaLotes/TablaLotes.css";
 import EliminarBase from "../Base/EliminarBase.jsx";
+import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { getGrupoFamiliar, crearMiembroFamiliar, eliminarMiembroFamiliar } from "../../../lib/api/personas.js";
 
 // Schema para crear miembro familiar (solo campos mínimos)
@@ -358,18 +359,7 @@ export default function PersonaGrupoFamiliarCard({
           </div>
         )}
 
-        {showSuccess && (
-          <div className="success-animation-overlay">
-            <div className="success-animation-card">
-              <div className="success-checkmark">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              </div>
-              <p className="success-message">¡Operación exitosa!</p>
-            </div>
-          </div>
-        )}
+        <SuccessAnimation show={showSuccess} message="¡Operación exitosa!" />
 
         {!loading && grupoFamiliar && (
           <>

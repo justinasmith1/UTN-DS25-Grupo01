@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import { getLoteById } from "../../lib/api/lotes";
 import { useToast } from "../../app/providers/ToastProvider";
 import { getArchivosByLote, getFileSignedUrl } from "../../lib/api/archivos";
+import SuccessAnimation from "../Cards/Base/SuccessAnimation.jsx";
 import LoteImageCarousel from "./LoteImageCarousel";
 import StatusBadge, { fmtEstadoLote } from "../Table/TablaLotes/cells/StatusBadge";
 import SubstatusBadge from "../Table/TablaLotes/cells/SubstatusBadge";
@@ -496,172 +497,10 @@ export default function LoteSidePanel({
         />
       )}
 
-      {/* Animación de éxito al editar */}
-      {showSuccessEdit && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Lote guardado exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
-
-      {/* Animación de éxito al reservar */}
-      {showSuccessReserve && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Reserva creada exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
+      <SuccessAnimation show={showSuccessEdit} message="¡Lote guardado exitosamente!" />
+      <SuccessAnimation show={showSuccessReserve} message="¡Reserva creada exitosamente!" />
 
       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from {
-            opacity: 0;
-            transform: scale(0.9);
-          }
-          to {
-            opacity: 1;
-            transform: scale(1);
-          }
-        }
-        @keyframes checkmark {
-          0% {
-            transform: scale(0);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.1);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
-        }
         .lote-side-panel.offcanvas {
           border-left: 1px solid rgba(0,0,0,.08);
           border-top-left-radius: 8px;

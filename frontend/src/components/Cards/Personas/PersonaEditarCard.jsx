@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import EditarBase from "../Base/EditarBase.jsx";
+import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { updatePersona, getPersona } from "../../../lib/api/personas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
@@ -403,84 +404,7 @@ export default function PersonaEditarCard({
   return (
     <>
       {/* Animación de éxito */}
-      {showSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <style>{`
-            @keyframes fadeIn {
-              from { opacity: 0; }
-              to { opacity: 1; }
-            }
-            @keyframes scaleIn {
-              from { transform: scale(0.9); opacity: 0; }
-              to { transform: scale(1); opacity: 1; }
-            }
-            @keyframes checkmark {
-              0% { transform: scale(0); }
-              50% { transform: scale(1.1); }
-              100% { transform: scale(1); }
-            }
-          `}</style>
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Persona guardada exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
+      <SuccessAnimation show={showSuccess} message="¡Persona guardada exitosamente!" />
 
       <EditarBase
         open={open}

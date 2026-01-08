@@ -160,6 +160,7 @@
   min-width: 220px;
   text-align: center;
   justify-content: center;
+  padding-right: 42px;
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {

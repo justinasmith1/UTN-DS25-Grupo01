@@ -928,7 +928,7 @@ select.field-input {
 .ns-item.is-active{ background:#e9efff; }
 
 /* ========================================================================
-   ANIMACIONES DE ÉXITO (para VentaEditarCard)
+   ANIMACIONES DE ÉXITO (usadas por SuccessAnimation y componentes de éxito)
    ======================================================================== */
 @keyframes fadeIn {
   from { opacity: 0; }

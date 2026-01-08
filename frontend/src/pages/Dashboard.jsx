@@ -45,6 +45,8 @@ export default function Dashboard() {
   const [reservaSel, setReservaSel] = useState(null);
   const [openVentaCrear, setOpenVentaCrear] = useState(false);
   const [loteParaVenta, setLoteParaVenta] = useState(null);
+  const [lockLoteVenta, setLockLoteVenta] = useState(false);
+  const [lockLoteReserva, setLockLoteReserva] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   
@@ -56,6 +58,20 @@ export default function Dashboard() {
     if (!lot) return;
     setLoteParaVenta(lot);
     setOpenVentaCrear(true);
+  }, []);
+
+  const handleRegistrarOperacion = useCallback((tipo, lote) => {
+    if (!lote) return;
+    if (tipo === 'venta') {
+      setLoteParaVenta(lote);
+      setLockLoteVenta(true); // Bloquear lote cuando viene desde fila
+      setOpenVentaCrear(true);
+    } else if (tipo === 'reserva') {
+      setLoteSel(lote);
+      setLockLoteReserva(true); // Bloquear lote cuando viene desde fila
+      setOpenReservaCrear(true);
+    }
+    // tipo === 'prioridad' no hace nada (disabled)
   }, []);
 
   const handleReservarLote = useCallback(async (lot) => {
@@ -361,6 +377,7 @@ export default function Dashboard() {
         onDelete={onEliminar}
         onRegistrarVenta={goRegistrarVenta}
         onRegisterSale={goRegistrarVenta}
+        onRegistrarOperacion={handleRegistrarOperacion}
         onAgregarLote={onAgregarLote}
       />
 
@@ -421,12 +438,15 @@ export default function Dashboard() {
         onCancel={() => {
           setOpenReservaCrear(false);
           setLoteSel(null);
+          setLockLoteReserva(false);
         }}
         onCreated={(newReserva) => {
           setOpenReservaCrear(false);
           setLoteSel(null);
+          setLockLoteReserva(false);
         }}
         loteIdPreSeleccionado={loteSel?.id}
+        lockLote={lockLoteReserva}
       />
 
       <VentaCrearCard
@@ -434,6 +454,7 @@ export default function Dashboard() {
         onCancel={() => {
           setOpenVentaCrear(false);
           setLoteParaVenta(null);
+          setLockLoteVenta(false);
         }}
         onCreated={(newVenta) => {
           setOpenVentaCrear(false);
@@ -441,8 +462,10 @@ export default function Dashboard() {
             mergeUpdatedLote({ ...loteParaVenta, estado: "VENDIDO", status: "VENDIDO" });
           }
           setLoteParaVenta(null);
+          setLockLoteVenta(false);
         }}
         loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
+        lockLote={lockLoteVenta}
       />
 
       {showDeleteSuccess && (

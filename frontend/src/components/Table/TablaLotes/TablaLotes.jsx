@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 import React, { useMemo, useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import './TablaLotes.css';
 
@@ -38,10 +39,181 @@ const STORAGE_VERSION = 'v2';
 const APP_NS = 'lfed';
 const makeColsKey = (userKey) => `${APP_NS}:tabla-cols:${STORAGE_VERSION}:${userKey}`;
 
+// Componente dropdown para "Registrar Operación"
+function RegistrarOperacionDropdown({ lote, onSelectOperacion }) {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (
+        btnRef.current &&
+        !btnRef.current.contains(e.target) &&
+        menuRef.current &&
+        !menuRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Obtener estado del lote
+  const estadoLote = String(getEstadoFromLote(lote) || "").toUpperCase();
+
+  // Determinar habilitación según estado
+  const puedePrioridad = false; // Siempre disabled (módulo no existe aún)
+  const puedeReserva = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "ALQUILADO" || estadoLote === "CON_PRIORIDAD";
+  const puedeVenta = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "ALQUILADO" || estadoLote === "CON_PRIORIDAD" || estadoLote === "RESERVADO";
+
+  // Obtener mensajes de tooltip para opciones disabled
+  const getTooltipPrioridad = () => {
+    if (!puedePrioridad) return "Funcionalidad disponible próximamente";
+    if (estadoLote === "CON_PRIORIDAD") return "El lote ya tiene prioridad";
+    if (estadoLote === "RESERVADO" || estadoLote === "VENDIDO" || estadoLote === "NO_DISPONIBLE") return "No disponible para este estado";
+    return "";
+  };
+
+  const getTooltipReserva = () => {
+    if (estadoLote === "RESERVADO") return "El lote ya está reservado";
+    if (estadoLote === "VENDIDO") return "Lote vendido";
+    if (estadoLote === "NO_DISPONIBLE") return "Lote no disponible";
+    return "";
+  };
+
+  const getTooltipVenta = () => {
+    if (estadoLote === "VENDIDO") return "Lote vendido";
+    if (estadoLote === "NO_DISPONIBLE") return "Lote no disponible";
+    return "";
+  };
+
+  const handleSelect = (tipo) => {
+    if (tipo === 'prioridad') return; // Siempre disabled (módulo no existe)
+    if (tipo === 'reserva' && !puedeReserva) return;
+    if (tipo === 'venta' && !puedeVenta) return;
+    onSelectOperacion?.(tipo, lote);
+    setOpen(false);
+  };
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        className="tl-icon tl-icon--money"
+        aria-label="Registrar operación"
+        data-tooltip="Registrar Operación"
+        onClick={() => setOpen(!open)}
+        style={{ position: "relative" }}
+      >
+        <DollarSign size={18} />
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            position: "fixed",
+            top: btnRef.current ? `${btnRef.current.getBoundingClientRect().bottom + 4}px` : "auto",
+            right: btnRef.current ? `${window.innerWidth - btnRef.current.getBoundingClientRect().right}px` : "auto",
+            background: "#fff",
+            border: "1px solid rgba(0,0,0,.14)",
+            borderRadius: "8px",
+            boxShadow: "0 4px 12px rgba(0,0,0,.15)",
+            zIndex: 99999,
+            minWidth: "200px",
+            overflow: "hidden",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => handleSelect('prioridad')}
+            disabled={!puedePrioridad}
+            title={getTooltipPrioridad()}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: puedePrioridad ? "pointer" : "not-allowed",
+              fontSize: "14px",
+              color: puedePrioridad ? "#111827" : "#9ca3af",
+              opacity: puedePrioridad ? 1 : 0.5,
+            }}
+            onMouseEnter={(e) => {
+              if (puedePrioridad) e.target.style.background = "#f3f4f6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "transparent";
+            }}
+          >
+            Registrar Prioridad
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelect('reserva')}
+            disabled={!puedeReserva}
+            title={getTooltipReserva()}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              borderTop: "1px solid #e5e7eb",
+              cursor: puedeReserva ? "pointer" : "not-allowed",
+              fontSize: "14px",
+              color: puedeReserva ? "#111827" : "#9ca3af",
+              opacity: puedeReserva ? 1 : 0.5,
+            }}
+            onMouseEnter={(e) => {
+              if (puedeReserva) e.target.style.background = "#f3f4f6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "transparent";
+            }}
+          >
+            Registrar Reserva
+          </button>
+          <button
+            type="button"
+            onClick={() => handleSelect('venta')}
+            disabled={!puedeVenta}
+            title={getTooltipVenta()}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              borderTop: "1px solid #e5e7eb",
+              cursor: puedeVenta ? "pointer" : "not-allowed",
+              fontSize: "14px",
+              color: puedeVenta ? "#111827" : "#9ca3af",
+              opacity: puedeVenta ? 1 : 0.5,
+            }}
+            onMouseEnter={(e) => {
+              if (puedeVenta) e.target.style.background = "#f3f4f6";
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.background = "transparent";
+            }}
+          >
+            Registrar Venta
+          </button>
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
 export default function TablaLotes({
   lotes, data,
   onVer, onEditar, onRegistrarVenta, onEliminar,
   onAgregarLote, onAplicarPromo,
+  onRegistrarOperacion,
   roleOverride,
   userKey,
 }) {
@@ -498,9 +670,10 @@ export default function TablaLotes({
                     </button>
                   )}
                   {can('venta') && (
-                    <button className="tl-icon tl-icon--money" aria-label="Registrar venta" data-tooltip="Registrar Venta" onClick={() => onRegistrarVenta?.(l)}>
-                      <DollarSign size={18} strokeWidth={2} />
-                    </button>
+                    <RegistrarOperacionDropdown
+                      lote={l}
+                      onSelectOperacion={onRegistrarOperacion}
+                    />
                   )}
                   {can('eliminar') && (
                     <button className="tl-icon tl-icon--delete" aria-label="Eliminar lote" data-tooltip="Eliminar Lote" onClick={() => onEliminar?.(l)}>

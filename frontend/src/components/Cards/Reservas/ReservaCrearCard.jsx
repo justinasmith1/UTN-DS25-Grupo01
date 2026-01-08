@@ -1,6 +1,7 @@
 // src/components/Cards/Reservas/ReservaCrearCard.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
+import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { createReserva } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
@@ -90,6 +91,7 @@ export default function ReservaCrearCard({
   loteIdPreSeleccionado, // Opcional: si viene desde el módulo de lotes
   entityType = "Reserva",
   fromSidePanel = false, // Si viene del side panel, el lote debe estar freezado
+  lockLote = false, // Si viene desde fila del tablero, bloquear el campo lote
 }) {
   const { user } = useAuth();
   const isInmobiliaria = user?.role === 'INMOBILIARIA';
@@ -119,15 +121,15 @@ export default function ReservaCrearCard({
   const [openCrearPersona, setOpenCrearPersona] = useState(false);
   const [busquedaLote, setBusquedaLote] = useState("");
 
-  // Calcular el mapId del lote seleccionado cuando viene del side panel
+  // Calcular el mapId del lote seleccionado cuando viene del side panel o desde fila
   const loteSeleccionadoMapId = useMemo(() => {
-    if (!fromSidePanel || !loteId) return null;
+    if ((!fromSidePanel && !lockLote) || !loteId) return null;
     const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
     if (!loteSeleccionado) return null;
     const mapId = loteSeleccionado.mapId;
     if (!mapId) return null;
     return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
-  }, [fromSidePanel, loteId, lotes]);
+  }, [fromSidePanel, lockLote, loteId, lotes]);
 
   // Cargar datos al abrir
   useEffect(() => {
@@ -140,10 +142,19 @@ export default function ReservaCrearCard({
         const resp = await getAllLotes({});
         const lotesData = resp?.data || [];
         // Filtrar solo lotes DISPONIBLE
-        const filteredLots = lotesData.filter((l) => {
+        let filteredLots = lotesData.filter((l) => {
           const st = String(l.estado || l.status || "").toUpperCase();
           return st === "DISPONIBLE";
         });
+        
+        // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
+        if (lockLote && loteIdPreSeleccionado) {
+          const lotePrecargado = lotesData.find(l => String(l.id) === String(loteIdPreSeleccionado));
+          if (lotePrecargado && !filteredLots.find(l => String(l.id) === String(lotePrecargado.id))) {
+            filteredLots = [lotePrecargado, ...filteredLots];
+          }
+        }
+        
         setLotes(filteredLots);
       } catch (err) {
         console.error("Error cargando lotes:", err);
@@ -194,11 +205,10 @@ export default function ReservaCrearCard({
     }
   }, [open, isInmobiliaria]);
 
-  // Resetear cuando se cierra
+  // Resetear cuando se cierra (pero mantener loteId si viene precargado)
   useEffect(() => {
     if (!open) {
       setFechaReserva(toDateInputValue(new Date()));
-      setLoteId(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
       setClienteId("");
       setInmobiliariaId("");
       setPlazoReserva(toDateInputValue(new Date()));
@@ -209,6 +219,13 @@ export default function ReservaCrearCard({
       setShowSuccess(false);
       setSaving(false);
       setBusquedaLote("");
+      // Solo resetear loteId si no viene precargado
+      if (!loteIdPreSeleccionado) {
+        setLoteId("");
+      }
+    } else if (loteIdPreSeleccionado) {
+      // Cuando se abre y hay loteIdPreSeleccionado, setearlo
+      setLoteId(String(loteIdPreSeleccionado));
     }
   }, [open, loteIdPreSeleccionado]);
 
@@ -407,69 +424,7 @@ export default function ReservaCrearCard({
   return (
     <>
       {/* Animación de éxito */}
-      {showSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡{entityType} creada exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
+      <SuccessAnimation show={showSuccess} message={`¡${entityType} creada exitosamente!`} />
 
       <EditarBase
         open={open}
@@ -501,12 +456,12 @@ export default function ReservaCrearCard({
             <div className="venta-col">
               <div className="field-row">
                 <div className="field-label">LOTE</div>
-                {fromSidePanel && loteSeleccionadoMapId ? (
-                  // Cuando viene del side panel, mostrar el lote como read-only con el mismo estilo que otros campos freezados
+                {(fromSidePanel || lockLote) && loteSeleccionadoMapId ? (
+                  // Cuando viene del side panel o desde fila, mostrar el lote como read-only
                   <div className="field-value is-readonly">
                     {loteSeleccionadoMapId}
                   </div>
-                ) : fromSidePanel ? (
+                ) : (fromSidePanel || lockLote) ? (
                   // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
                   <div className="field-value is-readonly">—</div>
                 ) : (
