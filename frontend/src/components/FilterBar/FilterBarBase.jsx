@@ -254,7 +254,14 @@ export default function FilterBarBase({
         if (field.type === 'multiSelect' && Array.isArray(value)) {
           label = `${field.label}: ${value.join(', ')}`;
         } else if (field.type === 'singleSelect') {
-          label = `${field.label}: ${value}`;
+          // Si value es un objeto, extraer el label; si no, usar el formateador o el valor directo
+          let displayValue = value;
+          if (value && typeof value === 'object' && value.label) {
+            displayValue = value.label;
+          } else if (optionFormatter[field.id]) {
+            displayValue = optionFormatter[field.id](value);
+          }
+          label = `${field.label}: ${displayValue}`;
         } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object') {
           if (value.min !== null && value.max !== null) {
             label = `${field.label}: ${value.min} - ${value.max}`;
@@ -324,8 +331,10 @@ export default function FilterBarBase({
                       const optionValue = option.value || option;
                       const optionLabel = option.label || option;
                       
-                      // Usar el formateador si está disponible, sino mostrar la opción tal como está
-                      const formattedOption = optionFormatter[field.id] ? optionFormatter[field.id](option) : optionLabel;
+                      // Usar el formateador si está disponible, pasando el valor (no el objeto completo)
+                      const formattedOption = optionFormatter[field.id] 
+                        ? optionFormatter[field.id](optionValue) 
+                        : optionLabel;
                       
                       return (
                         <button

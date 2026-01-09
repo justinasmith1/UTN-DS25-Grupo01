@@ -45,11 +45,8 @@ const corsOptions = {
 
 // Middlewares globlales
 app.use(cors(corsOptions));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(logRequest);
-
-// Error handling middleware
-app.use(handleError);
 
 // App Routes
 app.use('/api/auth', authRoutes);
@@ -62,6 +59,9 @@ app.use('/api/files', fileRoutes);
 app.use('/api/personas', personaRoutes);
 app.use('/api/fracciones', fraccionRoutes);
 app.use('/api/ubicaciones', ubicacionRoutes);
+
+// Error handling middleware (DEBE ir después de todas las rutas)
+app.use(handleError);
 
 
 export default app;

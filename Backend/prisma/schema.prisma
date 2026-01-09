@@ -118,6 +118,11 @@ enum EstadoPersona {
   INACTIVA
 }
 
+enum PersonaCategoria {
+  OPERATIVA
+  MIEMBRO_FAMILIAR
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -149,6 +154,8 @@ model Persona {
   // Estado
   estado            EstadoPersona    @default(ACTIVA)
   fechaBaja         DateTime?
+  // Categoría (OPERATIVA o MIEMBRO_FAMILIAR)
+  categoria         PersonaCategoria @default(OPERATIVA)
   // Contacto
   contacto          String?
   // Email (campo propio, separado de contacto)
@@ -182,6 +189,7 @@ model Persona {
   @@unique([identificadorTipo, identificadorValor])
   @@index([estado])
   @@index([inmobiliariaId])
+  @@index([categoria])
 }
 
 // Reserva
@@ -246,6 +254,7 @@ model Lote {
 
   reserva Reserva[]
   prioridad Prioridad[]
+  promociones Promocion[]
 
   createdAt DateTime  @default(now())
   updateAt  DateTime?
@@ -335,6 +344,28 @@ model Prioridad {
   @@index([loteId], name: "idx_prioridad_lote")
   @@index([estado], name: "idx_prioridad_estado")
   @@index([fechaFin], name: "idx_prioridad_fecha_fin")
+}
+
+// Promocion
+model Promocion {
+  id              Int           @id @default(autoincrement())
+  loteId          Int
+  lote            Lote          @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  
+  precioAnterior  Decimal       @db.Decimal(12, 2)
+  precioPromocional Decimal     @db.Decimal(12, 2)
+  estadoAnterior  EstadoLote
+  inicio          DateTime      @default(now())
+  fin             DateTime?
+  activa          Boolean       @default(true)
+  explicacion     String?
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([loteId])
+  @@index([activa])
+  @@index([fin])
 }
 
 // Archivos

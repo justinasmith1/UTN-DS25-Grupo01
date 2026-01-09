@@ -2,7 +2,7 @@
 // Tablero de personas con columnas dinámicas según rol y acciones basadas en permisos
 
 import React, { useMemo, useCallback } from 'react';
-import { Eye, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Eye, Edit, Trash2, RotateCcw, Users } from 'lucide-react';
 import TablaBase from '../TablaBase';
 import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
@@ -16,6 +16,7 @@ const TablaPersonas = ({
   onEliminarPersona,
   onEliminarDefinitivo,
   onAgregarPersona,
+  onGrupoFamiliar,
   selectedIds = [],
   onSelectedChange,
   className = '',
@@ -125,8 +126,31 @@ const TablaPersonas = ({
       }
     }
     
+    // Botón "Grupo familiar" (solo para propietarios/inquilinos operativos)
+    if (onGrupoFamiliar) {
+      const esPropietario = (persona._count?.lotesPropios ?? 0) > 0;
+      const esInquilino = (persona._count?.lotesAlquilados ?? 0) > 0;
+      const esAplicable = esPropietario || esInquilino;
+      const esMiembroFamiliar = persona.categoria === 'MIEMBRO_FAMILIAR';
+      
+      if (esAplicable && !esMiembroFamiliar) {
+        actions.push(
+          <button
+            key="grupo-familiar"
+            className="tl-icon tl-icon--view"
+            style={{ background: '#D1FAE5', color: '#065F46' }}
+            aria-label="Grupo familiar"
+            data-tooltip="Grupo familiar"
+            onClick={() => onGrupoFamiliar(persona)}
+          >
+            <Users size={18} />
+          </button>
+        );
+      }
+    }
+    
     return actions.length > 0 ? actions : null;
-  }, [user, effectiveUserRole, onVerPersona, onEditarPersona, onEliminarPersona, onEliminarDefinitivo]);
+  }, [user, effectiveUserRole, onVerPersona, onEditarPersona, onEliminarPersona, onEliminarDefinitivo, onGrupoFamiliar]);
 
   // Acciones de la barra superior
   const topActions = useMemo(() => {

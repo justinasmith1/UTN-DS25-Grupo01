@@ -39,14 +39,13 @@ export default function FilterBarPersonas({
     }
   }, [userRole]);
 
-  // Construir opciones unificadas de "Cliente de" (TODOS + LA FEDERALA + inmobiliarias)
+  // Construir opciones unificadas de "Cliente de" (LA FEDERALA + inmobiliarias)
   const clienteDeOptions = useMemo(() => {
     if (userRole !== "ADMINISTRADOR" && userRole !== "GESTOR") {
       return [];
     }
     
     const options = [
-      { value: 'ALL', label: 'Todos' },
       { value: 'FEDERALA', label: 'La Federala' }
     ];
     
@@ -109,7 +108,7 @@ export default function FilterBarPersonas({
   // Catálogos para los campos select
   const catalogs = useMemo(() => ({
     estado: ESTADOS_PERSONA,
-    clienteDe: clienteDeOptions, // Opciones unificadas (TODOS + La Federala + inmobiliarias)
+    clienteDe: clienteDeOptions, // Opciones unificadas (La Federala + inmobiliarias)
     identificadorTipo: TIPOS_IDENTIFICADOR
   }), [clienteDeOptions]);
 

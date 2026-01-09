@@ -34,7 +34,7 @@ export const fromApi = (apiPersona) => {
     contacto: apiPersona.contacto || null,
     cuil: apiPersona.cuil || identificadorValor, // Legacy
     estado: apiPersona.estado || 'ACTIVA',
-    createdAt: apiPersona.createdAt || new Date().toISOString(),
+    createdAt: apiPersona.createdAt || null,
     esPropietario: Boolean(apiPersona.esPropietario),
     esInquilino: Boolean(apiPersona.esInquilino),
     inmobiliariaId: apiPersona.inmobiliariaId || null,
@@ -245,12 +245,12 @@ export const updatePersona = async (id, personaData) => {
       body.razonSocial = personaData.razonSocial?.trim() || null;
     }
     
-    if (personaData.telefono !== null && personaData.telefono !== undefined) {
+    if (personaData.telefono !== undefined) {
       body.telefono = personaData.telefono;
     }
     
-    if (personaData.email !== undefined && personaData.email !== null) {
-      body.email = personaData.email.trim() || null;
+    if (personaData.email !== undefined) {
+      body.email = personaData.email === null ? null : (personaData.email.trim() || null);
     }
     
     if (personaData.estado !== undefined) {
@@ -361,6 +361,99 @@ export const deletePersonaDefinitivo = async (id) => {
  */
 export const deletePersona = async (id) => {
   return desactivarPersona(id);
+};
+
+/**
+ * Obtener grupo familiar de una persona
+ */
+export const getGrupoFamiliar = async (personaId) => {
+  try {
+    const response = await http(`/personas/${personaId}/grupo-familiar`, { method: 'GET' });
+    
+    // Manejar respuestas vacías (204 No Content)
+    if (response.status === 204 || !response.headers.get('content-type')?.includes('application/json')) {
+      return { titular: null, miembros: [] };
+    }
+    
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al obtener grupo familiar');
+    }
+    
+    return data;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      console.error(`Error al parsear respuesta JSON de grupo familiar:`, error);
+      throw new Error('Respuesta inválida del servidor');
+    }
+    console.error(`Error al obtener grupo familiar de persona ${personaId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Crear miembro familiar
+ */
+export const crearMiembroFamiliar = async (titularId, miembroData) => {
+  try {
+    const response = await http(`/personas/${titularId}/grupo-familiar/miembros`, {
+      method: 'POST',
+      body: {
+        nombre: miembroData.nombre.trim(),
+        apellido: miembroData.apellido.trim(),
+        identificadorTipo: miembroData.identificadorTipo,
+        identificadorValor: miembroData.identificadorValor.trim(),
+      }
+    });
+    const data = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al crear miembro familiar');
+    }
+    
+    return data.miembro || data;
+  } catch (error) {
+    console.error(`Error al crear miembro familiar:`, error);
+    throw error;
+  }
+};
+
+/**
+ * Eliminar miembro familiar
+ */
+export const eliminarMiembroFamiliar = async (titularId, miembroId) => {
+  try {
+    const response = await http(`/personas/${titularId}/grupo-familiar/miembros/${miembroId}`, {
+      method: 'DELETE'
+    });
+    
+    // Manejar respuestas vacías (204 No Content es común en DELETE)
+    if (response.status === 204) {
+      return { success: true };
+    }
+    
+    if (!response.headers.get('content-type')?.includes('application/json')) {
+      return { success: response.ok };
+    }
+    
+    const text = await response.text();
+    const data = text ? JSON.parse(text) : {};
+    
+    if (!response.ok) {
+      throw new Error(data?.message || 'Error al eliminar miembro familiar');
+    }
+    
+    return data;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      console.error(`Error al parsear respuesta JSON al eliminar miembro familiar:`, error);
+      throw new Error('Respuesta inválida del servidor');
+    }
+    console.error(`Error al eliminar miembro familiar:`, error);
+    throw error;
+  }
 };
 
 /**

@@ -52,6 +52,11 @@ function fromApi(x = {}) {
       ? `Mz ${x.manzana ?? "?"} - Lt ${x.numero ?? "?"}`
       : null);
 
+  // Promoción activa (primera de promociones activas)
+  const promocionActiva = Array.isArray(x.promociones) && x.promociones.length > 0 
+    ? x.promociones[0] 
+    : null;
+
   return {
     ...x,
     id,
@@ -60,15 +65,19 @@ function fromApi(x = {}) {
     subStatus,
     estado: x.estado ?? null,
     subestado: x.subestado ?? null,
+    tipo: x.tipo ?? null,
     owner,
     location,
     superficie: numOrNull(x.superficie ?? x.superficieM2 ?? x.surface),
     price: numOrNull(x.price ?? x.precio),
     precio: numOrNull(x.precio ?? x.price),
-    frente: numOrNull(x.frente),
-    fondo: numOrNull(x.fondo),
     deuda: x.deuda ?? null,
     descripcion: x.descripcion ?? null,
+    ubicacion: x.ubicacion ?? null,
+    fraccion: x.fraccion ?? null,
+    inquilino: x.inquilino ?? null,
+    numPartido: x.numPartido ?? null,
+    promocionActiva,
   };
 }
 
@@ -190,9 +199,83 @@ async function apiDelete(id) {
   return ok(true);
 }
 
+// ===================
+// Promociones
+// ===================
+
+async function apiAplicarPromocion(loteId, payload) {
+  // http() ya hace JSON.stringify del body, no hacerlo aquí
+  const res = await http(`${PRIMARY}/${loteId}/promociones/aplicar`, {
+    method: "POST",
+    body: payload, // Objeto, no string - http() lo serializa
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(json?.message || "Error al aplicar promoción");
+    error.statusCode = res.status;
+    error.response = { data: json, status: res.status };
+    throw error;
+  }
+  return ok(json?.data ?? json);
+}
+
+async function apiQuitarPromocion(loteId) {
+  const res = await http(`${PRIMARY}/${loteId}/promociones/quitar`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const error = new Error(json?.message || "Error al quitar promoción");
+    error.statusCode = res.status;
+    error.response = { status: res.status };
+    throw error;
+  }
+  return ok(json?.data ?? json);
+}
+
+async function apiGetPromocionActiva(loteId) {
+  const res = await http(`${PRIMARY}/${loteId}/promociones/activa`, {
+    method: "GET",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(json?.message || "Error al obtener promoción activa");
+  return ok(json?.data ?? json);
+}
+
 /* ------------------------------ EXPORTS ------------------------------ */
 export function getAllLotes(params)   { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
 export function getLoteById(id)       { return USE_MOCK ? mockGetById(id)      : apiGetById(id); }
 export function createLote(payload)   { return USE_MOCK ? mockCreate(payload)  : apiCreate(payload); }
 export function updateLote(id, data)  { return USE_MOCK ? mockUpdate(id, data) : apiUpdate(id, data); }
 export function deleteLote(id)        { return USE_MOCK ? mockDelete(id)       : apiDelete(id); }
+
+// ===================
+// Promociones
+// ===================
+export async function aplicarPromocion(loteId, payload) {
+  try {
+    return await apiAplicarPromocion(loteId, payload);
+  } catch (error) {
+    console.error(`Error al aplicar promoción al lote ${loteId}:`, error);
+    throw error;
+  }
+}
+
+export async function quitarPromocion(loteId) {
+  try {
+    return await apiQuitarPromocion(loteId);
+  } catch (error) {
+    console.error(`Error al quitar promoción del lote ${loteId}:`, error);
+    throw error;
+  }
+}
+
+export async function getPromocionActiva(loteId) {
+  try {
+    return await apiGetPromocionActiva(loteId);
+  } catch (error) {
+    console.error(`Error al obtener promoción activa del lote ${loteId}:`, error);
+    throw error;
+  }
+}

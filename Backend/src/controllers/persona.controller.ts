@@ -153,19 +153,19 @@ async actualizarPersona(req: Request, res: Response) {
         const { id } = getPersonaSchema.parse(req.params);
         const validatedData = updatePersonaSchema.parse(req.body);
 
-      // Construir UpdatePersonaDto con el nuevo formato
-      const updateData: any = {
-        identificadorTipo: validatedData.identificadorTipo,
-        identificadorValor: validatedData.identificadorValor,
-        nombre: validatedData.nombre,
-        apellido: validatedData.apellido,
-        razonSocial: validatedData.razonSocial,
-        telefono: validatedData.telefono,
-        email: validatedData.email,
-        jefeDeFamiliaId: validatedData.jefeDeFamiliaId,
-        estado: validatedData.estado,
-        inmobiliariaId: validatedData.inmobiliariaId,
-      };
+      // Construir UpdatePersonaDto: solo incluir campos que vienen en el request
+      const updateData: any = {};
+      
+      if (validatedData.identificadorTipo !== undefined) updateData.identificadorTipo = validatedData.identificadorTipo;
+      if (validatedData.identificadorValor !== undefined) updateData.identificadorValor = validatedData.identificadorValor;
+      if (validatedData.nombre !== undefined) updateData.nombre = validatedData.nombre;
+      if (validatedData.apellido !== undefined) updateData.apellido = validatedData.apellido;
+      if (validatedData.razonSocial !== undefined) updateData.razonSocial = validatedData.razonSocial;
+      if (validatedData.telefono !== undefined) updateData.telefono = validatedData.telefono;
+      if (validatedData.email !== undefined) updateData.email = validatedData.email;
+      if (validatedData.jefeDeFamiliaId !== undefined) updateData.jefeDeFamiliaId = validatedData.jefeDeFamiliaId;
+      if (validatedData.estado !== undefined) updateData.estado = validatedData.estado;
+      if (validatedData.inmobiliariaId !== undefined) updateData.inmobiliariaId = validatedData.inmobiliariaId;
 
         const result = await personaService.update(id, updateData);
 
@@ -287,4 +287,83 @@ async obtenerPersonaPorCuil(req: Request, res: Response) {
             });
         }
     }
+
+  async obtenerGrupoFamiliar(req: Request, res: Response) {
+    try {
+      const { id } = getPersonaSchema.parse(req.params);
+      const grupo = await personaService.getGrupoFamiliar(id);
+
+      res.status(200).json({
+        success: true,
+        ...grupo,
+      });
+    } catch (error: any) {
+      const mappedError = mapPrismaError(error);
+      res.status(mappedError.statusCode || 400).json({
+        success: false,
+        message: mappedError.message || 'Error al obtener grupo familiar',
+      });
+    }
+  }
+
+  async crearMiembroFamiliar(req: Request, res: Response) {
+    try {
+      const { id } = getPersonaSchema.parse(req.params);
+      const { nombre, apellido, identificadorTipo, identificadorValor } = req.body;
+
+      if (!nombre || !apellido || !identificadorTipo || !identificadorValor) {
+        return res.status(400).json({
+          success: false,
+          message: 'Faltan campos requeridos: nombre, apellido, identificadorTipo, identificadorValor',
+        });
+      }
+
+      const miembro = await personaService.crearMiembroFamiliar(id, {
+        nombre,
+        apellido,
+        identificadorTipo,
+        identificadorValor,
+      });
+
+      res.status(201).json({
+        success: true,
+        miembro,
+        message: 'Miembro familiar creado exitosamente',
+      });
+    } catch (error: any) {
+      const mappedError = mapPrismaError(error);
+      res.status(mappedError.statusCode || 400).json({
+        success: false,
+        message: mappedError.message || 'Error al crear miembro familiar',
+      });
+    }
+  }
+
+  async eliminarMiembroFamiliar(req: Request, res: Response) {
+    try {
+      const { id, miembroId } = req.params;
+      const titularId = Number(id);
+      const miembroIdNum = Number(miembroId);
+
+      if (isNaN(titularId) || isNaN(miembroIdNum)) {
+        return res.status(400).json({
+          success: false,
+          message: 'IDs inválidos',
+        });
+      }
+
+      await personaService.eliminarMiembroFamiliar(titularId, miembroIdNum);
+
+      res.status(200).json({
+        success: true,
+        message: 'Miembro familiar eliminado exitosamente',
+      });
+    } catch (error: any) {
+      const mappedError = mapPrismaError(error);
+      res.status(mappedError.statusCode || 400).json({
+        success: false,
+        message: mappedError.message || 'Error al eliminar miembro familiar',
+      });
+    }
+  }
 }

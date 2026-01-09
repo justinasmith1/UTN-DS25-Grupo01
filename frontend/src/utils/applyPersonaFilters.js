@@ -45,8 +45,8 @@ export const applyPersonaFilters = (personas, filters = {}) => {
       });
       
       if (!matches) {
-        return false;
-      }
+      return false;
+    }
     }
 
     // Filtro por tipo de identificador (soporta múltiples selecciones)

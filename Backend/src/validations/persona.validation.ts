@@ -53,9 +53,7 @@ const identificadorSchema = z
 
 // Schema base para crear persona
 const baseCreatePersonaSchema = z.object({
-  identificadorTipo: z.enum(["DNI", "CUIT", "CUIL", "PASAPORTE", "OTRO"], {
-    required_error: "El tipo de identificador es requerido",
-  }),
+  identificadorTipo: z.enum(["DNI", "CUIT", "CUIL", "PASAPORTE", "OTRO"]),
   identificadorValor: z
     .string()
     .min(1, "El valor del identificador es requerido")
@@ -74,7 +72,7 @@ const baseCreatePersonaSchema = z.object({
   email: z.string().email("Email invalido").optional(),
   // Relaciones
   jefeDeFamiliaId: z.number().int().positive().optional(),
-  // inmobiliariaId: opcional, solo para ADMIN/GESTOR (se valida en service)
+  // inmobiliariaId: opcional, solo para ADMIN/GESTOR
   inmobiliariaId: z.number().int().positive().nullable().optional(),
 })
 .refine(
@@ -116,8 +114,8 @@ export const updatePersonaSchema = z.object({
   nombre: z.string().min(1).max(100).optional(),
   apellido: z.string().min(1).max(100).optional(),
   razonSocial: z.string().max(200).optional(),
-  telefono: z.number().int().positive().optional(),
-  email: z.string().email("Email invalido").optional(),
+  telefono: z.union([z.number().int().positive(), z.null()]).optional(),
+  email: z.union([z.string().email("Email invalido"), z.null()]).optional(),
   jefeDeFamiliaId: z.number().int().positive().optional(),
   estado: z.enum(["ACTIVA", "INACTIVA"]).optional(),
   inmobiliariaId: z.number().int().positive().nullable().optional(),

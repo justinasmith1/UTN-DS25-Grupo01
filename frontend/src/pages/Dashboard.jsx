@@ -5,10 +5,12 @@ import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
 import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
+import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
 import LoteEditarCard from "../components/Cards/Lotes/LoteEditarCard.jsx";
 import LoteEliminarDialog from "../components/Cards/Lotes/LoteEliminarDialog.jsx";
 import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
+import PromocionCard from "../components/Cards/Lotes/PromocionCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
@@ -45,6 +47,11 @@ export default function Dashboard() {
   const [reservaSel, setReservaSel] = useState(null);
   const [openVentaCrear, setOpenVentaCrear] = useState(false);
   const [loteParaVenta, setLoteParaVenta] = useState(null);
+  const [lockLoteVenta, setLockLoteVenta] = useState(false);
+  const [lockLoteReserva, setLockLoteReserva] = useState(false);
+  const [openPromocion, setOpenPromocion] = useState(false);
+  const [loteParaPromocion, setLoteParaPromocion] = useState(null);
+  const [modoPromocion, setModoPromocion] = useState("aplicar"); // "aplicar" o "ver"
   const [deleting, setDeleting] = useState(false);
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   
@@ -56,6 +63,27 @@ export default function Dashboard() {
     if (!lot) return;
     setLoteParaVenta(lot);
     setOpenVentaCrear(true);
+  }, []);
+
+  const handleRegistrarOperacion = useCallback((tipo, lote) => {
+    if (!lote) return;
+    if (tipo === 'venta') {
+      setLoteParaVenta(lote);
+      setLockLoteVenta(true); // Bloquear lote cuando viene desde fila
+      setOpenVentaCrear(true);
+    } else if (tipo === 'reserva') {
+      setLoteSel(lote);
+      setLockLoteReserva(true); // Bloquear lote cuando viene desde fila
+      setOpenReservaCrear(true);
+    }
+    // tipo === 'prioridad' no hace nada (disabled)
+  }, []);
+
+  const handleAplicarPromo = useCallback((lote, modo = "aplicar") => {
+    if (!lote) return;
+    setLoteParaPromocion(lote);
+    setModoPromocion(modo); // "aplicar" o "ver"
+    setOpenPromocion(true);
   }, []);
 
   const handleReservarLote = useCallback(async (lot) => {
@@ -232,22 +260,10 @@ export default function Dashboard() {
       return; 
     }
     
-    // Convertir objetos de rango ({ min, max }) a parámetros planos (frenteMin, frenteMax, etc.)
+    // Convertir objetos de rango ({ min, max }) a parámetros planos
     const convertedParams = { ...patch };
     
     // Convertir rangos a formato plano que espera applyLoteFilters
-    if (patch.frente && (patch.frente.min !== null || patch.frente.max !== null)) {
-      convertedParams.frenteMin = patch.frente.min !== null ? patch.frente.min : undefined;
-      convertedParams.frenteMax = patch.frente.max !== null ? patch.frente.max : undefined;
-      delete convertedParams.frente;
-    }
-    
-    if (patch.fondo && (patch.fondo.min !== null || patch.fondo.max !== null)) {
-      convertedParams.fondoMin = patch.fondo.min !== null ? patch.fondo.min : undefined;
-      convertedParams.fondoMax = patch.fondo.max !== null ? patch.fondo.max : undefined;
-      delete convertedParams.fondo;
-    }
-    
     if (patch.sup && (patch.sup.min !== null || patch.sup.max !== null)) {
       convertedParams.supMin = patch.sup.min !== null ? patch.sup.min : undefined;
       convertedParams.supMax = patch.sup.max !== null ? patch.sup.max : undefined;
@@ -263,14 +279,8 @@ export default function Dashboard() {
     setParams((prev) => {
       // Limpiar parámetros de rango antiguos si existen
       const cleaned = { ...prev };
-      delete cleaned.frente;
-      delete cleaned.fondo;
       delete cleaned.sup;
       delete cleaned.precio;
-      delete cleaned.frenteMin;
-      delete cleaned.frenteMax;
-      delete cleaned.fondoMin;
-      delete cleaned.fondoMax;
       delete cleaned.supMin;
       delete cleaned.supMax;
       delete cleaned.priceMin;
@@ -379,7 +389,9 @@ export default function Dashboard() {
         onDelete={onEliminar}
         onRegistrarVenta={goRegistrarVenta}
         onRegisterSale={goRegistrarVenta}
+        onRegistrarOperacion={handleRegistrarOperacion}
         onAgregarLote={onAgregarLote}
+        onAplicarPromo={handleAplicarPromo}
       />
 
       <LoteVerCard
@@ -439,12 +451,15 @@ export default function Dashboard() {
         onCancel={() => {
           setOpenReservaCrear(false);
           setLoteSel(null);
+          setLockLoteReserva(false);
         }}
         onCreated={(newReserva) => {
           setOpenReservaCrear(false);
           setLoteSel(null);
+          setLockLoteReserva(false);
         }}
         loteIdPreSeleccionado={loteSel?.id}
+        lockLote={lockLoteReserva}
       />
 
       <VentaCrearCard
@@ -452,6 +467,7 @@ export default function Dashboard() {
         onCancel={() => {
           setOpenVentaCrear(false);
           setLoteParaVenta(null);
+          setLockLoteVenta(false);
         }}
         onCreated={(newVenta) => {
           setOpenVentaCrear(false);
@@ -459,73 +475,47 @@ export default function Dashboard() {
             mergeUpdatedLote({ ...loteParaVenta, estado: "VENDIDO", status: "VENDIDO" });
           }
           setLoteParaVenta(null);
+          setLockLoteVenta(false);
         }}
         loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
+        lockLote={lockLoteVenta}
       />
 
-      {showDeleteSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Lote eliminado exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
+      <PromocionCard
+        open={openPromocion}
+        lote={loteParaPromocion}
+        modo={modoPromocion}
+        onCancel={() => {
+          setOpenPromocion(false);
+          setLoteParaPromocion(null);
+          setModoPromocion("aplicar");
+        }}
+        onCreated={async () => {
+          setOpenPromocion(false);
+          // Refrescar lotes después de aplicar/quitar promoción
+          if (loteParaPromocion?.id) {
+            try {
+              const resp = await getLoteById(loteParaPromocion.id);
+              const updated = resp?.data ?? resp;
+              mergeUpdatedLote(updated);
+            } catch (err) {
+              console.error("Error refrescando lote:", err);
+              // Refrescar todos los lotes
+              try {
+                const res = await getAllLotes({});
+                const data = res?.data ?? (Array.isArray(res) ? res : []);
+                setAllLotes(Array.isArray(data) ? data : []);
+              } catch (refreshErr) {
+                console.error("Error refrescando lotes:", refreshErr);
+              }
+            }
+          }
+          setLoteParaPromocion(null);
+          setModoPromocion("aplicar");
+        }}
+      />
+
+      <SuccessAnimation show={showDeleteSuccess} message="¡Lote eliminado exitosamente!" />
 
     </>
   );

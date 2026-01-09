@@ -12,7 +12,7 @@
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, .35);
-  z-index: 2000;
+  z-index: 2700; /* Mayor que cclf-overlay (2600) para aparecer por encima */
   padding: 16px;
 }
 
@@ -294,6 +294,115 @@ select.field { appearance: auto; }
 .cclf-card__actions .cclf-tab.thin:hover { background: #cb9828; transform: translateY(-1px); transition: 200ms ease; }
 
 @media (max-width: 920px) { .venta-grid { grid-template-columns: 1fr; } }
+
+/* ========================================================================
+   MODAL PROMOCIÓN - Layout específico
+   ======================================================================== */
+.promocion-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px 36px;
+  margin-bottom: -4px;
+}
+
+.promocion-field-full {
+  grid-column: 1 / -1;
+}
+
+/* Checkbox para "Sin fecha de fin" */
+.promoCheckRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  width: 100%;
+}
+
+.promoCheckRow label {
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  font-weight: 400;
+  color: #111;
+  margin: 0;
+}
+
+.promoCheckRow input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  margin: 0;
+  transform: scale(0.9);
+  flex-shrink: 0;
+}
+
+/* Textarea para campo Explicación */
+/* Campo Explicación con label arriba y textarea debajo */
+.promocion-explicacion-row-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.promocion-explicacion-row-inner .field-label {
+  width: 100%;
+}
+
+.promocion-explicacion-row-inner .field-value {
+  width: 100%;
+  min-height: auto;
+  align-items: flex-start;
+  padding: 0;
+  margin-top: 5px;
+}
+
+.promocion-explicacion-row .fieldError {
+  margin-left: 0;
+  max-width: 100%;
+}
+
+.field-value.p0 .promocion-textarea {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,.18);
+  box-shadow: 0 2px 4px rgba(0,0,0,.10);
+  border-radius: 6px;
+  padding: 12px 14px;
+  min-height: 80px;
+  width: 100%;
+  resize: vertical;
+  line-height: 1.3;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.field-value.p0 .promocion-textarea::placeholder {
+  color: #9ca3af;
+}
+
+.promocion-error-message {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 8px;
+}
+
+.promocion-precio-actual {
+  color: #10b981 !important;
+  font-weight: 600 !important;
+}
+
+.promocion-explicacion-readonly {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+@media (max-width: 920px) {
+  .promocion-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 
 /* ========================================================================
@@ -805,9 +914,9 @@ select.field { appearance: auto; }
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 24px;
+  padding: 14px 20px;
   border-top: 1px solid rgba(0,0,0,.08);
-  padding-top: 14px;
+  margin-top: 20px;
 }
 
 /* Para que el "valor" editable conserve el rectángulo del VerCard */
@@ -928,7 +1037,7 @@ select.field-input {
 .ns-item.is-active{ background:#e9efff; }
 
 /* ========================================================================
-   ANIMACIONES DE ÉXITO (para VentaEditarCard)
+   ANIMACIONES DE ÉXITO (usadas por SuccessAnimation y componentes de éxito)
    ======================================================================== */
 @keyframes fadeIn {
   from { opacity: 0; }
@@ -958,5 +1067,55 @@ select.field-input {
     transform: scale(1);
     opacity: 1;
   }
+}
+
+/* ========================================================================
+   ANIMACIÓN DE ÉXITO (reutilizable)
+   ======================================================================== */
+.success-animation-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  z-index: 10000;
+  animation: fadeIn 0.2s ease-in;
+  pointer-events: auto;
+}
+
+.success-animation-card {
+  background: #fff;
+  padding: 32px 48px;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  animation: scaleIn 0.3s ease-out;
+}
+
+.success-checkmark {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #10b981;
+  display: grid;
+  place-items: center;
+  animation: checkmark 0.5s ease-in-out;
+}
+
+.success-message {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #111;
+}
+
+/* Animación para miembro eliminándose */
+.miembro-removing {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 

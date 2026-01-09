@@ -75,16 +75,10 @@ export default function FilterBarLotes({
       useGrid: true
     },
     {
-      id: 'frente',
-      type: 'range',
-      label: 'Frente',
-      defaultValue: { min: null, max: null }
-    },
-    {
-      id: 'fondo',
-      type: 'range',
-      label: 'Fondo',
-      defaultValue: { min: null, max: null }
+      id: 'tipo',
+      type: 'singleSelect',
+      label: 'Tipo',
+      defaultValue: null
     },
     {
       id: 'sup',
@@ -112,13 +106,15 @@ export default function FilterBarLotes({
     subestado: SUBESTADOS,
     calle: CALLES,
     fraccion: FRACCIONES,
+    tipo: [
+      { value: 'LOTE_VENTA', label: 'Lote Venta' },
+      { value: 'ESPACIO_COMUN', label: 'Espacio Común' }
+    ],
     ...(canDeudor ? { deudor: [true, false] } : {})
   }), [ESTADOS, SUBESTADOS, CALLES, FRACCIONES, canDeudor]);
 
   // Configuración de rangos para lotes
   const ranges = useMemo(() => ({
-    frente: preset?.ranges?.frente ?? { minLimit: 0, maxLimit: 100, step: 0.1, unit: "m" },
-    fondo: preset?.ranges?.fondo ?? { minLimit: 0, maxLimit: 100, step: 0.1, unit: "m" },
     sup: preset?.ranges?.sup ?? { minLimit: 0, maxLimit: 5000, step: 1, unit: "m²" },
     precio: preset?.ranges?.precio ?? { minLimit: 0, maxLimit: 300000, step: 100, unit: "USD" },
   }), [preset]);
@@ -130,8 +126,7 @@ export default function FilterBarLotes({
     subestado: [],
     calle: [],
     fraccion: [],
-    frente: { min: null, max: null },
-    fondo: { min: null, max: null },
+    tipo: null,
     sup: { min: null, max: null },
     precio: { min: null, max: null },
     ...(canDeudor ? { deudor: null } : {})
@@ -159,6 +154,7 @@ export default function FilterBarLotes({
     subestado: nice,
     calle: nice,
     fraccion: (val) => `Fracción ${val}`,
+    tipo: (val) => val === 'LOTE_VENTA' ? 'Lote Venta' : val === 'ESPACIO_COMUN' ? 'Espacio Común' : val,
     deudor: (val) => val === true ? "Solo deudor" : val === false ? "Sin deuda" : val
   }), []);
 

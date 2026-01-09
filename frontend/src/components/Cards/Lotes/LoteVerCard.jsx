@@ -309,8 +309,6 @@ export default function LoteVerCard({
 
   const rightPairs = [
     ["SUPERFICIE", fmtSurface(lot?.superficie ?? lot?.surface)],
-    ["FRENTE", fmtMeters(lot?.frente)],
-    ["FONDO", fmtMeters(lot?.fondo)],
     ["PRECIO", fmtMoney(lot?.precio ?? lot?.price)],
     ["ALQUILER", fmtBoolean(lot?.alquiler)],
     ["DEUDA", fmtBoolean(lot?.deuda)],

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
+import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import "../Base/cards.css";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
-import { getAllLotes, updateLote } from "../../../lib/api/lotes.js";
+import { getAllLotes } from "../../../lib/api/lotes.js";
 import { createVenta } from "../../../lib/api/ventas.js";
 import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
 
@@ -68,6 +69,7 @@ export default function VentaCrearCard({
   onCancel,
   onCreated,
   loteIdPreSeleccionado,
+  lockLote = false, // Si viene desde fila del tablero, bloquear el campo lote
 }) {
   const [fechaVenta, setFechaVenta] = useState(toDateInputValue(new Date()));
   const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
@@ -102,13 +104,19 @@ export default function VentaCrearCard({
         const lData = lRes?.data ?? (Array.isArray(lRes) ? lRes : []);
         setPersonas(Array.isArray(pData) ? pData : []);
         setInmobiliarias(Array.isArray(iData) ? iData : []);
-        // Solo lotes DISPONIBLE o RESERVADO
-        const filteredLots = Array.isArray(lData)
+        let filteredLots = Array.isArray(lData)
           ? lData.filter((l) => {
               const st = String(l.estado || l.status || "").toUpperCase();
               return st === "DISPONIBLE" || st === "RESERVADO";
             })
           : [];
+        
+        if (lockLote && loteIdPreSeleccionado) {
+          const lotePrecargado = lData.find(l => String(l.id) === String(loteIdPreSeleccionado));
+          if (lotePrecargado && !filteredLots.find(l => String(l.id) === String(lotePrecargado.id))) {
+            filteredLots = [lotePrecargado, ...filteredLots];
+          }
+        }
         setLotes(filteredLots);
       } catch (e) {
         console.error("Error cargando lookups venta:", e);
@@ -119,7 +127,6 @@ export default function VentaCrearCard({
   useEffect(() => {
     if (!open) {
       // Limpiar todos los datos cuando se cierra el modal sin guardar
-      setLoteId("");
       setBusquedaLote("");
       setCompradorId("");
       setInmobiliariaId("");
@@ -131,9 +138,15 @@ export default function VentaCrearCard({
       setError(null);
       setNumeroError(null);
       setOpenCrearPersona(false);
+      // Solo resetear loteId si no viene precargado
+      if (!loteIdPreSeleccionado) {
+        setLoteId("");
+      }
       return;
     }
-    if (loteIdPreSeleccionado) setLoteId(String(loteIdPreSeleccionado));
+    if (loteIdPreSeleccionado) {
+      setLoteId(String(loteIdPreSeleccionado));
+    }
   }, [open, loteIdPreSeleccionado]);
 
   // Handler para cuando se crea una nueva persona
@@ -158,7 +171,6 @@ export default function VentaCrearCard({
     [inmobiliarias]
   );
   
-  // Lotes para buscador: filtrar por mapId, numero o texto visible
   const lotesFiltrados = useMemo(() => {
     const q = busquedaLote.trim().toLowerCase();
     if (!q) return [];
@@ -171,6 +183,16 @@ export default function VentaCrearCard({
       return mapId.includes(q) || numero.includes(q) || id.includes(q) || textoLote.includes(q) || calle.includes(q);
     });
   }, [busquedaLote, lotes]);
+
+  // Calcular el mapId del lote seleccionado cuando viene bloqueado
+  const loteSeleccionadoMapId = useMemo(() => {
+    if (!lockLote || !loteId) return null;
+    const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
+    if (!loteSeleccionado) return null;
+    const mapId = loteSeleccionado.mapId;
+    if (!mapId) return null;
+    return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
+  }, [lockLote, loteId, lotes]);
 
   async function handleSave() {
     setSaving(true);
@@ -285,69 +307,7 @@ export default function VentaCrearCard({
 
   return (
     <>
-      {showSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
-                background: "#10b981",
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Venta registrada exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
+      <SuccessAnimation show={showSuccess} message="¡Venta registrada exitosamente!" />
 
       {open && (
         <EditarBase
@@ -362,6 +322,15 @@ export default function VentaCrearCard({
             <div className="venta-col">
               <div className="field-row">
                 <div className="field-label">LOTE</div>
+                {lockLote && loteSeleccionadoMapId ? (
+                  // Cuando viene desde fila, mostrar el lote como read-only
+                  <div className="field-value is-readonly">
+                    {loteSeleccionadoMapId}
+                  </div>
+                ) : lockLote ? (
+                  // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
+                  <div className="field-value is-readonly">—</div>
+                ) : (
                 <div className="field-value p0" style={{ alignItems: "flex-start" }}>
                   <div style={{ width: "100%", position: "relative" }}>
                     <div style={{ position: "relative" }}>
@@ -376,13 +345,11 @@ export default function VentaCrearCard({
                         })() : busquedaLote}
                         onChange={(e) => {
                           setBusquedaLote(e.target.value);
-                          // Si empieza a escribir, limpiar la selección para permitir buscar otro lote
                           if (e.target.value && loteId) {
                             setLoteId("");
                           }
                         }}
                         onFocus={() => {
-                          // Al hacer focus, activar el modo búsqueda
                           if (loteId) {
                             setBusquedaLote("");
                             setLoteId("");
@@ -421,6 +388,7 @@ export default function VentaCrearCard({
                     )}
                   </div>
                 </div>
+                )}
               </div>
 
               <div className="field-row">

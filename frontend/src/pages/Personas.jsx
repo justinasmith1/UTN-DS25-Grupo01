@@ -16,6 +16,7 @@ import PersonaDesactivarDialog from "../components/Cards/Personas/PersonaDesacti
 import PersonaReactivarDialog from "../components/Cards/Personas/PersonaReactivarDialog";
 import PersonaEliminarDefinitivoDialog from "../components/Cards/Personas/PersonaEliminarDefinitivoDialog";
 import PersonaCrearCard from "../components/Cards/Personas/PersonaCrearCard";
+import PersonaGrupoFamiliarCard from "../components/Cards/Personas/PersonaGrupoFamiliarCard";
 import { desactivarPersona, reactivarPersona, deletePersonaDefinitivo, getPersona } from "../lib/api/personas";
 
 /**
@@ -73,6 +74,10 @@ export default function Personas() {
   // Estado para modal "Editar Persona"
   const [editarPersonaOpen, setEditarPersonaOpen] = useState(false);
   const [personaAEditar, setPersonaAEditar] = useState(null);
+  
+  // Estado para modal "Grupo Familiar"
+  const [grupoFamiliarOpen, setGrupoFamiliarOpen] = useState(false);
+  const [personaGrupoFamiliar, setPersonaGrupoFamiliar] = useState(null);
   
   // Estado para modales de desactivar/reactivar/eliminar definitivo
   const [desactivarPersonaOpen, setDesactivarPersonaOpen] = useState(false);
@@ -396,6 +401,10 @@ export default function Personas() {
         onEliminarPersona={canPersonaDelete ? handleEliminarPersona : null}
         onEliminarDefinitivo={userRole === 'ADMINISTRADOR' && canPersonaDelete ? handleEliminarDefinitivo : null}
         onAgregarPersona={can(user, PERMISSIONS.PEOPLE_CREATE) ? handleAgregarPersona : null}
+        onGrupoFamiliar={(userRole === 'ADMINISTRADOR' || userRole === 'GESTOR') ? (persona) => {
+          setPersonaGrupoFamiliar(persona);
+          setGrupoFamiliarOpen(true);
+        } : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
       />
@@ -474,6 +483,16 @@ export default function Personas() {
         open={crearPersonaOpen}
         onCancel={() => setCrearPersonaOpen(false)}
         onCreated={handlePersonaCreada}
+      />
+
+      {/* Modal "Grupo Familiar" */}
+      <PersonaGrupoFamiliarCard
+        open={grupoFamiliarOpen}
+        onCancel={() => {
+          setGrupoFamiliarOpen(false);
+          setPersonaGrupoFamiliar(null);
+        }}
+        persona={personaGrupoFamiliar}
       />
 
       {/* Animación de éxito al desactivar/reactivar */}

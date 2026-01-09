@@ -18,12 +18,11 @@ export function chipsFrom(applied, D, isInmo) {
   (applied.calle || []).forEach((v) => arr.push({ k: "calle", v, label: nice(v) }));
   (applied.fraccion || []).forEach((v) => arr.push({ k: "fraccion", v, label: `Fracción ${v}` }));
 
-  if (applied.frente && (applied.frente.min !== D.frente.min || applied.frente.max !== D.frente.max)) {
-    arr.push({ k: "frente", label: `Frente ${applied.frente.min}–${applied.frente.max} m` });
+  if (applied.tipo) {
+    const tipoLabel = applied.tipo === 'LOTE_VENTA' ? 'Lote Venta' : applied.tipo === 'ESPACIO_COMUN' ? 'Espacio Común' : applied.tipo;
+    arr.push({ k: "tipo", v: applied.tipo, label: tipoLabel });
   }
-  if (applied.fondo && (applied.fondo.min !== D.fondo.min || applied.fondo.max !== D.fondo.max)) {
-    arr.push({ k: "fondo", label: `Fondo ${applied.fondo.min}–${applied.fondo.max} m` });
-  }
+
   if (applied.sup && (applied.sup.min !== D.sup.min || applied.sup.max !== D.sup.max)) {
     arr.push({ k: "sup", label: `Sup ${applied.sup.min}–${applied.sup.max} m²` });
   }
