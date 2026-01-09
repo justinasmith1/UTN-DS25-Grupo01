@@ -68,14 +68,16 @@ export default function EditarBase({
               </button>
             )}
 
-            <button
-              className="btn btn-primary"
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-            >
-              {saving ? "Guardando…" : (saveButtonText || "Guardar cambios")}
-            </button>
+            {saveButtonText !== null && (
+              <button
+                className="btn btn-primary"
+                type="button"
+                onClick={onSave}
+                disabled={saving}
+              >
+                {saving ? "Guardando…" : (saveButtonText || "Guardar cambios")}
+              </button>
+            )}
           </div>
         </div>
       </div>

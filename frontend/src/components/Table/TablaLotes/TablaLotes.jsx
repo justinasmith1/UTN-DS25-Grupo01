@@ -680,11 +680,47 @@ export default function TablaLotes({
                       <Trash2 size={18} strokeWidth={2} />
                     </button>
                   )}
-                  {can('aplicarPromo') && (
-                    <button className="tl-icon tl-icon--promo" aria-label="Aplicar promoción" data-tooltip="Aplicar Promoción" onClick={() => onAplicarPromo?.(l)}>
-                      <CirclePercent size={18} strokeWidth={2} />
-                    </button>
-                  )}
+                  {can('aplicarPromo') && (() => {
+                    const estadoLote = String(getEstadoFromLote(l) || "").toUpperCase();
+                    const isDisponible = estadoLote === "DISPONIBLE";
+                    const isEnPromocion = estadoLote === "EN_PROMOCION";
+                    const isDisabled = !isDisponible && !isEnPromocion;
+                    
+                    const tooltip = isDisponible 
+                      ? "Aplicar Promoción"
+                      : isEnPromocion
+                      ? "Ver Promoción"
+                      : "Solo para lotes en estado DISPONIBLE";
+                    
+                    const label = isEnPromocion ? "En promoción" : "Aplicar Promoción";
+                    
+                    return (
+                      <button
+                        className={`tl-icon tl-icon--promo ${isDisabled ? "is-disabled" : ""}`}
+                        aria-label={label}
+                        data-tooltip={tooltip}
+                        onClick={() => {
+                          if (isDisabled) {
+                            // Mostrar feedback si está disabled
+                            return;
+                          }
+                          onAplicarPromo?.(l, isEnPromocion ? "ver" : "aplicar");
+                        }}
+                        disabled={isDisabled}
+                        style={{
+                          cursor: isDisabled ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <CirclePercent 
+                          size={18} 
+                          strokeWidth={2} 
+                          style={{
+                            opacity: isDisabled ? 0.5 : 1,
+                          }}
+                        />
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );

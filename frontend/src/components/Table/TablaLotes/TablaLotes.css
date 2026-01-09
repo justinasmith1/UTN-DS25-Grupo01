@@ -319,4 +319,37 @@
 .tl-td--actions .tl-icon[data-tooltip]:focus-visible::after {
   transform: translateY(-50%);
 }
+
+/* Asegurar que el tooltip no herede opacidad del botón disabled */
+/* El problema es que opacity en el padre afecta a los pseudo-elementos */
+/* Solución: usar un contenedor wrapper o forzar el tooltip a ser completamente opaco */
+.tl-td--actions .tl-icon.is-disabled[data-tooltip]::after {
+  opacity: 0;
+  pointer-events: none;
+  /* Valores iniciales sólidos */
+  background: #fff !important;
+  color: #0f172a !important;
+}
+
+/* Tooltip visible incluso cuando el botón está disabled - completamente sólido */
+/* IMPORTANTE: El tooltip debe estar en un contexto de renderizado independiente */
+.tl-td--actions .tl-icon.is-disabled[data-tooltip]:hover::after {
+  /* Forzar opacidad completa - el !important es crítico aquí */
+  opacity: 1 !important;
+  pointer-events: auto;
+  color: #0f172a !important;
+  background: #fff !important;
+  transform: translateY(-50%) !important;
+  /* Asegurar z-index alto para estar por encima de todo */
+  z-index: 10000 !important;
+  /* El texto debe ser completamente opaco - sin herencia de opacidad */
+  text-shadow: none;
+  /* Asegurar que el borde también sea opaco */
+  border-color: #d9dee5 !important;
+}
+
+/* También para el ::before si existe (flecha del tooltip) */
+.tl-td--actions .tl-icon.is-disabled[data-tooltip]:hover::before {
+  opacity: 1 !important;
+}
 /* --------------------------------------------- */

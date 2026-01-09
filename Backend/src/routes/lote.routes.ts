@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import * as loteController from '../controllers/lote.controller';
+import * as promocionController from '../controllers/promocion.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { createLoteSchema, updateLoteSchema, getLoteSchema, deleteLoteSchema, queryLoteSchema } from '../validations/lote.validation';
+import { aplicarPromocionSchema, quitarPromocionSchema, getPromocionActivaSchema } from '../validations/promocion.validation';
 import { checkLoteStatusForTecnico } from '../middlewares/lote.auth.middleware';
 
 const router = Router();
@@ -49,5 +51,30 @@ router.delete(
     authorize('ADMINISTRADOR'),
     validateParams(deleteLoteSchema),
     loteController.eliminarLote);
+
+// POST /api/lotes/:id/promociones/aplicar
+router.post(
+    '/:id/promociones/aplicar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(getLoteSchema),
+    validate(aplicarPromocionSchema),
+    promocionController.aplicarPromocion);
+
+// POST /api/lotes/:id/promociones/quitar
+router.post(
+    '/:id/promociones/quitar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(quitarPromocionSchema),
+    promocionController.quitarPromocion);
+
+// GET /api/lotes/:id/promociones/activa
+router.get(
+    '/:id/promociones/activa',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA', 'TECNICO'),
+    validateParams(getPromocionActivaSchema),
+    promocionController.getPromocionActiva);
 
 export const loteRoutes = router;
