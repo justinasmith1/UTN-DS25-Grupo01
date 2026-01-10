@@ -1028,7 +1028,7 @@ select.field-input {
 .ns-item:hover{ background: #f3f4f6; }
 .ns-item.is-active{ background: #e9efff; }
 
-.ns-wrap { position: relative; }
+.ns-wrap { position: relative; overflow: visible; }
 
 .ns-trigger{
   width:100%;
@@ -1206,11 +1206,13 @@ select.field-input {
   position: relative;
   width: 100%;
   min-width: 0;
+  overflow: visible;
 }
 
 .propietario-search-input-wrapper {
   position: relative;
   width: 100%;
+  overflow: visible;
 }
 
 .propietario-info-icon-inline {
@@ -1239,15 +1241,15 @@ select.field-input {
   color: #0f172a;
   border: 1px solid #d9dee5;
   border-radius: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   font-size: 12px;
   line-height: 1.5;
   white-space: normal;
-  min-width: 200px;
-  max-width: 320px;
+  min-width: 220px;
+  max-width: 350px;
   width: max-content;
   box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
-  z-index: 10000;
+  z-index: 10001;
 
   transition: opacity 0.15s ease, transform 0.15s ease;
 }
@@ -1259,6 +1261,51 @@ select.field-input {
 
 .propietario-info-icon-inline:hover {
   color: #374151;
+}
+
+/* Tooltip del estado - posicionado sobre el select en el lado derecho */
+.estado-tooltip-icon {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+}
+
+.estado-tooltip-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  transform: translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 350px;
+  width: max-content;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  z-index: 10001;
+
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.estado-tooltip-icon[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Asegurar que el tooltip no se corte por overflow */
+.field-value.p0 {
+  overflow: visible;
 }
 
 .propietario-search-icon {
