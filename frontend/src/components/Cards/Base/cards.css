@@ -189,6 +189,7 @@
 /* Outline (Restablecer) */
 .btn-outline {
   background: #fff;
+  text-decoration: 0.5px underline !important;
   border: 1px solid #000; /* borde negro suave para consistencia */
   color: #111;
 }
@@ -321,7 +322,7 @@ select.field { appearance: auto; }
 .promoCheckRow label {
   cursor: pointer;
   user-select: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   color: #111;
   margin: 0;
@@ -345,10 +346,13 @@ select.field { appearance: auto; }
   gap: 8px;
 }
 
-.promocion-explicacion-row-inner .field-label {
+.promocion-explicacion-row-inner{
   width: 100%;
 }
 
+.promocion-explicacion-row-inner .field-label {
+  width: 200px;
+}
 .promocion-explicacion-row-inner .field-value {
   width: 100%;
   min-height: auto;
@@ -617,6 +621,27 @@ select.field { appearance: auto; }
   resize: vertical;
   font-family: inherit;
   font-size: 14px;
+}
+
+.lote-description-textarea {
+  margin: 8px 0 0;
+  width: 100%;
+  min-height: 80px;
+  padding: 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.lote-error-global {
+  margin-top: 18px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13.5px;
 }
 
 .boolean-value {
@@ -920,7 +945,15 @@ select.field { appearance: auto; }
 }
 
 /* Para que el "valor" editable conserve el rectángulo del VerCard */
-.field-value.p0 { padding: 0; }
+.field-value.p0 { 
+  padding: 0; 
+  min-width: 0;
+}
+
+.field-value.p0 .propietario-search-wrapper {
+  width: 100%;
+  min-width: 0;
+}
 
 .field-input {
   width: 100%;
@@ -995,7 +1028,7 @@ select.field-input {
 .ns-item:hover{ background: #f3f4f6; }
 .ns-item.is-active{ background: #e9efff; }
 
-.ns-wrap { position: relative; }
+.ns-wrap { position: relative; overflow: visible; }
 
 .ns-trigger{
   width:100%;
@@ -1119,3 +1152,214 @@ select.field-input {
   transition: opacity 0.3s ease-out, transform 0.3s ease-out;
 }
 
+/* Estilos para el buscador de propietario (autocomplete) */
+.propietario-label-with-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.propietario-info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  cursor: help;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.propietario-info-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: normal;
+  max-width: 280px;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  z-index: 10000;
+
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.propietario-info-icon[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.propietario-info-icon:hover {
+  color: #374151;
+}
+
+.propietario-search-wrapper {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  overflow: visible;
+}
+
+.propietario-search-input-wrapper {
+  position: relative;
+  width: 100%;
+  overflow: visible;
+}
+
+.propietario-info-icon-inline {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7280;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.propietario-info-icon-inline[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  transform: translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 350px;
+  width: max-content;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  z-index: 10001;
+
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.propietario-info-icon-inline[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.propietario-info-icon-inline:hover {
+  color: #374151;
+}
+
+/* Tooltip del estado - posicionado sobre el select en el lado derecho */
+.estado-tooltip-icon {
+  position: absolute;
+  right: 36px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 15;
+}
+
+.estado-tooltip-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  transform: translateY(4px);
+  opacity: 0;
+  pointer-events: none;
+
+  background: #fff;
+  color: #0f172a;
+  border: 1px solid #d9dee5;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: normal;
+  min-width: 220px;
+  max-width: 350px;
+  width: max-content;
+  box-shadow: 0 8px 24px rgba(16, 24, 40, 0.12);
+  z-index: 10001;
+
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.estado-tooltip-icon[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Asegurar que el tooltip no se corte por overflow */
+.field-value.p0 {
+  overflow: visible;
+}
+
+.propietario-search-icon {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.propietario-dropdown {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  position: absolute;
+  width: 100%;
+  z-index: 1000;
+  background: #fff;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.propietario-dropdown-empty {
+  padding: 12px;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.propietario-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.propietario-dropdown-item:hover {
+  background: #f9fafb;
+}
+
+.propietario-dropdown-item-name {
+  font-weight: 500;
+  color: #111;
+}
+
+.propietario-dropdown-item-id {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 2px;
+}

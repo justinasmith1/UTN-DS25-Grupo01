@@ -7,8 +7,6 @@ export const baseLoteSchema = z.object({
   numero: z.coerce.number().int('El número de lote debe ser un número entero').positive('El número de lote debe ser positivo'),
   fraccionId: z.coerce.number().int('La fracción debe ser un número entero').positive('La fracción debe ser positiva'),
   numPartido: z.coerce.number().int().default(62),
-  frente: z.coerce.number().min(0, 'El frente no puede ser negativo').optional(),
-  fondo: z.coerce.number().min(0, 'El fondo no puede ser negativo').optional(),
   superficie: z.coerce.number().min(0, 'La superficie no puede ser negativa').optional(),
   estado: z.enum(['Disponible', 'Reservado', 'Vendido', 'No Disponible', 'Alquilado', 'En Promoción']),
   subestado: z.enum(['En Construccion', 'No Construido', 'Construido']),

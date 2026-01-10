@@ -1,22 +1,28 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { Info } from "lucide-react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
-import { getAllFracciones } from "../../../lib/api/fracciones.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
+import { getAllPersonas } from "../../../lib/api/personas.js";
 import { uploadArchivo, getArchivosByLote, deleteArchivo, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
-import { removeLotePrefix } from "../../../utils/mapaUtils.js";
+import { getLoteIdFormatted } from "../../Table/TablaLotes/utils/getters.js";
+import { applySearch } from "../../../utils/personaSearch.js";
 import LoteImageUploader from "./LoteImageUploader.jsx";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
+function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const listRef = useRef(null);
 
   useEffect(() => {
+    if (disabled) {
+      setOpen(false);
+      return;
+    }
     function onDoc(e) {
       if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
         setOpen(false);
@@ -24,9 +30,19 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
     }
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
+  }, [disabled]);
 
   const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
+
+  if (disabled) {
+    return (
+      <div className="ns-wrap" style={{ position: "relative" }}>
+        <div className="ns-trigger" style={{ opacity: 0.6, cursor: "not-allowed", pointerEvents: "none" }}>
+          <span>{label}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="ns-wrap" style={{ position: "relative" }}>
@@ -37,6 +53,7 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
         onClick={() => setOpen(o => !o)}
         aria-haspopup="listbox"
         aria-expanded={open}
+        disabled={disabled}
       >
         <span>{label}</span>
         <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
@@ -44,7 +61,7 @@ function NiceSelect({ value, options, placeholder = "Sin información", onChange
         </svg>
       </button>
 
-      {open && (
+      {open && !disabled && (
         <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
           {(placeholder ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
             <li
@@ -71,13 +88,11 @@ const TIPOS = [
   { value: "Espacio Comun", label: "Espacio Común" },
 ];
 
-const ESTADOS = [
+// Estados editables: solo los que se pueden seleccionar manualmente
+const ESTADOS_EDITABLES_LOTE = [
   { value: "Disponible", label: "Disponible" },
-  { value: "Reservado", label: "Reservado" },
-  { value: "Vendido", label: "Vendido" },
   { value: "No Disponible", label: "No Disponible" },
-  { value: "Alquilado", label: "Alquilado" },
-  { value: "En Promoción", label: "En Promoción" },
+  { value: "Vendido", label: "Vendido" },
 ];
 
 const SUBESTADOS = [
@@ -86,7 +101,25 @@ const SUBESTADOS = [
   { value: "Construido", label: "Construido" },
 ];
 
+// Estados derivados (NO editables manualmente)
+const ESTADOS_DERIVADOS = ["Reservado", "Alquilado", "En Promoción", "Con Prioridad"];
 
+// Listado de calles disponibles (enum NombreCalle del backend)
+const CALLES_OPTIONS = [
+  { value: "REINAMORA", label: "REINAMORA" },
+  { value: "MACA", label: "MACA" },
+  { value: "ZORZAL", label: "ZORZAL" },
+  { value: "CAUQUEN", label: "CAUQUEN" },
+  { value: "ALONDRA", label: "ALONDRA" },
+  { value: "JACANA", label: "JACANA" },
+  { value: "TACUARITO", label: "TACUARITO" },
+  { value: "JILGUERO", label: "JILGUERO" },
+  { value: "GOLONDRINA", label: "GOLONDRINA" },
+  { value: "CALANDRIA", label: "CALANDRIA" },
+  { value: "AGUILAMORA", label: "AGUILAMORA" },
+  { value: "LORCA", label: "LORCA" },
+  { value: "MILANO", label: "MILANO" },
+];
 
 const LABELS = [
   "ID",
@@ -94,10 +127,7 @@ const LABELS = [
   "TIPO",
   "ESTADO",
   "SUB-ESTADO",
-  "FRACCIÓN",
   "SUPERFICIE",
-  "FRENTE",
-  "FONDO",
   "PRECIO",
   "PROPIETARIO",
   "UBICACIÓN",
@@ -115,6 +145,7 @@ const FROM_PRISMA_MAP = {
   NO_DISPONIBLE: "No Disponible",
   ALQUILADO: "Alquilado",
   EN_PROMOCION: "En Promoción",
+  CON_PRIORIDAD: "Con Prioridad",
   EN_CONSTRUCCION: "En Construccion",
   NO_CONSTRUIDO: "No Construido",
   CONSTRUIDO: "Construido",
@@ -135,18 +166,12 @@ const buildInitialForm = (lot) => {
   if (!lot) {
     return {
       id: "",
-      mapId: "",
       tipo: "",
       estado: "",
       subestado: "",
       numPartido: "",
-      fraccionId: "",
-      fraccionNumero: "",
       propietarioId: "",
-      propietarioNombre: "",
       superficie: "",
-      frente: "",
-      fondo: "",
       precio: "",
       alquiler: false,
       deuda: false,
@@ -161,50 +186,16 @@ const buildInitialForm = (lot) => {
   }
 
   const propietario = lot?.propietario || lot?.owner || lot?.Propietario || {};
-  const propietarioNombre = [propietario.nombre || propietario.firstName, propietario.apellido || propietario.lastName]
-    .filter(Boolean)
-    .join(" ");
-
-  const fraccionId = lot?.fraccionId ?? lot?.fraccion?.id ?? "";
-  const fraccionNumero = lot?.fraccion?.numero ?? "";
   const ubicacion = lot?.ubicacion ?? {};
-
-  const frente = lot?.frente ?? "";
-  const fondo = lot?.fondo ?? "";
-  let superficie = lot?.superficie ?? lot?.surface ?? "";
-
-  if (frente && fondo && !superficie) {
-    const f = Number(frente);
-    const fo = Number(fondo);
-    if (!isNaN(f) && !isNaN(fo) && f >= 0 && fo >= 0) {
-      superficie = String(f * fo);
-    }
-  } else if (frente && fondo) {
-    const f = Number(frente);
-    const fo = Number(fondo);
-    const sup = Number(superficie);
-    if (!isNaN(f) && !isNaN(fo) && !isNaN(sup) && f >= 0 && fo >= 0 && sup >= 0) {
-      const calculated = f * fo;
-      if (Math.abs(sup - calculated) > 0.01) {
-        superficie = String(calculated);
-      }
-    }
-  }
 
   return {
     id: lot.id ?? "",
-    mapId: lot.mapId ?? lot.codigo ?? "",
     tipo: toFriendly(lot?.tipo),
     estado: toFriendly(lot?.estado ?? lot?.status),
     subestado: toFriendly(lot?.subestado ?? lot?.subStatus),
     numPartido: lot?.numPartido ?? lot?.numeroPartida ?? "",
-    fraccionId,
-    fraccionNumero,
     propietarioId: lot?.propietarioId ?? propietario?.id ?? "",
-    propietarioNombre: propietarioNombre || lot?.owner || "",
-    superficie,
-    frente: String(frente),
-    fondo: String(fondo),
+    superficie: lot?.superficie ?? lot?.surface ?? "",
     precio: lot?.precio ?? lot?.price ?? "",
     alquiler: Boolean(lot?.alquiler),
     deuda: Boolean(lot?.deuda),
@@ -238,29 +229,101 @@ export default function LoteEditarCard({
   const [reservasLote, setReservasLote] = useState([]);
   const [ventasLote, setVentasLote] = useState([]);
   const [archivosParaBorrar, setArchivosParaBorrar] = useState([]);
+  const [personas, setPersonas] = useState([]);
+  const [loadingPersonas, setLoadingPersonas] = useState(false);
+  const [busquedaPropietario, setBusquedaPropietario] = useState(null);
+  const inputPropietarioRef = useRef(null);
+  const dropdownPropietarioRef = useRef(null);
 
+  // Cargar personas al abrir
   useEffect(() => {
     if (!open) return;
-    if (fracciones.length > 0) return;
-    setLoadingFracciones(true);
+    if (personas.length > 0) return;
+    setLoadingPersonas(true);
     (async () => {
       try {
-        const resp = await getAllFracciones();
-        if (resp.success && resp.data?.fracciones) {
-          setFracciones(resp.data.fracciones);
-        }
+        const resp = await getAllPersonas({});
+        const personasData = resp?.personas ?? (Array.isArray(resp) ? resp : []);
+        setPersonas(Array.isArray(personasData) ? personasData : []);
       } catch (err) {
-        console.error("Error cargando fracciones:", err);
+        console.error("Error cargando personas:", err);
+        setPersonas([]);
       } finally {
-        setLoadingFracciones(false);
+        setLoadingPersonas(false);
       }
     })();
-  }, [open, fracciones.length]);
+  }, [open, personas.length]);
+
+  // Cerrar dropdown de propietario al hacer click fuera
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (
+        inputPropietarioRef.current &&
+        !inputPropietarioRef.current.contains(event.target) &&
+        dropdownPropietarioRef.current &&
+        !dropdownPropietarioRef.current.contains(event.target)
+      ) {
+        setBusquedaPropietario(null);
+      }
+    }
+    if (busquedaPropietario) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [busquedaPropietario]);
+
+  // Obtener la persona seleccionada para mostrar en el input
+  const personaSeleccionada = useMemo(() => {
+    if (!form.propietarioId) return null;
+    return personas.find((p) => `${p.id ?? p.idPersona}` === `${form.propietarioId}`);
+  }, [personas, form.propietarioId]);
+
+  // Filtrar personas por búsqueda
+  const personasFiltradas = useMemo(() => {
+    if (!busquedaPropietario || !busquedaPropietario.trim()) {
+      return [];
+    }
+    return applySearch(personas, busquedaPropietario).slice(0, 10); // Limitar a 10 resultados
+  }, [personas, busquedaPropietario]);
 
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
   }, []);
+
+  // Opciones de estado: incluir estado actual si es derivado (no editable) para mostrarlo
+  const opcionesEstado = useMemo(() => {
+    const estadoActual = form.estado;
+    const esEditable = ESTADOS_EDITABLES_LOTE.some(e => e.value === estadoActual);
+    
+    // Si el estado actual no es editable, agregarlo temporalmente para mostrarlo (pero readonly)
+    if (estadoActual && !esEditable) {
+      return [{ value: estadoActual, label: estadoActual }, ...ESTADOS_EDITABLES_LOTE];
+    }
+    
+    return ESTADOS_EDITABLES_LOTE;
+  }, [form.estado]);
+
+  // Determinar si el estado actual es derivado (readonly)
+  const estadoEsDerivado = useMemo(() => {
+    return ESTADOS_DERIVADOS.includes(form.estado);
+  }, [form.estado]);
+
+  // Mensaje tooltip para estado derivado
+  const getTooltipEstadoDerivado = () => {
+    const estado = form.estado;
+    if (estado === "Reservado") return "Este estado se gestiona desde el módulo de Reservas.";
+    if (estado === "Alquilado") return "Este estado se gestiona desde el módulo de Alquiler.";
+    if (estado === "En Promoción") return "Este estado se gestiona desde el módulo de Promociones.";
+    if (estado === "Con Prioridad") return "Este estado se gestiona desde el módulo de Prioridades.";
+    return "Este estado se gestiona desde su módulo correspondiente.";
+  };
+
+  // Formatear ID del lote
+  const loteDisplayId = useMemo(() => {
+    if (!detalle) return "—";
+    return getLoteIdFormatted(detalle) || "—";
+  }, [detalle]);
 
   const fallbackDetalle = useMemo(() => {
     if (lote) return lote;
@@ -358,19 +421,7 @@ export default function LoteEditarCard({
   }, [open, detalle?.id]);
 
   const updateForm = (patch) => {
-    setForm(prev => {
-      const updated = { ...prev, ...patch };
-      if ('frente' in patch || 'fondo' in patch) {
-        const frente = toNumberOrNull(updated.frente);
-        const fondo = toNumberOrNull(updated.fondo);
-        if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
-          updated.superficie = String(frente * fondo);
-        } else {
-          updated.superficie = "";
-        }
-      }
-      return updated;
-    });
+    setForm(prev => ({ ...prev, ...patch }));
   };
 
   const handleReset = () => {
@@ -393,23 +444,19 @@ export default function LoteEditarCard({
     try {
       const payload = {};
       if (form.tipo) payload.tipo = form.tipo;
-      if (form.estado) payload.estado = form.estado;
+      
+      // Solo enviar estado si no es derivado (y si el usuario lo cambió a uno editable)
+      if (form.estado && !estadoEsDerivado) {
+        payload.estado = form.estado;
+      }
+      
       if (form.subestado) payload.subestado = form.subestado;
 
       const numPartido = toNumberOrNull(form.numPartido);
       if (numPartido != null) payload.numPartido = numPartido;
 
-      const frente = toNumberOrNull(form.frente);
-      const fondo = toNumberOrNull(form.fondo);
-      let superficie = toNumberOrNull(form.superficie);
-
-      if (frente != null && fondo != null && frente >= 0 && fondo >= 0) {
-        superficie = frente * fondo;
-      }
-
+      const superficie = toNumberOrNull(form.superficie);
       if (superficie != null && superficie >= 0) payload.superficie = superficie;
-      if (frente != null) payload.frente = frente;
-      if (fondo != null) payload.fondo = fondo;
 
       const precio = toNumberOrNull(form.precio);
       if (precio != null) payload.precio = precio;
@@ -417,17 +464,38 @@ export default function LoteEditarCard({
       if (form.descripcion != null) payload.descripcion = form.descripcion;
       payload.alquiler = Boolean(form.alquiler);
       payload.deuda = Boolean(form.deuda);
-      
-      // Si se marca alquiler, establecer estado a ALQUILADO
-      if (form.alquiler) {
-        payload.estado = "Alquilado";
-      }
-
-      const fraccionId = toNumberOrNull(form.fraccionId);
-      if (fraccionId) payload.fraccionId = fraccionId;
 
       const propietarioId = toNumberOrNull(form.propietarioId);
       if (propietarioId) payload.propietarioId = propietarioId;
+
+      // Ubicación: enviar solo si hay cambios
+      const ubicacionOriginal = detalle?.ubicacion;
+      const calleOriginal = ubicacionOriginal?.calle;
+      const numeroOriginal = ubicacionOriginal?.numero;
+      
+      const calleForm = form.ubicacionCalle?.trim() || null;
+      const numeroForm = toNumberOrNull(form.ubicacionNumero);
+      
+      // Determinar si hay cambios
+      const calleCambio = calleForm && calleForm !== calleOriginal;
+      const numeroCambio = numeroForm != null && numeroForm > 0 && numeroForm !== numeroOriginal;
+      
+      if (calleCambio || numeroCambio) {
+        // Si hay ubicación existente, enviar ambos valores (el que cambió + el original del otro)
+        if (form.ubicacionId && calleOriginal) {
+          payload.calle = calleForm || calleOriginal;
+          const numeroAEnviar = numeroCambio ? numeroForm : (numeroOriginal || null);
+          if (numeroAEnviar != null && numeroAEnviar > 0) {
+            payload.numeroCalle = numeroAEnviar;
+          }
+        } else if (calleForm) {
+          // Crear nueva ubicación solo si hay calle
+          payload.calle = calleForm;
+          if (numeroForm != null && numeroForm > 0) {
+            payload.numeroCalle = numeroForm;
+          }
+        }
+      }
 
       if (form.tipo === "Espacio Comun") {
         if (form.nombreEspacioComun != null && form.nombreEspacioComun.trim()) {
@@ -453,27 +521,10 @@ export default function LoteEditarCard({
       const nuevoEstado = payload.estado || form.estado;
       const estadoUpper = String(nuevoEstado || "").toUpperCase();
 
-      if (estadoUpper === "RESERVADO") {
-        const tieneReservaActiva = reservasLote.some(r => String(r.estado || "").toUpperCase() === "ACTIVA");
-        if (!tieneReservaActiva) {
-          setError("No se puede establecer el estado RESERVADO sin una reserva ACTIVA para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-
+      // Validación de VENDIDO: solo permitir si hay venta registrada
       if (estadoUpper === "VENDIDO") {
         if (ventasLote.length === 0) {
           setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-
-      if (estadoUpper === "ALQUILADO") {
-        const tieneInquilino = detalle?.inquilinoId || detalle?.inquilino?.id;
-        if (!tieneInquilino) {
-          setError("No se puede establecer el estado ALQUILADO sin un inquilino asignado para este lote.");
           setSaving(false);
           return;
         }
@@ -551,12 +602,15 @@ export default function LoteEditarCard({
       const enriched = {
         ...(detalle || {}),
         ...(updated || {}),
-        mapId: updated?.mapId ?? detalle?.mapId ?? form.mapId ?? null,
         images: imagenesActualizadas,
         descripcion: form.descripcion,
         alquiler: payload.alquiler,
         deuda: payload.deuda,
         estado: payload.estado ?? updated?.estado ?? detalle?.estado,
+        superficie: payload.superficie ?? updated?.superficie ?? detalle?.superficie,
+        precio: payload.precio ?? updated?.precio ?? detalle?.precio,
+        propietarioId: payload.propietarioId ?? updated?.propietarioId ?? detalle?.propietarioId,
+        ubicacion: updated?.ubicacion ?? detalle?.ubicacion,
       };
 
       setDetalle(enriched);
@@ -582,7 +636,7 @@ export default function LoteEditarCard({
 
       <EditarBase
         open={open}
-        title={`Editar Lote Nº ${removeLotePrefix(form.mapId || detalle?.mapId || "")}`}
+        title={`Editar Lote N° ${loteDisplayId}`}
         onCancel={() => { if (showSuccess) return; setSaving(false); setShowSuccess(false); onCancel?.(); }}
         saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}
@@ -601,7 +655,7 @@ export default function LoteEditarCard({
         {detalle && (
           <div className="lote-grid" style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}>
             <div className="lote-data-col">
-              <div className="field-row"><div className="field-label">ID</div><div className="field-value is-readonly">{form.mapId || detalle?.mapId || "—"}</div></div>
+              <div className="field-row"><div className="field-label">ID</div><div className="field-value is-readonly">{loteDisplayId}</div></div>
               <div className="field-row"><div className="field-label">Número Partida</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.numPartido ?? ""} onChange={(e) => updateForm({ numPartido: e.target.value })} placeholder="Número de partida" /></div></div>
               <div className="field-row"><div className="field-label">Tipo</div><div className="field-value p0"><NiceSelect value={form.tipo} options={TIPOS} placeholder="" onChange={(value) => updateForm({ tipo: value, nombreEspacioComun: value === "Espacio Comun" ? form.nombreEspacioComun : "", capacidad: value === "Espacio Comun" ? form.capacidad : "" })} /></div></div>
 
@@ -612,15 +666,146 @@ export default function LoteEditarCard({
                 </>
               )}
 
-              <div className="field-row"><div className="field-label">Estado</div><div className="field-value p0"><NiceSelect value={form.estado} options={ESTADOS} placeholder="" onChange={(value) => updateForm({ estado: value })} /></div></div>
+              <div className="field-row">
+                <div className="field-label">
+                  Estado
+                </div>
+                <div className="field-value p0" style={{ position: "relative" }}>
+                  <NiceSelect 
+                    value={form.estado} 
+                    options={opcionesEstado} 
+                    placeholder="" 
+                    onChange={(value) => updateForm({ estado: value })} 
+                    disabled={estadoEsDerivado}
+                  />
+                  {estadoEsDerivado && (
+                    <span
+                      className="propietario-info-icon-inline estado-tooltip-icon"
+                      data-tooltip={getTooltipEstadoDerivado()}
+                    >
+                      <Info size={14} />
+                    </span>
+                  )}
+                </div>
+              </div>
               <div className="field-row"><div className="field-label">Sub-Estado</div><div className="field-value p0"><NiceSelect value={form.subestado} options={SUBESTADOS} placeholder="" onChange={(value) => updateForm({ subestado: value })} /></div></div>
-              <div className="field-row"><div className="field-label">Fracción</div><div className="field-value p0"><NiceSelect value={form.fraccionId ? String(form.fraccionId) : ""} options={fracciones.map(f => ({ value: String(f.idFraccion ?? f.id ?? ""), label: `Fracción ${f.numero ?? f.id}` }))} placeholder={loadingFracciones ? "Cargando..." : ""} onChange={(value) => { const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value); updateForm({ fraccionId: value ? Number(value) : "", fraccionNumero: fraccion?.numero ?? "" }); }} /></div></div>
-              <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input is-readonly" type="number" inputMode="decimal" value={form.superficie ?? ""} readOnly placeholder="Se calcula automáticamente" title="La superficie se calcula automáticamente como frente × fondo" /></div></div>
-              <div className="field-row"><div className="field-label">Frente</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.frente ?? ""} onChange={(e) => updateForm({ frente: e.target.value })} placeholder="Metros" /></div></div>
-              <div className="field-row"><div className="field-label">Fondo</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.fondo ?? ""} onChange={(e) => updateForm({ fondo: e.target.value })} placeholder="Metros" /></div></div>
+              <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.superficie ?? ""} onChange={(e) => updateForm({ superficie: e.target.value })} placeholder="m²" /></div></div>
               <div className="field-row"><div className="field-label">Precio</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.precio ?? ""} onChange={(e) => updateForm({ precio: e.target.value })} placeholder="USD" /></div></div>
-              <div className="field-row"><div className="field-label">Propietario</div><div className="field-value is-readonly">{form.propietarioNombre || "—"}</div></div>
-              <div className="field-row"><div className="field-label">Ubicación</div><div className="field-value is-readonly">{form.ubicacionCalle ? `Calle ${form.ubicacionCalle} ${form.ubicacionNumero ? `Nº ${form.ubicacionNumero}` : ""}` : "—"}</div></div>
+              
+              <div className="field-row">
+                <div className="field-label">Propietario</div>
+                <div className="field-value p0">
+                  <div ref={inputPropietarioRef} className="propietario-search-wrapper">
+                    <div className="propietario-search-input-wrapper">
+                      <input
+                        className="field-input"
+                        type="text"
+                        placeholder={loadingPersonas ? "Cargando..." : "Buscar por nombre, apellido o DNI"}
+                        value={
+                          busquedaPropietario !== null && busquedaPropietario !== undefined
+                            ? busquedaPropietario
+                            : personaSeleccionada
+                            ? (() => {
+                                const nombre = personaSeleccionada.nombre ?? "";
+                                const apellido = personaSeleccionada.apellido ?? "";
+                                const razonSocial = personaSeleccionada.razonSocial;
+                                return razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${personaSeleccionada.id}`;
+                              })()
+                            : ""
+                        }
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setBusquedaPropietario(value);
+                          // Si el usuario está escribiendo, limpiar propietarioId si hay texto que no coincide
+                          if (value) {
+                            if (personaSeleccionada) {
+                              const nombre = personaSeleccionada.nombre ?? "";
+                              const apellido = personaSeleccionada.apellido ?? "";
+                              const razonSocial = personaSeleccionada.razonSocial;
+                              const displayText = razonSocial || `${nombre} ${apellido}`.trim();
+                              if (!displayText.toLowerCase().includes(value.toLowerCase())) {
+                                updateForm({ propietarioId: "" });
+                              }
+                            }
+                          } else {
+                            updateForm({ propietarioId: "" });
+                          }
+                        }}
+                        onFocus={(e) => {
+                          // Al hacer focus, si hay persona seleccionada y no hay texto de búsqueda activa, activar modo búsqueda
+                          if (personaSeleccionada && busquedaPropietario === null) {
+                            setBusquedaPropietario("");
+                            updateForm({ propietarioId: "" });
+                            setTimeout(() => {
+                              e.target.select();
+                            }, 0);
+                          }
+                        }}
+                      />
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        className="propietario-search-icon"
+                      >
+                        <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none" />
+                        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2" />
+                      </svg>
+                      <span
+                        className="propietario-info-icon-inline"
+                        data-tooltip="Si no aparece en la lista, primero registrá a la persona en el módulo Personas."
+                      >
+                        <Info size={16} />
+                      </span>
+                    </div>
+                    {busquedaPropietario !== null && busquedaPropietario !== undefined && busquedaPropietario !== "" && (
+                      <div
+                        ref={dropdownPropietarioRef}
+                        className="propietario-dropdown"
+                      >
+                        {personasFiltradas.length === 0 ? (
+                          <div className="propietario-dropdown-empty">
+                            Sin resultados
+                          </div>
+                        ) : (
+                          personasFiltradas.map((p) => {
+                            const id = p.id ?? p.idPersona;
+                            const nombre = p.nombre ?? "";
+                            const apellido = p.apellido ?? "";
+                            const razonSocial = p.razonSocial;
+                            const identificadorTipo = p.identificadorTipo;
+                            const identificadorValor = p.identificadorValor;
+                            const displayText = razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${id}`;
+                            return (
+                              <button
+                                key={id}
+                                type="button"
+                                className="propietario-dropdown-item"
+                                onClick={() => {
+                                  updateForm({ propietarioId: Number(id) });
+                                  setBusquedaPropietario(null);
+                                  inputPropietarioRef.current?.blur();
+                                }}
+                              >
+                                <div className="propietario-dropdown-item-name">{displayText}</div>
+                                {identificadorValor && (
+                                  <div className="propietario-dropdown-item-id">
+                                    {identificadorTipo ? `${identificadorTipo} ${identificadorValor}` : identificadorValor}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="field-row"><div className="field-label">Calle</div><div className="field-value p0"><NiceSelect value={form.ubicacionCalle ?? ""} options={CALLES_OPTIONS} placeholder="Seleccionar calle" onChange={(value) => updateForm({ ubicacionCalle: value || "" })} /></div></div>
+              <div className="field-row"><div className="field-label">Número</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.ubicacionNumero ?? ""} onChange={(e) => updateForm({ ubicacionNumero: e.target.value })} placeholder="Ej. 202" /></div></div>
+              
               <div className="field-row"><div className="field-label">Alquiler</div><div className="field-value boolean-value"><input type="checkbox" checked={form.alquiler} onChange={(e) => updateForm({ alquiler: e.target.checked })} /><span>{form.alquiler ? "Sí" : "No"}</span></div></div>
               <div className="field-row"><div className="field-label">Deuda</div><div className="field-value boolean-value"><input type="checkbox" checked={form.deuda} onChange={(e) => updateForm({ deuda: e.target.checked })} /><span>{form.deuda ? "Sí" : "No"}</span></div></div>
             </div>

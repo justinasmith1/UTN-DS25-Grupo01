@@ -95,7 +95,7 @@ export const loteCreateSchema = z
       .refine((val) => val !== "" && val !== null && val !== undefined, {
         message: "Seleccioná una opción",
       })
-      .refine((val) => ["Disponible", "Reservado", "Vendido", "No Disponible", "Alquilado", "En Promoción"].includes(val), {
+      .refine((val) => ["Disponible", "No Disponible", "Vendido"].includes(val), {
         message: "Seleccioná una opción válida",
       }),
     
@@ -242,6 +242,17 @@ export const loteCreateSchema = z
           code: z.ZodIssueCode.custom,
           message: "El nombre del espacio común es obligatorio",
           path: ["nombreEspacioComun"],
+        });
+      }
+    }
+    
+    // Validar que el precio sea obligatorio si el tipo es "Lote Venta"
+    if (data.tipo === "Lote Venta") {
+      if (data.precio == null || data.precio === undefined || data.precio === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `El precio es obligatorio para "Lote Venta"`,
+          path: ["precio"],
         });
       }
     }

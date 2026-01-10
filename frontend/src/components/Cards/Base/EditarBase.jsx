@@ -49,7 +49,7 @@ export default function EditarBase({
 
           <div className="cclf-footer">
             <button
-              className="btn btn-ghost"
+              className="btn btn-outline"
               type="button"
               onClick={onCancel}
               // Permitir cancelar incluso si está guardando para evitar que se trabe

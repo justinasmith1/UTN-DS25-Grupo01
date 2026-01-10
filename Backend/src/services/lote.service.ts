@@ -56,21 +56,9 @@ function stripFieldsForTecnico<T>(lote: T): T {
 }
 
 function normalizeSuperficie(payload: any) {
-  const frente = payload?.frente;
-  const fondo = payload?.fondo;
-  if (frente != null && fondo != null) {
-    const expected = Number(frente) * Number(fondo);
-    if (payload.superficie == null) {
-      payload.superficie = expected;
-    } else {
-      const superficie = Number(payload.superficie);
-      if (!Number.isFinite(superficie) || Math.abs(superficie - expected) > 0.0001) {
-        const err: any = new Error(`La superficie debe ser igual a frente x fondo (${expected}).`);
-        err.statusCode = 400;
-        throw err;
-      }
-    }
-  }
+  // Función mantenida por compatibilidad, pero ya no valida frente/fondo
+  // La superficie se maneja directamente en el payload
+  // Esta función puede eliminarse en el futuro si no se usa en otros lugares
 }
 
 // Normaliza filtros de query (DTO) a enums Prisma
@@ -278,7 +266,7 @@ export async function createLote(data: any): Promise<Lote> {
 export async function updatedLote(id: number, data: any, role?: string): Promise<Lote> {
   let payload = data;
   if (role === 'TECNICO') {
-    const allowedFields = ['subestado', 'frente', 'fondo', 'superficie', 'archivos'];
+    const allowedFields = ['subestado', 'superficie', 'archivos'];
     const filtered: Record<string, any> = {};
     Object.keys(data || {}).forEach((field) => {
       if (allowedFields.includes(field)) {
@@ -287,7 +275,7 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
     });
 
     if (Object.keys(filtered).length === 0) {
-      const e: any = new Error('Como TECNICO, solo puedes modificar los campos: subestado, frente, fondo, superficie y archivos (planos)');
+      const e: any = new Error('Como TECNICO, solo puedes modificar los campos: subestado, superficie y archivos (planos)');
       e.statusCode = 403;
       throw e;
     }
@@ -299,43 +287,53 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
   // La autorización para TECNICO ya fue manejada por el middleware y la lógica en getLoteById.
   // Aquí solo transformamos el DTO para la actualización.
   const dataToUpdate: Prisma.LoteUpdateInput = {};
-  const { estado, subestado, tipo, propietarioId, ubicacionId, fraccionId, superficie, frente, fondo, ...rest } = payload;
+  const { estado, subestado, tipo, propietarioId, ubicacionId, superficie, calle, numeroCalle, ...rest } = payload;
 
   if (estado) dataToUpdate.estado = estadoLoteToPrisma(estado);
   if (subestado) dataToUpdate.subestado = subestadoLoteToPrisma(subestado);
   if (tipo) dataToUpdate.tipo = tipoLoteToPrisma(tipo);
   if (propietarioId) dataToUpdate.propietario = { connect: { id: propietarioId } };
-  if (ubicacionId) dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
-  if (fraccionId) dataToUpdate.fraccion = { connect: { id: fraccionId } };
-
-  // Manejar frente y fondo
-  if (frente !== undefined) dataToUpdate.frente = frente;
-  if (fondo !== undefined) dataToUpdate.fondo = fondo;
   
-  // Calcular superficie automáticamente si vienen frente y fondo pero no superficie
-  // O si se está actualizando frente/fondo, recalcular superficie
-  if (frente !== undefined || fondo !== undefined) {
-    let frenteVal: number | null = frente !== undefined ? Number(frente) : null;
-    let fondoVal: number | null = fondo !== undefined ? Number(fondo) : null;
-    
-    // Obtener valores actuales del lote si no vienen en el payload
-    if (frenteVal === null || fondoVal === null) {
-      const currentLote = await prisma.lote.findUnique({ where: { id }, select: { frente: true, fondo: true } });
-      if (frenteVal === null && currentLote?.frente) frenteVal = Number(currentLote.frente);
-      if (fondoVal === null && currentLote?.fondo) fondoVal = Number(currentLote.fondo);
+  // Manejar ubicación
+  if (ubicacionId) {
+    dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
+  } else if (calle) {
+    const loteActual = await prisma.lote.findUnique({
+      where: { id },
+      select: { ubicacionId: true },
+    });
+
+    if (loteActual?.ubicacionId) {
+      // Actualizar ubicación existente
+      const updateData: any = { calle: calle as any };
+      if (numeroCalle !== undefined && numeroCalle !== null && numeroCalle > 0) {
+        updateData.numero = numeroCalle;
+      }
+      await prisma.ubicacion.update({
+        where: { id: loteActual.ubicacionId },
+        data: updateData,
+      });
+    } else {
+      // Crear nueva ubicación
+      const nuevaUbicacion = await prisma.ubicacion.create({
+        data: {
+          calle: calle as any,
+          ...(numeroCalle !== undefined && numeroCalle !== null && numeroCalle > 0 && { numero: numeroCalle }),
+        },
+      });
+      dataToUpdate.ubicacion = { connect: { id: nuevaUbicacion.id } };
     }
-    
-    // Calcular superficie si tenemos ambos valores
-    if (frenteVal != null && fondoVal != null && frenteVal >= 0 && fondoVal >= 0) {
-      dataToUpdate.superficie = frenteVal * fondoVal;
-    }
-  } else if (superficie !== undefined) {
-    // Si se envía superficie explícitamente, usarla (para casos especiales)
+  }
+  
+  // Superficie: si se envía explícitamente, usarla
+  if (superficie !== undefined) {
     dataToUpdate.superficie = superficie;
   }
 
-  // Asignar el resto de los campos
-  Object.assign(dataToUpdate, rest);
+  // Asignar el resto de los campos (excluyendo calle y numeroCalle que ya se procesaron)
+  // Excluir también campos que no deben actualizarse directamente
+  const { calle: _, numeroCalle: __, ...restFields } = rest;
+  Object.assign(dataToUpdate, restFields);
 
   // Detectar transición a NO_DISPONIBLE y cancelar operaciones activas (efecto centralizado)
   if (estado && estadoLoteToPrisma(estado) === EstadoLotePrisma.NO_DISPONIBLE) {
