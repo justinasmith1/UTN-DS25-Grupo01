@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
-import { removeLotePrefix } from "../../../utils/mapaUtils.js";
 import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getLoteById } from "../../../lib/api/lotes.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
+import { getLoteIdFormatted } from "../../Table/TablaLotes/utils/getters.js";
 
 /* ----------------------- Select custom sin librerías ----------------------- */
 function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
@@ -257,7 +257,12 @@ export default function LoteVerCard({
     if (isBlank(d)) return NA;
     const date =
       typeof d === "string" || typeof d === "number" ? new Date(d) : d;
-    return isNaN(date?.getTime?.()) ? NA : date.toLocaleDateString("es-AR");
+    if (!date || isNaN(date?.getTime?.())) return NA;
+    // Formato DD/MM/YYYY
+    const dd = String(date.getDate()).padStart(2, "0");
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const yyyy = date.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
   };
 
   const ownerName = useMemo(() => {
@@ -288,16 +293,19 @@ export default function LoteVerCard({
 
   const fraccion = safe(lot?.fraccion?.numero ?? "");
 
-    const getEstadoValue = (estado) => {
-      if (!estado) return "";
-      const normalized = String(estado).toUpperCase().replace(/\s+/g, "_");
-      return normalized;
-    };
+  // Formatear ID del lote como Lote {fraccion}-{numero}
+  const loteDisplayId = useMemo(() => {
+    return getLoteIdFormatted(lot) || NA;
+  }, [lot]);
 
-    const leftPairs = [
-      // Nunca mostramos el ID interno del lote en la UI.
-      // Si no hay mapId, no mostramos identificador en este lugar.
-      ["ID", safe(lot?.mapId ?? "")],
+  const getEstadoValue = (estado) => {
+    if (!estado) return "";
+    const normalized = String(estado).toUpperCase().replace(/\s+/g, "_");
+    return normalized;
+  };
+
+  const leftPairs = [
+    ["ID", loteDisplayId],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
       ["FRACCIÓN", fraccion],
       ["TIPO", titleCase(lot?.tipo)],
@@ -313,7 +321,7 @@ export default function LoteVerCard({
     ["ALQUILER", fmtBoolean(lot?.alquiler)],
     ["DEUDA", fmtBoolean(lot?.deuda)],
     ["CREADO", fmtDate(lot?.createdAt ?? lot?.creadoEl)],
-    ["ACTUALIZADO", fmtDate(lot?.updatedAt ?? lot?.updateAt)],
+    ["ACTUALIZADO", fmtDate(lot?.updateAt ?? lot?.updatedAt)],
   ];
 
   const docs = useMemo(() => {
@@ -460,8 +468,7 @@ export default function LoteVerCard({
         style={{ ["--sale-label-w"]: `${labelWidth}px` }}
       >
         <div className="cclf-card__header">
-          {/* Nunca mostramos el ID interno del lote en la UI. Si no hay mapId, no mostramos identificador. */}
-          <h2 className="cclf-card__title">{lot?.mapId ? `Lote Nº ${safe(removeLotePrefix(lot.mapId))}` : "Lote"}</h2>
+          <h2 className="cclf-card__title">{loteDisplayId !== NA ? loteDisplayId : "Lote"}</h2>
 
           <div className="cclf-card__actions lote-header-actions">
             {/* Botón "Editar Lote": NO se muestra para INMOBILIARIA */}

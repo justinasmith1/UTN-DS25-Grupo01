@@ -41,6 +41,7 @@ export default function PromocionCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [openQuitar, setOpenQuitar] = useState(false);
   const [quitarLoading, setQuitarLoading] = useState(false);
   const [promocionActiva, setPromocionActiva] = useState(null);
@@ -104,6 +105,7 @@ export default function PromocionCard({
       setError(null);
       setOpenQuitar(false);
       setPromocionActiva(null);
+      setSuccessMessage("");
     }
   }, [open, showSuccess, reset]);
 
@@ -127,11 +129,13 @@ export default function PromocionCard({
 
       const response = await aplicarPromocion(lote.id, payload);
       
+      setSuccessMessage("¡Promoción aplicada exitosamente!");
       setShowSuccess(true);
       onCreated?.(response?.data);
       
       setTimeout(() => {
         setShowSuccess(false);
+        setSuccessMessage("");
         setSaving(false);
         onCancel?.();
       }, 1500);
@@ -150,11 +154,13 @@ export default function PromocionCard({
       await quitarPromocion(lote.id);
       
       setOpenQuitar(false);
+      setSuccessMessage("¡Promoción quitada exitosamente!");
       setShowSuccess(true);
       onCreated?.();
       
       setTimeout(() => {
         setShowSuccess(false);
+        setSuccessMessage("");
         setQuitarLoading(false);
         onCancel?.();
       }, 1500);
@@ -173,7 +179,7 @@ export default function PromocionCard({
     return (
       <>
         {/* Animación de éxito - se muestra incluso si open es false */}
-        <SuccessAnimation show={showSuccess} message="¡Promoción quitada exitosamente!" />
+        <SuccessAnimation show={showSuccess} message={successMessage || "¡Promoción quitada exitosamente!"} />
 
         {open && !showSuccess && (
           <div className="cclf-overlay" onClick={!quitarLoading ? onCancel : undefined}>
@@ -286,7 +292,7 @@ export default function PromocionCard({
           title="Quitar Promoción"
           message="¿Confirmás que querés quitar la promoción de este lote?"
           details={[
-            `Lote: ${lote?.mapId || lote?.id || "—"}`,
+            `Lote: Lote ${lote?.fraccion.numero}-${lote?.numero}`,
             `Precio actual: ${fmtMoney(promocionActiva?.precioPromocional)}`,
             `Se revertirá a: ${fmtMoney(promocionActiva?.precioAnterior)}`,
           ]}
@@ -304,7 +310,7 @@ export default function PromocionCard({
   return (
     <>
       {/* Animación de éxito - se muestra incluso si open es false */}
-      <SuccessAnimation show={showSuccess} message="¡Promoción aplicada exitosamente!" />
+      <SuccessAnimation show={showSuccess} message={successMessage || "¡Promoción aplicada exitosamente!"} />
 
       <EditarBase
         open={open}
@@ -417,11 +423,3 @@ export default function PromocionCard({
     </>
   );
 }
-
-
-
-
-
-
-
-

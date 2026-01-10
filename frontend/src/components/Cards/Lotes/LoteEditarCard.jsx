@@ -71,13 +71,11 @@ const TIPOS = [
   { value: "Espacio Comun", label: "Espacio Común" },
 ];
 
-const ESTADOS = [
+// Estados editables: solo los que se pueden seleccionar manualmente
+const ESTADOS_EDITABLES_LOTE = [
   { value: "Disponible", label: "Disponible" },
-  { value: "Reservado", label: "Reservado" },
-  { value: "Vendido", label: "Vendido" },
   { value: "No Disponible", label: "No Disponible" },
-  { value: "Alquilado", label: "Alquilado" },
-  { value: "En Promoción", label: "En Promoción" },
+  { value: "Vendido", label: "Vendido" },
 ];
 
 const SUBESTADOS = [
@@ -115,6 +113,7 @@ const FROM_PRISMA_MAP = {
   NO_DISPONIBLE: "No Disponible",
   ALQUILADO: "Alquilado",
   EN_PROMOCION: "En Promoción",
+  CON_PRIORIDAD: "Con Prioridad",
   EN_CONSTRUCCION: "En Construccion",
   NO_CONSTRUIDO: "No Construido",
   CONSTRUIDO: "Construido",
@@ -261,6 +260,19 @@ export default function LoteEditarCard({
     const longest = Math.max(...LABELS.map((l) => l.length));
     return Math.min(260, Math.max(160, Math.round(longest * 8.2) + 22));
   }, []);
+
+  // Opciones de estado: incluir estado actual si es derivado (no editable) para mostrarlo
+  const opcionesEstado = useMemo(() => {
+    const estadoActual = form.estado;
+    const esEditable = ESTADOS_EDITABLES_LOTE.some(e => e.value === estadoActual);
+    
+    // Si el estado actual no es editable, agregarlo temporalmente para mostrarlo
+    if (estadoActual && !esEditable) {
+      return [{ value: estadoActual, label: estadoActual }, ...ESTADOS_EDITABLES_LOTE];
+    }
+    
+    return ESTADOS_EDITABLES_LOTE;
+  }, [form.estado]);
 
   const fallbackDetalle = useMemo(() => {
     if (lote) return lote;
@@ -417,11 +429,6 @@ export default function LoteEditarCard({
       if (form.descripcion != null) payload.descripcion = form.descripcion;
       payload.alquiler = Boolean(form.alquiler);
       payload.deuda = Boolean(form.deuda);
-      
-      // Si se marca alquiler, establecer estado a ALQUILADO
-      if (form.alquiler) {
-        payload.estado = "Alquilado";
-      }
 
       const fraccionId = toNumberOrNull(form.fraccionId);
       if (fraccionId) payload.fraccionId = fraccionId;
@@ -453,27 +460,10 @@ export default function LoteEditarCard({
       const nuevoEstado = payload.estado || form.estado;
       const estadoUpper = String(nuevoEstado || "").toUpperCase();
 
-      if (estadoUpper === "RESERVADO") {
-        const tieneReservaActiva = reservasLote.some(r => String(r.estado || "").toUpperCase() === "ACTIVA");
-        if (!tieneReservaActiva) {
-          setError("No se puede establecer el estado RESERVADO sin una reserva ACTIVA para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-
+      // Validación de VENDIDO: solo permitir si hay venta registrada
       if (estadoUpper === "VENDIDO") {
         if (ventasLote.length === 0) {
           setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
-          setSaving(false);
-          return;
-        }
-      }
-
-      if (estadoUpper === "ALQUILADO") {
-        const tieneInquilino = detalle?.inquilinoId || detalle?.inquilino?.id;
-        if (!tieneInquilino) {
-          setError("No se puede establecer el estado ALQUILADO sin un inquilino asignado para este lote.");
           setSaving(false);
           return;
         }
@@ -612,7 +602,7 @@ export default function LoteEditarCard({
                 </>
               )}
 
-              <div className="field-row"><div className="field-label">Estado</div><div className="field-value p0"><NiceSelect value={form.estado} options={ESTADOS} placeholder="" onChange={(value) => updateForm({ estado: value })} /></div></div>
+              <div className="field-row"><div className="field-label">Estado</div><div className="field-value p0"><NiceSelect value={form.estado} options={opcionesEstado} placeholder="" onChange={(value) => updateForm({ estado: value })} /></div></div>
               <div className="field-row"><div className="field-label">Sub-Estado</div><div className="field-value p0"><NiceSelect value={form.subestado} options={SUBESTADOS} placeholder="" onChange={(value) => updateForm({ subestado: value })} /></div></div>
               <div className="field-row"><div className="field-label">Fracción</div><div className="field-value p0"><NiceSelect value={form.fraccionId ? String(form.fraccionId) : ""} options={fracciones.map(f => ({ value: String(f.idFraccion ?? f.id ?? ""), label: `Fracción ${f.numero ?? f.id}` }))} placeholder={loadingFracciones ? "Cargando..." : ""} onChange={(value) => { const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value); updateForm({ fraccionId: value ? Number(value) : "", fraccionNumero: fraccion?.numero ?? "" }); }} /></div></div>
               <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input is-readonly" type="number" inputMode="decimal" value={form.superficie ?? ""} readOnly placeholder="Se calcula automáticamente" title="La superficie se calcula automáticamente como frente × fondo" /></div></div>
