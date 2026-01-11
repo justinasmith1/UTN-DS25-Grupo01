@@ -281,7 +281,7 @@ export async function updateReserva(
     // Obtener reserva actual para validaciones
     const reservaActual = await prisma.reserva.findUnique({
       where: { id },
-      select: { estado: true, inmobiliariaId: true, loteId: true, loteEstadoAlCrear: true }
+      select: { estado: true, inmobiliariaId: true, loteId: true, loteEstadoAlCrear: true, ventaId: true }
     });
 
     if (!reservaActual) {
@@ -290,10 +290,26 @@ export async function updateReserva(
       throw err;
     }
 
+    // BLOQUEO CRÍTICO: Si la reserva está consumida por una venta, no se puede modificar el estado
+    if (reservaActual.ventaId != null && body.estado !== undefined) {
+      const err: any = new Error('Esta reserva ya fue consumida por una venta y no se puede modificar su estado');
+      err.status = 400;
+      throw err;
+    }
+
     // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA
     if (body.estado !== undefined && body.estado === EstadoReserva.EXPIRADA) {
       if (reservaActual.estado !== EstadoReserva.ACTIVA) {
         const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA');
+        err.status = 400;
+        throw err;
+      }
+    }
+
+    // Validar rechazo: solo puede aplicarse desde ACTIVA o ACEPTADA
+    if (body.estado !== undefined && body.estado === EstadoReserva.RECHAZADA) {
+      if (reservaActual.estado !== EstadoReserva.ACTIVA && reservaActual.estado !== EstadoReserva.ACEPTADA) {
+        const err: any = new Error('Solo se puede rechazar una reserva que está ACTIVA o ACEPTADA');
         err.status = 400;
         throw err;
       }
@@ -308,11 +324,17 @@ export async function updateReserva(
         throw err;
       }
 
-      // Validar cambio de estado: solo puede cambiar a CANCELADA
+      // Validar cambio de estado: solo puede cambiar a CANCELADA y solo si está ACTIVA
       if (body.estado !== undefined) {
         if (reservaActual.estado === EstadoReserva.CANCELADA) {
           const err: any = new Error('No se puede cambiar el estado de una reserva cancelada');
           err.status = 400;
+          throw err;
+        }
+        // INMOBILIARIA solo puede cancelar si la reserva está ACTIVA (no ACEPTADA)
+        if (reservaActual.estado !== EstadoReserva.ACTIVA) {
+          const err: any = new Error('Solo puedes cancelar una reserva que está ACTIVA. Las reservas ACEPTADAS solo pueden ser gestionadas por Administradores o Gestores');
+          err.status = 403;
           throw err;
         }
         if (body.estado !== EstadoReserva.CANCELADA) {
