@@ -90,7 +90,9 @@ const enrichVenta = (v, personasById = {}, inmosById = {}) => {
 export default function VentasPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const crearParam = searchParams.get('crear') === 'true';
+  const openIdParam = searchParams.get('openId');
   const searchParamsString = searchParams.toString();
   const selectedInmobiliariaParam = useMemo(() => {
     const params = new URLSearchParams(searchParamsString);
