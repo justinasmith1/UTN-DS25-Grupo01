@@ -121,12 +121,12 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     // Si había prioridad activa, se finaliza al concretar la venta (efecto centralizado)
     await finalizePrioridadActivaOnVenta(data.loteId);
     
-    // Asgignar la reservaId si existe una reserva ACEPTADA
+    // Asignar el ventaId a la reserva si existe una reserva ACEPTADA
     if (reserva) {
-        await prisma.venta.update({
-        where: { id: newVenta.id },
-        data: { reservaId: reserva.id },
-      });
+        await prisma.reserva.update({
+            where: { id: reserva.id },
+            data: { ventaId: newVenta.id },
+        });
     }
 
     return newVenta;   // En lo que devuelve, no incluye idReserva, cuando vas a buscar una venta, si incluye idReserva.
