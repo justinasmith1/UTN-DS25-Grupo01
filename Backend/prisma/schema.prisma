@@ -26,6 +26,8 @@ enum TipoLote {
 }
 
 enum EstadoLote {
+  OPERATIVO
+  ELIMINADO
   ALQUILADO
   CON_PRIORIDAD
   DISPONIBLE
@@ -58,6 +60,8 @@ enum NombreCalle {
 }
 
 enum EstadoReserva {
+  OPERATIVO
+  ELIMINADO
   ACTIVA
   CANCELADA
   ACEPTADA
@@ -67,12 +71,16 @@ enum EstadoReserva {
 }
 
 enum EstadoCobro {
+  OPERATIVO
+  ELIMINADO
   PENDIENTE
   EN_CURSO
   COMPLETADA
 }
 
 enum EstadoVenta {
+  OPERATIVO
+  ELIMINADO
   INICIADA
   CON_BOLETO
   ESCRITURA_PROGRAMADA
@@ -81,6 +89,8 @@ enum EstadoVenta {
 }
 
 enum EstadoPrioridad {
+  OPERATIVO
+  ELIMINADO
   ACTIVA
   CANCELADA
   FINALIZADA
@@ -101,8 +111,8 @@ enum TiposArchivos {
 }
 
 enum EstadoInmobiliaria {
-  ACTIVA
-  INACTIVA
+  OPERATIVO
+  ELIMINADO
 }
 
 enum IdentificadorTipo {
@@ -114,8 +124,8 @@ enum IdentificadorTipo {
 }
 
 enum EstadoPersona {
-  ACTIVA
-  INACTIVA
+  OPERATIVO
+  ELIMINADO
 }
 
 enum PersonaCategoria {
@@ -152,7 +162,7 @@ model Persona {
   // Datos para personas jurídicas
   razonSocial        String?
   // Estado
-  estado             EstadoPersona     @default(ACTIVA)
+  estado             EstadoPersona     @default(OPERATIVO)
   fechaBaja          DateTime?
   // Categoría (OPERATIVA o MIEMBRO_FAMILIAR)
   categoria          PersonaCategoria  @default(OPERATIVA)
@@ -306,7 +316,7 @@ model Inmobiliaria {
   razonSocial           String
   comxventa             Decimal?           @db.Decimal(5, 2)
   contacto              String?
-  estado                EstadoInmobiliaria @default(ACTIVA)
+  estado                EstadoInmobiliaria @default(OPERATIVO)
   fechaBaja             DateTime?
   maxPrioridadesActivas Int                @default(5)
 
