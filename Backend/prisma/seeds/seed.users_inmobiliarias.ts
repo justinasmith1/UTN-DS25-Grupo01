@@ -5,7 +5,7 @@
  * Para resetear y forzar IDs fijos: SEED_RESET=1 npm run seed:core
  */
 
-import { PrismaClient, Role } from "../src/generated/prisma";
+import { PrismaClient, Role } from "../../src/generated/prisma";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 

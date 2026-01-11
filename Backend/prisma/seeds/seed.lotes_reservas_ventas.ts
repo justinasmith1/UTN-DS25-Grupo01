@@ -72,13 +72,13 @@ async function main() {
   const clienteMaria = await findPersonaByDNI("23456789"); // María González
   const clienteRoberto = await findPersonaByDNI("56789012"); // Roberto García (cliente de Gianfelice)
 
-  // 3. Crear Fracción
-  const fraccion1 = await prisma.fraccion.create({
+  // 3. Crear Fracción (Usaremos Fracción 3 para coincidir con el mapa visualmente)
+  const fraccion3 = await prisma.fraccion.create({
     data: {
-      numero: 1,
+      numero: 3,
     },
   });
-  console.log(`✓ Fracción 1 creada (ID: ${fraccion1.id})`);
+  console.log(`✓ Fracción 3 creada (ID: ${fraccion3.id})`);
 
   // 4. Crear Lotes
   console.log("\n📝 Creando Lotes...");
@@ -86,33 +86,35 @@ async function main() {
   // Lote 1: DISPONIBLE
   const lote1 = await prisma.lote.create({
     data: {
-      numero: 1, // Corregido: 'lote' -> 'numero'
-      tipo: TipoLote.LOTE_VENTA, // Corregido: agregado campo obligatorio
+      numero: 1, 
+      mapId: "Lote1-3", // ID del SVG
+      tipo: TipoLote.LOTE_VENTA, 
       subestado: SubestadoLote.NO_CONSTRUIDO,
       superficie: 300,
       precio: 15000.00,
       estado: EstadoLote.DISPONIBLE,
-      fraccionId: fraccion1.id,
-      propietarioId: clienteJuan.id, // Juan es el dueño original
+      fraccionId: fraccion3.id,
+      propietarioId: clienteJuan.id, 
       ubicacion: {
         create: {
-          calle: NombreCalle.REINAMORA, // Corregido: enum válido
+          calle: NombreCalle.REINAMORA, 
           numero: 101,
         }
       }
     },
   });
-  console.log(`  ✓ Lote 1 (Disponible)`);
+  console.log(`  ✓ Lote 1 (Disponible) - mapId: Lote1-3`);
 
   // Lote 2: RESERVADO (por María)
   const lote2 = await prisma.lote.create({
     data: {
       numero: 2,
+      mapId: "Lote2-3", // ID del SVG
       tipo: TipoLote.LOTE_VENTA,
       superficie: 350,
       precio: 18000.00,
       estado: EstadoLote.RESERVADO,
-      fraccionId: fraccion1.id,
+      fraccionId: fraccion3.id,
       propietarioId: clienteJuan.id,
       ubicacion: {
         create: {
@@ -122,7 +124,7 @@ async function main() {
       }
     },
   });
-  console.log(`  ✓ Lote 2 (Reservado)`);
+  console.log(`  ✓ Lote 2 (Reservado) - mapId: Lote2-3`);
 
   // Crear Reserva para Lote 2
   await prisma.reserva.create({
@@ -144,11 +146,12 @@ async function main() {
   const lote3 = await prisma.lote.create({
     data: {
       numero: 3,
+      mapId: "Lote3-3", // ID del SVG
       tipo: TipoLote.LOTE_VENTA,
       superficie: 400,
       precio: 20000.00,
       estado: EstadoLote.VENDIDO,
-      fraccionId: fraccion1.id,
+      fraccionId: fraccion3.id,
       propietarioId: clienteRoberto.id, // El propietario ya es Roberto
       ubicacion: {
         create: {
@@ -158,7 +161,7 @@ async function main() {
       }
     },
   });
-  console.log(`  ✓ Lote 3 (Vendido)`);
+  console.log(`  ✓ Lote 3 (Vendido) - mapId: Lote3-3`);
 
   // Crear Reserva consumida (histórica)
   const reservaLote3 = await prisma.reserva.create({
@@ -187,8 +190,6 @@ async function main() {
       tipoPago: "CONTADO",
       compradorId: clienteRoberto.id,
       inmobiliariaId: idGianfelice,
-      // reservaId se conecta aquí pero debemos actualizar la reserva también
-      reservaId: reservaLote3.id 
     },
   });
 
