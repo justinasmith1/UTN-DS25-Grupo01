@@ -266,6 +266,7 @@ export async function desactivarVenta(id: number): Promise<Venta> {
         where: { id },
         data: {
             estado: 'ELIMINADO',
+            estadoPrevio: venta.estado,
             fechaBaja: new Date(),
         },
         include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
@@ -295,10 +296,13 @@ export async function reactivarVenta(id: number): Promise<Venta> {
     // ASUMIRÉ: Volver a OPERATIVO (si el enum lo tiene, que sí lo tiene). 
     // El usuario podrá cambiarlo manualmente después.
 
+    const nuevoEstado = venta.estadoPrevio || 'INICIADA';
+
     return await prisma.venta.update({
         where: { id },
         data: {
-            estado: 'OPERATIVO', // O lo que decidamos como "Activo genérico"
+            estado: nuevoEstado,
+            estadoPrevio: null,
             fechaBaja: null,
         },
         include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
