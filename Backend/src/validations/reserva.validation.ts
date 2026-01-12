@@ -69,6 +69,8 @@ export const getReservaParamsSchema = z.object({
 
 /*  Parametros para eliminar, usa el mismo que el de arriba del obtener */
 export const deleteReservaParamsSchema = getReservaParamsSchema;
+export const desactivarReservaParamsSchema = getReservaParamsSchema;
+export const reactivarReservaParamsSchema = getReservaParamsSchema;
 
 /*  Query del listado (GET /reservas) */
 export const queryReservasSchema = z.object({

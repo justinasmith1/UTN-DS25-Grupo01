@@ -6,6 +6,8 @@ import {
   createReserva,
   updateReserva,
   deleteReserva,
+  desactivarReserva, // <- NUEVO
+  reactivarReserva,  // <- NUEVO
   getReservaByImmobiliariaId,
   getReservaByEstado
 } from '../services/reserva.service';
@@ -97,12 +99,36 @@ export async function updateReservaController(req: Request, res: Response, next:
 // ==============================
 // Eliminar reserva
 // ==============================
+// ==============================
+// Eliminar reserva
+// ==============================
 export async function deleteReservaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number(req.params.id);
-    await deleteReserva(id);
-    res.json({ success: true, message: 'Reserva eliminada exitosamente' });
+    // IMPORTANTE: Cambiamos comportamiento a Soft Delete
+    const data = await desactivarReserva(id);
+    res.json({ success: true, message: 'Reserva eliminada exitosamente', data });
   } catch (error) {
     next(error);
   }
 } 
+
+export async function desactivarReservaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const data = await desactivarReserva(id);
+    res.json({ success: true, message: 'Reserva desactivada exitosamente', data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function reactivarReservaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const data = await reactivarReserva(id);
+    res.json({ success: true, message: 'Reserva reactivada exitosamente', data });
+  } catch (error) {
+    next(error);
+  }
+}

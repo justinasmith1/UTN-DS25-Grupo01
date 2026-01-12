@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as reservaController from '../controllers/reserva.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema } from '../validations/reserva.validation';
+import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema, desactivarReservaParamsSchema, reactivarReservaParamsSchema } from '../validations/reserva.validation';
 
 const router = Router();
 
@@ -65,5 +65,23 @@ router.delete(
     authorize('ADMINISTRADOR', 'GESTOR'),
     validateParams(deleteReservaParamsSchema),  
     reservaController.deleteReservaController);
+
+// PATCH /api/Reservas/:id/desactivar
+router.patch(
+    '/:id/desactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(desactivarReservaParamsSchema),
+    reservaController.desactivarReservaController
+);
+
+// PATCH /api/Reservas/:id/reactivar
+router.patch(
+    '/:id/reactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(reactivarReservaParamsSchema),
+    reservaController.reactivarReservaController
+);
 
 export const reservaRoutes = router;
