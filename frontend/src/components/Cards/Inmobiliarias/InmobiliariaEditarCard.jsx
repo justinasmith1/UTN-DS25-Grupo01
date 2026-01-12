@@ -98,7 +98,7 @@ export default function InmobiliariaEditarCard({
     razonSocial: detalle?.razonSocial ?? "",
     contacto: detalle?.contacto ?? "",
     comxventa: detalle?.comxventa != null ? String(detalle.comxventa) : "",
-    estado: detalle?.estado ?? "ACTIVA", // <--- NUEVO
+    estado: detalle?.estado ?? "OPERATIVO", // <--- NUEVO
   };
 
   const [nombre, setNombre] = useState(base.nombre);
@@ -143,7 +143,7 @@ export default function InmobiliariaEditarCard({
     // ... (tu código de contacto y comxventa) ...
 
     // --- NUEVO BLOQUE PARA ESTADO ---
-    if (estado !== (detalle?.estado ?? "ACTIVA")) {
+    if (estado !== (detalle?.estado ?? "OPERATIVO")) {
       patch.estado = estado;
       // Nota: No enviamos fechaBaja, el backend la calcula solo.
     }

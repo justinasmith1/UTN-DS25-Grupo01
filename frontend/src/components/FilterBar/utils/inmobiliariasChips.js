@@ -28,6 +28,11 @@ export function inmobiliariasChipsFrom(applied, catalogs) {
     arr.push({ k: "contacto", v, label: `Contacto: ${v}` })
   );
 
+  // Filtro de estado
+  (applied.estado || []).forEach((v) => 
+    arr.push({ k: "estado", v, label: `Estado: ${nice(v)}` })
+  );
+
   // Filtros de rango - Comisión x Venta
   if (applied.comxventa && (applied.comxventa.min !== null || applied.comxventa.max !== null)) {
     const min = applied.comxventa.min !== null ? applied.comxventa.min : '';

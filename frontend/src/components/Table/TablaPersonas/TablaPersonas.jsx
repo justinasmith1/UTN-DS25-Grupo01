@@ -98,7 +98,7 @@ const TablaPersonas = ({
     if (can(user, 'personas.delete') && onEliminarPersona) {
       // Si está activa: botón desactivar (basura roja)
       // Si está inactiva: botón reactivar (refresh verde)
-      if (persona.estado === 'ACTIVA') {
+      if (persona.estado === 'OPERATIVO') {
         actions.push(
           <button
             key="delete"
@@ -110,7 +110,7 @@ const TablaPersonas = ({
             <Trash2 size={18} />
           </button>
         );
-      } else if (persona.estado === 'INACTIVA') {
+      } else if (persona.estado === 'ELIMINADO') {
         actions.push(
           <button
             key="reactivate"

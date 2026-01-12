@@ -34,7 +34,7 @@ export default function PersonaReactivarDialog({
 
   const title = `Reactivar Persona: ${displayName}`;
 
-  const message = `¿Seguro que deseas reactivar la persona "${displayName}"? Volverá a estado ACTIVA y aparecerá nuevamente en la lista activa.`;
+  const message = `¿Seguro que deseas reactivar la persona "${displayName}"? Volverá a estado OPERATIVO y aparecerá nuevamente en la lista activa.`;
 
   const details = [
     `Identificador: ${pers?.identificadorTipo && pers?.identificadorValor ? `${pers.identificadorTipo} ${pers.identificadorValor}` : "—"}`,
@@ -49,6 +49,7 @@ export default function PersonaReactivarDialog({
       details={details}
       confirmLabel="Reactivar Persona"
       loading={loading}
+      loadingLabel="Reactivando…"
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

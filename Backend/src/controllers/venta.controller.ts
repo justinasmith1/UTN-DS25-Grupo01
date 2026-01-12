@@ -87,3 +87,23 @@ export async function eliminarVenta(req: Request, res: Response, next: NextFunct
     }
 }
 
+export async function desactivarVenta(req: Request, res: Response, next: NextFunction) {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await ventaService.desactivarVenta(id);
+        res.json({success: true, message: "Venta desactivada exitosamente", data: result});
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function reactivarVenta(req: Request, res: Response, next: NextFunction) {
+    try {
+        const id = parseInt(req.params.id);
+        const result = await ventaService.reactivarVenta(id);
+        res.json({success: true, message: "Venta reactivada exitosamente", data: result});
+    } catch (error) {
+        next(error);
+    }
+}
+

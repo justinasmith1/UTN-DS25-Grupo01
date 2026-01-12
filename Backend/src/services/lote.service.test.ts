@@ -14,7 +14,21 @@ jest.mock('../config/prisma', () => ({
         delete: jest.fn(),
         deleteMany: jest.fn(),
     },
+    ubicacion: {
+        update: jest.fn(),
+        create: jest.fn(),
+    },
+    archivos: {
+        deleteMany: jest.fn(),
+    },
+    reserva: {
+        deleteMany: jest.fn(),
+    },
+    venta: {
+        deleteMany: jest.fn(),
+    },
 }));
+
 
 const createMockLote = (overrides: Partial<any> = {}) => ({
     id: 1,

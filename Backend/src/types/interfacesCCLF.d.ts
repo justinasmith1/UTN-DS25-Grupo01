@@ -15,7 +15,8 @@ export type UbicacionOpc = "Norte" | "Sur" | "Este" | "Oeste";
 export type Rol = "ADMINISTRADOR" | "INMOBILIARIA" | "GESTOR" | "TECNICO";
 export type TipoLote = "Lote Venta" | "Espacio Comun";
 export type EstadoReserva = "ACTIVA" | "CANCELADA" | "ACEPTADA" | "RECHAZADA" | "CONTRAOFERTA" | 'EXPIRADA';
-export type EstadoInmbobiliaria = "ACTIVA" | "INACTIVA";
+export type EstadoInmbobiliaria = "OPERATIVO" | "ELIMINADO"; // Typo preserved as in original if wanted, or fixed? user mentioned update files. Keeping typo name but changing values.
+export type EstadoPersona = "OPERATIVO" | "ELIMINADO";
 export type DateTime = string; // Formato ISO 8601: "YYYY-MM-DDTHH:MM:SSZ"
 
 // --- INTERFACES DE DATOS (ESTRUCTURAS) ---

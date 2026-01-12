@@ -21,7 +21,7 @@ export default function FilterBarPersonas({
   useEffect(() => {
     if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
       setLoadingInmobiliarias(true);
-      getAllInmobiliarias({ estado: "ACTIVA" })
+      getAllInmobiliarias({ estado: "OPERATIVO" })
         .then((res) => {
           const inmobiliariasList = (res.data || []).map((inm) => ({
             value: inm.id,
@@ -130,7 +130,7 @@ export default function FilterBarPersonas({
     if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
       return {
         q: '',
-        estado: 'ACTIVA', // Por defecto mostrar solo activas
+        estado: 'OPERATIVO', // Por defecto mostrar solo operativas
         clienteDe: [], // Array vacío para multiSelect
         identificadorTipo: [], // Array vacío para multiSelect
         fechaCreacion: { min: null, max: null }

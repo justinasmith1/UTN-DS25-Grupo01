@@ -14,7 +14,7 @@ import TablaBase from '../TablaBase';
 
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText, X } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, X, RefreshCcw } from 'lucide-react';
 import MapaInteractivo from '../../Mapa/MapaInteractivo';
 import {
   normalizeEstadoKey,
@@ -108,7 +108,7 @@ export default function TablaReservas({
   lookups,
 
   // callbacks
-  onVer, onEditar, onEliminar, onVerDocumentos, onAgregarReserva,
+  onVer, onEditar, onEliminar, onVerDocumentos, onAgregarReserva, onReactivar,
 
   // selección
   selectedIds = [], onSelectedChange,
@@ -293,6 +293,48 @@ export default function TablaReservas({
     return lotes.map((l) => l.mapId).filter(Boolean);
   }, [lotes]);
 
+  // 9) Acciones por fila
+  const renderRowActions = (row) => {
+    const isEliminado = row?.estado === 'ELIMINADO' || row?.estado === 'eliminado';
+    
+    if (isEliminado) {
+      return (
+        <div className="tl-actions">
+           {can('visualizarReserva') && (
+            <button className="tl-icon tl-icon--view" aria-label="Ver Reserva" data-tooltip="Ver Reserva" onClick={() => onVer?.(row)}>
+              <Eye size={18} strokeWidth={2} />
+            </button>
+          )}
+          {onReactivar && (
+             <button className="tl-icon tl-icon--success" aria-label="Reactivar Reserva" data-tooltip="Reactivar Reserva" onClick={() => onReactivar?.(row)}>
+               <RefreshCcw size={18} strokeWidth={2} />
+             </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+    <div className="tl-actions">
+      {can('visualizarReserva') && (
+        <button className="tl-icon tl-icon--view" aria-label="Ver Reserva" data-tooltip="Ver Reserva" onClick={() => onVer?.(row)}>
+          <Eye size={18} strokeWidth={2} />
+        </button>
+      )}
+      {can('editarReserva') && (
+        <button className="tl-icon tl-icon--edit" aria-label="Editar Reserva" data-tooltip="Editar Reserva" onClick={() => onEditar?.(row)}>
+          <Edit size={18} strokeWidth={2} />
+        </button>
+      )}
+      {can('eliminarReserva') && (
+        <button className="tl-icon tl-icon--delete" aria-label="Eliminar Reserva" data-tooltip="Eliminar Reserva" onClick={() => onEliminar?.(row)}>
+          <Trash2 size={18} strokeWidth={2} />
+        </button>
+      )}
+    </div>
+  );
+};
+
   // 8) Toolbar derecha
   const toolbarRight = (
     <div className="tl-actions-right">
@@ -328,31 +370,8 @@ export default function TablaReservas({
     </div>
   );
 
-  // 9) Acciones por fila
-  const renderRowActions = (row) => (
-    <div className="tl-actions">
-      {can('visualizarReserva') && (
-        <button className="tl-icon tl-icon--view" aria-label="Ver Reserva" data-tooltip="Ver Reserva" onClick={() => onVer?.(row)}>
-          <Eye size={18} strokeWidth={2} />
-        </button>
-      )}
-      {can('editarReserva') && (
-        <button className="tl-icon tl-icon--edit" aria-label="Editar Reserva" data-tooltip="Editar Reserva" onClick={() => onEditar?.(row)}>
-          <Edit size={18} strokeWidth={2} />
-        </button>
-      )}
-      {can('eliminarReserva') && (
-        <button className="tl-icon tl-icon--delete" aria-label="Eliminar Reserva" data-tooltip="Eliminar Reserva" onClick={() => onEliminar?.(row)}>
-          <Trash2 size={18} strokeWidth={2} />
-        </button>
-      )}
-    </div>
-  );
-
-  // 10) Render
   return (
     <>
-      {/* Preview del mapa - card flotante */}
       {selectedMapIdsForPreview.length > 0 && (
         <>
           {/* Backdrop muy sutil */}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText, X } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, X, RotateCcw } from 'lucide-react';
 import MapaInteractivo from '../../Mapa/MapaInteractivo';
 import {
   normalizeEstadoKey,
@@ -31,6 +31,7 @@ export default function TablaVentas({
   onVer,
   onEditar,
   onEliminar,
+  onReactivar, // <- NUEVO
   onVerDocumentos,
   onAgregarVenta,
   selectedIds = [],
@@ -201,7 +202,9 @@ export default function TablaVentas({
     }
   };
 
-  const renderRowActions = (venta) => (
+  const renderRowActions = (venta) => {
+    const isEliminado = venta.estado === 'ELIMINADO';
+    return (
     <div className="tl-actions">
       {can('ver') && (
         <button
@@ -213,7 +216,8 @@ export default function TablaVentas({
           <Eye size={18} strokeWidth={2} />
         </button>
       )}
-      {can('editar') && (
+      {/* Editar: solo si NO está eliminado */}
+      {can('editar') && !isEliminado && (
         <button
           className="tl-icon tl-icon--edit"
           aria-label="Editar Venta"
@@ -234,17 +238,30 @@ export default function TablaVentas({
         </button>
       )}
       {can('eliminar') && (
-        <button
-          className="tl-icon tl-icon--delete"
-          aria-label="Eliminar Venta"
-          data-tooltip="Eliminar Venta"
-          onClick={() => onEliminar?.(venta)}
-        >
-          <Trash2 size={18} strokeWidth={2} />
-        </button>
+        isEliminado ? (
+           <button
+             className="tl-icon tl-icon--reactivate"
+             aria-label="Reactivar Venta"
+             data-tooltip="Reactivar Venta"
+             onClick={() => onReactivar?.(venta)}
+             style={{ color: '#10b981' }} // Verde esmeralda para diferenciar
+           >
+             <RotateCcw size={18} strokeWidth={2} />
+           </button>
+        ) : (
+          <button
+            className="tl-icon tl-icon--delete"
+            aria-label="Eliminar Venta"
+            data-tooltip="Eliminar Venta"
+            onClick={() => onEliminar?.(venta)}
+          >
+            <Trash2 size={18} strokeWidth={2} />
+          </button>
+        )
       )}
     </div>
-  );
+    );
+  };
 
   // ===== preview del mapa  =====
   const [selectedMapIdsForPreview, setSelectedMapIdsForPreview] = useState([]);

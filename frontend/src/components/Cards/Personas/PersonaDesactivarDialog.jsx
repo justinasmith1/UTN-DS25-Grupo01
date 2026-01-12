@@ -41,7 +41,7 @@ export default function PersonaDesactivarDialog({
 
   const title = `Desactivar Persona: ${displayName}`;
 
-  const message = `¿Seguro que deseas desactivar la persona "${displayName}"? Pasará a estado INACTIVA y dejará de aparecer en la lista activa.`;
+  const message = `¿Seguro que deseas desactivar la persona "${displayName}"? Pasará a estado ELIMINADO y dejará de aparecer en la lista activa.`;
 
   const details = [
     `Identificador: ${identificadorTexto}`,

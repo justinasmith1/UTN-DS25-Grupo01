@@ -184,12 +184,12 @@ export default function Inmobiliarias() {
     try {
       setDeleting(true);
       const response = await deleteInmobiliaria(inmobiliariaSel.id);
-      // La API ahora devuelve la inmobiliaria con estado INACTIVA
+      // La API ahora devuelve la inmobiliaria con estado ELIMINADO
       const updated = response?.data ?? response;
 
       // Actualizar el estado de la inmobiliaria en lugar de eliminarla
       setAllInmobiliarias((prev) => prev.map((i) =>
-        i.id === inmobiliariaSel.id ? { ...i, estado: "INACTIVA", fechaBaja: updated?.fechaBaja ?? new Date().toISOString() } : i
+        i.id === inmobiliariaSel.id ? { ...i, estado: "ELIMINADO", fechaBaja: updated?.fechaBaja ?? new Date().toISOString() } : i
       ));
 
       setOpenEliminar(false);
@@ -313,7 +313,7 @@ export default function Inmobiliarias() {
 
             // Actualizar el estado de la inmobiliaria
             setAllInmobiliarias((prev) => prev.map((i) =>
-              i.id === inmobiliariaSel.id ? { ...i, estado: "ACTIVA" } : i
+              i.id === inmobiliariaSel.id ? { ...i, estado: "OPERATIVO" } : i
             ));
 
             setOpenReactivar(false);

@@ -85,7 +85,7 @@ async obtenerTodas(req: Request, res: Response) {
       const view = (req.query.view as PersonaView) || 'ALL';
       const q = req.query.q as string | undefined;
       const includeInactive = req.query.includeInactive === 'true';
-      const estado = req.query.estado as 'ACTIVA' | 'INACTIVA' | undefined;
+      const estado = req.query.estado as 'OPERATIVO' | 'ELIMINADO' | undefined;
       const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
 
       const result = await personaService.findAll(user, {

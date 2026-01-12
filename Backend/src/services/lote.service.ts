@@ -295,34 +295,35 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
   if (propietarioId) dataToUpdate.propietario = { connect: { id: propietarioId } };
   
   // Manejar ubicación
-  if (ubicacionId) {
-    dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
-  } else if (calle) {
+  if (calle && numeroCalle !== undefined && numeroCalle !== null && numeroCalle > 0) {
+    // Solo procesar si tenemos AMBOS: calle Y número válido
     const loteActual = await prisma.lote.findUnique({
       where: { id },
-      select: { ubicacionId: true },
+      include: { ubicacion: true },
     });
 
-    if (loteActual?.ubicacionId) {
+    if (loteActual?.ubicacion?.id) {
       // Actualizar ubicación existente
-      const updateData: any = { calle: calle as any };
-      if (numeroCalle !== undefined && numeroCalle !== null && numeroCalle > 0) {
-        updateData.numero = numeroCalle;
-      }
       await prisma.ubicacion.update({
-        where: { id: loteActual.ubicacionId },
-        data: updateData,
-      });
-    } else {
-      // Crear nueva ubicación
-      const nuevaUbicacion = await prisma.ubicacion.create({
+        where: { id: loteActual.ubicacion.id },
         data: {
           calle: calle as any,
-          ...(numeroCalle !== undefined && numeroCalle !== null && numeroCalle > 0 && { numero: numeroCalle }),
+          numero: numeroCalle,
         },
       });
-      dataToUpdate.ubicacion = { connect: { id: nuevaUbicacion.id } };
+    } else {
+      // Crear nueva ubicación conectada directamente al lote
+      // Usamos nested create dentro del update del lote
+      dataToUpdate.ubicacion = {
+        create: {
+          calle: calle as any,
+          numero: numeroCalle,
+        },
+      };
     }
+  } else if (ubicacionId) {
+    // Si solo se proporciona ubicacionId (sin calle/numero), conectar ubicación existente
+    dataToUpdate.ubicacion = { connect: { id: ubicacionId } };
   }
   
   // Superficie: si se envía explícitamente, usarla
@@ -359,6 +360,14 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
       (error as any).statusCode = 404;
       throw error;
     }
+    // Log temporal para debugging
+    console.error('[updatedLote] Error updating lote:', {
+      loteId: id,
+      error: e,
+      errorCode: e.code,
+      errorMessage: e.message,
+      dataToUpdate: JSON.stringify(dataToUpdate, null, 2),
+    });
     throw e; // Re-lanzar otros errores
   }
 }

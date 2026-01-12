@@ -13,7 +13,7 @@ export default function InmobiliariaEliminarDialog({
   const title = `Desactivar Inmobiliaria: ${inmobiliaria?.nombre ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas desactivar la inmobiliaria "${inmobiliaria?.nombre ?? "—"}"? Pasará a estado INACTIVA y dejará de aparecer en la lista activa.`;
+  const message = `¿Seguro que deseas desactivar la inmobiliaria "${inmobiliaria?.nombre ?? "—"}"? Pasará a estado ELIMINADO y dejará de aparecer en la lista activa.`;
 
   // Detalles listados con bullets
   const details = [

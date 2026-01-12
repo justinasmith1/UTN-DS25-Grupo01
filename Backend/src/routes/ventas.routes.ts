@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ventaController from '../controllers/venta.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema } from '../validations/venta.validation';
+import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, desactivarVentaSchema, reactivarVentaSchema } from '../validations/venta.validation';
 
 const router = Router();
 
@@ -52,5 +52,23 @@ router.delete(
     authorize('ADMINISTRADOR', 'GESTOR'),
     validateParams(deleteVentaSchema),  
     ventaController.eliminarVenta);
+
+// PATCH /api/Ventas/:id/desactivar
+router.patch(
+    '/:id/desactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(desactivarVentaSchema),
+    ventaController.desactivarVenta
+);
+
+// PATCH /api/Ventas/:id/reactivar
+router.patch(
+    '/:id/reactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(reactivarVentaSchema),
+    ventaController.reactivarVenta
+);
 
 export const ventaRoutes = router;

@@ -8,10 +8,9 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 
 import {
   getAllVentas,
-  getVentaById,          // <-- agregado
   getVentasByInmobiliaria,
-  updateVenta,
-  deleteVenta,
+  desactivarVenta, // <- NUEVO
+  reactivarVenta,
 } from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
@@ -24,6 +23,7 @@ import { applyVentaFilters } from "../utils/applyVentaFilters";
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
 import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.jsx";
+import VentaReactivarDialog from "../components/Cards/Ventas/VentaReactivarDialog.jsx"; // <- NUEVO
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
@@ -90,7 +90,9 @@ const enrichVenta = (v, personasById = {}, inmosById = {}) => {
 export default function VentasPage() {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const crearParam = searchParams.get('crear') === 'true';
+  const openIdParam = searchParams.get('openId');
   const searchParamsString = searchParams.toString();
   const selectedInmobiliariaParam = useMemo(() => {
     const params = new URLSearchParams(searchParamsString);
@@ -298,6 +300,8 @@ export default function VentasPage() {
   }, [openIdParam, location.state, ventas, setSearchParams]);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false); // Feedback eliminar
+  const [showReactivarSuccess, setShowReactivarSuccess] = useState(false); // Feedback reactivar
 
   // Ver: abre directamente con la venta (VentaVerCard carga los datos completos internamente)
   const onVer = useCallback((venta) => {
@@ -390,46 +394,86 @@ export default function VentasPage() {
     []
   );
 
-  // DELETE (Eliminar)
-  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  // DELETE (Eliminar -> Desactivar)
+  // Estado local para success message ya declarado arriba
   const handleDelete = useCallback(async () => {
     if (!ventaSel?.id) return;
     try {
       setDeleting(true);
-      const loteId = ventaSel.loteId ?? ventaSel.lotId ?? ventaSel.lote?.id;
       
-      await deleteVenta(ventaSel.id);
+      // Usamos soft delete (desactivar)
+      const res = await desactivarVenta(ventaSel.id);
+      const deactivated = res.data || res;
       
-      if (loteId) {
-        try {
-          const { getAllReservas } = await import("../lib/api/reservas");
-          const reservasResp = await getAllReservas({});
-          const reservas = reservasResp?.data ?? [];
-          
-          const loteIdNum = Number(loteId);
-          const reservaActiva = reservas.find((r) => {
-            const rLoteId = Number(r.loteId ?? r.lote?.id ?? 0);
-            const estado = String(r.estado ?? "").toUpperCase();
-            return rLoteId === loteIdNum && estado === "ACTIVA";
-          });
-          
-          const { updateLote } = await import("../lib/api/lotes");
-          await updateLote(loteIdNum, { estado: reservaActiva ? "Reservado" : "Disponible" });
-        } catch (err) {
-          console.error("Error restaurando estado del lote:", err);
-        }
-      }
+      // Actualizar en lista (no borrar, solo cambiar estado)
+      const personasById = {};
+      const [personasResp, inmosResp] = await Promise.all([
+          getAllPersonas({}),
+          getAllInmobiliarias({})
+      ]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+        
+      const inmosById = {};
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = enrichVenta(deactivated, personasById, inmosById);
+      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
       
-      setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
       setTimeout(() => {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error eliminando venta:", e);
+      console.error("Error desactivando venta:", e);
     } finally {
       setDeleting(false);
+    }
+  }, [ventaSel]);
+
+  // REACTIVAR
+  const [openReactivar, setOpenReactivar] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  
+  const onReactivar = useCallback((venta) => {
+    setVentaSel(venta);
+    setOpenReactivar(true);
+  }, []);
+
+  const handleReactivar = useCallback(async () => {
+    if (!ventaSel?.id) return;
+    try {
+      setReactivating(true);
+      const res = await reactivarVenta(ventaSel.id);
+      const reactivated = res.data || res;
+      
+      // Actualizar en lista
+      const personasById = {};
+      const  [personasResp, inmosResp] = await Promise.all([
+         getAllPersonas({}),
+         getAllInmobiliarias({})
+      ]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+        
+      const inmosById = {};
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = enrichVenta(reactivated, personasById, inmosById);
+      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
+
+      setOpenReactivar(false);
+      setShowReactivarSuccess(true);
+      setTimeout(() => {
+        setShowReactivarSuccess(false);
+      }, 1500);
+    } catch (e) {
+      console.error("Error reactivando venta:", e);
+    } finally {
+      setReactivating(false);
     }
   }, [ventaSel]);
 
@@ -525,6 +569,7 @@ export default function VentasPage() {
         onVer={canSaleView ? onVer : null}
         onEditar={onEditarAlways}
         onEliminar={canSaleDelete ? onEliminar : null}
+        onReactivar={canSaleDelete ? onReactivar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
@@ -559,6 +604,14 @@ export default function VentasPage() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <VentaReactivarDialog
+        open={openReactivar}
+        venta={ventaSel}
+        loading={reactivating}
+        onCancel={() => setOpenReactivar(false)}
+        onConfirm={handleReactivar}
       />
 
       <VentaCrearCard
@@ -608,6 +661,136 @@ export default function VentasPage() {
           console.log("Descargar documento:", url);
         }}
       />
+
+      {/* Animación de éxito al eliminar */}
+      {showDeleteSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 10000,
+            animation: "fadeIn 0.2s ease-in",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "32px 48px",
+              borderRadius: "12px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "#10b981",
+                display: "grid",
+                placeItems: "center",
+                animation: "checkmark 0.5s ease-in-out",
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "20px",
+                fontWeight: 600,
+                color: "#111",
+              }}
+            >
+              ¡Venta eliminada exitosamente!
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* Animación de éxito al reactivar */}
+      {showReactivarSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 10000,
+            animation: "fadeIn 0.2s ease-in",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "32px 48px",
+              borderRadius: "12px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "#10b981", // Green for success
+                display: "grid",
+                placeItems: "center",
+                animation: "checkmark 0.5s ease-in-out",
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "20px",
+                fontWeight: 600,
+                color: "#111",
+              }}
+            >
+              ¡Venta reactivada exitosamente!
+            </h3>
+          </div>
+        </div>
+      )}
 
       {/* Animación de éxito al eliminar */}
       {showDeleteSuccess && (

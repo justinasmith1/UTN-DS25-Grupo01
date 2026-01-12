@@ -1,4 +1,4 @@
-// Diálogo de confirmación para reactivar una inmobiliaria (cambiar de INACTIVA a ACTIVA).
+// Diálogo de confirmación para reactivar una inmobiliaria (cambiar de ELIMINADO a OPERATIVO).
 import EliminarBase from "../Base/EliminarBase.jsx";
 
 export default function InmobiliariaReactivarDialog({
@@ -13,7 +13,7 @@ export default function InmobiliariaReactivarDialog({
     const title = `Reactivar Inmobiliaria: ${inmobiliaria?.nombre ?? "—"}`;
 
     // Mensaje tipo pregunta
-    const message = `¿Seguro que deseas reactivar la inmobiliaria "${inmobiliaria?.nombre ?? "—"}"? Pasará a estado ACTIVA y volverá a aparecer en la lista activa.`;
+    const message = `¿Seguro que deseas reactivar la inmobiliaria "${inmobiliaria?.nombre ?? "—"}"? Pasará a estado OPERATIVO y volverá a aparecer en la lista activa.`;
 
     // Detalles listados con bullets
     const details = [
@@ -33,6 +33,7 @@ export default function InmobiliariaReactivarDialog({
             noteBold={noteBold}
             confirmLabel="Reactivar Inmobiliaria"
             loading={loading}
+            loadingLabel="Reactivando…"
             onCancel={onCancel}
             onConfirm={onConfirm}
         />

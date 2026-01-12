@@ -456,14 +456,15 @@ export const updateReserva = async (id, payload) => {
   }
 };
 
-export const deleteReserva = async (id) => {
+export const desactivarReserva = async (id) => {
   if (USE_MOCK) {
     const index = mockReservas.findIndex(r => r.id === parseInt(id));
     if (index !== -1) {
-      mockReservas.splice(index, 1);
+      mockReservas[index].estado = 'ELIMINADO';
       return {
         success: true,
-        message: 'Reserva eliminada correctamente (MOCK)'
+        data: mockReservas[index],
+        message: 'Reserva desactivada correctamente (MOCK)'
       };
     }
     return {
@@ -473,22 +474,77 @@ export const deleteReserva = async (id) => {
   }
 
   try {
-    const response = await http(`/reservas/${id}`, {
-      method: 'DELETE'
+    const response = await http(`/reservas/${id}/desactivar`, {
+      method: 'PATCH'
     });
+    
+    // Parsear respuesta JSON de manera segura
+    const resData = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+       const errorMsg = resData?.message || "Error al desactivar reserva";
+       throw new Error(errorMsg);
+    }
+
+    const raw = resData?.data ?? resData?.reserva ?? resData;
+    const normalized = fromApi(raw);
 
     return {
       success: true,
-      message: response.message || 'Reserva eliminada correctamente'
+      data: normalized,
+      message: resData.message || 'Reserva desactivada correctamente'
     };
   } catch (error) {
-    console.error('❌ Error eliminando reserva:', error);
-    return {
-      success: false,
-      message: error.message || 'Error al eliminar reserva'
-    };
+    console.error('❌ Error desactivando reserva:', error);
+    throw error;
   }
 };
+
+export const reactivarReserva = async (id) => {
+    if (USE_MOCK) {
+        const index = mockReservas.findIndex(r => r.id === parseInt(id));
+        if (index !== -1) {
+            mockReservas[index].estado = 'ACTIVA';
+            return {
+                success: true,
+                data: mockReservas[index],
+                message: 'Reserva reactivada correctamente (MOCK)'
+            };
+        }
+        return {
+            success: false,
+            message: 'Reserva no encontrada (MOCK)'
+        };
+    }
+
+    try {
+        const response = await http(`/reservas/${id}/reactivar`, {
+            method: 'PATCH'
+        });
+
+        const resData = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+             const errorMsg = resData?.message || "Error al reactivar reserva";
+             throw new Error(errorMsg);
+        }
+
+        const raw = resData?.data ?? resData?.reserva ?? resData;
+        const normalized = fromApi(raw);
+
+        return {
+            success: true,
+            data: normalized,
+            message: resData.message || 'Reserva reactivada correctamente'
+        };
+    } catch (error) {
+        console.error('❌ Error reactivando reserva:', error);
+        throw error;
+    }
+}
+
+// deleteReserva ahora usa desactivarReserva (Soft Delete)
+export const deleteReserva = desactivarReserva;
 
 // ===== UTILIDADES =====
 const mockFilterSortPage = (data, params = {}) => {

@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 // Definimos el enum una vez para reusarlo
-const EstadoInmobiliariaEnum = z.enum(['ACTIVA', 'INACTIVA']);
+const EstadoInmobiliariaEnum = z.enum(['OPERATIVO', 'ELIMINADO']);
 
 export const createInmobiliariaSchema = z.object({
     nombre: z.string().min(1, 'Se requiere un nombre').max(100, 'El nombre es demasiado largo').trim(),
@@ -11,9 +11,9 @@ export const createInmobiliariaSchema = z.object({
     comxventa: z.coerce.number().min(0, 'La comisión por venta no puede ser negativa').max(100, 'La comisión por venta no puede ser mayor a 100').optional(),
     userId: z.coerce.number().int().positive().optional(),
     
-    // Recomendación: Al crear, no deberíamos permitir enviar fechaBaja ni estado INACTIVA.
+    // Recomendación: Al crear, no deberíamos permitir enviar fechaBaja ni estado ELIMINADO.
     // Lo forzamos por defecto y ocultamos la fechaBaja en la creación.
-    estado: EstadoInmobiliariaEnum.default('ACTIVA'),
+    estado: EstadoInmobiliariaEnum.default('OPERATIVO'),
 });
 
 // body del PUT

@@ -7,7 +7,7 @@ const getRazonSocial = (inmobiliaria) => inmobiliaria?.razonSocial || '';
 const getContacto = (inmobiliaria) => inmobiliaria?.contacto || '';
 const getComxventa = (inmobiliaria) => Number(inmobiliaria?.comxventa) || 0;
 const getCantidadVentas = (inmobiliaria) => Number(inmobiliaria?.cantidadVentas) || 0;
-const getEstado = (inmobiliaria) => inmobiliaria?.estado || 'ACTIVA';
+const getEstado = (inmobiliaria) => inmobiliaria?.estado || 'OPERATIVO';
 const getCreatedAt = (inmobiliaria) => {
   const date = inmobiliaria?.createdAt;
   return date ? new Date(date).getTime() : 0;
@@ -29,15 +29,15 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
   let rows = [...inmobiliarias];
 
   // Filtro de estado - multiSelect pattern (siguiendo FilterBarVentas)
-  // Si estado está vacío o undefined, mostrar solo ACTIVAS
+  // Si estado está vacío o undefined, mostrar solo OPERATIVAS
   // Si tiene valores, filtrar por esos estados
   if (params.estado && Array.isArray(params.estado) && params.estado.length > 0) {
     rows = rows.filter((inmobiliaria) =>
       params.estado.includes(getEstado(inmobiliaria))
     );
   } else {
-    // Por defecto, mostrar solo inmobiliarias ACTIVAS
-    rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === 'ACTIVA');
+    // Por defecto, mostrar solo inmobiliarias OPERATIVAS
+    rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === 'OPERATIVO');
   }
 
 

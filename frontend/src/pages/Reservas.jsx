@@ -2,13 +2,13 @@
 // Página de reservas usando la arquitectura genérica
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarReservas from "../components/FilterBar/FilterBarReservas";
 import TablaReservas from "../components/Table/TablaReservas/TablaReservas";
-import { getAllReservas, getReservaById, updateReserva, deleteReserva } from "../lib/api/reservas";
+import { getAllReservas, getReservaById, updateReserva, deleteReserva, reactivarReserva } from "../lib/api/reservas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 import { getAllLotes } from "../lib/api/lotes";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
@@ -17,12 +17,13 @@ import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import ReservaEliminarDialog from "../components/Cards/Reservas/ReservaEliminarDialog.jsx";
+import ReservaReactivarDialog from "../components/Cards/Reservas/ReservaReactivarDialog.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
 
 export default function Reservas() {
   const { user } = useAuth();
-  const { success, error } = useToast();
+  const { error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const crearParam = searchParams.get('crear') === 'true';
@@ -92,17 +93,7 @@ export default function Reservas() {
   const canReservaEdit = can(user, PERMISSIONS.RES_EDIT);
   const canReservaDelete = can(user, PERMISSIONS.RES_DELETE);
 
-  // Verificar permisos
-  if (!canReservaView) {
-    return (
-      <>
-        <div className="alert alert-warning">
-          <h4>Acceso Restringido</h4>
-          <p>No tienes permisos para ver las reservas.</p>
-        </div>
-      </>
-    );
-  }
+
 
   // Manejar cambios de parámetros
   const handleParamsChange = useCallback((patch) => {
@@ -313,8 +304,9 @@ export default function Reservas() {
   const [openEditar, setOpenEditar] = useState(false);
   const [openCrear, setOpenCrear] = useState(false);
   const [openEliminar, setOpenEliminar] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [openReactivar, setOpenReactivar] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
 
   // Abrir el card de crear cuando viene desde el ModulePills (?crear=true)
   useEffect(() => {
@@ -429,8 +421,17 @@ export default function Reservas() {
   }, []);
 
   const onEliminar = useCallback((reserva) => {
+    if (reserva.estado === 'ACEPTADA' || reserva.estado === 'CONTRAOFERTA') {
+      error(`No se puede eliminar una reserva en estado ${reserva.estado}`);
+      return;
+    }
     setReservaSel(reserva);
     setOpenEliminar(true);
+  }, [error]);
+
+  const onReactivar = useCallback((reserva) => {
+    setReservaSel(reserva);
+    setOpenReactivar(true);
   }, []);
 
   // Estados para documentos
@@ -494,12 +495,16 @@ export default function Reservas() {
   );
 
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showReactivarSuccess, setShowReactivarSuccess] = useState(false);
+
   const handleDelete = useCallback(async () => {
     if (!reservaSel?.id) return;
     try {
       setDeleting(true);
       await deleteReserva(reservaSel.id);
-      setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
+      // Actualizamos el estado local a ELIMINADO en lugar de quitarlo, 
+      // para que si el filtro permite ver eliminados, se vea.
+      setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, estado: 'ELIMINADO' } : r));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
       window.dispatchEvent(new CustomEvent('reloadLotes'));
@@ -507,11 +512,43 @@ export default function Reservas() {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      alert(e?.message || "No se pudo eliminar la reserva.");
+      alert(e?.message || "No se pudo desactivar la reserva.");
     } finally {
       setDeleting(false);
     }
   }, [reservaSel]);
+
+  const handleReactivar = useCallback(async () => {
+    if (!reservaSel?.id) return;
+    try {
+      setReactivating(true);
+      const res = await reactivarReserva(reservaSel.id);
+      const updated = res.data || res;
+      setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, ...updated } : r));
+      setOpenReactivar(false);
+      setShowReactivarSuccess(true);
+      window.dispatchEvent(new CustomEvent('reloadLotes'));
+      setTimeout(() => {
+        setShowReactivarSuccess(false);
+      }, 1500);
+    } catch (e) {
+      alert(e?.message || "No se pudo reactivar la reserva.");
+    } finally {
+      setReactivating(false);
+    }
+  }, [reservaSel]);
+
+  // Verificar permisos
+  if (!canReservaView) {
+    return (
+      <div className="container py-3">
+        <div className="alert alert-warning">
+          <h4>Acceso Restringido</h4>
+          <p>No tienes permisos para ver las reservas.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -565,6 +602,7 @@ export default function Reservas() {
         onVer={canReservaView ? onVer : null}
         onEditar={canReservaEdit ? onEditar : null}
         onEliminar={canReservaDelete ? onEliminar : null}
+        onReactivar={canReservaDelete ? onReactivar : null}
         onVerDocumentos={canReservaView ? onVerDocumentos : null}
         onAgregarReserva={can(user, PERMISSIONS.RES_CREATE) ? onAgregarReserva : null}
         selectedIds={selectedIds}
@@ -627,6 +665,14 @@ export default function Reservas() {
         open={openCrear}
         onCancel={() => setOpenCrear(false)}
         onCreated={handleCreated}
+      />
+
+      <ReservaReactivarDialog
+        open={openReactivar}
+        reserva={reservaSel}
+        loading={reactivating}
+        onCancel={() => setOpenReactivar(false)}
+        onConfirm={handleReactivar}
       />
 
       <ReservaEliminarDialog
@@ -726,6 +772,71 @@ export default function Reservas() {
               }}
             >
               ¡Reserva eliminada exitosamente!
+            </h3>
+          </div>
+        </div>
+      )}
+
+      {/* Animación de éxito al reactivar */}
+      {showReactivarSuccess && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0, 0, 0, 0.5)",
+            display: "grid",
+            placeItems: "center",
+            zIndex: 10000,
+            animation: "fadeIn 0.2s ease-in",
+            pointerEvents: "auto",
+          }}
+        >
+          <div
+            style={{
+              background: "#fff",
+              padding: "32px 48px",
+              borderRadius: "12px",
+              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "16px",
+              animation: "scaleIn 0.3s ease-out",
+            }}
+          >
+            <div
+              style={{
+                width: "64px",
+                height: "64px",
+                borderRadius: "50%",
+                background: "#10b981", // Green for success
+                display: "grid",
+                placeItems: "center",
+                animation: "checkmark 0.5s ease-in-out",
+              }}
+            >
+              <svg
+                width="36"
+                height="36"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="white"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <h3
+              style={{
+                margin: 0,
+                fontSize: "20px",
+                fontWeight: 600,
+                color: "#111",
+              }}
+            >
+              ¡Reserva reactivada exitosamente!
             </h3>
           </div>
         </div>

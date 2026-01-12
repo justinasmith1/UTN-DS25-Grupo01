@@ -8,8 +8,8 @@
 const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http, normalizeApiListResponse } from "../http/http";
 
-const PRIMARY = "/Ventas";
-const FALLBACK = "/ventas";
+const PRIMARY = "/ventas";
+const FALLBACK = "/Ventas";
 
 const ok = (data) => ({ data });
 
@@ -53,6 +53,7 @@ const fromApi = (row = {}) => {
     estado: row.estado ?? row.status ?? null,
     tipoPago: row.tipoPago ?? row.paymentType ?? null,
     plazoEscritura: row.plazoEscritura ?? row.plazo_escritura ?? null,
+    fechaBaja: row.fechaBaja ?? row.fecha_baja ?? null,
     // Mantener compatibilidad con nombres en inglés para código existente
     date: row.fechaVenta ?? row.date ?? row.fecha ?? null,
     status: row.estado ?? row.status ?? null,
@@ -301,11 +302,48 @@ async function apiDelete(id) {
 }
 
 /* --------------------------- EXPORT PÚBLICO --------------------------- */
+async function mockDesactivar(id) {
+  ensureSeed();
+  const i = VENTAS.findIndex((v) => String(v.id) === String(id));
+  if (i < 0) throw new Error("Venta no encontrada");
+  VENTAS[i] = { ...VENTAS[i], estado: "ELIMINADO", fechaBaja: new Date().toISOString() };
+  return ok(VENTAS[i]);
+}
+
+async function mockReactivar(id) {
+  ensureSeed();
+  const i = VENTAS.findIndex((v) => String(v.id) === String(id));
+  if (i < 0) throw new Error("Venta no encontrada");
+  VENTAS[i] = { ...VENTAS[i], estado: "OPERATIVO", fechaBaja: null };
+  return ok(VENTAS[i]);
+}
+
+async function apiDesactivar(id) {
+  // Ahora usamos PATCH /:id/desactivar en lugar de DELETE si queremos soft delete explicito
+  // Mantendremos deleteVenta apuntando a esto o separado? 
+  // El usuario pidió "implementar la eliminacion logica".
+  // Usaremos el endpoint nuevo.
+  const res = await fetchWithFallback(`${PRIMARY}/${id}/desactivar`, { method: "PATCH" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.message || "Error al desactivar venta");
+  return ok(fromApi(data?.data ?? data));
+}
+
+async function apiReactivar(id) {
+  const res = await fetchWithFallback(`${PRIMARY}/${id}/reactivar`, { method: "PATCH" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.message || "Error al reactivar venta");
+  return ok(fromApi(data?.data ?? data));
+}
+
 export function getAllVentas(params)  { return USE_MOCK ? mockGetAll(params)  : apiGetAll(params); }
 export function getVentaById(id)      { return USE_MOCK ? mockGetById(id)     : apiGetById(id); }
 export function createVenta(payload)  { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
 export function updateVenta(id,data)  { return USE_MOCK ? mockUpdate(id,data) : apiUpdate(id,data); }
 export function deleteVenta(id)       { return USE_MOCK ? mockDelete(id)      : apiDelete(id); }
+export function desactivarVenta(id)   { return USE_MOCK ? mockDesactivar(id)  : apiDesactivar(id); }
+export function reactivarVenta(id)    { return USE_MOCK ? mockReactivar(id)   : apiReactivar(id); }
+
 export function getVentasByInmobiliaria(id, params) {
   return USE_MOCK ? mockGetByInmobiliaria(id, params) : apiGetByInmobiliaria(id, params);
 }

@@ -1,6 +1,7 @@
 // src/jobs/runExpirations.ts
 // Agregador de jobs de expiración (reutilizable para futuras expiraciones)
 import { expirePromotions } from './expirePromotions';
+import { expireReservas } from './expireReservas';
 
 /**
  * Ejecuta todos los jobs de expiración
@@ -19,7 +20,7 @@ export async function runExpirations(): Promise<void> {
     console.log(`[runExpirations] Promociones expiradas: ${promocionesExpiradas}`);
     
     // Aca se pueden agregar más jobs en el futuro:
-    // const reservasExpiradas = await expireReservas();
+    const reservasExpiradas = await expireReservas();
     // const prioridadesExpiradas = await expirePrioridades();
     
     console.log('[runExpirations] Ejecución de jobs de expiración finalizada');

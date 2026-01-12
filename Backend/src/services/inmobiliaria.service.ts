@@ -111,7 +111,7 @@ export async function createInmobiliaria(req: PostInmobiliariaRequest): Promise<
             user: req.userId != null ? { connect: { id: req.userId } } : undefined,
             createdAt: new Date(),
             // 3. Por defecto nace ACTIVA (aunque Prisma lo hace por default, es bueno ser explícito)
-            estado: EstadoInmobiliaria.ACTIVA, 
+            estado: EstadoInmobiliaria.OPERATIVO, 
             fechaBaja: null
         }
     });
@@ -143,12 +143,12 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
   // Calculamos la fecha de baja basándonos en el cambio de estado
   let fechaBajaCalc: Date | null | undefined = undefined;
 
-  // Si envían un estado y es INACTIVA, ponemos fecha de hoy
-  if (updateData.estado === 'INACTIVA') {
+  // Si envían un estado y es ELIMINADO, ponemos fecha de hoy
+  if (updateData.estado === 'ELIMINADO') {
       fechaBajaCalc = new Date();
   } 
-  // Si envían un estado y es ACTIVA, limpiamos la fecha (null)
-  else if (updateData.estado === 'ACTIVA') {
+  // Si envían un estado y es OPERATIVO, limpiamos la fecha (null)
+  else if (updateData.estado === 'OPERATIVO') {
       fechaBajaCalc = null;
   }
   // Si no envían estado, fechaBajaCalc se queda undefined y no toca la base de datos

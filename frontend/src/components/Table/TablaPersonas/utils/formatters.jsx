@@ -195,12 +195,12 @@ export const fmtValorIdentificador = (tipo, valor) => {
   return valor;
 };
 
-/** Formatea el estado de persona (ACTIVA/INACTIVA), usa el mismo badge que usasmo para los Lotes */
+/** Formatea el estado de persona (OPERATIVO/ELIMINADO), usa el mismo badge que usasmo para los Lotes */
 export const fmtEstadoPersona = (estado) => {
   if (!estado) return <span className="text-muted">—</span>;
   
   // Usar el mismo estilo que StatusBadge de Lotes
-  const variant = estado === 'ACTIVA' ? 'success' : 'danger';
+  const variant = estado === 'OPERATIVO' ? 'success' : 'danger';
   return (
     <span className={`tl-badge tl-badge--${variant}`}>
       {estado}
