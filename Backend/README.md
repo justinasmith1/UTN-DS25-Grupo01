@@ -97,6 +97,68 @@ Configura middlewares, rutas y levanta el servidor.
 
 ---
 
+## ⏰ Cron Jobs (Tareas Programadas)
+
+El sistema utiliza cron jobs para ejecutar tareas automáticas de expiración:
+
+### Funcionalidad
+
+- **Expirar Promociones**: Marca automáticamente las promociones vencidas como inactivas y restaura el estado del lote.
+- **Expirar Reservas**: Marca automáticamente las reservas vencidas como `EXPIRADA` y restaura el estado del lote.
+
+### Configuración
+
+#### Desarrollo Local (cron activo por defecto)
+
+El cron se ejecuta automáticamente cada hora cuando se inicie el servidor. No requiere configuración adicional:
+
+```bash
+npm run dev
+```
+
+El cron se ejecutará en el servidor cada hora (minuto 0).
+
+#### Producción en Render (recomendado)
+
+**Opción 1: Usar Render Cron Jobs (recomendado para producción)**
+
+1. **Desactivar el cron en el servidor principal**:
+   - En Render, configura la variable de entorno:
+     ```
+     ENABLE_CRON=false
+     ```
+
+2. **Configurar un Cron Job separado en Render**:
+   - Vamos al servicio nuestor en Render Dashboard
+   - Creamos un nuevo "Cron Job" (no un servicio web)
+   - Configuracion:
+     - **Comando**: `npm run jobs:expirations:prod` (producción) o `npm run jobs:expirations` (desarrollo)
+     - **Frecuencia**: `0 * * * *` (cada hora)
+     - **Plan**: Free tier o superior
+   - **Importante**: Asegurarse de que el código esté compilado (`npm run build`) antes de usar `jobs:expirations:prod`
+
+**Opción 2: Mantener cron en código (para desarrollo/testing)**
+
+Si se prefiere mantener todo en código, simplemente no configurar `ENABLE_CRON=false`. El cron se ejecutará en todas las instancias del servidor (puede causar ejecuciones duplicadas si se tiene múltiples instancias).
+
+### Ejecución Manual
+
+Puedes ejecutar los jobs de expiración manualmente:
+
+```bash
+npm run jobs:expirations
+```
+
+Esto ejecutará todas las expiraciones inmediatamente, útil para testing o ejecuciones manuales.
+
+### Variables de Entorno
+
+| Variable | Descripción | Valores | Default |
+|----------|-------------|---------|---------|
+| `ENABLE_CRON` | Habilita/deshabilita el cron en el servidor | `true` / `false` | `true` |
+
+---
+
 ## 🚀 Flujo general de la aplicación
 1. El **usuario** hace una petición HTTP → `routes/`.
 2. La ruta invoca el **controller** correspondiente.
