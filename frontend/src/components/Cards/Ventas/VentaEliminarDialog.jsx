@@ -17,8 +17,8 @@ export default function VentaEliminarDialog({
 
   const title = `Eliminar Venta N° ${venta?.numero ?? "—"}`;
 
-  // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero}?. Esta acción es irreversible.`;
+  // Mensaje tipo pregunta
+  const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero}?. La venta pasará a estado ELIMINADO.`;
 
   // Detalles listados con bullets
   const details = [
@@ -27,7 +27,7 @@ export default function VentaEliminarDialog({
   ].filter(Boolean);
 
   // Nota final en negrita
-  const noteBold = "Esta acción es irreversible.";
+  const noteBold = "Podrás recuperarla luego desde los filtros de estado.";
 
   return (
     <EliminarBase
@@ -38,6 +38,7 @@ export default function VentaEliminarDialog({
       noteBold={noteBold}
       confirmLabel="Eliminar Venta"
       loading={loading}
+      loadingLabel="Eliminando…"
       onCancel={onCancel}
       onConfirm={onConfirm} 
     />

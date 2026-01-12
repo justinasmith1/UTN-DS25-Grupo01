@@ -8,10 +8,10 @@ import { can, PERMISSIONS } from "../lib/auth/rbac";
 
 import {
   getAllVentas,
-  getVentaById,          // <-- agregado
   getVentasByInmobiliaria,
-  updateVenta,
   deleteVenta,
+  desactivarVenta, // <- NUEVO
+  reactivarVenta,
 } from "../lib/api/ventas";
 import { getAllPersonas } from "../lib/api/personas";
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
@@ -24,6 +24,7 @@ import { applyVentaFilters } from "../utils/applyVentaFilters";
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
 import VentaEliminarDialog from "../components/Cards/Ventas/VentaEliminarDialog.jsx";
+import VentaReactivarDialog from "../components/Cards/Ventas/VentaReactivarDialog.jsx"; // <- NUEVO
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
@@ -392,46 +393,83 @@ export default function VentasPage() {
     []
   );
 
-  // DELETE (Eliminar)
+  // DELETE (Eliminar -> Desactivar)
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
   const handleDelete = useCallback(async () => {
     if (!ventaSel?.id) return;
     try {
       setDeleting(true);
-      const loteId = ventaSel.loteId ?? ventaSel.lotId ?? ventaSel.lote?.id;
       
-      await deleteVenta(ventaSel.id);
+      // Usamos soft delete (desactivar)
+      const res = await desactivarVenta(ventaSel.id);
+      const deactivated = res.data || res;
       
-      if (loteId) {
-        try {
-          const { getAllReservas } = await import("../lib/api/reservas");
-          const reservasResp = await getAllReservas({});
-          const reservas = reservasResp?.data ?? [];
-          
-          const loteIdNum = Number(loteId);
-          const reservaActiva = reservas.find((r) => {
-            const rLoteId = Number(r.loteId ?? r.lote?.id ?? 0);
-            const estado = String(r.estado ?? "").toUpperCase();
-            return rLoteId === loteIdNum && estado === "ACTIVA";
-          });
-          
-          const { updateLote } = await import("../lib/api/lotes");
-          await updateLote(loteIdNum, { estado: reservaActiva ? "Reservado" : "Disponible" });
-        } catch (err) {
-          console.error("Error restaurando estado del lote:", err);
-        }
-      }
+      // Actualizar en lista (no borrar, solo cambiar estado)
+      const personasById = {};
+      const [personasResp, inmosResp] = await Promise.all([
+          getAllPersonas({}),
+          getAllInmobiliarias({})
+      ]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+        
+      const inmosById = {};
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = enrichVenta(deactivated, personasById, inmosById);
+      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
       
-      setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
       setTimeout(() => {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error eliminando venta:", e);
+      console.error("Error desactivando venta:", e);
     } finally {
       setDeleting(false);
+    }
+  }, [ventaSel]);
+
+  // REACTIVAR
+  const [openReactivar, setOpenReactivar] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  
+  const onReactivar = useCallback((venta) => {
+    setVentaSel(venta);
+    setOpenReactivar(true);
+  }, []);
+
+  const handleReactivar = useCallback(async () => {
+    if (!ventaSel?.id) return;
+    try {
+      setReactivating(true);
+      const res = await reactivarVenta(ventaSel.id);
+      const reactivated = res.data || res;
+      
+      // Actualizar en lista
+      const personasById = {};
+      const  [personasResp, inmosResp] = await Promise.all([
+         getAllPersonas({}),
+         getAllInmobiliarias({})
+      ]);
+      const personasApi = pickArray(personasResp, ["personas"]);
+      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+        
+      const inmosById = {};
+      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+
+      const enriched = enrichVenta(reactivated, personasById, inmosById);
+      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
+
+      setOpenReactivar(false);
+      // Podríamos mostrar toast de éxito
+    } catch (e) {
+      console.error("Error reactivando venta:", e);
+    } finally {
+      setReactivating(false);
     }
   }, [ventaSel]);
 
@@ -527,6 +565,7 @@ export default function VentasPage() {
         onVer={canSaleView ? onVer : null}
         onEditar={onEditarAlways}
         onEliminar={canSaleDelete ? onEliminar : null}
+        onReactivar={canSaleDelete ? onReactivar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
@@ -561,6 +600,14 @@ export default function VentasPage() {
         loading={deleting}
         onCancel={() => setOpenEliminar(false)}
         onConfirm={handleDelete}
+      />
+
+      <VentaReactivarDialog
+        open={openReactivar}
+        venta={ventaSel}
+        loading={reactivating}
+        onCancel={() => setOpenReactivar(false)}
+        onConfirm={handleReactivar}
       />
 
       <VentaCrearCard

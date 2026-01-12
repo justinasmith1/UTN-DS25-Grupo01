@@ -27,6 +27,11 @@ const humanize = (s) =>
 // Map explícito a tus enums
 function pickVariant(estado) {
   switch (estado) {
+    case 'OPERATIVO':
+      return 'success';
+    case 'ELIMINADO':
+      return 'muted'; // 'muted' para que se vea gris/desactivado, o 'danger' si queremos resaltar que está borrado.
+                      // En tablas "soft delete", suele ser gris.
     case 'ESCRITURADO':
       return 'success';
     case 'ESCRITURA_PROGRAMADA':

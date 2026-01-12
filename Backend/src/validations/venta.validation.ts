@@ -22,6 +22,8 @@ export const getVentaSchema = z.object({
 });
 
 export const deleteVentaSchema = getVentaSchema;
+export const desactivarVentaSchema = getVentaSchema;
+export const reactivarVentaSchema = getVentaSchema;
 
 export const queryVentaSchema = z.object({
     estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO', 'CANCELADA']).optional(),

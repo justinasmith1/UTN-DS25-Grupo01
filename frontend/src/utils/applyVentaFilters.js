@@ -111,6 +111,9 @@ export function applyVentaFilters(rows = [], f = {}) {
     // ----- 2) Estados -----
     if (estadosSet && estadosSet.size > 0) {
       if (!estadosSet.has(estadoNorm)) return false;
+    } else {
+      // Por defecto (sin filtro) se ocultan los ELIMINADO
+      if (estadoNorm === "eliminado") return false;
     }
 
     // ----- 3) Tipo de Pago (si llega como lista) -----

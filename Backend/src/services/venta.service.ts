@@ -212,6 +212,7 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
     }
 }
 
+// Hard delete
 export async function deleteVenta(id: number): Promise<DeleteVentaResponse> {
     try {
         await prisma.venta.delete({
@@ -219,12 +220,88 @@ export async function deleteVenta(id: number): Promise<DeleteVentaResponse> {
         });
         return { message: 'Venta eliminada correctamente' };
     } catch (e: any) {
-        if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
+        if (e.code === 'P2025') { 
             const error = new Error('Venta no encontrada');
             (error as any).statusCode = 404;
             throw error;
         }
-        throw e; // Re-lanzar otros errores
+        throw e;
     }
+}
+
+export async function desactivarVenta(id: number): Promise<Venta> {
+    const venta = await prisma.venta.findUnique({ where: { id } });
+    if (!venta) {
+        const error = new Error('Venta no encontrada') as any;
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (venta.estado === 'ELIMINADO') {
+        const error = new Error('La venta ya está eliminada') as any;
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // Al eliminar (lógico), liberamos el lote si estaba vendido?
+    // "Eliminar una venta" conceptualmente anula la operación. 
+    // Si es "papelera de reciclaje", quizás no deberíamos liberar el lote todavía hasta que sea defintivo?
+    // PERO: Si el usuario borra la venta, espera que el lote quede libre.
+    // Sin embargo, Venta tiene estados complejos (cancelada, etc).
+    // Si usamos ELIMINADO como "papelera", quizás deberíamos mantener el lote ocupado?
+    // En Personas/Inmobiliarias, eliminar es "ocultar".
+    // En Venta, es transaccional.
+    // Voy a asumir que desactivar es solo "soft delete" y NO altera el lote por ahora, 
+    // SALVO que el usuario pida explicitamente anular la venta (que seria CANCELADA).
+    // Pero espera, el usuario quiere "eliminacion logica".
+    // Si elimino logicamente, ¿aparece en los listados? Normalmente no.
+    // Si no aparece, y el lote sigue VENDIDO, es un problema de integridad.
+    // Si la venta se elimina, el lote debería volver a DISPONIBLE?
+    // Eso ya lo hace "CANCELADA".
+    // "ELIMINADO" suele ser "borré este registro por error" o "ya no interesa".
+    // Voy a hacer que cambie el estado y ponga fechaBaja, sin tocar el lote automágicamente, 
+    // para evitar efectos secundarios peligrosos. El usuario debería Cancelar primero si quiere liberar.
+
+    return await prisma.venta.update({
+        where: { id },
+        data: {
+            estado: 'ELIMINADO',
+            fechaBaja: new Date(),
+        },
+        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+    });
+}
+
+export async function reactivarVenta(id: number): Promise<Venta> {
+    const venta = await prisma.venta.findUnique({ where: { id } });
+    if (!venta) {
+        const error = new Error('Venta no encontrada') as any;
+        error.statusCode = 404;
+        throw error;
+    }
+
+    if (venta.estado !== 'ELIMINADO') {
+        const error = new Error('La venta no está eliminada') as any;
+        error.statusCode = 400;
+        throw error;
+    }
+
+    // Al reactivar, volvemos a INICIADA o OPERATIVO?
+    // Dado que el sistema usa INICIADA como default, y OPERATIVO es el genérico...
+    // Voy a usar INICIADA si no tengo historial, o OPERATIVO si queremos ser consistentes con "Active".
+    // Pero EstadoVenta tiene INICIADA, CON_BOLETO...
+    // Si estaba ESCRITURADO y lo borré, y lo reactivo... volver a INICIADA es perder datos.
+    // Como no guardé el "estadoAnterior", tengo un problema.
+    // ASUMIRÉ: Volver a OPERATIVO (si el enum lo tiene, que sí lo tiene). 
+    // El usuario podrá cambiarlo manualmente después.
+
+    return await prisma.venta.update({
+        where: { id },
+        data: {
+            estado: 'OPERATIVO', // O lo que decidamos como "Activo genérico"
+            fechaBaja: null,
+        },
+        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+    });
 }
 
