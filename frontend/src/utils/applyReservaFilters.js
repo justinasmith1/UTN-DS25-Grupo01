@@ -96,6 +96,9 @@ export const applyReservaFilters = (reservas, params = {}) => {
   const estados = normArr(params.estado).map(upper);
   if (estados.length) {
     filtered = filtered.filter((r) => estados.includes(upper(r?.estado)));
+  } else {
+    // Por defecto ocultar ELIMINADO
+    filtered = filtered.filter((r) => upper(r?.estado) !== 'ELIMINADO');
   }
 
   // 3) Inmobiliaria (multi)
