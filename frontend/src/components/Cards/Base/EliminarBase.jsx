@@ -12,6 +12,7 @@ export default function EliminarBase({
   noteBold,
   confirmLabel = "Eliminar",
   loading = false,
+  loadingLabel = "Eliminando…",
   onConfirm,
   onCancel,
 }) {
@@ -85,7 +86,7 @@ export default function EliminarBase({
             onClick={onConfirm}
             disabled={loading}
           >
-            {loading ? "Eliminando…" : confirmLabel}
+            {loading ? loadingLabel : confirmLabel}
           </button>
         </footer>
       </section>

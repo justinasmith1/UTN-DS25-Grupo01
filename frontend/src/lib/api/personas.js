@@ -33,7 +33,7 @@ export const fromApi = (apiPersona) => {
     email: apiPersona.email || null, // Campo propio de Persona
     contacto: apiPersona.contacto || null,
     cuil: apiPersona.cuil || identificadorValor, // Legacy
-    estado: apiPersona.estado || 'ACTIVA',
+    estado: apiPersona.estado || 'OPERATIVO',
     createdAt: apiPersona.createdAt || null,
     esPropietario: Boolean(apiPersona.esPropietario),
     esInquilino: Boolean(apiPersona.esInquilino),

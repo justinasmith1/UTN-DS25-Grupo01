@@ -31,7 +31,7 @@ import { desactivarPersona, reactivarPersona, deletePersonaDefinitivo, getPerson
 const getDefaultFilters = (userRole) => {
   if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
     return {
-      estado: 'ACTIVA', // Por defecto mostrar solo activas
+      estado: 'OPERATIVO', // Por defecto mostrar solo operativas
       clienteDe: [], // Array vacío para multiSelect
       identificadorTipo: [], // Array vacío para multiSelect
       fechaCreacion: { min: null, max: null }
@@ -221,12 +221,12 @@ export default function Personas() {
     if (!persona) return;
     
     // Si está activa, abrir modal de desactivar
-    if (persona.estado === 'ACTIVA') {
+    if (persona.estado === 'OPERATIVO') {
       setPersonaADesactivar(persona);
       setDesactivarPersonaOpen(true);
     } 
     // Si está inactiva, abrir modal de reactivar
-    else if (persona.estado === 'INACTIVA') {
+    else if (persona.estado === 'ELIMINADO') {
       setPersonaADesactivar(persona);
       setReactivarPersonaOpen(true);
     }

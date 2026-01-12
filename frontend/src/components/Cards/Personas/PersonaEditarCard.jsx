@@ -134,7 +134,7 @@ export default function PersonaEditarCard({
   const [valorIdentificador, setValorIdentificador] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [estado, setEstado] = useState("ACTIVA");
+  const [estado, setEstado] = useState("OPERATIVO");
   const [inmobiliariaId, setInmobiliariaId] = useState(null);
   
   // Estados auxiliares
@@ -187,7 +187,7 @@ export default function PersonaEditarCard({
   useEffect(() => {
     if (open && isAdminOrGestor) {
       setLoadingInmobiliarias(true);
-      getAllInmobiliarias({ estado: "ACTIVA" })
+      getAllInmobiliarias({ estado: "OPERATIVO" })
         .then((res) => {
           const inmobiliariasList = (res.data || []).map((inm) => ({
             value: inm.id,
@@ -213,7 +213,7 @@ export default function PersonaEditarCard({
       setRazonSocial(detalle.razonSocial || "");
       setTipoIdentificador(detalle.identificadorTipo || "CUIL");
       setValorIdentificador(detalle.identificadorValor || "");
-      setEstado(detalle.estado || "ACTIVA");
+      setEstado(detalle.estado || "OPERATIVO");
       setInmobiliariaId(detalle.inmobiliariaId || null);
       
       // Cargar email y teléfono usando helpers centralizados
@@ -558,8 +558,8 @@ export default function PersonaEditarCard({
                   <NiceSelect
                     value={estado}
                     options={[
-                      { value: "ACTIVA", label: "ACTIVA" },
-                      { value: "INACTIVA", label: "INACTIVA" },
+                      { value: "OPERATIVO", label: "OPERATIVO" },
+                      { value: "ELIMINADO", label: "ELIMINADO" },
                     ]}
                     placeholder="Seleccionar estado"
                     onChange={(val) => setEstado(val)}

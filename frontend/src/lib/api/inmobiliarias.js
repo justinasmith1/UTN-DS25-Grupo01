@@ -19,7 +19,7 @@ const fromApi = (row = {}) => ({
   razonSocial: row.razonSocial ?? row.razon_social ?? "",
   comxventa: row.comxventa ?? row.comision ?? null,
   contacto: row.contacto ?? row.phone ?? row.telefono ?? "",
-  estado: row.estado ?? "ACTIVA", // ACTIVA o INACTIVA
+  estado: row.estado ?? "OPERATIVO", // OPERATIVO o ELIMINADO
   fechaBaja: row.fechaBaja ?? row.fecha_baja ?? null,
   cantidadVentas: row.cantidadVentas ?? row.ventas_count ?? 0,
   cantidadReservas: row.cantidadReservas ?? row.reservas_count ?? row._count?.reservas ?? 0,
@@ -139,7 +139,7 @@ async function mockGetAll(params = {}) { ensureSeed(); const { data, meta } = mo
 async function mockGetById(id) { ensureSeed(); return ok(INMOS.find((x) => String(x.id) === String(id))); }
 async function mockCreate(payload) { ensureSeed(); const row = { id: nextId(), ...fromApi(toApi(payload)) }; INMOS.unshift(row); return ok(row); }
 async function mockUpdate(id, payload) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], ...fromApi(toApi(payload)) }; return ok(INMOS[i]); }
-async function mockDeactivate(id) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], estado: "INACTIVA", fechaBaja: new Date().toISOString() }; return ok(INMOS[i]); }
+async function mockDeactivate(id) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], estado: "ELIMINADO", fechaBaja: new Date().toISOString() }; return ok(INMOS[i]); }
 
 /* ------------------------------- API --------------------------------- */
 async function apiGetAll(params = {}) {
@@ -220,7 +220,7 @@ async function apiUpdate(id, payload) {
   const body = {};
 
   // Mapear campos que pueden venir (todos opcionales para PATCH)
-  // El schema espera: nombre (string, min 1), razonSocial (string, min 1), contacto (string, max 100, opcional), comxventa (number, 0-100, opcional), estado (ACTIVA/INACTIVA)
+  // El schema espera: nombre (string, min 1), razonSocial (string, min 1), contacto (string, max 100, opcional), comxventa (number, 0-100, opcional), estado (OPERATIVO/ELIMINADO)
   if (payload.nombre !== undefined && payload.nombre !== null && String(payload.nombre).trim().length > 0) {
     const nombreTrim = String(payload.nombre).trim();
     if (nombreTrim.length > 100) {
@@ -265,8 +265,8 @@ async function apiUpdate(id, payload) {
   // Soporte para cambio de estado (baja lógica)
   if (payload.estado !== undefined && payload.estado !== null) {
     const estadoUpper = String(payload.estado).toUpperCase();
-    if (estadoUpper !== "ACTIVA" && estadoUpper !== "INACTIVA") {
-      throw new Error("El estado debe ser ACTIVA o INACTIVA");
+    if (estadoUpper !== "OPERATIVO" && estadoUpper !== "ELIMINADO") {
+      throw new Error("El estado debe ser OPERATIVO o ELIMINADO");
     }
     body.estado = estadoUpper;
   }
@@ -306,8 +306,8 @@ async function apiUpdate(id, payload) {
 }
 
 async function apiDeactivate(id) {
-  // Baja lógica: cambiar estado a INACTIVA en lugar de DELETE
-  const body = { estado: "INACTIVA" };
+  // Baja lógica: cambiar estado a ELIMINADO en lugar de DELETE
+  const body = { estado: "ELIMINADO" };
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -321,7 +321,7 @@ async function apiDeactivate(id) {
     ...base,
     createdAt: raw?.createdAt ?? raw?.created_at ?? base.createdAt ?? null,
     updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? base.updateAt ?? null,
-    estado: raw?.estado ?? "INACTIVA",
+    estado: raw?.estado ?? "ELIMINADO",
     fechaBaja: raw?.fechaBaja ?? raw?.fecha_baja ?? new Date().toISOString(),
     cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
     cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? base.cantidadReservas ?? 0,
@@ -336,8 +336,8 @@ export function getInmobiliariaById(id) { return USE_MOCK ? mockGetById(id) : ap
 export function createInmobiliaria(payload) { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
 export function updateInmobiliaria(id, p) { return USE_MOCK ? mockUpdate(id, p) : apiUpdate(id, p); }
 export function deactivateInmobiliaria(id) { return USE_MOCK ? mockDeactivate(id) : apiDeactivate(id); }
-// Reactivar: cambiar estado de INACTIVA a ACTIVA
-export function reactivateInmobiliaria(id) { return updateInmobiliaria(id, { estado: "ACTIVA" }); }
+// Reactivar: cambiar estado de ELIMINADO a OPERATIVO
+export function reactivateInmobiliaria(id) { return updateInmobiliaria(id, { estado: "OPERATIVO" }); }
 // Mantener deleteInmobiliaria por compatibilidad (ahora hace soft delete)
 export function deleteInmobiliaria(id) { return deactivateInmobiliaria(id); }
 

@@ -142,12 +142,20 @@ export default function TablaInmobiliarias({
   // -----------------------------------------
   const columns = useMemo(() => {
     return inmobiliariasTablePreset.columns.map((col) => {
+      if (col.id === 'estado') {
+        return {
+          ...col,
+          accessor: (row) => (
+            <StatusBadge value={row.estado} type="estado" />
+          ),
+        };
+      }
       if (col.id === 'nombre') {
         return {
           ...col,
           accessor: (row) => {
             // Opcional: Podrías poner el texto en gris si está inactiva
-            const style = row.estado === 'INACTIVA' ? { color: '#9ca3af' } : {};
+            const style = row.estado === 'ELIMINADO' ? { color: '#9ca3af' } : {};
             return (
               <span style={{
                 display: 'inline-block',
@@ -266,7 +274,7 @@ export default function TablaInmobiliarias({
       }
 
       // Mostrar botón de eliminar O reactivar según el estado
-      if (row.estado === 'INACTIVA') {
+      if (row.estado === 'ELIMINADO') {
         // Inmobiliaria inactiva: mostrar botón de REACTIVAR
         if (can(user, PERMISSIONS.AGENCY_EDIT) && onReactivarInmobiliaria) {
           actions.push(

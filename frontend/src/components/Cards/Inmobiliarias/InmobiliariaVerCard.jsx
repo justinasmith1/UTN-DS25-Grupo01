@@ -73,8 +73,8 @@ export default function InmobiliariaVerCard({
     // 1. Estado (Prioridad alta)
     [
       "ESTADO", 
-      inmob?.estado ?? "ACTIVA", 
-      inmob?.estado === "INACTIVA" ? "#ef4444" : "#10b981" // Rojo si inactiva, Verde si activa
+      inmob?.estado ?? "OPERATIVO", 
+      inmob?.estado === "ELIMINADO" ? "#ef4444" : "#10b981" // Rojo si inactiva, Verde si activa
     ],
     // 2. Fecha de Baja (Solo si existe y está inactiva)
     ...(inmob?.fechaBaja 

@@ -16,7 +16,7 @@ export const inmobiliariasTablePreset = {
     {
       id: 'estado',
       header: 'Estado',
-      accessor: (row) => row.estado || 'ACTIVA',
+      accessor: (row) => row.estado || 'OPERATIVO',
       width: 120,
       sortable: true,
       align: 'center',

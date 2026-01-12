@@ -13,8 +13,8 @@ export default function StatusBadge({ value, type = 'default' }) {
   // --- NUEVO BLOQUE: Para estado de inmobiliaria ---
   if (type === 'estado') {
     // Asignamos colores según el valor exacto
-    if (label === 'ACTIVA') return badge('ACTIVA', 'success');
-    if (label === 'INACTIVA') return badge('INACTIVA', 'danger');
+    if (label === 'OPERATIVO') return badge('OPERATIVO', 'success');
+    if (label === 'ELIMINADO') return badge('ELIMINADO', 'danger');
     return badge(label, 'muted');
   }
   // ------------------------------------------------

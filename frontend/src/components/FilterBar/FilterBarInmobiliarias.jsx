@@ -49,8 +49,8 @@ export default function FilterBarInmobiliarias({
   // Catálogos para el filtro de estado
   const catalogs = useMemo(() => ({
     estado: [
-      { value: 'ACTIVA', label: 'Activa' },
-      { value: 'INACTIVA', label: 'Inactiva' },
+      { value: 'OPERATIVO', label: 'Operativo' },
+      { value: 'ELIMINADO', label: 'Eliminado' },
     ]
   }), []);
 
@@ -61,7 +61,7 @@ export default function FilterBarInmobiliarias({
     createdAt: inmobiliariasFilterPreset.ranges.createdAt,
   }), []);
 
-  // Valores por defecto - estado vacío significa mostrar solo ACTIVAS
+  // Valores por defecto - estado vacío significa mostrar solo OPERATIVAS
   const defaults = useMemo(() => ({
     ...inmobiliariasFilterPreset.defaults,
     estado: [], // Vacío por defecto
