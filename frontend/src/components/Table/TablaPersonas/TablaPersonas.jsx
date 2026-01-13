@@ -7,6 +7,7 @@ import TablaBase from '../TablaBase';
 import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { can } from '../../../lib/auth/rbac';
+import './TablaPersonas.css';
 
 const TablaPersonas = ({
   personas = [],

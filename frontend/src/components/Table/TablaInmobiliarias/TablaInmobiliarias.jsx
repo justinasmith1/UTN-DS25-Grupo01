@@ -10,12 +10,7 @@ import { can, PERMISSIONS } from "../../../lib/auth/rbac";
 import TablaBase from "../TablaBase";
 import StatusBadge from "./cells/StatusBadge";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
-import {
-  fmtComxVenta,
-  fmtCantidadVentas,
-  fmtFecha,
-  fmtContacto,
-} from "./utils/formatters";
+import { fmtComxVenta, fmtCantidadVentas, fmtFecha, fmtContacto } from "./utils/formatters";
 
 // Componente dropdown para "Ver asociadas" (ventas y reservas)
 function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) {
@@ -446,19 +441,21 @@ export default function TablaInmobiliarias({
   }, [config.columns]);
 
   return (
-    <TablaBase
-      {...tablaProps}
-      rows={data}
-      columns={config.columns}
-      widthFor={widthFor}
-      renderRowActions={config.renderRowActions}
-      toolbarRight={config.topActions}
-      selected={selectedRows}
-      onSelectedChange={onSelectionChange}
-      selectable={config.selectable}
-      rowKey="id"
-      defaultVisibleIds={defaultVisibleIds}
-      maxVisible={7}
-    />
+    <div className="tabla-inmobiliarias">
+      <TablaBase
+        {...tablaProps}
+        rows={data}
+        columns={config.columns}
+        widthFor={widthFor}
+        renderRowActions={config.renderRowActions}
+        toolbarRight={config.topActions}
+        selected={selectedRows}
+        onSelectedChange={onSelectionChange}
+        selectable={config.selectable}
+        rowKey="id"
+        defaultVisibleIds={defaultVisibleIds}
+        maxVisible={7}
+      />
+    </div>
   );
 }

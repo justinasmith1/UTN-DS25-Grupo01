@@ -1,0 +1,6 @@
+/* Estilos específicos para la tabla de Personas */
+
+/* Centrar el header de Acciones en la tabla de personas */
+.tabla-personas .tl-th--actions.tl-th--center {
+  padding-left: 40px;
+}

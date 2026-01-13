@@ -13,8 +13,8 @@ import {
 
 import { fmtMoney, fmtEstado } from './utils/formatters';
 import { ventasTablePreset as tablePreset } from './presets/ventas.table.jsx';
-
 import StatusBadge from './cells/StatusBadge.jsx';
+import './TablaVentas.css';
 
 // Persistencia de columnas por usuario
 const STORAGE_VERSION = 'v2';
@@ -468,21 +468,23 @@ export default function TablaVentas({
         </>
       )}
 
-      <TablaBase
-        rows={source}
-        rowKey="id"
-        columns={ALL_SAFE}
-        widthFor={tablePreset.widthFor}
-        defaultVisibleIds={baseDefaultCols}
-        maxVisible={MAX_VISIBLE}
-        renderRowActions={renderRowActions}
-        toolbarRight={toolbarRight}
-        defaultPageSize={25}
-        selected={selectedIds}
-        onSelectedChange={onSelectedChange}
-        visibleIds={colIds}
-        onVisibleIdsChange={setColIds}
-      />
+      <div className="tabla-ventas">
+        <TablaBase
+          rows={source}
+          rowKey="id"
+          columns={ALL_SAFE}
+          widthFor={tablePreset.widthFor}
+          defaultVisibleIds={baseDefaultCols}
+          maxVisible={MAX_VISIBLE}
+          renderRowActions={renderRowActions}
+          toolbarRight={toolbarRight}
+          defaultPageSize={25}
+          selected={selectedIds}
+          onSelectedChange={onSelectedChange}
+          visibleIds={colIds}
+          onVisibleIdsChange={setColIds}
+        />
+      </div>
     </>
   );
 }

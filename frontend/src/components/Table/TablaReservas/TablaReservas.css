@@ -1,0 +1,12 @@
+/* Estilos específicos para la tabla de Reservas */
+
+/* Centrar el header de Acciones en la tabla de reservas */
+.tabla-reservas .tl-th--actions.tl-th--center {
+  padding-left: 40px;
+}
+
+/* Asegurar que la columna Plazo Reserva tenga suficiente espacio */
+.tabla-reservas [data-col="fechaFinReserva"] {
+  min-width: 180px;
+  white-space: nowrap;
+}
