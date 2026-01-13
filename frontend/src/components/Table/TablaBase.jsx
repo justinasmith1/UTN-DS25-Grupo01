@@ -181,7 +181,7 @@ export default function TablaBase({
               </div>
             ))}
             <div aria-hidden className="tl-th tl-th--spacer-invisible" />
-            <div className="tl-th tl-th--actions">Acciones</div>
+            <div className="tl-th tl-th--actions tl-th--center">Acciones</div>
           </div>
         </div>
 

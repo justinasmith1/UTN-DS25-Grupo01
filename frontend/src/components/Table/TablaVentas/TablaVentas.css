@@ -1,0 +1,6 @@
+/* Estilos específicos para la tabla de Ventas */
+
+/* Centrar el header de Acciones en la tabla de ventas */
+.tabla-ventas .tl-th--actions.tl-th--center {
+  padding-left: 40px;
+}
