@@ -120,6 +120,9 @@
   box-sizing:border-box;
   padding:12px 14px; border-bottom:1px solid #eef2f6; font-size:14px;
   display:flex; align-items:center; min-height:56px; line-height:1.35; /* altura + línea uniformes */
+  overflow: visible; /* Permitir que el contenido se vea completo */
+  white-space: normal; /* Permitir que el texto se ajuste */
+  word-wrap: break-word; /* Permitir que las palabras largas se dividan si es necesario */
 }
 .tl-th{ font-weight:600; color:#2b3748; }
 .tl-th--checkbox, .tl-td--checkbox{ justify-content:center; }
@@ -161,6 +164,11 @@
   text-align: center;
   justify-content: center;
   padding-right: 42px;
+}
+/* Asegurar centrado cuando tiene ambas clases */
+.tl-th--actions.tl-th--center {
+  text-align: center !important;
+  justify-content: center !important;
 }
 .tl-td--actions,
 [data-col="actions"].tl-td {

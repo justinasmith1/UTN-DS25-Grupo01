@@ -161,7 +161,7 @@ export default function Layout() {
   return (
     <div className="min-vh-100 d-flex flex-column bg-white">
       <Sidebar />
-      <div style={{ marginLeft: '64px' }}>
+      <div className="app-content" style={{ marginLeft: '64px' }}>
         <Header onUserClick={() => setShowUserModal(true)} />
 
         {/* Píldoras de módulos en modo CLARO (fondo blanco del layout) */}

@@ -34,7 +34,7 @@ export const reservasTablePreset = {
       id: 'loteInfo',
       titulo: 'Lote',
       accessor: (r) => r?.lote?.mapId ?? r?.lotMapId ?? r?.loteInfo?.mapId ?? r?.loteId ?? '—',
-      width: '120px'
+      width: '100px'
     },
 
     // Cliente: nombre y apellido desde row.cliente
@@ -42,7 +42,7 @@ export const reservasTablePreset = {
       id: 'clienteCompleto',
       titulo: 'Cliente',
       accessor: (r) => getClienteNombre(r) ?? '—',
-      width: '140px'
+      width: '100px'
     },
 
     // Fecha Reserva en una sola línea
@@ -50,14 +50,15 @@ export const reservasTablePreset = {
       id: 'fechaReserva',
       titulo: 'Fecha Reserva',
       accessor: (r) => (getFechaReserva(r) ? new Date(getFechaReserva(r)).toLocaleDateString('es-AR') : '—'),
-      width: '140px'
+      width: '100px'
     },
 
     {
       id: 'fechaFinReserva',
       titulo: 'Plazo Reserva',
       accessor: (r) => (getFechaFinReserva(r) ? new Date(getFechaFinReserva(r)).toLocaleDateString('es-AR') : '—'),
-      width: '140px'
+      width: '200px',
+      align: 'center'
     },
 
     // Seña: vuelve a guion simple si falta
@@ -118,13 +119,14 @@ export const reservasTablePreset = {
   // anchos por id
   widthFor: (id) => {
     const W = {
-      id: '120px',
-      loteInfo: '120px',
-      clienteCompleto: '220px',
-      fechaReserva: '140px',
-      fechaFinReserva: '140px',
+      id: '110px',              // Reducido de 120px
+      loteInfo: '100px',        // Reducido de 120px
+      estado: '130px',          // Ancho para la columna Estado (agregada dinámicamente)
+      clienteCompleto: '180px',  // Reducido de 220px
+      fechaReserva: '120px',    // Reducido de 140px
+      fechaFinReserva: '200px',  // Aumentado de 180px para mostrar "Plazo Reserva" completo
       seña: '120px',
-      inmobiliariaNombre: '200px',
+      inmobiliariaNombre: '180px', // Reducido de 200px
       lotePrecio: '130px',
       createdAt: '130px',
     };

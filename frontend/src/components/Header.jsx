@@ -38,7 +38,7 @@ export default function Header({ onUserClick, user }) {
       style={{
         background: 'var(--color-header-bg)',
         color: 'var(--color-text-light)',
-        boxShadow: 'var(--elev-1)',
+        boxShadow: 'none', /* Sin sombra: header como fondo continuo, no elemento flotante */
         paddingTop: HEADER_PAD_V,
         paddingBottom: HEADER_PAD_V,
         border: 'none', /* Eliminar cualquier borde del Navbar de Bootstrap */
@@ -51,18 +51,6 @@ export default function Header({ onUserClick, user }) {
         .navbar.sticky-top {
           border-left: none;
           position: relative;
-        }
-        
-        /* Cubrir la zona del sidebar en el header para eliminar sombra visible */
-        .navbar.sticky-top::before {
-          content: '';
-          position: absolute;
-          left: -64px;
-          top: 0;
-          width: 64px;
-          height: 100%;
-          background: var(--color-header-bg);
-          z-index: -1;
         }
         
         .cclf-tab, .cclf-logout {

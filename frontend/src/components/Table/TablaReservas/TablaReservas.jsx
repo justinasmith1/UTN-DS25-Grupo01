@@ -23,7 +23,8 @@ import {
 } from '../../../utils/mapaUtils';
 
 import { reservasTablePreset as tablePreset } from './presets/reservas.table.jsx';
-import StatusBadge from './cells/StatusBadge.jsx'; 
+import StatusBadge from './cells/StatusBadge.jsx';
+import './TablaReservas.css'; 
 
 // ------------------------
 // Helpers internos
@@ -165,7 +166,7 @@ export default function TablaReservas({
       id: 'estado',
       titulo: 'Estado',
       accessorKey: 'estado',
-      width: '140px',
+      width: '130px',  // Reducido de 140px
       align: 'center',
       cell: ({ getValue, row }) => {
         const v = getValue?.() ?? row?.original?.estado ?? null;
@@ -468,19 +469,21 @@ export default function TablaReservas({
         </>
       )}
 
-      <TablaBase
-        rows={rows}
-        rowKey="id"
-        columns={columnsAligned}
-        widthFor={tablePreset.widthFor}
-        defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
-        maxVisible={7}                        // tope en 7 columnas visibles
-        renderRowActions={renderRowActions}
-        toolbarRight={toolbarRight}
-        defaultPageSize={25}
-        selected={selectedIds}
-        onSelectedChange={onSelectedChange}
-      />
+      <div className="tabla-reservas">
+        <TablaBase
+          rows={rows}
+          rowKey="id"
+          columns={columnsAligned}
+          widthFor={tablePreset.widthFor}
+          defaultVisibleIds={defaultVisibleIds} // 7 por defecto (con "estado")
+          maxVisible={7}                        // tope en 7 columnas visibles
+          renderRowActions={renderRowActions}
+          toolbarRight={toolbarRight}
+          defaultPageSize={25}
+          selected={selectedIds}
+          onSelectedChange={onSelectedChange}
+        />
+      </div>
     </>
   );
 }
