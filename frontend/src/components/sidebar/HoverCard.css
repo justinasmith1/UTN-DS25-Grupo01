@@ -1,0 +1,90 @@
+/* Estilos para HoverCard del Sidebar */
+
+.hover-card {
+  position: fixed;
+  background: var(--color-header-bg); /* Verde oscuro del sistema */
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  min-width: 200px;
+  z-index: 1001;
+  overflow: hidden;
+  pointer-events: auto;
+  padding: 12px 0;
+}
+
+/* Solo mostrar hover cards en desktop */
+@media (max-width: 768px) {
+  .hover-card {
+    display: none;
+  }
+}
+
+.hover-card__title {
+  padding: 0 14px 8px 14px;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--color-text-light);
+  text-transform: none; /* Title Case, no mayúsculas */
+  letter-spacing: 0.5px;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.hover-card__separator {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0;
+  border: none;
+}
+
+.hover-card__list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.hover-card__item {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  color: var(--color-text-light);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 400;
+  transition: background-color 0.18s ease;
+  cursor: pointer;
+  border-radius: 8px;
+  margin: 2px 8px;
+  min-height: 36px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.hover-card__item:hover,
+.hover-card__item:focus-visible {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: var(--color-text-light);
+  outline: 2px solid rgba(255, 255, 255, 0.2);
+  outline-offset: -2px;
+}
+
+.hover-card__item--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.hover-card__item--disabled:hover {
+  background-color: transparent;
+  color: var(--color-text-light);
+}
+
+.hover-card__message {
+  padding: 14px;
+  color: var(--color-text-light);
+  font-size: 13px;
+  text-align: center;
+  font-style: italic;
+  opacity: 0.75;
+}
