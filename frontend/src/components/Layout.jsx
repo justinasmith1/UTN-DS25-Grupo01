@@ -13,6 +13,7 @@ import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
 import LoteSidePanel from "./Mapa/LoteSidePanel";
+import "./Layout.css";
 
 export default function Layout() {
   const { success, error, info } = useToast();

@@ -48,10 +48,26 @@ export default function SidebarItem({
     const updatePosition = () => {
       if (showHoverCard && itemRef.current) {
         const rect = itemRef.current.getBoundingClientRect();
-        // Posicionar a la derecha del sidebar, alineado con el ítem
+        const viewportHeight = window.innerHeight;
+        const cardEstimatedHeight = 200; // Altura estimada del card
+        
+        // Calcular posición vertical: centrar con el ítem
+        let top = rect.top + (rect.height / 2) - (cardEstimatedHeight / 2);
+        
+        // Si el card se sale por abajo, reposicionarlo
+        if (top + cardEstimatedHeight > viewportHeight - 10) {
+          top = viewportHeight - cardEstimatedHeight - 10;
+        }
+        
+        // Si el card se sale por arriba, reposicionarlo
+        if (top < 10) {
+          top = 10;
+        }
+        
+        // Posicionar a la derecha del sidebar con separación de 10-12px
         setHoverCardPosition({
-          top: rect.top,
-          left: rect.right + 8, // 8px de separación del sidebar
+          top: Math.max(10, top),
+          left: rect.right + 11, // 11px de separación del sidebar
         });
       }
     };
@@ -83,10 +99,10 @@ export default function SidebarItem({
   };
 
   const handleMouseLeave = () => {
-    // Pequeño delay para permitir mover el mouse al hover card
+    // Delay para permitir mover el mouse al hover card sin flicker
     timeoutRef.current = setTimeout(() => {
       setShowHoverCard(false);
-    }, 100);
+    }, 150);
   };
 
   const handleHoverCardEnter = () => {

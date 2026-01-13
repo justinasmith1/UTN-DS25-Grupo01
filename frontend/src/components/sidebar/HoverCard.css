@@ -3,14 +3,37 @@
 .hover-card {
   position: fixed;
   background: var(--color-header-bg); /* Verde oscuro del sistema */
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.15); /* Borde más sutil pero visible */
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  /* Sombra más difusa y premium: menos intensa, más suave */
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), 0 2px 8px rgba(0, 0, 0, 0.15);
   min-width: 200px;
   z-index: 1001;
   overflow: hidden;
   pointer-events: auto;
-  padding: 12px 0;
+  padding: 0; /* Padding removido del contenedor, se maneja en cada sección */
+  
+  /* Micro-interacción: aparición suave */
+  opacity: 0;
+  transform: translateY(-4px);
+  animation: hoverCardEnter 0.2s ease-out forwards;
+}
+
+/* Animación de aparición suave */
+@keyframes hoverCardEnter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Respetar prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  .hover-card {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Solo mostrar hover cards en desktop */
@@ -20,55 +43,64 @@
   }
 }
 
+/* ===== TÍTULO: Mayor jerarquía visual ===== */
 .hover-card__title {
-  padding: 0 14px 8px 14px;
-  font-weight: 500;
-  font-size: 14px;
+  padding: 14px 16px 10px 16px; /* Más padding arriba para jerarquía */
+  font-weight: 600; /* Semibold para mayor peso visual */
+  font-size: 15px; /* Un poco mayor que los items */
   color: var(--color-text-light);
   text-transform: none; /* Title Case, no mayúsculas */
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px; /* Ligero espaciado para legibilidad */
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.3; /* Más compacto para título */
 }
 
+/* ===== SEPARADOR: Divisor sutil bajo el título ===== */
 .hover-card__separator {
   height: 1px;
-  background: rgba(255, 255, 255, 0.08);
-  margin: 0;
+  background: rgba(255, 255, 255, 0.12); /* Un poco más visible que antes */
+  margin: 0 12px; /* Margen horizontal para no tocar bordes */
   border: none;
 }
 
+/* ===== LISTA: Contenedor de items ===== */
 .hover-card__list {
   list-style: none;
   margin: 0;
-  padding: 4px 0;
+  padding: 6px 0; /* Padding vertical para separar del separador y del borde */
 }
 
+/* ===== ITEMS: Área clickeable completa tipo menú ===== */
 .hover-card__item {
   display: flex;
   align-items: center;
-  padding: 10px 12px;
+  padding: 11px 16px; /* Padding consistente: más vertical para área clickeable completa */
   color: var(--color-text-light);
   text-decoration: none;
   font-size: 13px;
   font-weight: 400;
-  transition: background-color 0.18s ease;
+  /* Transición suave para hover (150-200ms como solicitado) */
+  transition: background-color 0.18s ease, transform 0.1s ease;
   cursor: pointer;
-  border-radius: 8px;
-  margin: 2px 8px;
-  min-height: 36px;
+  border-radius: 8px; /* Border-radius para estilo píldora */
+  margin: 2px 8px; /* Margen horizontal para que no toque los bordes, estilo píldora */
+  min-height: 40px; /* Altura mínima generosa para área clickeable */
   outline: none;
   box-sizing: border-box;
+  width: calc(100% - 16px); /* Ajustar ancho para compensar el margen horizontal */
 }
 
+/* Hover state: estilo píldora con fondo más claro */
 .hover-card__item:hover,
 .hover-card__item:focus-visible {
-  background-color: rgba(255, 255, 255, 0.12);
-  color: var(--color-text-light);
-  outline: 2px solid rgba(255, 255, 255, 0.2);
-  outline-offset: -2px;
+  background-color: rgba(255, 255, 255, 0.15) !important; /* Fondo más claro tipo píldora */
+  color: var(--color-text-light) !important;
+  /* Sin outline para mantener look limpio, solo cambio de fondo */
+  outline: none;
+  transform: translateX(2px); /* Micro-movimiento sutil hacia la derecha */
 }
 
+/* Items deshabilitados */
 .hover-card__item--disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -78,13 +110,16 @@
 .hover-card__item--disabled:hover {
   background-color: transparent;
   color: var(--color-text-light);
+  transform: none; /* Sin transform en disabled */
 }
 
+/* ===== MENSAJE: Para módulos en desarrollo ===== */
 .hover-card__message {
-  padding: 14px;
+  padding: 16px;
   color: var(--color-text-light);
   font-size: 13px;
   text-align: center;
   font-style: italic;
   opacity: 0.75;
+  line-height: 1.5;
 }
