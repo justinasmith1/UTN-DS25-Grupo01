@@ -32,7 +32,7 @@ export default function Header({ onUserClick, user }) {
   })();
 
   return (
-    <Navbar
+      <Navbar
       expand="lg"
       className="sticky-top"
       style={{
@@ -41,10 +41,30 @@ export default function Header({ onUserClick, user }) {
         boxShadow: 'var(--elev-1)',
         paddingTop: HEADER_PAD_V,
         paddingBottom: HEADER_PAD_V,
+        border: 'none', /* Eliminar cualquier borde del Navbar de Bootstrap */
+        marginLeft: 0, /* Sin margen: el wrapper en Layout.jsx ya maneja el desplazamiento del sidebar */
       }}
     >
       {/* estilos de hover/active para tabs y logout */}
       <style>{`
+        /* Asegurar que el header no tenga borde visible en la zona del sidebar */
+        .navbar.sticky-top {
+          border-left: none;
+          position: relative;
+        }
+        
+        /* Cubrir la zona del sidebar en el header para eliminar sombra visible */
+        .navbar.sticky-top::before {
+          content: '';
+          position: absolute;
+          left: -64px;
+          top: 0;
+          width: 64px;
+          height: 100%;
+          background: var(--color-header-bg);
+          z-index: -1;
+        }
+        
         .cclf-tab, .cclf-logout {
           border: 1px solid rgba(0,0,0,0.85);
           border-radius: ${TABS_BORDER_RADIUS}px;

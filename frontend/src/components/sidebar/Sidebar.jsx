@@ -121,12 +121,25 @@ export default function Sidebar() {
           bottom: 0;
           width: 64px; /* Ancho colapsado: solo íconos */
           background: var(--color-header-bg); /* Mismo verde que el header #0D3730 */
-          z-index: 999; /* Debajo del header (sticky-top) pero sobre el contenido */
+          z-index: 1021; /* Por encima del header (sticky-top de Bootstrap usa z-index 1020) */
           display: flex;
           flex-direction: column;
           align-items: center;
           padding-top: 90px; /* Espacio para el header (logo 55px + padding vertical) */
           box-shadow: 2px 0 4px rgba(0, 0, 0, 0.1);
+          border: none; /* Eliminar cualquier borde */
+        }
+        
+        /* Extender el sidebar sobre la altura del header para cubrir cualquier línea o sombra visible */
+        .sidebar::after {
+          content: '';
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 64px;
+          height: 83px; /* Altura total del header: 55px logo + 14px padding-top + 14px padding-bottom */
+          background: var(--color-header-bg);
+          z-index: -1; /* Detrás del contenido del sidebar pero cubriendo la zona del header */
         }
 
         .sidebar-item-wrapper {

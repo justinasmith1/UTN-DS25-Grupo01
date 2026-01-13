@@ -10,8 +10,8 @@
 
 /* ===== Barra ===== */
 .fb{ position: sticky; top: 0; z-index: 8; background:#fff; border-bottom:1px solid var(--fb-line); padding:16px 24px 16px 30px; }
-.fb-dashboard { padding: 8px 24px 16px 30px; }
-.fb-map       { padding: 16px 24px 16px 30px; }
+.fb-dashboard { padding: 20px 24px 16px 30px; } /* Espaciado: 20px arriba (más separación del header), 16px abajo */
+.fb-map       { padding: 20px 24px 16px 30px; } /* Espaciado: 20px arriba (más separación del header), 16px abajo */
 
 .fb-row{ display:flex; gap:10px; align-items:center; }
 .fb-search{ flex:1 1 560px; max-width:900px; display:flex; gap:10px; align-items:center; background:#fff; border:1px solid var(--fb-line); border-radius:14px; padding:10px 14px; transition: box-shadow .15s, border-color .15s; }
