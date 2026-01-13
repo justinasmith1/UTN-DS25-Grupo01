@@ -8,6 +8,7 @@ import { getAllLotes, updateLote, deleteLote, createLote } from "../lib/api/lote
 
 import Header from "./Header";
 import ModulePills from "./ModulePills";
+import Sidebar from "./sidebar/Sidebar";
 import User from "./User";
 import LotInfo from "./LotInfo";
 import ModalGestionLote from "./ModalGestionLote";
@@ -159,28 +160,32 @@ export default function Layout() {
 
   return (
     <div className="min-vh-100 d-flex flex-column bg-white">
-      <Header onUserClick={() => setShowUserModal(true)} />
+      <Sidebar />
+      <div style={{ marginLeft: '64px' }}>
+        <Header onUserClick={() => setShowUserModal(true)} />
 
-      {/* Píldoras de módulos en modo CLARO (fondo blanco del layout) */}
-      <div className="container py-2">
-        <ModulePills variant="light" />
+        {/* Píldoras de módulos en modo CLARO (fondo blanco del layout) */}
+        {/* DESACTIVADO: Se reemplazó por sidebar colapsable. Mantener código para referencia futura. */}
+        {/* <div className="container py-2">
+          <ModulePills variant="light" />
+        </div> */}
+
+        <Outlet
+          context={{
+            lots: filteredLots,
+            allLots: lotsData,
+            loadingLots,
+            handleStatusChange,
+            handleSubStatusChange,
+            handleViewDetail,
+            abrirModalEditar,
+            abrirModalEliminar,
+            openSidePanel: handleOpenPanel,
+            selectedLotId,
+            showPanel,
+          }}
+        />
       </div>
-
-      <Outlet
-        context={{
-          lots: filteredLots,
-          allLots: lotsData,
-          loadingLots,
-          handleStatusChange,
-          handleSubStatusChange,
-          handleViewDetail,
-          abrirModalEditar,
-          abrirModalEliminar,
-          openSidePanel: handleOpenPanel,
-          selectedLotId,
-          showPanel,
-        }}
-      />
 
       <LoteSidePanel
         show={showPanel}
