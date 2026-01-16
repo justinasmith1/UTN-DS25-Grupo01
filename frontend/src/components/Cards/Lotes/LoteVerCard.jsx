@@ -136,9 +136,12 @@ export default function LoteVerCard({
       // Verificar si ya tenemos las relaciones necesarias (objeto completo con nombre/calle)
       const hasPropietario = currentLot?.propietario && typeof currentLot.propietario === 'object' && (currentLot.propietario.nombre || currentLot.propietario.apellido);
       const hasUbicacion = currentLot?.ubicacion && typeof currentLot.ubicacion === 'object' && currentLot.ubicacion.calle;
+      const hasInquilino = currentLot?.inquilino && typeof currentLot.inquilino === 'object' && (currentLot.inquilino.nombre || currentLot.inquilino.apellido || currentLot.inquilino.razonSocial);
 
       // Si ya tenemos los datos completos, no hacer la llamada
-      if (hasPropietario && hasUbicacion) return;
+      // Si el lote tiene ocupación ALQUILADO o alquilerActivo, también necesitamos verificar inquilino
+      const needsInquilino = currentLot?.ocupacion === 'ALQUILADO' || currentLot?.alquilerActivo || currentLot?.alquiler === true;
+      if (hasPropietario && hasUbicacion && (!needsInquilino || hasInquilino)) return;
 
       try {
         const response = await getLoteById(idToUse);
@@ -275,8 +278,22 @@ export default function LoteVerCard({
     const nombre =
       p.nombre || p.firstName || p.username || p.name;
     const apellido = p.apellido || p.lastName || p.surname;
-    const full = [nombre, apellido].filter(Boolean).join(" ");
+    const razonSocial = p.razonSocial;
+    const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
     return safe(full || nombre || apellido);
+  }, [lot]);
+
+  const tenantName = useMemo(() => {
+    const i =
+      lot?.inquilino ||
+      null;
+    if (!i) return null;
+    const nombre =
+      i.nombre || i.firstName || i.username || i.name;
+    const apellido = i.apellido || i.lastName || i.surname;
+    const razonSocial = i.razonSocial;
+    const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
+    return full || nombre || apellido || null;
   }, [lot]);
 
   const ubicacion = useMemo(() => {
@@ -304,6 +321,26 @@ export default function LoteVerCard({
     return normalized;
   };
 
+  // Calcular ocupación desde alquilerActivo
+  const ocupacion = useMemo(() => {
+    if (lot?.ocupacion) return lot.ocupacion === 'ALQUILADO' ? 'Alquilado' : 'No alquilado';
+    return 'No alquilado';
+  }, [lot]);
+
+  // Obtener inquilino activo (preferir alquilerActivo.inquilino)
+  const inquilinoActivo = useMemo(() => {
+    if (lot?.alquilerActivo?.inquilino) {
+      const i = lot.alquilerActivo.inquilino;
+      const nombre = i.nombre || i.firstName || i.username || i.name;
+      const apellido = i.apellido || i.lastName || i.surname;
+      const razonSocial = i.razonSocial;
+      const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
+      return full || nombre || apellido || null;
+    }
+    // Fallback: usar inquilino legacy si existe
+    return tenantName;
+  }, [lot, tenantName]);
+
   const leftPairs = [
     ["ID", loteDisplayId],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
@@ -313,12 +350,17 @@ export default function LoteVerCard({
       ["SUB-ESTADO", getEstadoValue(lot?.subestado ?? lot?.subStatus)],
       ["PROPIETARIO", ownerName],
       ["UBICACION", ubicacion],
+      ["OCUPACIÓN", ocupacion], // Reemplazar ALQUILER por OCUPACIÓN
     ];
+    
+    // Agregar INQUILINO solo si está alquilado (ocupación === 'Alquilado')
+    if (ocupacion === 'Alquilado' && inquilinoActivo) {
+      leftPairs.push(["INQUILINO", safe(inquilinoActivo)]);
+    }
 
   const rightPairs = [
     ["SUPERFICIE", fmtSurface(lot?.superficie ?? lot?.surface)],
     ["PRECIO", fmtMoney(lot?.precio ?? lot?.price)],
-    ["ALQUILER", fmtBoolean(lot?.alquiler)],
     ["DEUDA", fmtBoolean(lot?.deuda)],
     ["CREADO", fmtDate(lot?.createdAt ?? lot?.creadoEl)],
     ["ACTUALIZADO", fmtDate(lot?.updateAt ?? lot?.updatedAt)],

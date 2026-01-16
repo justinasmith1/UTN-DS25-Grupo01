@@ -295,9 +295,9 @@ export default function LoteSidePanel({
   const isReserveButtonDisabled = useMemo(() => {
     if (!currentLot) return true;
     const estado = estadoLote;
-    // Deshabilitado si está NO_DISPONIBLE, ALQUILADO
+    // Deshabilitado si está NO_DISPONIBLE (ocupación se maneja por separado)
     // NO deshabilitado si está DISPONIBLE, RESERVADO (muestra "Ver Reserva"), o VENDIDO (muestra "Ver Venta")
-    return estado === "NO_DISPONIBLE" || estado === "NO DISPONIBLE" || estado === "ALQUILADO";
+    return estado === "NO_DISPONIBLE" || estado === "NO DISPONIBLE";
   }, [currentLot, estadoLote]);
 
   // Texto del botón según el estado

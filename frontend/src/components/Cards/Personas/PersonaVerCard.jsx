@@ -115,13 +115,13 @@ export default function PersonaVerCard({
 
   // Counts
   const countLotesPropios = pers?._count?.lotesPropios ?? 0;
-  const countLotesAlquilados = pers?._count?.lotesAlquilados ?? 0;
+  const countLotesAlquilados = pers?._count?.alquileres ?? pers?._count?.lotesAlquilados ?? 0;
   const countReservas = pers?._count?.Reserva ?? 0;
   const countVentas = pers?._count?.Venta ?? 0;
 
   // Arrays para mini detalles
   const lotesPropios = pers?.lotesPropios || [];
-  const lotesAlquilados = pers?.lotesAlquilados || [];
+  const lotesAlquilados = pers?.alquileresActivos || pers?.lotesAlquilados || [];
   const reservas = pers?.reservas || [];
   const ventas = pers?.ventas || [];
 

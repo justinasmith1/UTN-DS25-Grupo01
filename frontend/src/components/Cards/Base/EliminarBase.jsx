@@ -10,6 +10,8 @@ export default function EliminarBase({
   details = [],
   // Nota en negrita (ej.: "Esta acción es irreversible.")
   noteBold,
+  // Mensaje de error a mostrar
+  error = null,
   confirmLabel = "Eliminar",
   loading = false,
   loadingLabel = "Eliminando…",
@@ -63,6 +65,22 @@ export default function EliminarBase({
                 <li key={idx}>{line}</li>
               ))}
             </ul>
+          )}
+
+          {/* Mensaje de error si existe */}
+          {error && (
+            <div style={{
+              marginTop: '16px',
+              padding: '12px',
+              backgroundColor: '#fee2e2',
+              border: '1px solid #fca5a5',
+              borderRadius: '6px',
+              color: '#991b1b',
+              fontSize: '14px',
+              lineHeight: '1.5'
+            }}>
+              {error}
+            </div>
           )}
         </div>
 

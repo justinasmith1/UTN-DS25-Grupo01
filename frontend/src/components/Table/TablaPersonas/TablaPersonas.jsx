@@ -130,7 +130,7 @@ const TablaPersonas = ({
     // Botón "Grupo familiar" (solo para propietarios/inquilinos operativos)
     if (onGrupoFamiliar) {
       const esPropietario = (persona._count?.lotesPropios ?? 0) > 0;
-      const esInquilino = (persona._count?.lotesAlquilados ?? 0) > 0;
+      const esInquilino = (persona._count?.alquileres ?? 0) > 0 || persona.esInquilino === true;
       const esAplicable = esPropietario || esInquilino;
       const esMiembroFamiliar = persona.categoria === 'MIEMBRO_FAMILIAR';
       

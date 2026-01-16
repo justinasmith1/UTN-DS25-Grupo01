@@ -28,7 +28,7 @@ import ColumnPicker from './parts/ColumnPicker';
 import StatusBadge, { estadoBadge } from './cells/StatusBadge';
 import SubstatusBadge, { subestadoBadge } from './cells/SubstatusBadge';
 import { fmtMoney, fmtM2, fmtM, fmtEstado } from './utils/formatters';
-import { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getNumPartida, getLoteIdFormatted } from './utils/getters';
+import { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getOcupacion, getNumPartida, getLoteIdFormatted } from './utils/getters';
 
 // Preset con columnas/anchos/plantillas
 import { lotesTablePreset as tablePreset } from './presets/lotes.table.jsx';
@@ -65,8 +65,8 @@ function RegistrarOperacionDropdown({ lote, onSelectOperacion }) {
 
   // Determinar habilitación según estado
   const puedePrioridad = false; // Siempre disabled (módulo no existe aún)
-  const puedeReserva = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "ALQUILADO" || estadoLote === "CON_PRIORIDAD";
-  const puedeVenta = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "ALQUILADO" || estadoLote === "CON_PRIORIDAD" || estadoLote === "RESERVADO";
+  const puedeReserva = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "CON_PRIORIDAD";
+  const puedeVenta = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "CON_PRIORIDAD" || estadoLote === "RESERVADO";
 
   // Obtener mensajes de tooltip para opciones disabled
   const getTooltipPrioridad = () => {
@@ -245,7 +245,7 @@ export default function TablaLotes({
   const helpers = useMemo(() => ({
     cells: { estadoBadge, subestadoBadge, StatusBadge, SubstatusBadge },
     fmt: { fmtMoney, fmtM2, fmtM, fmtEstado },
-    getters: { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getNumPartida, getLoteIdFormatted },
+    getters: { getPropietarioNombre, getUbicacion, getTipo, getFraccion, getInquilino, getOcupacion, getNumPartida, getLoteIdFormatted },
   }), []);
 
   // ===== catálogo de columnas desde el preset =====

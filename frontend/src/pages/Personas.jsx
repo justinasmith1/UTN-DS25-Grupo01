@@ -85,6 +85,7 @@ export default function Personas() {
   const [eliminarDefinitivoOpen, setEliminarDefinitivoOpen] = useState(false);
   const [personaADesactivar, setPersonaADesactivar] = useState(null);
   const [loadingDesactivar, setLoadingDesactivar] = useState(false);
+  const [errorDesactivar, setErrorDesactivar] = useState(null);
   
   // Estado para animación de éxito
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
@@ -223,6 +224,7 @@ export default function Personas() {
     // Si está activa, abrir modal de desactivar
     if (persona.estado === 'OPERATIVO') {
       setPersonaADesactivar(persona);
+      setErrorDesactivar(null);
       setDesactivarPersonaOpen(true);
     } 
     // Si está inactiva, abrir modal de reactivar
@@ -242,6 +244,7 @@ export default function Personas() {
       const tieneAsociaciones = 
         (counts.lotesPropios || 0) > 0 ||
         (counts.lotesAlquilados || 0) > 0 ||
+        (counts.alquileres || 0) > 0 ||
         (counts.Reserva || 0) > 0 ||
         (counts.Venta || 0) > 0;
       
@@ -261,6 +264,9 @@ export default function Personas() {
   const handleConfirmarDesactivar = useCallback(async () => {
     if (!personaADesactivar) return;
     
+    // Limpiar error previo
+    setErrorDesactivar(null);
+    
     try {
       setLoadingDesactivar(true);
       await desactivarPersona(personaADesactivar.id);
@@ -275,9 +281,11 @@ export default function Personas() {
       
       setDesactivarPersonaOpen(false);
       setPersonaADesactivar(null);
+      setErrorDesactivar(null);
     } catch (error) {
       console.error('Error al desactivar persona:', error);
-      alert(error.message || 'Error al desactivar la persona');
+      // Mostrar error en la UI en lugar de alert
+      setErrorDesactivar(error.message || 'Error al desactivar la persona');
     } finally {
       setLoadingDesactivar(false);
     }
@@ -445,9 +453,11 @@ export default function Personas() {
         open={desactivarPersonaOpen}
         persona={personaADesactivar}
         loading={loadingDesactivar}
+        error={errorDesactivar}
         onCancel={() => {
           setDesactivarPersonaOpen(false);
           setPersonaADesactivar(null);
+          setErrorDesactivar(null);
         }}
         onConfirm={handleConfirmarDesactivar}
       />

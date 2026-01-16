@@ -42,10 +42,11 @@ export const fromApi = (apiPersona) => {
     jefeDeFamilia: apiPersona.jefeDeFamilia || null,
     miembrosFamilia: apiPersona.miembrosFamilia || [],
     esJefeDeFamilia: Boolean(apiPersona.esJefeDeFamilia),
-    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
+    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, alquileres: 0, Reserva: 0, Venta: 0 },
     // Arrays mínimos para mini detalles
     lotesPropios: apiPersona.lotesPropios || [],
     lotesAlquilados: apiPersona.lotesAlquilados || [],
+    alquileresActivos: apiPersona.alquileresActivos || [],
     reservas: apiPersona.reservas || [],
     ventas: apiPersona.ventas || [],
   };
