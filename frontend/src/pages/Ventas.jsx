@@ -19,6 +19,8 @@ import { getAllLotes } from "../lib/api/lotes";
 import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
 import { applyVentaFilters } from "../utils/applyVentaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getVentaSearchFields } from "../utils/search/fields/ventaSearchFields";
 
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
@@ -116,9 +118,16 @@ export default function VentasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   // Filtros - inicializar con inmobiliariaId de la URL si existe
   const [filters, setFilters] = useState(() => ({
-    texto: "",
     tipoPago: [],
     inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
     fechaVentaMin: null,
@@ -243,11 +252,15 @@ export default function VentasPage() {
     };
   }, [selectedInmobiliariaParam, selectedInmobiliariaRequest, loadVentasData]);
 
-  // Aplicar filtros
-  const ventasFiltradas = useMemo(
-    () => applyVentaFilters(ventas, filters),
-    [ventas, filters]
-  );
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
+  const ventasFiltradas = useMemo(() => {
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(ventas, searchText, getVentaSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, tipoPago, inmobiliarias, fechas, montos)
+    // Nota: applyVentaFilters ya no usa filters.texto porque se maneja con searchText
+    return applyVentaFilters(afterSearch, filters);
+  }, [ventas, filters, searchText]);
 
   // Modales/cards
   const [ventaSel, setVentaSel] = useState(null);
@@ -541,14 +554,15 @@ export default function VentasPage() {
         total={ventas.length}
         filtrados={ventasFiltradas.length}
         inmobiliariasOpts={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+        onSearchChange={handleSearchChange}
         onClear={() => {
           const next = new URLSearchParams(searchParams);
           if (next.has("inmobiliariaId")) {
             next.delete("inmobiliariaId");
             setSearchParams(next, { replace: true });
           }
+          setSearchText('');
           setFilters({
-            texto: "",
             tipoPago: [],
             inmobiliarias: [],
             fechaVentaMin: null,

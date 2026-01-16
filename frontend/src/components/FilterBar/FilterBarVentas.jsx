@@ -10,6 +10,7 @@ import { ventasChipsFrom, nice } from "./utils/ventasChips";
 export default function FilterBarVentas({
   value,
   onChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
   isLoading,
   total,
   filtrados,
@@ -22,7 +23,7 @@ export default function FilterBarVentas({
   // ===== Definición de campos que maneja FilterBarBase =====
   const fields = useMemo(
     () => [
-      { id: "q",              type: "search",      label: "Búsqueda",       placeholder: "ID, lote, monto...", defaultValue: "" },
+      { id: "q",              type: "search",      label: "Búsqueda",       placeholder: "ID, lote, cliente...", defaultValue: "" },
       { id: "estado",         type: "multiSelect", label: "Estado",         defaultValue: [] },
       { id: "tipoPago",       type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect", label: "Inmobiliaria",   defaultValue: [] },
@@ -155,17 +156,19 @@ export default function FilterBarVentas({
   });
 
   const handleParamsChange = (paramsFromFB) => {
-    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // Excluir 'q' del procesamiento (se maneja con onSearchChange)
+    const { q, ...paramsSinQ } = paramsFromFB || {};
+    
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial), 
     // no convertir con toPageShape porque agrega todos los campos con defaults
-    const isPartialUpdate = paramsFromFB && (
-      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
-      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    const isPartialUpdate = paramsSinQ && (
+      Object.keys(paramsSinQ).length < 3 && !paramsSinQ.inmobiliarias
     );
     
     if (isPartialUpdate) {
-      onChange?.(paramsFromFB);
+      onChange?.(paramsSinQ);
     } else {
-      onChange?.(toPageShape(paramsFromFB));
+      onChange?.(toPageShape(paramsSinQ));
     }
   };
 
@@ -184,6 +187,7 @@ export default function FilterBarVentas({
       filtrados={filtrados}
       onClear={onClear}
       onParamsChange={handleParamsChange}
+      onSearchChange={onSearchChange}
       initialValue={fromPageShape(value)}
     />
   );

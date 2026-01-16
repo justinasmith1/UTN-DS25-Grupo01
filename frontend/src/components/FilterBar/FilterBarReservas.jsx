@@ -7,6 +7,7 @@ import { reservasChipsFrom, nice } from "./utils/reservasChips";
 export default function FilterBarReservas({
   value,
   onChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
   isLoading,
   total,
   filtrados,
@@ -33,7 +34,7 @@ export default function FilterBarReservas({
   const fields = useMemo(
     () => {
       const allFields = [
-      { id: "q",              type: "search",     label: "Buscar",             placeholder: "Cliente, inmobiliaria, lote...", defaultValue: "" },
+      { id: "q",              type: "search",     label: "Búsqueda",             placeholder: "N° reserva, cliente, lote...", defaultValue: "" },
       { id: "estado",         type: "multiSelect",label: "Estado",             defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect",label: "Inmobiliaria",       defaultValue: [] },
       { id: "fechaReserva",   type: "dateRange",  label: "Fecha de Reserva",   defaultValue: { min: null, max: null } },
@@ -191,17 +192,19 @@ export default function FilterBarReservas({
   };
 
   const handleParamsChange = (paramsFromFB) => {
-    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // Excluir 'q' del procesamiento (se maneja con onSearchChange)
+    const { q, ...paramsSinQ } = paramsFromFB || {};
+    
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial), 
     // no convertir con toPageShape porque agrega todos los campos con defaults
-    const isPartialUpdate = paramsFromFB && (
-      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
-      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    const isPartialUpdate = paramsSinQ && (
+      Object.keys(paramsSinQ).length < 3 && !paramsSinQ.inmobiliarias
     );
     
     if (isPartialUpdate) {
-      onChange?.(paramsFromFB);
+      onChange?.(paramsSinQ);
     } else {
-      onChange?.(toPageShape(paramsFromFB));
+      onChange?.(toPageShape(paramsSinQ));
     }
   };
 
@@ -226,6 +229,7 @@ export default function FilterBarReservas({
       filtrados={filtrados}
       onClear={onClear}
       onParamsChange={handleParamsChange}
+      onSearchChange={onSearchChange}
       initialValue={fromPageShape(value)}
     />
   );

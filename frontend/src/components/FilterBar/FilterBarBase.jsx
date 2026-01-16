@@ -116,23 +116,42 @@ export default function FilterBarBase({
   const searchField = fields.find(f => f.type === 'search');
   const searchValue = searchField ? filterState[searchField.id] : '';
   
+  // Debounce de búsqueda: solo actualizar appliedFilters cuando NO hay onSearchChange
+  // o al final del debounce si hay onSearchChange (para evitar rebotes)
   useEffect(() => {
     if (!searchField) return;
     
     const timeoutId = setTimeout(() => {
-      setAppliedFilters((prev) => ({ ...prev, [searchField.id]: searchValue }));
-      
-      // Si hay onSearchChange, usarlo para búsqueda (no dispara fetch)
-      // Si no, usar onParamsChange (comportamiento por defecto)
       if (onSearchChange) {
+        // Con onSearchChange: solo llamar al callback, NO actualizar appliedFilters durante escritura
+        // Esto evita re-renders innecesarios que causan el "rebote" en el input
         onSearchChange(searchValue);
       } else {
-      onParamsChange?.({ [searchField.id]: searchValue });
+        // Sin onSearchChange: comportamiento por defecto (actualizar appliedFilters y llamar onParamsChange)
+        setAppliedFilters((prev) => ({ ...prev, [searchField.id]: searchValue }));
+        onParamsChange?.({ [searchField.id]: searchValue });
       }
     }, DEBOUNCE_MS);
     
     return () => clearTimeout(timeoutId);
   }, [searchValue, searchField, onSearchChange, onParamsChange]);
+  
+  // Actualizar appliedFilters para el chip de búsqueda solo cuando hay onSearchChange
+  // y el valor se estabiliza (después del debounce), pero sin causar re-render del input
+  useEffect(() => {
+    if (!searchField || !onSearchChange) return;
+    
+    // Usar un timeout adicional para actualizar appliedFilters sin afectar el input
+    const timeoutId = setTimeout(() => {
+      setAppliedFilters((prev) => {
+        // Solo actualizar si el valor realmente cambió
+        if (prev[searchField.id] === searchValue) return prev;
+        return { ...prev, [searchField.id]: searchValue };
+      });
+    }, DEBOUNCE_MS + 50); // Ligeramente después del debounce para no interferir
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchValue, searchField, onSearchChange]);
 
   const toggle = (fieldId, value) => {
     const currentValue = filterState[fieldId];

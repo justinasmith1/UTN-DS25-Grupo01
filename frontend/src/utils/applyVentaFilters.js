@@ -26,7 +26,7 @@ const toTime = (v) => {
 
 export function applyVentaFilters(rows = [], f = {}) {
   const {
-    texto = "",
+    // Nota: 'texto' ya no se usa aquí, se maneja con applySearch en el componente
     // arrays (pueden venir como strings, números o incluso objetos con { id })
     tipoPago = [],
     inmobiliarias = [],
@@ -41,8 +41,7 @@ export function applyVentaFilters(rows = [], f = {}) {
     estados = [],
   } = f;
 
-  // Normalizaciones base
-  const q = norm(texto);
+  // Normalizaciones base (ya no normalizamos texto aquí)
   const estadosSet =
     estados && estados.length
       ? new Set(estados.map((e) => norm(e)))
@@ -72,43 +71,16 @@ export function applyVentaFilters(rows = [], f = {}) {
     const estadoNorm = norm(v.estado);
     const tipoPagoNorm = norm(v.tipoPago);
 
-    // Inmobiliaria: id y nombre (por si filtras por texto)
+    // Inmobiliaria: id y nombre
     const inmoId = v?.inmobiliaria?.id ?? v?.inmobiliariaId ?? v?.inmobiliaria_id ?? null;
     const inmoIdStr = inmoId != null ? String(inmoId) : "";
     const inmoNombreNorm = norm(v?.inmobiliaria?.nombre);
-
-    // Comprador para búsqueda por texto
-    const compradorNorm = norm(
-      v?.compradorNombreCompleto ??
-        (v?.comprador && (v.comprador.nombre || v.comprador.apellido)
-          ? `${v.comprador.nombre ?? ""} ${v.comprador.apellido ?? ""}`
-          : "")
-    );
-
-    // Lote e id para búsqueda por texto
-    const loteIdStr = v?.loteId != null ? String(v.loteId) : "";
-    const loteMapIdStr = norm(v?.lotMapId ?? v?.lote?.mapId ?? "");
-    const ventaIdStr = v?.id != null ? String(v.id) : "";
 
     // Monto y Fecha
     const montoNum = toNumber(v.monto);
     const fechaMs = toTime(v.fechaVenta);
 
-    // ----- 1) Texto libre -----
-    if (q) {
-      const haystack = [
-        loteIdStr,
-        loteMapIdStr,
-        ventaIdStr,
-        compradorNorm,
-        inmoNombreNorm,
-        estadoNorm,
-        tipoPagoNorm,
-      ].join(" ");
-      if (!haystack.includes(q)) return false;
-    }
-
-    // ----- 2) Estados -----
+    // ----- 1) Estados -----
     if (estadosSet && estadosSet.size > 0) {
       if (!estadosSet.has(estadoNorm)) return false;
     } else {
@@ -116,13 +88,13 @@ export function applyVentaFilters(rows = [], f = {}) {
       if (estadoNorm === "eliminado") return false;
     }
 
-    // ----- 3) Tipo de Pago (si llega como lista) -----
+    // ----- 2) Tipo de Pago (si llega como lista) -----
     if (Array.isArray(tipoPago) && tipoPago.length > 0) {
       const tiposSet = new Set(tipoPago.map((t) => norm(t)));
       if (!tiposSet.has(tipoPagoNorm)) return false;
     }
 
-    // ----- 4) Inmobiliarias -----
+    // ----- 3) Inmobiliarias -----
     if (inmoIdsSet && inmoIdsSet.size > 0) {
       // match por id (preferente) o por nombre: con que coincida una alcanza
       const matchById = inmoIdStr && inmoIdsSet.has(inmoIdStr);
@@ -139,11 +111,11 @@ export function applyVentaFilters(rows = [], f = {}) {
       if (!matchById && !matchByName) return false;
     }
 
-    // ----- 5) Rango de fechas -----
+    // ----- 4) Rango de fechas -----
     if (tMin != null && (fechaMs == null || fechaMs < tMin)) return false;
     if (tMax != null && (fechaMs == null || fechaMs > tMax)) return false;
 
-    // ----- 6) Rango de montos -----
+    // ----- 5) Rango de montos -----
     if (nMin != null && (montoNum == null || montoNum < nMin)) return false;
     if (nMax != null && (montoNum == null || montoNum > nMax)) return false;
 

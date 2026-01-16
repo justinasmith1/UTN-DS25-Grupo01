@@ -15,6 +15,8 @@ import {
   reactivateInmobiliaria
 } from "../lib/api/inmobiliarias";
 import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getInmobiliariaSearchFields } from "../utils/search/fields/inmobiliariaSearchFields";
 
 import InmobiliariaVerCard from "../components/Cards/Inmobiliarias/InmobiliariaVerCard.jsx";
 import InmobiliariaEditarCard from "../components/Cards/Inmobiliarias/InmobiliariaEditarCard.jsx";
@@ -29,6 +31,14 @@ export default function Inmobiliarias() {
   const { success, error } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const crearParam = searchParams.get('crear') === 'true';
+
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
 
   // Estado de filtros
   const [params, setParams] = useState({});
@@ -71,16 +81,20 @@ export default function Inmobiliarias() {
     return () => { alive = false; };
   }, []); // Dependencias vacías para ejecutar solo una vez
 
-  // Aplicar filtros localmente
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
   const inmobiliarias = useMemo(() => {
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allInmobiliarias, searchText, getInmobiliariaSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, comxventa, cantidadVentas, etc.)
     const hasParams = params && Object.keys(params).length > 0;
     try {
-      return hasParams ? applyInmobiliariaFilters(allInmobiliarias, params) : allInmobiliarias;
+      return hasParams ? applyInmobiliariaFilters(afterSearch, params) : afterSearch;
     } catch (err) {
       console.error('Error aplicando filtros:', err);
-      return allInmobiliarias;
+      return afterSearch;
     }
-  }, [allInmobiliarias, params]);
+  }, [allInmobiliarias, params, searchText]);
 
   // Estado de selección - TablaBase espera array de IDs (strings)
   const [selectedRows, setSelectedRows] = useState([]);
@@ -242,6 +256,7 @@ export default function Inmobiliarias() {
         variant="dashboard"
         userRole={user?.role}
         onParamsChange={handleParamsChange}
+        onSearchChange={handleSearchChange}
       />
 
       {/* Tabla de inmobiliarias */}

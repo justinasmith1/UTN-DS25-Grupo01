@@ -10,6 +10,7 @@ export default function FilterBarInmobiliarias({
   variant = "dashboard",
   userRole = "GENERAL",
   onParamsChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
 }) {
   // Configuración de campos para inmobiliarias (siguiendo patrón de FilterBarVentas)
   const fields = useMemo(() => [
@@ -17,7 +18,7 @@ export default function FilterBarInmobiliarias({
       id: 'q',
       type: 'search',
       label: 'Búsqueda',
-      placeholder: 'ID, nombre, razón social, contacto...',
+      placeholder: 'Nombre o razón social...',
       defaultValue: ''
     },
     {
@@ -87,6 +88,7 @@ export default function FilterBarInmobiliarias({
       viewsConfig={viewsConfig}
       variant={variant}
       onParamsChange={onParamsChange}
+      onSearchChange={onSearchChange}
       chipsFormatter={inmobiliariasChipsFrom}
       optionFormatter={optionFormatter}
       userRole={userRole}

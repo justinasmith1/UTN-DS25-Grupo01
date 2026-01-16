@@ -4,6 +4,8 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getLoteSearchFields } from "../utils/search/fields/loteSearchFields";
 import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
 import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
@@ -253,6 +255,14 @@ export default function Dashboard() {
         []
       );
 
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   const [params, setParams] = useState({});
   const handleParamsChange = useCallback((patch) => {
     if (!patch || Object.keys(patch).length === 0) { 
@@ -348,15 +358,22 @@ export default function Dashboard() {
     };
   }, []); // Sin dependencias: solo se ejecuta una vez al montar
 
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
   const lots = useMemo(() => {
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allLotes, searchText, getLoteSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, calle, fraccion, etc.)
     const hasParams = params && Object.keys(params).length > 0;
-    const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
+    const result = hasParams ? applyLoteFilters(afterSearch, params) : afterSearch;
+    
+    // 3. Ordenar
     return [...result].sort((a, b) => {
       const idA = a?.id ?? a?.idLote ?? 0;
       const idB = b?.id ?? b?.idLote ?? 0;
       return idA - idB;
     });
-  }, [allLotes, params]);
+  }, [allLotes, params, searchText]);
 
   // Mostrar loading mientras se cargan los datos
   if (loading) {
@@ -373,7 +390,8 @@ export default function Dashboard() {
       <FilterBarLotes 
         variant="dashboard" 
         userRole={userRole} 
-        onParamsChange={handleParamsChange} 
+        onParamsChange={handleParamsChange}
+        onSearchChange={handleSearchChange}
       />
 
       <TablaLotes

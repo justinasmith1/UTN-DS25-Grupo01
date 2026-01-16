@@ -12,6 +12,7 @@ export default function FilterBarLotes({
   variant = "dashboard",
   userRole = "GENERAL",
   onParamsChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
 }) {
   const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
   // Catálogos desde preset, filtrados por RBAC (ALQUILADO removido como estado)
@@ -45,7 +46,7 @@ export default function FilterBarLotes({
       id: 'q',
       type: 'search',
       label: 'Búsqueda',
-      placeholder: 'ID, calle, precio...',
+      placeholder: 'Lote, propietario, ubicación...',
       defaultValue: ''
     },
     {
@@ -184,6 +185,7 @@ export default function FilterBarLotes({
       viewsConfig={viewsConfig}
       variant={variant}
       onParamsChange={onParamsChange}
+      onSearchChange={onSearchChange}
       chipsFormatter={chipsFormatter}
       optionFormatter={optionFormatter}
     />

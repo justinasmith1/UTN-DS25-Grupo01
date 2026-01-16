@@ -12,6 +12,8 @@ import { getAllReservas, getReservaById, updateReserva, deleteReserva, reactivar
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 import { getAllLotes } from "../lib/api/lotes";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getReservaSearchFields } from "../utils/search/fields/reservaSearchFields";
 
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
@@ -41,6 +43,14 @@ export default function Reservas() {
   
   const selectedInmobiliariaKey = selectedInmobiliariaParam != null ? selectedInmobiliariaParam : null;
   
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   const [params, setParams] = useState(() => ({
     inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
   }));
@@ -293,10 +303,14 @@ export default function Reservas() {
     };
   }, [user?.role]); // Solo dependemos del rol del usuario, no de la función error
 
-  // Aplicar filtros localmente
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
   const reservas = useMemo(() => {
-    return applyReservaFilters(allReservas, params);
-  }, [allReservas, params]);
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allReservas, searchText, getReservaSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, inmobiliarias, fechas, etc.)
+    return applyReservaFilters(afterSearch, params);
+  }, [allReservas, params, searchText]);
 
   // Modales/cards
   const [reservaSel, setReservaSel] = useState(null);
@@ -571,6 +585,7 @@ export default function Reservas() {
         variant="dashboard" 
         userRole={user?.role} 
         value={params} 
+        onSearchChange={handleSearchChange}
         onChange={(newParams) => {
           handleParamsChange(newParams);
           // Si se quitó el filtro de inmobiliaria, limpiar la URL
