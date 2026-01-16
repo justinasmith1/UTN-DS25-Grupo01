@@ -133,6 +133,11 @@ enum PersonaCategoria {
   MIEMBRO_FAMILIAR
 }
 
+enum EstadoAlquiler {
+  ACTIVO
+  FINALIZADO
+}
+
 // ===================
 // Modelos de dominio
 // ===================
@@ -187,8 +192,11 @@ model Persona {
   jefeDeFamilia   Persona?  @relation("GrupoFamiliar", fields: [jefeDeFamiliaId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   miembrosFamilia Persona[] @relation("GrupoFamiliar")
 
-  // Relación con Lote como inquilino (alquilados)
+  // Relación con Lote como inquilino (alquilados) - LEGACY: mantener para compatibilidad
   lotesAlquilados Lote[] @relation("InquilinoLotes")
+
+  // Relación con Alquileres
+  alquileres Alquiler[]
 
   createdAt DateTime @default(now())
   updateAt  DateTime
@@ -261,9 +269,12 @@ model Lote {
   propietarioId Int
   propietario   Persona @relation("PropietarioLotes", fields: [propietarioId], references: [id])
 
-  // Inquilino (opcional)
+  // Inquilino (opcional) - LEGACY: mantener para compatibilidad, pero usar Alquiler para lógica nueva
   inquilinoId Int?
   inquilino   Persona? @relation("InquilinoLotes", fields: [inquilinoId], references: [id])
+
+  // Relación con Alquileres
+  alquileres Alquiler[]
 
   reserva     Reserva[]
   prioridad   Prioridad[]
@@ -393,4 +404,26 @@ model Archivos {
   createdAt      DateTime      @default(now())
   uploadedBy     String?
   user           User?         @relation(fields: [uploadedBy], references: [email])
+}
+
+// Alquiler
+model Alquiler {
+  id          Int            @id @default(autoincrement())
+  loteId      Int
+  lote        Lote           @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  inquilinoId Int
+  inquilino   Persona        @relation(fields: [inquilinoId], references: [id], onDelete: Restrict)
+  estado      EstadoAlquiler @default(ACTIVO)
+  fechaInicio DateTime       @default(now())
+  fechaFin    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([loteId], name: "idx_alquiler_lote")
+  @@index([inquilinoId], name: "idx_alquiler_inquilino")
+  @@index([estado], name: "idx_alquiler_estado")
+  // Constraint parcial: solo un ACTIVO por lote (a nivel de aplicación, no de DB)
+  // En PostgreSQL, usaríamos un índice parcial único, pero Prisma no lo soporta directamente
+  // Se maneja a nivel de aplicación
 }

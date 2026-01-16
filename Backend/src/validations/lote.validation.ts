@@ -8,16 +8,18 @@ export const baseLoteSchema = z.object({
   fraccionId: z.coerce.number().int('La fracción debe ser un número entero').positive('La fracción debe ser positiva'),
   numPartido: z.coerce.number().int().default(62),
   superficie: z.coerce.number().min(0, 'La superficie no puede ser negativa').optional(),
-  estado: z.enum(['Disponible', 'Reservado', 'Vendido', 'No Disponible', 'Alquilado', 'En Promoción']),
+  estado: z.enum(['Disponible', 'Reservado', 'Vendido', 'No Disponible', 'En Promoción']).optional(), // ALQUILADO removido como estado
   subestado: z.enum(['En Construccion', 'No Construido', 'Construido']),
   tipo: z.enum(['Lote Venta', 'Espacio Comun']), // Lote Venta o Espacio Común
   precio: z.coerce.number().min(0, 'El precio no puede ser negativo').optional(),
-  alquiler: z.coerce.boolean().optional(),
+  ocupacion: z.enum(['ALQUILADO', 'NO_ALQUILADO']).optional(), // Nueva dimensión de ocupación
+  alquiler: z.coerce.boolean().optional(), // LEGACY: mantener para compatibilidad, pero preferir ocupacion
   deuda: z.coerce.boolean().optional(),
   nombreEspacioComun: z.string().max(100, 'El nombre es demasiado largo').optional(),
   capacidad: z.coerce.number().min(0, 'La capacidad no puede ser negativa').optional(), 
   descripcion: z.string().optional(),
   propietarioId: z.coerce.number().int('El ID del propietario debe ser un número entero').positive('El ID del propietario debe ser positivo'),
+  inquilinoId: z.coerce.number().int('El ID del inquilino debe ser un número entero').positive('El ID del inquilino debe ser positivo').optional(),
   ubicacionId: z.coerce.number().int('El ID de la ubicación debe ser un número entero').positive('El ID de la ubicación debe ser positivo').optional(),
   // Campos para crear ubicación: calle (enum) y numeroCalle (número)
   calle: z.enum(['REINAMORA', 'MACA', 'ZORZAL', 'CAUQUEN', 'ALONDRA', 'JACANA', 'TACUARITO', 'JILGUERO', 'GOLONDRINA', 'CALANDRIA', 'AGUILAMORA', 'LORCA', 'MILANO']).optional(),
@@ -40,9 +42,10 @@ export const deleteLoteSchema = getLoteSchema;
 
 // Para filtrar lotes por varios parámetros
 export const queryLoteSchema = z.object({
-  estado: z.enum(['Disponible', 'Reservado', 'Vendido', 'No Disponible', 'Alquilado', 'En Promoción']).optional(),
+  estado: z.enum(['Disponible', 'Reservado', 'Vendido', 'No Disponible', 'En Promoción']).optional(), // ALQUILADO removido
   subestado: z.enum(['En Construccion', 'No Construido', 'Construido']).optional(),
   tipo: z.enum(['Lote Venta', 'Espacio Comun']).optional(),
+  ocupacion: z.enum(['ALQUILADO', 'NO_ALQUILADO']).optional(), // Nuevo filtro de ocupación
   propietarioId: z.coerce.number().int('El ID del propietario debe ser un número entero').positive('El ID del propietario debe ser positivo').optional(),
   ubicacionId: z.coerce.number().int('El ID de la ubicación debe ser un número entero').positive('El ID de la ubicación debe ser positivo').optional(),
   fechaCreacionFrom: z.string().refine((date) => !isNaN(Date.parse(date)), { message: 'Fecha de creación "from" inválida' }).optional(),

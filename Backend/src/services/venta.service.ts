@@ -63,11 +63,7 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     }
     // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
     assertLoteOperableFor('crear venta', loteExists.estado);
-    if (loteExists.estado === 'ALQUILADO') {
-        const error = new Error('No se puede vender un lote que está alquilado');
-        (error as any).statusCode = 400;
-        throw error;
-    }
+    // Nota: No se bloquea la venta de lotes alquilados según requerimientos
     // Obtener la reserva asociada al lote (si existe y está aceptada)
     const reserva = await prisma.reserva.findFirst({
       where: {
