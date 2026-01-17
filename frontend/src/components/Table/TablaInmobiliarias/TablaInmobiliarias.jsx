@@ -11,6 +11,7 @@ import TablaBase from "../TablaBase";
 import StatusBadge from "./cells/StatusBadge";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
 import { fmtComxVenta, fmtCantidadVentas, fmtFecha, fmtContacto } from "./utils/formatters";
+import "./TablaInmobiliarias.css";
 
 // Componente dropdown para "Ver asociadas" (ventas y reservas)
 function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) {
@@ -193,11 +194,7 @@ export default function TablaInmobiliarias({
     'fechaBaja',
     'comxventa',
     'contacto',
-    'cantidadVentas'
-    // 'cantidadReservas' excluida para mostrar solo 7
   ], []);
-
-
 
 
   // -----------------------------------------
@@ -421,16 +418,6 @@ export default function TablaInmobiliarias({
     [columns, renderRowActions, topActions, user]
   );
 
-  // Debug logs
-  console.log(
-    "🏢 TablaInmobiliarias render - data length:",
-    data.length,
-    "loading:",
-    loading,
-    "config:",
-    config
-  );
-
   // Función para obtener el ancho de las columnas
   const widthFor = useCallback((id) => {
     const col = config.columns.find((c) => c.id === id);
@@ -454,7 +441,7 @@ export default function TablaInmobiliarias({
         selectable={config.selectable}
         rowKey="id"
         defaultVisibleIds={defaultVisibleIds}
-        maxVisible={7}
+        maxVisible={6}
       />
     </div>
   );

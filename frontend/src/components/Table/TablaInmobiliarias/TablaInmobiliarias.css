@@ -1,6 +1,7 @@
 /* Estilos específicos para la tabla de Inmobiliarias */
 
-/* Centrar el header de Acciones en la tabla de inmobiliarias */
+/* Mover el header de Acciones más a la derecha en la tabla de inmobiliarias */
 .tabla-inmobiliarias .tl-th--actions.tl-th--center {
   padding-left: 40px;
+
 }

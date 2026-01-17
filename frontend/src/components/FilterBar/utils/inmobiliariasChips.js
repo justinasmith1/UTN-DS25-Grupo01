@@ -59,6 +59,19 @@ export function inmobiliariasChipsFrom(applied, catalogs) {
     }
   }
 
+  // Filtros de rango - Cantidad de Reservas
+  if (applied.cantidadReservas && (applied.cantidadReservas.min !== null || applied.cantidadReservas.max !== null)) {
+    const min = applied.cantidadReservas.min !== null ? applied.cantidadReservas.min : '';
+    const max = applied.cantidadReservas.max !== null ? applied.cantidadReservas.max : '';
+    if (min && max) {
+      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: ${min} - ${max}` });
+    } else if (min) {
+      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: desde ${min}` });
+    } else if (max) {
+      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: hasta ${max}` });
+    }
+  }
+
   // Filtros de rango - Fecha de Creación
   if (applied.createdAt && (applied.createdAt.min !== null || applied.createdAt.max !== null)) {
     const minDate = applied.createdAt.min ? new Date(applied.createdAt.min).toISOString().split('T')[0] : '';

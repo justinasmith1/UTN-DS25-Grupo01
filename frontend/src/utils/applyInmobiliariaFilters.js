@@ -7,6 +7,7 @@ const getRazonSocial = (inmobiliaria) => inmobiliaria?.razonSocial || '';
 const getContacto = (inmobiliaria) => inmobiliaria?.contacto || '';
 const getComxventa = (inmobiliaria) => Number(inmobiliaria?.comxventa) || 0;
 const getCantidadVentas = (inmobiliaria) => Number(inmobiliaria?.cantidadVentas) || 0;
+const getCantidadReservas = (inmobiliaria) => Number(inmobiliaria?.cantidadReservas) || 0;
 const getEstado = (inmobiliaria) => inmobiliaria?.estado || 'OPERATIVO';
 const getCreatedAt = (inmobiliaria) => {
   const date = inmobiliaria?.createdAt;
@@ -87,6 +88,13 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
     (params.cantidadVentas?.max !== undefined && params.cantidadVentas?.max !== null)) {
     rows = rows.filter((inmobiliaria) =>
       inRange(getCantidadVentas(inmobiliaria), params.cantidadVentas?.min, params.cantidadVentas?.max)
+    );
+  }
+
+  if ((params.cantidadReservas?.min !== undefined && params.cantidadReservas?.min !== null) ||
+    (params.cantidadReservas?.max !== undefined && params.cantidadReservas?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getCantidadReservas(inmobiliaria), params.cantidadReservas?.min, params.cantidadReservas?.max)
     );
   }
 

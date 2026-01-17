@@ -64,7 +64,7 @@ export default function InmobiliariaVerCard({
     ["NOMBRE", safe(inmob?.nombre)],
     ["RAZÓN SOCIAL", safe(inmob?.razonSocial)],
     ["CONTACTO", safe(inmob?.contacto)],
-    ["COMISIÓN X VENTA", inmob?.comxventa != null ? fmtMoney(inmob.comxventa) : NA],
+    ["COMISIÓN X VENTA", inmob?.comxventa != null ? `${inmob.comxventa}%` : NA],
   ];
 
   // --- COLUMNA DERECHA (Con lógica de colores) ---

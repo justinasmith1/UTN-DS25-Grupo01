@@ -34,6 +34,12 @@ export default function FilterBarInmobiliarias({
       defaultValue: { min: null, max: null }
     },
     {
+      id: 'cantidadReservas',
+      type: 'range',
+      label: 'Cantidad de Reservas',
+      defaultValue: { min: null, max: null }
+    },
+    {
       id: 'cantidadVentas',
       type: 'range',
       label: 'Cantidad de Ventas',
@@ -58,6 +64,7 @@ export default function FilterBarInmobiliarias({
   // Rangos para los filtros numéricos
   const ranges = useMemo(() => ({
     comxventa: inmobiliariasFilterPreset.ranges.comxventa,
+    cantidadReservas: inmobiliariasFilterPreset.ranges.cantidadReservas,
     cantidadVentas: inmobiliariasFilterPreset.ranges.cantidadVentas,
     createdAt: inmobiliariasFilterPreset.ranges.createdAt,
   }), []);
