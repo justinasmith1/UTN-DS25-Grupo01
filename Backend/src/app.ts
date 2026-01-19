@@ -13,6 +13,7 @@ import { fileRoutes } from './routes/files.routes';
 import {personaRoutes} from "./routes/persona.routes";
 import { fraccionRoutes } from './routes/fraccion.routes';
 import { ubicacionRoutes } from './routes/ubicacion.routes';
+import { prioridadRoutes } from './routes/prioridad.routes';
 
 dotenv.config();
 
@@ -72,6 +73,7 @@ app.use('/api/files', fileRoutes);
 app.use('/api/personas', personaRoutes);
 app.use('/api/fracciones', fraccionRoutes);
 app.use('/api/ubicaciones', ubicacionRoutes);
+app.use('/api/prioridades', prioridadRoutes);
 
 // Error handling middleware (DEBE ir después de todas las rutas)
 app.use(handleError);

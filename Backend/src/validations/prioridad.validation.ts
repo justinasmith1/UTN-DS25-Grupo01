@@ -16,16 +16,59 @@ const isoDate = z
 // Body: crear prioridad
 // ==============================
 export const createPrioridadSchema = z.object({
+  numero: z.string().min(1, 'El número de prioridad es obligatorio').trim(),
   loteId: idInt,
-  fechaFin: isoDate.refine(
-    (dateStr) => {
-      const date = new Date(dateStr);
-      const now = new Date();
-      return date > now;
-    },
-    { message: 'La fecha de fin debe ser posterior a la fecha actual' }
-  ),
-});
+  fechaInicio: isoDate,
+  fechaFin: isoDate,
+  // Permitir ownerType e inmobiliariaId opcionales para ADMIN/GESTOR
+  ownerType: z.enum(['INMOBILIARIA', 'CCLF']).optional(),
+  inmobiliariaId: idInt.optional().nullable(),
+}).refine(
+  (data) => {
+    const fechaInicioDate = new Date(data.fechaInicio);
+    const fechaFinDate = new Date(data.fechaFin);
+    return fechaFinDate > fechaInicioDate;
+  },
+  {
+    message: 'La fecha de fin debe ser posterior a la fecha de inicio',
+    path: ['fechaFin'],
+  }
+).refine(
+  (data) => {
+    const fechaFinDate = new Date(data.fechaFin);
+    const now = new Date();
+    return fechaFinDate > now;
+  },
+  {
+    message: 'La fecha de fin debe ser posterior a la fecha actual',
+    path: ['fechaFin'],
+  }
+);
+
+// ==============================
+// Body: actualizar prioridad
+// ==============================
+export const updatePrioridadSchema = z.object({
+  numero: z.string().min(1, 'El número de prioridad es obligatorio').trim().optional(),
+  inmobiliariaId: idInt.optional().nullable(),
+  fechaFin: isoDate.optional(),
+}).refine((data) => {
+  // Asegurar que al menos un campo está presente
+  return Object.keys(data).length > 0;
+}, {
+  message: 'Debes enviar al menos un campo para actualizar',
+}).refine(
+  (data) => {
+    if (!data.fechaFin) return true;
+    const fechaFinDate = new Date(data.fechaFin);
+    const now = new Date();
+    return fechaFinDate > now;
+  },
+  {
+    message: 'La fecha de fin debe ser posterior a la fecha actual',
+    path: ['fechaFin'],
+  }
+);
 
 // ==============================
 // Parámetros comunes (/:id)

@@ -4,6 +4,7 @@ import { validate, validateParams, validateQuery } from '../middlewares/validati
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import {
   createPrioridadSchema,
+  updatePrioridadSchema,
   getPrioridadParamsSchema,
   queryPrioridadesSchema,
 } from '../validations/prioridad.validation';
@@ -41,6 +42,19 @@ router.post(
   authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
   validate(createPrioridadSchema),
   prioridadController.createPrioridadController
+);
+
+// PATCH /api/prioridades/:id
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// ADMINISTRADOR/GESTOR pueden actualizar numero e inmobiliariaId
+// INMOBILIARIA solo puede actualizar numero de sus propias prioridades
+router.patch(
+  '/:id',
+  authenticate,
+  authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+  validateParams(getPrioridadParamsSchema),
+  validate(updatePrioridadSchema),
+  prioridadController.updatePrioridadController
 );
 
 // PATCH /api/prioridades/:id/cancelar

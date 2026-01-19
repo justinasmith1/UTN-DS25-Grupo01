@@ -353,6 +353,7 @@ model Inmobiliaria {
 // Prioridad
 model Prioridad {
   id                Int             @id @default(autoincrement())
+  numero            String          @unique
   loteId            Int
   lote              Lote            @relation(fields: [loteId], references: [id])
   estado            EstadoPrioridad @default(ACTIVA)

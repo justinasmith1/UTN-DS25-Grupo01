@@ -4,6 +4,7 @@ import {
   getAllPrioridades,
   getPrioridadById,
   createPrioridad,
+  updatePrioridad,
   cancelPrioridad,
   finalizePrioridad,
   expirePrioridadesManual,
@@ -42,9 +43,23 @@ export async function getPrioridadByIdController(req: Request, res: Response, ne
 // ==============================
 export async function createPrioridadController(req: Request, res: Response, next: NextFunction) {
   try {
-    const user = req.user; // Usuario autenticado desde el middleware
+    const user = req.user;
     const data = await createPrioridad(req.body, user);
     res.status(201).json({ success: true, message: 'Prioridad creada exitosamente', data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Actualizar prioridad
+// ==============================
+export async function updatePrioridadController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const user = req.user;
+    const data = await updatePrioridad(id, req.body, user);
+    res.json({ success: true, message: 'Prioridad actualizada exitosamente', data });
   } catch (error) {
     next(error);
   }
