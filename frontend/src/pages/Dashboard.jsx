@@ -15,6 +15,7 @@ import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
 import PromocionCard from "../components/Cards/Lotes/PromocionCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
+import PrioridadCrearCard from "../components/Cards/Prioridades/PrioridadCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 import { getAllReservas, getReservaById } from "../lib/api/reservas";
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -51,6 +52,9 @@ export default function Dashboard() {
   const [loteParaVenta, setLoteParaVenta] = useState(null);
   const [lockLoteVenta, setLockLoteVenta] = useState(false);
   const [lockLoteReserva, setLockLoteReserva] = useState(false);
+  const [openPrioridadCrear, setOpenPrioridadCrear] = useState(false);
+  const [loteParaPrioridad, setLoteParaPrioridad] = useState(null);
+  const [lockLotePrioridad, setLockLotePrioridad] = useState(false);
   const [openPromocion, setOpenPromocion] = useState(false);
   const [loteParaPromocion, setLoteParaPromocion] = useState(null);
   const [modoPromocion, setModoPromocion] = useState("aplicar"); // "aplicar" o "ver"
@@ -77,8 +81,11 @@ export default function Dashboard() {
       setLoteSel(lote);
       setLockLoteReserva(true); // Bloquear lote cuando viene desde fila
       setOpenReservaCrear(true);
+    } else if (tipo === 'prioridad') {
+      setLoteParaPrioridad(lote);
+      setLockLotePrioridad(true); // Bloquear lote cuando viene desde fila
+      setOpenPrioridadCrear(true);
     }
-    // tipo === 'prioridad' no hace nada (disabled)
   }, []);
 
   const handleAplicarPromo = useCallback((lote, modo = "aplicar") => {
@@ -497,6 +504,26 @@ export default function Dashboard() {
         }}
         loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
         lockLote={lockLoteVenta}
+      />
+
+      <PrioridadCrearCard
+        open={openPrioridadCrear}
+        onCancel={() => {
+          setOpenPrioridadCrear(false);
+          setLoteParaPrioridad(null);
+          setLockLotePrioridad(false);
+        }}
+        onCreated={(newPrioridad) => {
+          setOpenPrioridadCrear(false);
+          // Refrescar el lote después de crear prioridad (el backend cambia el estado a CON_PRIORIDAD)
+          if (loteParaPrioridad?.id) {
+            fetchAndMergeLote(loteParaPrioridad);
+          }
+          setLoteParaPrioridad(null);
+          setLockLotePrioridad(false);
+        }}
+        loteIdPreSeleccionado={loteParaPrioridad?.id ?? loteParaPrioridad?.idLote}
+        lockLote={lockLotePrioridad}
       />
 
       <PromocionCard

@@ -4,6 +4,19 @@
 export const prioridadesChipsFrom = (filters = {}, catalogs = {}) => {
   const chips = [];
 
+  // Visibilidad (singleSelect) - solo mostrar chip si NO es OPERATIVO (default)
+  const visibilidad = filters.visibilidad ?? filters.estadoOperativo ?? "OPERATIVO";
+  if (visibilidad !== "OPERATIVO") {
+    const visibilidadLabel = visibilidad === "ELIMINADO" ? "Eliminadas" : visibilidad;
+    chips.push({
+      id: `visibilidad-${visibilidad}`,
+      k: 'visibilidad',
+      label: visibilidadLabel,
+      value: visibilidad,
+      v: visibilidad,
+    });
+  }
+
   // Estado (multiSelect) - un chip por cada valor
   if (filters.estado && Array.isArray(filters.estado) && filters.estado.length > 0) {
     filters.estado.forEach(selected => {

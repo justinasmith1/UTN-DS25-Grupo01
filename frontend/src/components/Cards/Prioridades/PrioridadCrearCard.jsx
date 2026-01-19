@@ -45,6 +45,7 @@ export default function PrioridadCrearCard({
   onCancel,
   onCreated,
   loteIdPreSeleccionado,
+  lockLote = false, // Si viene desde fila del tablero, bloquear el campo lote
   entityType = "Prioridad",
 }) {
   const { user } = useAuth();
@@ -78,6 +79,16 @@ export default function PrioridadCrearCard({
 
   const formValues = watch();
 
+  // Calcular el mapId del lote seleccionado cuando viene desde fila
+  const loteSeleccionadoMapId = useMemo(() => {
+    if (!lockLote || !loteIdPreSeleccionado) return null;
+    const loteSeleccionado = lotes.find(l => String(l.id) === String(loteIdPreSeleccionado));
+    if (!loteSeleccionado) return null;
+    const mapId = loteSeleccionado.mapId;
+    if (!mapId) return null;
+    return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
+  }, [lockLote, loteIdPreSeleccionado, lotes]);
+
   // Cargar lotes disponibles (solo DISPONIBLE o EN_PROMOCION)
   useEffect(() => {
     if (!open) return;
@@ -91,6 +102,15 @@ export default function PrioridadCrearCard({
           const st = String(l.estado || l.status || "").toUpperCase();
           return st === "DISPONIBLE" || st === "EN_PROMOCION";
         });
+        
+        // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
+        if (lockLote && loteIdPreSeleccionado) {
+          const lotePrecargado = lotesData.find(l => String(l.id) === String(loteIdPreSeleccionado));
+          if (lotePrecargado && !filteredLots.find(l => String(l.id) === String(lotePrecargado.id))) {
+            filteredLots.unshift(lotePrecargado);
+          }
+        }
+        
         setLotes(filteredLots);
       } catch (err) {
         console.error("Error cargando lotes:", err);
@@ -124,7 +144,7 @@ export default function PrioridadCrearCard({
     }
 
     setBusquedaLote("");
-  }, [open, isInmobiliaria]);
+  }, [open, isInmobiliaria, lockLote, loteIdPreSeleccionado]);
 
   // Resetear formulario cuando se cierra o cambia loteIdPreSeleccionado
   useEffect(() => {
@@ -136,7 +156,7 @@ export default function PrioridadCrearCard({
     } else if (loteIdPreSeleccionado) {
       setValue("loteId", String(loteIdPreSeleccionado));
     }
-  }, [open, loteIdPreSeleccionado, reset, setValue]);
+  }, [open, loteIdPreSeleccionado, reset, setValue, lockLote]);
 
   // Filtrar lotes según búsqueda
   const lotesFiltrados = useMemo(() => {
@@ -323,67 +343,77 @@ export default function PrioridadCrearCard({
               <div className={`fieldRow ${errors.loteId ? "hasError" : ""}`}>
                 <div className="field-row">
                   <div className="field-label">LOTE</div>
-                  <div className="field-value p0" style={{ alignItems: "flex-start" }}>
-                    <div style={{ width: "100%", position: "relative" }}>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          type="hidden"
-                          {...register("loteId")}
-                        />
-                        <input
-                          className={`field-input ${errors.loteId ? "is-invalid" : ""}`}
-                          placeholder={loteIdValue ? "" : "Buscar lote por número o fracción"}
-                          value={loteDisplayText}
-                          onChange={(e) => {
-                            setBusquedaLote(e.target.value);
-                            if (e.target.value && loteIdValue) {
-                              setValue("loteId", "");
-                            }
-                          }}
-                          onFocus={() => {
-                            if (loteIdValue) {
-                              setBusquedaLote("");
-                              setValue("loteId", "");
-                            }
-                          }}
-                        />
-                        <svg width="18" height="18" viewBox="0 0 24 24" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: .6 }}>
-                          <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none"/>
-                          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2"/>
-                        </svg>
-                      </div>
-                      {busquedaLote && (
-                        <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff" }}>
-                          {lotesFiltrados.length === 0 && (
-                            <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
-                          )}
-                          {lotesFiltrados.map((l) => {
-                            const fraccion = l?.fraccion?.numero;
-                            const numero = l?.numero;
-                            const displayText = (fraccion != null && numero != null) 
-                              ? `Lote ${fraccion}-${numero}`
-                              : (l.mapId || `Lote ID: ${l.id}`);
-                            return (
-                              <button
-                                key={l.id}
-                                type="button"
-                                onClick={() => { 
-                                  setValue("loteId", String(l.id)); 
-                                  setBusquedaLote(""); 
-                                  clearErrors("loteId");
-                                }}
-                                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
-                                onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
-                                onMouseLeave={(e) => e.target.style.background = "#fff"}
-                              >
-                                {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                  {lockLote && loteSeleccionadoMapId ? (
+                    // Cuando viene desde fila, mostrar el lote como read-only
+                    <div className="field-value is-readonly">
+                      {loteSeleccionadoMapId}
                     </div>
-                  </div>
+                  ) : lockLote ? (
+                    // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
+                    <div className="field-value is-readonly">—</div>
+                  ) : (
+                    <div className="field-value p0" style={{ alignItems: "flex-start" }}>
+                      <div style={{ width: "100%", position: "relative" }}>
+                        <div style={{ position: "relative" }}>
+                          <input
+                            type="hidden"
+                            {...register("loteId")}
+                          />
+                          <input
+                            className={`field-input ${errors.loteId ? "is-invalid" : ""}`}
+                            placeholder={loteIdValue ? "" : "Buscar lote por número o fracción"}
+                            value={loteDisplayText}
+                            onChange={(e) => {
+                              setBusquedaLote(e.target.value);
+                              if (e.target.value && loteIdValue) {
+                                setValue("loteId", "");
+                              }
+                            }}
+                            onFocus={() => {
+                              if (loteIdValue) {
+                                setBusquedaLote("");
+                                setValue("loteId", "");
+                              }
+                            }}
+                          />
+                          <svg width="18" height="18" viewBox="0 0 24 24" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: .6 }}>
+                            <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none"/>
+                            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2"/>
+                          </svg>
+                        </div>
+                        {busquedaLote && (
+                          <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff" }}>
+                            {lotesFiltrados.length === 0 && (
+                              <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
+                            )}
+                            {lotesFiltrados.map((l) => {
+                              const fraccion = l?.fraccion?.numero;
+                              const numero = l?.numero;
+                              const displayText = (fraccion != null && numero != null) 
+                                ? `Lote ${fraccion}-${numero}`
+                                : (l.mapId || `Lote ID: ${l.id}`);
+                              return (
+                                <button
+                                  key={l.id}
+                                  type="button"
+                                  onClick={() => { 
+                                    setValue("loteId", String(l.id)); 
+                                    setBusquedaLote(""); 
+                                    clearErrors("loteId");
+                                  }}
+                                  style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
+                                  onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
+                                  onMouseLeave={(e) => e.target.style.background = "#fff"}
+                                >
+                                  {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 {errors.loteId && (
                   <div className="fieldError">{errors.loteId.message}</div>

@@ -26,6 +26,15 @@ export const applyPrioridadFilters = (prioridades, params = {}) => {
   if (!Array.isArray(prioridades)) return [];
   let filtered = [...prioridades];
 
+  // 0) Visibilidad (estadoOperativo) - se filtra en backend, pero por si acaso aplicamos también en frontend
+  const visibilidad = params.estadoOperativo ?? params.visibilidad ?? "OPERATIVO";
+  if (visibilidad) {
+    filtered = filtered.filter((p) => {
+      const estadoOp = String(p?.estadoOperativo ?? "OPERATIVO").toUpperCase();
+      return estadoOp === visibilidad.toUpperCase();
+    });
+  }
+
   // 1) Estado (multi)
   const estados = normArr(params.estado).map(upper);
   if (estados.length) {

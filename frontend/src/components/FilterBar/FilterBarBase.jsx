@@ -165,8 +165,9 @@ export default function FilterBarBase({
         : [...currentArray, value];
       setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
     } else if (field?.type === 'singleSelect') {
-      const newValue = currentValue === value ? null : value;
-      setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
+      // Para singleSelect, siempre establecer el valor (no resetear a null al hacer click en el mismo)
+      // Esto permite que el usuario pueda cambiar entre opciones sin perder la selección
+      setFilterState(prev => ({ ...prev, [fieldId]: value }));
     }
   };
 
@@ -262,9 +263,14 @@ export default function FilterBarBase({
       .map(field => {
         const value = appliedFilters[field.id];
         let isEmpty = false;
-        if (!value) isEmpty = true;
-        else if (Array.isArray(value) && value.length === 0) isEmpty = true;
-        else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
+        // Para singleSelect, considerar vacío solo si es null o undefined (no si es string vacío o valor válido)
+        if (field.type === 'singleSelect') {
+          isEmpty = value === null || value === undefined;
+        } else if (!value) {
+          isEmpty = true;
+        } else if (Array.isArray(value) && value.length === 0) {
+          isEmpty = true;
+        } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
           isEmpty = true;
         }
         if (isEmpty) return null;

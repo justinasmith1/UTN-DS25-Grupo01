@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { isPrioridadEliminada } from "../../../utils/prioridadHelpers";
 
 /**
  * PrioridadVerCard
@@ -22,6 +23,8 @@ export default function PrioridadVerCard({
     }
     return null;
   }, [prioridad, prioridadId, prioridades]);
+
+  const estaEliminada = isPrioridadEliminada(pr);
 
   const NA = "Sin información";
   const isBlank = (v) =>
@@ -127,7 +130,7 @@ export default function PrioridadVerCard({
           <h2 className="cclf-card__title">{`Prioridad N° ${numeroPrioridad}`}</h2>
 
           <div className="cclf-card__actions">
-            {!fromSidePanel && (
+            {!fromSidePanel && !estaEliminada && (
               <button
                 type="button"
                 className="cclf-tab thin"

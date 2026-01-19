@@ -16,6 +16,7 @@ import {
   getEstadoVariant,
   getEstadoFromLote,
 } from '../../../utils/mapaUtils';
+import { getAllPrioridades } from '../../../lib/api/prioridades';
 
 // rbac y visibilidad de estados
 import { canDashboardAction, filterEstadoOptionsFor } from '../../../lib/auth/rbac.ui';
@@ -44,6 +45,8 @@ function RegistrarOperacionDropdown({ lote, onSelectOperacion }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef(null);
   const menuRef = useRef(null);
+  const [tienePrioridadActiva, setTienePrioridadActiva] = useState(false);
+  const [loadingPrioridad, setLoadingPrioridad] = useState(false);
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -60,19 +63,53 @@ function RegistrarOperacionDropdown({ lote, onSelectOperacion }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Verificar si el lote tiene prioridad activa
+  useEffect(() => {
+    if (!lote?.id) {
+      setTienePrioridadActiva(false);
+      return;
+    }
+
+    let abort = false;
+    setLoadingPrioridad(true);
+    (async () => {
+      try {
+        const resp = await getAllPrioridades({ loteId: lote.id, estado: "ACTIVA" });
+        const prioridades = resp?.data?.prioridades ?? resp?.prioridades ?? [];
+        if (!abort) {
+          setTienePrioridadActiva(prioridades.length > 0);
+        }
+      } catch (err) {
+        console.error("Error verificando prioridad activa:", err);
+        if (!abort) {
+          setTienePrioridadActiva(false);
+        }
+      } finally {
+        if (!abort) {
+          setLoadingPrioridad(false);
+        }
+      }
+    })();
+
+    return () => { abort = true; };
+  }, [lote?.id]);
+
   // Obtener estado del lote
   const estadoLote = String(getEstadoFromLote(lote) || "").toUpperCase();
 
   // Determinar habilitación según estado
-  const puedePrioridad = false; // Siempre disabled (módulo no existe aún)
+  // Prioridad: solo DISPONIBLE o EN_PROMOCION, y sin prioridad activa
+  const puedePrioridad = (estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION") && !tienePrioridadActiva && !loadingPrioridad;
   const puedeReserva = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "CON_PRIORIDAD";
   const puedeVenta = estadoLote === "DISPONIBLE" || estadoLote === "EN_PROMOCION" || estadoLote === "CON_PRIORIDAD" || estadoLote === "RESERVADO";
 
   // Obtener mensajes de tooltip para opciones disabled
   const getTooltipPrioridad = () => {
-    if (!puedePrioridad) return "Funcionalidad disponible próximamente";
-    if (estadoLote === "CON_PRIORIDAD") return "El lote ya tiene prioridad";
-    if (estadoLote === "RESERVADO" || estadoLote === "VENDIDO" || estadoLote === "NO_DISPONIBLE") return "No disponible para este estado";
+    if (loadingPrioridad) return "Verificando...";
+    if (tienePrioridadActiva || estadoLote === "CON_PRIORIDAD") return "Este lote ya tiene una prioridad activa.";
+    if (estadoLote !== "DISPONIBLE" && estadoLote !== "EN_PROMOCION") {
+      return "Solo se puede registrar prioridad para lotes DISPONIBLE o EN PROMOCIÓN.";
+    }
     return "";
   };
 
@@ -90,7 +127,7 @@ function RegistrarOperacionDropdown({ lote, onSelectOperacion }) {
   };
 
   const handleSelect = (tipo) => {
-    if (tipo === 'prioridad') return; // Siempre disabled (módulo no existe)
+    if (tipo === 'prioridad' && !puedePrioridad) return;
     if (tipo === 'reserva' && !puedeReserva) return;
     if (tipo === 'venta' && !puedeVenta) return;
     onSelectOperacion?.(tipo, lote);

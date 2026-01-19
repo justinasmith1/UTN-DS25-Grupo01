@@ -18,6 +18,10 @@ import { getPrioridadSearchFields } from "../utils/search/fields/prioridadSearch
 import PrioridadVerCard from "../components/Cards/Prioridades/PrioridadVerCard.jsx";
 import PrioridadEditarCard from "../components/Cards/Prioridades/PrioridadEditarCard.jsx";
 import PrioridadCrearCard from "../components/Cards/Prioridades/PrioridadCrearCard.jsx";
+import PrioridadEliminarDialog from "../components/Cards/Prioridades/PrioridadEliminarDialog.jsx";
+import PrioridadReactivarDialog from "../components/Cards/Prioridades/PrioridadReactivarDialog.jsx";
+import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
+import { softDeletePrioridad, reactivatePrioridad } from "../lib/api/prioridades.js";
 
 export default function Prioridades() {
   const { user } = useAuth();
@@ -65,8 +69,12 @@ export default function Prioridades() {
     (async () => {
       try {
         setLoading(true);
+        // Construir query con estadoOperativo desde params
+        const queryParams = {
+          ...(params.estadoOperativo ? { estadoOperativo: params.estadoOperativo } : {}),
+        };
         const [prioridadesResp, lotesResp] = await Promise.all([
-          getAllPrioridades({}),
+          getAllPrioridades(queryParams),
           getAllLotes({}),
         ]);
         
@@ -105,7 +113,7 @@ export default function Prioridades() {
     })();
 
     return () => { alive = false; };
-  }, [error]);
+  }, [error, params.estadoOperativo]);
 
   // Cargar inmobiliarias solo para ADMIN/GESTOR
   useEffect(() => {
@@ -146,6 +154,12 @@ export default function Prioridades() {
   const [openVer, setOpenVer] = useState(false);
   const [openEditar, setOpenEditar] = useState(false);
   const [openCrear, setOpenCrear] = useState(false);
+  const [openEliminar, setOpenEliminar] = useState(false);
+  const [openReactivar, setOpenReactivar] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [reactivating, setReactivating] = useState(false);
+  const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+  const [showReactivarSuccess, setShowReactivarSuccess] = useState(false);
 
   // Abrir el card de crear cuando viene desde el ModulePills (?crear=true)
   useEffect(() => {
@@ -222,6 +236,64 @@ export default function Prioridades() {
   const onAgregarPrioridad = useCallback(() => {
     setOpenCrear(true);
   }, []);
+
+  // Eliminar (soft delete)
+  const onEliminar = useCallback((prioridad) => {
+    setPrioridadSel(prioridad);
+    setOpenEliminar(true);
+  }, []);
+
+  const handleEliminar = useCallback(async () => {
+    if (!prioridadSel?.id) return;
+    try {
+      setDeleting(true);
+      const res = await softDeletePrioridad(prioridadSel.id);
+      const updated = res.data || res;
+      
+      // Actualizar en lista
+      setAllPrioridades((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+      
+      setOpenEliminar(false);
+      setShowDeleteSuccess(true);
+      setTimeout(() => {
+        setShowDeleteSuccess(false);
+      }, 1500);
+    } catch (e) {
+      console.error("Error eliminando prioridad:", e);
+      error(e?.message || "Error al eliminar prioridad");
+    } finally {
+      setDeleting(false);
+    }
+  }, [prioridadSel, error]);
+
+  // Reactivar
+  const onReactivar = useCallback((prioridad) => {
+    setPrioridadSel(prioridad);
+    setOpenReactivar(true);
+  }, []);
+
+  const handleReactivar = useCallback(async () => {
+    if (!prioridadSel?.id) return;
+    try {
+      setReactivating(true);
+      const res = await reactivatePrioridad(prioridadSel.id);
+      const updated = res.data || res;
+      
+      // Actualizar en lista
+      setAllPrioridades((prev) => prev.map((p) => p.id === updated.id ? updated : p));
+      
+      setOpenReactivar(false);
+      setShowReactivarSuccess(true);
+      setTimeout(() => {
+        setShowReactivarSuccess(false);
+      }, 1500);
+    } catch (e) {
+      console.error("Error reactivando prioridad:", e);
+      error(e?.message || "Error al reactivar prioridad");
+    } finally {
+      setReactivating(false);
+    }
+  }, [prioridadSel, error]);
 
   // PUT (Editar)
   const handleSave = useCallback(
@@ -304,6 +376,8 @@ export default function Prioridades() {
         inmobiliarias={inmobiliarias}
         onVer={canPrioridadView ? onVer : null}
         onEditar={canPrioridadEdit ? onEditar : null}
+        onEliminar={canPrioridadEdit ? onEliminar : null}
+        onReactivar={canPrioridadEdit ? onReactivar : null}
         onAgregarPrioridad={canPrioridadCreate ? onAgregarPrioridad : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
@@ -345,6 +419,25 @@ export default function Prioridades() {
         onCancel={() => setOpenCrear(false)}
         onCreated={handleCreated}
       />
+
+      <PrioridadEliminarDialog
+        open={openEliminar}
+        prioridad={prioridadSel}
+        loading={deleting}
+        onCancel={() => setOpenEliminar(false)}
+        onConfirm={handleEliminar}
+      />
+
+      <PrioridadReactivarDialog
+        open={openReactivar}
+        prioridad={prioridadSel}
+        loading={reactivating}
+        onCancel={() => setOpenReactivar(false)}
+        onConfirm={handleReactivar}
+      />
+
+      <SuccessAnimation show={showDeleteSuccess} message="¡Prioridad eliminada exitosamente!" />
+      <SuccessAnimation show={showReactivarSuccess} message="¡Prioridad reactivada exitosamente!" />
     </>
   );
 }

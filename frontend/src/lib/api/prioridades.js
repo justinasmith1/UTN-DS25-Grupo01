@@ -12,6 +12,7 @@ const fromApi = (row = {}) => {
     loteId: row.loteId ?? row.lote?.id ?? null,
     lote: row.lote || null,
     estado: row.estado ?? null,
+    estadoOperativo: row.estadoOperativo ?? 'OPERATIVO', // Default OPERATIVO para compatibilidad
     ownerType: row.ownerType ?? null,
     inmobiliariaId: row.inmobiliariaId ?? null,
     inmobiliaria: row.inmobiliaria || null,
@@ -340,6 +341,82 @@ export const expirePrioridadesManual = async () => {
     };
   } catch (error) {
     console.error('❌ Error expirando prioridades:', error);
+    throw error;
+  }
+};
+
+export const softDeletePrioridad = async (id) => {
+  if (USE_MOCK) {
+    return {
+      success: true,
+      data: null,
+      message: 'Prioridad eliminada correctamente (MOCK)'
+    };
+  }
+
+  try {
+    const response = await http(`/prioridades/${id}/eliminar`, {
+      method: 'PATCH'
+    });
+    
+    const resData = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = resData?.message || "Error al eliminar prioridad";
+      const error = new Error(errorMsg);
+      error.statusCode = response.status;
+      error.response = { data: resData, status: response.status };
+      throw error;
+    }
+
+    const raw = resData?.data ?? resData;
+    const normalized = fromApi(raw);
+
+    return {
+      success: true,
+      data: normalized,
+      message: resData.message || 'Prioridad eliminada correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error eliminando prioridad:', error);
+    throw error;
+  }
+};
+
+export const reactivatePrioridad = async (id) => {
+  if (USE_MOCK) {
+    return {
+      success: true,
+      data: null,
+      message: 'Prioridad reactivada correctamente (MOCK)'
+    };
+  }
+
+  try {
+    const response = await http(`/prioridades/${id}/reactivar`, {
+      method: 'PATCH'
+    });
+    
+    const resData = await response.json().catch(() => ({}));
+    
+    if (!response.ok) {
+      const errorMsg = resData?.message || "Error al reactivar prioridad";
+      const error = new Error(errorMsg);
+      error.statusCode = response.status;
+      error.response = { data: resData, status: response.status };
+      throw error;
+    }
+
+    const raw = resData?.data ?? resData;
+    const normalized = fromApi(raw);
+
+    return {
+      success: true,
+      data: normalized,
+      message: resData.message || 'Prioridad reactivada correctamente'
+    };
+  } catch (error) {
+    console.error('❌ Error reactivando prioridad:', error);
     throw error;
   }
 };

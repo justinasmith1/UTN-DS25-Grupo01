@@ -247,9 +247,11 @@
 .tl-badge--muted  { background:#F2F4F7; color:#475467; border-color:#E5E7EB; }
 .tl-badge--success{ background:#E7F7EE; color:#18794E; border-color:#BCE8D3; }
 .tl-badge--danger { background:#FEECEC; color:#C23B3B; border-color:#FAC5C5; }
-.tl-badge--warn   { background:#FFF6E5; color:#9A5C00; border-color:#FFE2B8; }
+.tl-badge--warn   { background:#FFF6E5; color:#FBBF24; border-color:#FCD34D; } /* Amarillo para VENDIDO */
 .tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
 .tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
+.tl-badge--orange { background:#FFF4E6; color:#EA580C; border-color:#FDBA74; } /* Naranja/ámbar para EN_PROMOCION */
+.tl-badge--violet { background:#F3E8FF; color:#7C3AED; border-color:#C4B5FD; } /* Violeta/índigo para CON_PRIORIDAD */
 /* --------------------------------------------- */
 
 

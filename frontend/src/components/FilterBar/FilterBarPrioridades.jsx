@@ -32,6 +32,7 @@ export default function FilterBarPrioridades({
     const allFields = [
       { id: "q", type: "search", label: "Búsqueda", placeholder: "N° prioridad, lote, inmobiliaria...", defaultValue: "" },
       { id: "estado", type: "multiSelect", label: "Estado", defaultValue: [] },
+      { id: "visibilidad", type: "singleSelect", label: "Visibilidad", defaultValue: "OPERATIVO" },
       { id: "owner", type: "multiSelect", label: "Inmobiliaria", defaultValue: [] },
       { id: "fechaFin", type: "dateRange", label: "Vencimiento", defaultValue: { min: null, max: null } },
     ];
@@ -47,6 +48,12 @@ export default function FilterBarPrioridades({
     // ESTADOS
     const ESTADOS = normOptions(estadosOpts ?? prioridadesFilterPreset?.catalogs?.ESTADOS ?? []);
 
+    // VISIBILIDAD (estadoOperativo)
+    const VISIBILIDAD_OPTIONS = [
+      { value: "OPERATIVO", label: "Operativas" },
+      { value: "ELIMINADO", label: "Eliminadas" },
+    ];
+
     // OWNER: "La Federala" + inmobiliarias dinámicas
     const INM_FROM_PROPS = normOptions(inmobiliariasOpts);
     const hasLF = INM_FROM_PROPS.some((o) => (o.label ?? "").toLowerCase().includes("la federala"));
@@ -54,7 +61,7 @@ export default function FilterBarPrioridades({
       ? INM_FROM_PROPS 
       : [{ value: "La Federala", label: "La Federala" }, ...INM_FROM_PROPS];
 
-    return { estado: ESTADOS, owner: OWNER_OPTIONS };
+    return { estado: ESTADOS, visibilidad: VISIBILIDAD_OPTIONS, owner: OWNER_OPTIONS };
   }, [estadosOpts, inmobiliariasOpts]);
 
   // ===== Rangos / Defaults =====
@@ -70,6 +77,7 @@ export default function FilterBarPrioridades({
       const baseDefaults = {
         q: "",
         estado: [],
+        visibilidad: "OPERATIVO", // Default: mostrar solo operativas
         fechaFin: { min: null, max: null },
       };
       // Para INMOBILIARIA: no incluir owner en defaults
@@ -83,6 +91,11 @@ export default function FilterBarPrioridades({
 
   const optionFormatter = useMemo(() => ({
     estado: nice,
+    visibilidad: (val) => {
+      if (val === "OPERATIVO") return "Operativas";
+      if (val === "ELIMINADO") return "Eliminadas";
+      return val;
+    },
     // owner no necesita formateador porque FilterBarBase ya usa optionLabel directamente
   }), []);
 
@@ -108,9 +121,12 @@ export default function FilterBarPrioridades({
     const ffMin = p?.fechaFin?.min ?? null;
     const ffMax = p?.fechaFin?.max ?? null;
 
+    const visibilidad = p?.visibilidad ?? "OPERATIVO"; // Default OPERATIVO
+
     return {
       q: p?.q ?? "",
       estado,
+      estadoOperativo: visibilidad, // Mapear visibilidad a estadoOperativo para backend
       owner: ownerIds,
       fechaFin: { min: ffMin, max: ffMax },
       
@@ -126,6 +142,7 @@ export default function FilterBarPrioridades({
     return {
       q: v.q ?? "",
       estado: v.estado ?? [],
+      visibilidad: v.estadoOperativo ?? v.visibilidad ?? "OPERATIVO", // Mapear desde estadoOperativo o visibilidad
       owner: v.owner ?? [],
       fechaFin: {
         min: pick(v?.fechaFin?.min, v?.fechaFinDesde) ?? null,

@@ -6,6 +6,7 @@ import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getPrioridadById, updatePrioridad, cancelPrioridad, finalizePrioridad } from "../../../lib/api/prioridades.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
+import { isPrioridadEliminada } from "../../../utils/prioridadHelpers";
 
 /** Estados editables de prioridad: solo FINALIZADA y CANCELADA (no EXPIRADA manualmente) */
 const ESTADOS_PRIORIDAD = [
@@ -189,6 +190,12 @@ export default function PrioridadEditarCard({
   /* Guardado */
   async function handleSave() {
     if (!detalle?.id) return;
+    
+    // Bloquear guardado si está eliminada
+    if (estaEliminada) {
+      setNumeroError("No se puede editar una prioridad eliminada. Reactívala para modificarla.");
+      return;
+    }
 
     setSaving(true);
     setShowSuccess(false);
@@ -335,6 +342,8 @@ export default function PrioridadEditarCard({
   const isReadOnly = String(detalle?.estado ?? "").toUpperCase() === "FINALIZADA" || 
                      String(detalle?.estado ?? "").toUpperCase() === "CANCELADA" ||
                      String(detalle?.estado ?? "").toUpperCase() === "EXPIRADA";
+  
+  const estaEliminada = isPrioridadEliminada(detalle);
 
   if (!open || !detalle) return null;
 
@@ -353,8 +362,25 @@ export default function PrioridadEditarCard({
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
+        saveButtonText={estaEliminada ? null : "Guardar cambios"}
       >
         <div style={{ "--sale-label-w": `${labelW}px` }}>
+          {estaEliminada && (
+            <div 
+              className="alert alert-warning" 
+              style={{ 
+                marginBottom: '1rem', 
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+                borderRadius: '0.375rem',
+                color: '#92400e'
+              }}
+            >
+              <strong>Prioridad eliminada:</strong> No se puede editar una prioridad eliminada. Reactívala para modificarla.
+            </div>
+          )}
+          
           <h3 className="venta-section-title">Información de la prioridad</h3>
 
           <div className="venta-grid" ref={containerRef}>
@@ -367,14 +393,14 @@ export default function PrioridadEditarCard({
 
               <div className="field-row">
                 <div className="field-label">ESTADO</div>
-                <div className="field-value p0">
+                  <div className="field-value p0">
                   <NiceSelect
                     value={estado}
                     options={estadosDisponibles}
                     placeholder=""
                     showPlaceholderOption={false}
                     onChange={setEstado}
-                    disabled={isReadOnly}
+                    disabled={isReadOnly || estaEliminada}
                   />
                 </div>
               </div>
@@ -392,14 +418,18 @@ export default function PrioridadEditarCard({
                   <div className="field-label">N° PRIORIDAD</div>
                   <div className="field-value p0">
                     <input
-                      className={`field-input ${numeroError ? "is-invalid" : ""}`}
+                      className={`field-input ${numeroError ? "is-invalid" : ""} ${estaEliminada ? "is-readonly" : ""}`}
                       type="text"
                       value={numero}
                       onChange={(e) => {
-                        setNumero(e.target.value);
-                        if (numeroError) setNumeroError(null);
+                        if (!estaEliminada) {
+                          setNumero(e.target.value);
+                          if (numeroError) setNumeroError(null);
+                        }
                       }}
                       placeholder="Ej: PRI-2026-01"
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
                     />
                   </div>
                 </div>
@@ -421,7 +451,8 @@ export default function PrioridadEditarCard({
                       options={inmobiliariaOpts}
                       placeholder="Seleccionar inmobiliaria"
                       showPlaceholderOption={false}
-                      onChange={(val) => setInmobiliariaId(val || "")}
+                      onChange={(val) => !estaEliminada && setInmobiliariaId(val || "")}
+                      disabled={estaEliminada}
                     />
                   </div>
                 )}
@@ -434,10 +465,12 @@ export default function PrioridadEditarCard({
                 ) : (
                   <div className="field-value p0">
                     <input
-                      className="field-input"
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                       type="date"
                       value={fechaFin}
-                      onChange={(e) => setFechaFin(e.target.value)}
+                      onChange={(e) => !estaEliminada && setFechaFin(e.target.value)}
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
                     />
                   </div>
                 )}

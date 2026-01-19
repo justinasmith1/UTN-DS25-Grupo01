@@ -5,7 +5,7 @@ import React, { useMemo } from 'react';
 import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { Eye, Edit, Trash2, RotateCcw } from 'lucide-react';
 import { prioridadesTablePreset as tablePreset } from './presets/prioridades.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx';
 
@@ -37,6 +37,7 @@ export default function TablaPrioridades({
   onVer,
   onEditar,
   onEliminar,
+  onReactivar,
   onAgregarPrioridad,
 
   // selección
@@ -127,6 +128,11 @@ export default function TablaPrioridades({
 
   // 8) Acciones por fila
   const renderRowActions = (row) => {
+    const estadoOperativo = String(row?.estadoOperativo ?? "OPERATIVO").toUpperCase();
+    const estado = String(row?.estado ?? "").toUpperCase();
+    const isEliminado = estadoOperativo === "ELIMINADO";
+    const isActiva = estado === "ACTIVA";
+
     return (
       <div className="tl-actions">
         {can('visualizarPrioridad') && (
@@ -139,7 +145,7 @@ export default function TablaPrioridades({
             <Eye size={18} strokeWidth={2} />
           </button>
         )}
-        {can('editarPrioridad') && (
+        {can('editarPrioridad') && !isEliminado && (
           <button
             className="tl-icon tl-icon--edit"
             aria-label="Editar Prioridad"
@@ -149,16 +155,32 @@ export default function TablaPrioridades({
             <Edit size={18} strokeWidth={2} />
           </button>
         )}
-        {/* Botón tacho deshabilitado con tooltip */}
-        <button
-          className="tl-icon tl-icon--delete"
-          aria-label="Eliminar Prioridad"
-          data-tooltip="Pendiente: unificación eliminación lógica (operativo/eliminado)"
-          disabled
-          style={{ opacity: 0.5, cursor: 'not-allowed' }}
-        >
-          <Trash2 size={18} strokeWidth={2} />
-        </button>
+        {can('eliminarPrioridad') && (
+          isEliminado ? (
+            // Prioridad eliminada: mostrar botón reactivar
+            <button
+              className="tl-icon tl-icon--reactivate"
+              aria-label="Reactivar Prioridad"
+              data-tooltip="Reactivar Prioridad"
+              onClick={() => onReactivar?.(row)}
+              style={{ color: '#10b981' }}
+            >
+              <RotateCcw size={18} strokeWidth={2} />
+            </button>
+          ) : (
+            // Prioridad operativa: mostrar botón eliminar (solo si no está ACTIVA)
+            <button
+              className="tl-icon tl-icon--delete"
+              aria-label={isActiva ? "No se puede eliminar una prioridad activa" : "Eliminar Prioridad"}
+              data-tooltip={isActiva ? "Primero cancelar o finalizar" : "Eliminar Prioridad"}
+              onClick={() => !isActiva && onEliminar?.(row)}
+              disabled={isActiva}
+              style={isActiva ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            >
+              <Trash2 size={18} strokeWidth={2} />
+            </button>
+          )
+        )}
       </div>
     );
   };
