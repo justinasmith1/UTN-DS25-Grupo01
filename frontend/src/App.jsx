@@ -9,6 +9,7 @@ import ProtectedRoute from "./app/routes/ProtectedRoute";
 import RequireRole from "./app/routes/RequireRole";
 import { PERMISSIONS } from "./lib/auth/rbac";
 
+import Prioridades from "./pages/Prioridades";
 import Reservas from "./pages/Reservas";
 import Ventas from "./pages/Ventas";
 import Inmobiliarias from "./pages/Inmobiliarias";
@@ -31,6 +32,14 @@ export default function App() {
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
           <Route path="map" element={<Map />} />
+          <Route
+            path="prioridades"
+            element={
+              <RequireRole permission={PERMISSIONS.PRIORITY_ACCESS}>
+                <Prioridades />
+              </RequireRole>
+            }
+          />
           <Route
             path="inmobiliarias"
             element={

@@ -6,6 +6,7 @@ import { PERMISSIONS, userPermissions, can } from './rbac';
 // ================================
 // Clave = key del módulo en la UI; valor = permiso mínimo para verlo.
 export const MODULES = {
+  prioridades:   PERMISSIONS.PRIORITY_ACCESS,
   ventas:        PERMISSIONS.SALE_ACCESS,
   inmobiliarias: PERMISSIONS.AGENCY_ACCESS,
   reservas:      PERMISSIONS.RES_ACCESS,
@@ -23,6 +24,7 @@ export function visibleModulesForUser(user) {
 // Nota: usamos beginsWith para admitir subrutas (/ventas/123, etc.)
 const ROUTE_PERMISSION_MAP = [
   { test: (path) => path === '/' || path === '/dashboard', permission: null },
+  { test: (path) => path.startsWith('/prioridades'), permission: PERMISSIONS.PRIORITY_ACCESS },
   { test: (path) => path.startsWith('/ventas'), permission: PERMISSIONS.SALE_ACCESS },
   { test: (path) => path.startsWith('/reservas'), permission: PERMISSIONS.RES_ACCESS },
   { test: (path) => path.startsWith('/inmobiliarias'), permission: PERMISSIONS.AGENCY_ACCESS },
@@ -71,6 +73,11 @@ export function canDashboardAction(user, action) {
     case 'visualizarReserva':  return can(user, PERMISSIONS.RES_VIEW);
     case 'editarReserva':      return can(user, PERMISSIONS.RES_EDIT);
     case 'eliminarReserva':    return can(user, PERMISSIONS.RES_DELETE);
+    
+    // Prioridades
+    case 'visualizarPrioridad':  return can(user, PERMISSIONS.PRIORITY_VIEW);
+    case 'editarPrioridad':      return can(user, PERMISSIONS.PRIORITY_EDIT);
+    case 'eliminarPrioridad':    return can(user, PERMISSIONS.PRIORITY_DELETE);
     
     // Personas
     case 'visualizarPersona':  return can(user, PERMISSIONS.PEOPLE_VIEW);
