@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateVenta, getVentaById } from "../../../lib/api/ventas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 
@@ -51,69 +52,6 @@ function fmtMoney(val) {
     currency: "USD",
     maximumFractionDigits: 0,
   });
-}
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const label = value
-    ? (options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder)
-    : placeholder;
-
-  // Solo incluir placeholder como opción si showPlaceholderOption es true
-  const optionsToShow = showPlaceholderOption && placeholder
-    ? [{ value: "", label: placeholder }, ...options]
-    : options;
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {optionsToShow.map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 /* ========================================================================== */

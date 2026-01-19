@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { createPortal } from "react-dom";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { createPrioridad } from "../../../lib/api/prioridades.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
@@ -28,108 +28,6 @@ function fromDateInputToISO(s, useEndOfDay = false) {
   const date = new Date(`${s}${timeStr}`);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
-}
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Seleccionar", onChange, usePortal = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (open && usePortal && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom, left: rect.left });
-    }
-  }, [open, usePortal]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e) => {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  const menuContent = open ? (
-    <ul 
-      ref={listRef} 
-      className="ns-list" 
-      role="listbox" 
-      tabIndex={-1}
-      style={usePortal ? {
-        position: 'fixed',
-        top: `${pos.top}px`,
-        left: `${pos.left}px`,
-        width: btnRef.current ? `${btnRef.current.offsetWidth}px` : '233px',
-        zIndex: 10000,
-        maxHeight: '300px',
-        overflowY: 'auto',
-        backgroundColor: '#fff',
-        border: '1px solid rgba(0,0,0,.14)',
-        borderRadius: '10px',
-        boxShadow: '0 12px 28px rgba(0,0,0,.18)',
-        padding: '6px',
-        margin: 0,
-        listStyle: 'none'
-      } : {}}
-    >
-      {options.map(opt => (
-        <li
-          key={`${opt.value}::${opt.label}`}
-          role="option"
-          aria-selected={`${opt.value}` === `${value}`}
-          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-          onClick={() => {
-            onChange?.(opt.value || "");
-            setOpen(false);
-          }}
-        >
-          {opt.label}
-        </li>
-      ))}
-    </ul>
-  ) : null;
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%'
-        }}
-      >
-        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-        <svg 
-          width="18" 
-          height="18" 
-          viewBox="0 0 20 20" 
-          aria-hidden
-          style={{ marginLeft: '8px', flexShrink: 0 }}
-        >
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {usePortal && typeof document !== 'undefined' 
-        ? createPortal(menuContent, document.body)
-        : menuContent}
-    </div>
-  );
 }
 
 function buildInitialForm(loteIdPreSeleccionado = null) {

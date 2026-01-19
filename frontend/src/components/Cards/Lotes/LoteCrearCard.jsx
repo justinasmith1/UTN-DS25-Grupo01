@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Info } from "lucide-react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { createLote } from "../../../lib/api/lotes.js";
 import { getAllFracciones } from "../../../lib/api/fracciones.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
@@ -13,62 +14,6 @@ import { normNum } from "../../../lib/forms/validate.js";
 import { loteCreateSchema } from "../../../lib/validations/loteCreate.schema.js";
 import LoteImageUploader from "./LoteImageUploader.jsx";
 import { applySearch } from "../../../utils/personaSearch.js";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  return (
-    <div className="ns-wrap">
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {(placeholder ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 const TIPOS = [
   { value: "Lote Venta", label: "Lote Venta" },
@@ -538,6 +483,7 @@ export default function LoteCrearCard({
                     value={formValues.estado ?? ""}
                     options={ESTADOS_EDITABLES_LOTE}
                     placeholder="Seleccionar estado"
+                    showPlaceholderOption={true}
                     onChange={(value) => setValue("estado", value)}
                   />
                 </div>
@@ -555,6 +501,7 @@ export default function LoteCrearCard({
                     value={formValues.subestado ?? ""}
                     options={SUBESTADOS}
                     placeholder="Seleccionar sub-estado"
+                    showPlaceholderOption={true}
                     onChange={(value) => setValue("subestado", value)}
                   />
                 </div>
@@ -579,6 +526,7 @@ export default function LoteCrearCard({
                       };
                     })}
                     placeholder={loadingFracciones ? "Cargando..." : "Seleccionar fracción"}
+                    showPlaceholderOption={true}
                     onChange={(value) => {
                       const fraccion = fracciones.find(f => `${f.idFraccion ?? f.id}` === value);
                       const fraccionId = value ? Number(value) : "";
@@ -751,6 +699,7 @@ export default function LoteCrearCard({
                   value={formValues.calle ?? ""}
                   options={CALLES_OPTIONS}
                   placeholder="Seleccionar calle"
+                  showPlaceholderOption={true}
                   onChange={(value) => {
                     setValue("calle", value || "");
                   }}

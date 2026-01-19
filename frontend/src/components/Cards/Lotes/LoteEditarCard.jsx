@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Info } from "lucide-react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
@@ -11,77 +12,6 @@ import { useToast } from "../../../app/providers/ToastProvider.jsx";
 import { getLoteIdFormatted } from "../../Table/TablaLotes/utils/getters.js";
 import PersonaSearchSelect from "./PersonaSearchSelect.jsx";
 import LoteImageUploader from "./LoteImageUploader.jsx";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    if (disabled) {
-      setOpen(false);
-      return;
-    }
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [disabled]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  if (disabled) {
-    return (
-      <div className="ns-wrap" style={{ position: "relative" }}>
-        <div className="ns-trigger" style={{ opacity: 0.6, cursor: "not-allowed", pointerEvents: "none" }}>
-          <span>{label}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && !disabled && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {(placeholder ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 const TIPOS = [
   { value: "Lote Venta", label: "Lote Venta" },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import "../Base/cards.css";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
@@ -20,48 +21,6 @@ function fromDateInputToISO(s) {
   if (!s || !s.trim()) return null;
   const date = new Date(`${s}T00:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
-
-function NiceSelect({ value, options, placeholder = "Seleccionar", onChange }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  useEffect(() => {
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-  const label = options.find((o) => `${o.value}` === `${value}`)?.label ?? placeholder;
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button type="button" ref={btnRef} className="ns-trigger" onClick={() => setOpen((o) => !o)}>
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {open && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1} style={{ zIndex: 10000 }}>
-          {options.map((opt) => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value);
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 export default function VentaCrearCard({
