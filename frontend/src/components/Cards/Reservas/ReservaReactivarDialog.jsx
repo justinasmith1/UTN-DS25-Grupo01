@@ -29,12 +29,11 @@ export default function ReservaReactivarDialog({
 
   const r = detalleCompleto || reserva;
   const reservaNumero = r?.numero ?? r?.id ?? "—";
+  const estadoActual = r?.estado ?? "—";
   
   const title = `Reactivar Reserva N° ${reservaNumero}`;
 
-  const message = `¿Seguro que deseas reactivar la reserva N° ${reservaNumero}? Pasará a estado ACTIVA.
-  
-  Nota: Solo se puede reactivar si el lote asociado se encuentra DISPONIBLE. Si el lote ya fue reservado o vendido por otra operación, no se podrá reactivar.`;
+  const message = `¿Seguro que deseas reactivar la reserva N° ${reservaNumero}? Se reactivará la reserva (volverá a mostrarse como OPERATIVA) manteniendo su estado actual: ${estadoActual}.`;
 
   const details = [
     `Lote N°: ${r?.lote?.mapId || r?.lotMapId || r?.loteId || "—"}`,

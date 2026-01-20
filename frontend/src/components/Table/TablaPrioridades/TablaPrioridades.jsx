@@ -8,6 +8,7 @@ import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, RotateCcw } from 'lucide-react';
 import { prioridadesTablePreset as tablePreset } from './presets/prioridades.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx';
+import { canEditByEstadoOperativo, isEliminado } from '../../../utils/estadoOperativo';
 
 // ------------------------
 // Helpers internos
@@ -128,10 +129,10 @@ export default function TablaPrioridades({
 
   // 8) Acciones por fila
   const renderRowActions = (row) => {
-    const estadoOperativo = String(row?.estadoOperativo ?? "OPERATIVO").toUpperCase();
     const estado = String(row?.estado ?? "").toUpperCase();
-    const isEliminado = estadoOperativo === "ELIMINADO";
     const isActiva = estado === "ACTIVA";
+    const estaEliminada = isEliminado(row);
+    const puedeEditar = canEditByEstadoOperativo(row);
 
     return (
       <div className="tl-actions">
@@ -145,7 +146,7 @@ export default function TablaPrioridades({
             <Eye size={18} strokeWidth={2} />
           </button>
         )}
-        {can('editarPrioridad') && !isEliminado && (
+        {can('editarPrioridad') && puedeEditar && (
           <button
             className="tl-icon tl-icon--edit"
             aria-label="Editar Prioridad"
@@ -156,7 +157,7 @@ export default function TablaPrioridades({
           </button>
         )}
         {can('eliminarPrioridad') && (
-          isEliminado ? (
+          estaEliminada ? (
             // Prioridad eliminada: mostrar botón reactivar
             <button
               className="tl-icon tl-icon--reactivate"

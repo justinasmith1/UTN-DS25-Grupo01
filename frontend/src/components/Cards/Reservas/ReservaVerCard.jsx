@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 
 /**
  * ReservaVerCard
@@ -139,7 +140,7 @@ export default function ReservaVerCard({
           <h2 className="cclf-card__title">{`Reserva N° ${res?.numero ?? res?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
-            {!fromSidePanel && (
+            {!fromSidePanel && canEditByEstadoOperativo(res) && (
               <button
                 type="button"
                 className="cclf-tab thin"

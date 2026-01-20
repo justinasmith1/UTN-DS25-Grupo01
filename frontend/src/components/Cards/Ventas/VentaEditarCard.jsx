@@ -5,6 +5,7 @@ import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateVenta, getVentaById } from "../../../lib/api/ventas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
+import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 
 /** Estados: value técnico + label Title Case */
 const ESTADOS = [
@@ -293,6 +294,12 @@ export default function VentaEditarCard({
   }
 
   async function handleSave() {
+    // Bloquear guardado si está eliminada
+    if (isEliminado(detalle)) {
+      setNumeroError("No se puede editar una venta eliminada. Reactívala para modificarla.");
+      return;
+    }
+    
     try {
       setSaving(true);
       setNumeroError(null);
@@ -380,6 +387,9 @@ export default function VentaEditarCard({
 
   if (!open && !showSuccess) return null;
 
+  const estaEliminada = isEliminado(detalle);
+  const puedeEditar = canEditByEstadoOperativo(detalle);
+
   return (
     <>
       {/* Animación de éxito */}
@@ -398,9 +408,26 @@ export default function VentaEditarCard({
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
+        saveButtonText={puedeEditar ? "Guardar cambios" : null}
       >
         {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
         <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
+          {estaEliminada && (
+            <div 
+              className="alert alert-warning" 
+              style={{ 
+                marginBottom: '1rem', 
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+                borderRadius: '0.375rem',
+                color: '#92400e'
+              }}
+            >
+              <strong>Venta eliminada:</strong> No se puede editar una venta eliminada. Reactívala para modificarla.
+            </div>
+          )}
+          
           <h3 className="venta-section-title">Información de la venta</h3>
 
           <div className="venta-grid" ref={containerRef}>
@@ -415,13 +442,15 @@ export default function VentaEditarCard({
                 <div className="field-label">MONTO</div>
                 <div className="field-value p0" style={{ position: "relative" }}>
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="number"
                     inputMode="decimal"
                     min="0"
                     value={monto}
-                    onChange={(e) => setMonto(e.target.value)}
+                    onChange={(e) => !estaEliminada && setMonto(e.target.value)}
                     style={{ paddingRight: "50px" }}
+                    disabled={estaEliminada}
+                    readOnly={estaEliminada}
                   />
                   {/* Mostrar USD como símbolo al final */}
                   <span style={{
@@ -446,8 +475,9 @@ export default function VentaEditarCard({
                     value={estado}
                     options={ESTADOS}
                     placeholder="Seleccionar estado"
-                    onChange={setEstado}
+                    onChange={(val) => !estaEliminada && setEstado(val)}
                     showPlaceholderOption={false}
+                    disabled={estaEliminada}
                   />
                 </div>
               </div>
@@ -480,16 +510,20 @@ export default function VentaEditarCard({
               <div className="field-row">
                 <div className="field-label">NÚMERO DE VENTA</div>
                 <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={numero}
-                    onChange={(e) => {
-                      setNumero(e.target.value);
-                      if (numeroError) setNumeroError(null);
-                    }}
-                    placeholder="Ej: CCLF-2025-01"
-                  />
+                    <input
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                      type="text"
+                      value={numero}
+                      onChange={(e) => {
+                        if (!estaEliminada) {
+                          setNumero(e.target.value);
+                          if (numeroError) setNumeroError(null);
+                        }
+                      }}
+                      placeholder="Ej: CCLF-2025-01"
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
+                    />
                   {numeroError && (
                     <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
                       {numeroError}
@@ -501,37 +535,43 @@ export default function VentaEditarCard({
               <div className="field-row">
                 <div className="field-label">FECHA VENTA</div>
                 <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="date"
-                    value={fechaVenta}
-                    onChange={(e) => setFechaVenta(e.target.value)}
-                  />
+                    <input
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                      type="date"
+                      value={fechaVenta}
+                      onChange={(e) => !estaEliminada && setFechaVenta(e.target.value)}
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
+                    />
                 </div>
               </div>
 
               <div className="field-row">
                 <div className="field-label">TIPO DE PAGO</div>
                 <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={tipoPago}
-                    onChange={(e) => setTipoPago(e.target.value)}
-                    placeholder="Contado, Transferencia, Cuotas…"
-                  />
+                    <input
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                      type="text"
+                      value={tipoPago}
+                      onChange={(e) => !estaEliminada && setTipoPago(e.target.value)}
+                      placeholder="Contado, Transferencia, Cuotas…"
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
+                    />
                 </div>
               </div>
 
               <div className="field-row">
                 <div className="field-label">PLAZO ESCRITURA</div>
                 <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="date"
-                    value={plazoEscritura}
-                    onChange={(e) => setPlazoEscritura(e.target.value)}
-                  />
+                    <input
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                      type="date"
+                      value={plazoEscritura}
+                      onChange={(e) => !estaEliminada && setPlazoEscritura(e.target.value)}
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
+                    />
                 </div>
               </div>
 

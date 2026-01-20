@@ -32,7 +32,7 @@ export default function ReservaEliminarDialog({
   const title = `Eliminar Reserva N° ${reserva?.numero ?? "—"}`;
 
   // Mensaje tipo pregunta (línea 1)
-  const message = `¿Seguro que deseas desactivar la Reserva N° ${reserva?.numero ?? "—"}?`;
+  const message = `¿Seguro que deseas eliminar la Reserva N° ${reserva?.numero ?? "—"}?`;
 
   // Detalles listados con bullets
   const details = [
@@ -41,7 +41,8 @@ export default function ReservaEliminarDialog({
   ].filter(Boolean);
 
   // Nota final en negrita
-  const noteBold = "La reserva pasará a estado ELIMINADO y el lote quedará DISPONIBLE.";
+  // IMPORTANTE: No mencionar el lote. El eliminado lógico solo cambia estadoOperativo.
+  const noteBold = "La reserva pasará a estado operativo ELIMINADO. El estado comercial de la reserva y el estado del lote no se modificarán.";
 
   return (
     <EliminarBase
@@ -50,7 +51,7 @@ export default function ReservaEliminarDialog({
       message={message}
       details={details}
       noteBold={noteBold}
-      confirmLabel="Desactivar Reserva"
+      confirmLabel="Eliminar Reserva"
       loading={loading}
       onCancel={onCancel}
       onConfirm={onConfirm} 

@@ -64,6 +64,14 @@ const fromApi = (row = {}) => {
     inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
     reservaId: row.reservaId ?? row.reserva_id ?? null,
     observaciones: row.observaciones ?? row.notas ?? "",
+    // Estado operativo: derivado de estado si es OPERATIVO/ELIMINADO, sino default OPERATIVO
+    estadoOperativo: (() => {
+      const estadoStr = String(row.estado ?? "").toUpperCase().trim();
+      if (estadoStr === "OPERATIVO" || estadoStr === "ELIMINADO") {
+        return estadoStr;
+      }
+      return "OPERATIVO";
+    })(),
     // Preservar fechas del backend
     createdAt: row.createdAt ?? row.fechaCreacion ?? null,
     updatedAt: row.updatedAt ?? row.updateAt ?? row.fechaActualizacion ?? null,

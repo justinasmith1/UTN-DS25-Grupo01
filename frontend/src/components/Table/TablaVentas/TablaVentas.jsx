@@ -4,6 +4,7 @@ import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, FileText, X, RotateCcw } from 'lucide-react';
+import { canEditByEstadoOperativo, isEliminado } from '../../../utils/estadoOperativo';
 import MapaInteractivo from '../../Mapa/MapaInteractivo';
 import {
   normalizeEstadoKey,
@@ -203,7 +204,9 @@ export default function TablaVentas({
   };
 
   const renderRowActions = (venta) => {
-    const isEliminado = venta.estado === 'ELIMINADO';
+    const estaEliminada = isEliminado(venta);
+    const puedeEditar = canEditByEstadoOperativo(venta);
+    
     return (
     <div className="tl-actions">
       {can('ver') && (
@@ -216,8 +219,8 @@ export default function TablaVentas({
           <Eye size={18} strokeWidth={2} />
         </button>
       )}
-      {/* Editar: solo si NO está eliminado */}
-      {can('editar') && !isEliminado && (
+      {/* Editar: solo si puede editar (es operativa) */}
+      {can('editar') && puedeEditar && (
         <button
           className="tl-icon tl-icon--edit"
           aria-label="Editar Venta"
@@ -238,7 +241,7 @@ export default function TablaVentas({
         </button>
       )}
       {can('eliminar') && (
-        isEliminado ? (
+        estaEliminada ? (
            <button
              className="tl-icon tl-icon--reactivate"
              aria-label="Reactivar Venta"
@@ -260,8 +263,8 @@ export default function TablaVentas({
         )
       )}
     </div>
-    );
-  };
+  );
+};
 
   // ===== preview del mapa  =====
   const [selectedMapIdsForPreview, setSelectedMapIdsForPreview] = useState([]);

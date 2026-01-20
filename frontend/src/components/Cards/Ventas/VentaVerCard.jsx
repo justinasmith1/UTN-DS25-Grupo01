@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getVentaById } from "../../../lib/api/ventas";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 
 /**
  * VentaVerCard
@@ -226,7 +227,7 @@ export default function VentaVerCard({
           <h2 className="cclf-card__title">{`Venta N° ${sale?.numero ?? sale?.id ?? "—"}`}</h2>
 
           <div className="cclf-card__actions">
-            {!fromSidePanel && (
+            {!fromSidePanel && canEditByEstadoOperativo(sale) && (
               <button
                 type="button"
                 className="cclf-tab thin"

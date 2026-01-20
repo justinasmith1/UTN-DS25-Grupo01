@@ -15,6 +15,7 @@ import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, FileText, X, RefreshCcw } from 'lucide-react';
+import { canEditByEstadoOperativo, isEliminado, canDeleteReserva, getReservaDeleteTooltip } from '../../../utils/estadoOperativo';
 import MapaInteractivo from '../../Mapa/MapaInteractivo';
 import {
   normalizeEstadoKey,
@@ -296,9 +297,12 @@ export default function TablaReservas({
 
   // 9) Acciones por fila
   const renderRowActions = (row) => {
-    const isEliminado = row?.estado === 'ELIMINADO' || row?.estado === 'eliminado';
+    const estaEliminada = isEliminado(row);
+    const puedeEditar = canEditByEstadoOperativo(row);
+    const puedeEliminar = canDeleteReserva(row);
+    const tooltipEliminar = getReservaDeleteTooltip(row);
     
-    if (isEliminado) {
+    if (estaEliminada) {
       return (
         <div className="tl-actions">
            {can('visualizarReserva') && (
@@ -322,13 +326,20 @@ export default function TablaReservas({
           <Eye size={18} strokeWidth={2} />
         </button>
       )}
-      {can('editarReserva') && (
+      {can('editarReserva') && puedeEditar && (
         <button className="tl-icon tl-icon--edit" aria-label="Editar Reserva" data-tooltip="Editar Reserva" onClick={() => onEditar?.(row)}>
           <Edit size={18} strokeWidth={2} />
         </button>
       )}
       {can('eliminarReserva') && (
-        <button className="tl-icon tl-icon--delete" aria-label="Eliminar Reserva" data-tooltip="Eliminar Reserva" onClick={() => onEliminar?.(row)}>
+        <button 
+          className={`tl-icon tl-icon--delete ${!puedeEliminar ? 'disabled' : ''}`}
+          aria-label="Eliminar Reserva" 
+          data-tooltip={puedeEliminar ? "Eliminar Reserva" : tooltipEliminar}
+          disabled={!puedeEliminar}
+          onClick={() => puedeEliminar && onEliminar?.(row)}
+          style={!puedeEliminar ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        >
           <Trash2 size={18} strokeWidth={2} />
         </button>
       )}

@@ -6,7 +6,7 @@ import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getPrioridadById, updatePrioridad, cancelPrioridad, finalizePrioridad } from "../../../lib/api/prioridades.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
-import { isPrioridadEliminada } from "../../../utils/prioridadHelpers";
+import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 
 /** Estados editables de prioridad: solo FINALIZADA y CANCELADA (no EXPIRADA manualmente) */
 const ESTADOS_PRIORIDAD = [
@@ -343,7 +343,8 @@ export default function PrioridadEditarCard({
                      String(detalle?.estado ?? "").toUpperCase() === "CANCELADA" ||
                      String(detalle?.estado ?? "").toUpperCase() === "EXPIRADA";
   
-  const estaEliminada = isPrioridadEliminada(detalle);
+  const estaEliminada = isEliminado(detalle);
+  const puedeEditar = canEditByEstadoOperativo(detalle);
 
   if (!open || !detalle) return null;
 

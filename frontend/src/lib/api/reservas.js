@@ -63,6 +63,20 @@ const fromApi = (row = {}) => {
       row.inmobiliariaNombre ??
       "La Federala",
     loteInfo: buildLoteInfo(),
+    // Estado operativo: leer directamente del backend, default OPERATIVO
+    estadoOperativo: (() => {
+      // Prioridad: usar estadoOperativo del backend si existe
+      if (row.estadoOperativo != null) {
+        const opStr = String(row.estadoOperativo).toUpperCase().trim();
+        return opStr === "ELIMINADO" ? "ELIMINADO" : "OPERATIVO";
+      }
+      // Fallback: derivar de estado solo si es OPERATIVO/ELIMINADO (compatibilidad)
+      const estadoStr = String(row.estado ?? "").toUpperCase().trim();
+      if (estadoStr === "OPERATIVO" || estadoStr === "ELIMINADO") {
+        return estadoStr;
+      }
+      return "OPERATIVO";
+    })(),
     createdAt: row.createdAt ?? row.created_at ?? new Date().toISOString(),
     updateAt: row.updateAt ?? row.updated_at ?? row.updatedAt,
   };
@@ -456,15 +470,15 @@ export const updateReserva = async (id, payload) => {
   }
 };
 
-export const desactivarReserva = async (id) => {
+export const eliminarReserva = async (id) => {
   if (USE_MOCK) {
     const index = mockReservas.findIndex(r => r.id === parseInt(id));
     if (index !== -1) {
-      mockReservas[index].estado = 'ELIMINADO';
+      mockReservas[index] = { ...mockReservas[index], estadoOperativo: 'ELIMINADO' };
       return {
         success: true,
         data: mockReservas[index],
-        message: 'Reserva desactivada correctamente (MOCK)'
+        message: 'Reserva eliminada correctamente (MOCK)'
       };
     }
     return {
@@ -474,7 +488,7 @@ export const desactivarReserva = async (id) => {
   }
 
   try {
-    const response = await http(`/reservas/${id}/desactivar`, {
+    const response = await http(`/reservas/${id}/eliminar`, {
       method: 'PATCH'
     });
     
@@ -482,7 +496,7 @@ export const desactivarReserva = async (id) => {
     const resData = await response.json().catch(() => ({}));
     
     if (!response.ok) {
-       const errorMsg = resData?.message || "Error al desactivar reserva";
+       const errorMsg = resData?.message || "Error al eliminar reserva";
        throw new Error(errorMsg);
     }
 
@@ -492,19 +506,25 @@ export const desactivarReserva = async (id) => {
     return {
       success: true,
       data: normalized,
-      message: resData.message || 'Reserva desactivada correctamente'
+      message: resData.message || 'Reserva eliminada correctamente'
     };
   } catch (error) {
-    console.error('❌ Error desactivando reserva:', error);
+    console.error('❌ Error eliminando reserva:', error);
     throw error;
   }
 };
+
+// Alias para compatibilidad (deprecated, usar eliminarReserva)
+export const desactivarReserva = eliminarReserva;
+
+// deleteReserva ahora usa eliminarReserva (Soft Delete)
+export const deleteReserva = eliminarReserva;
 
 export const reactivarReserva = async (id) => {
     if (USE_MOCK) {
         const index = mockReservas.findIndex(r => r.id === parseInt(id));
         if (index !== -1) {
-            mockReservas[index].estado = 'ACTIVA';
+            mockReservas[index] = { ...mockReservas[index], estadoOperativo: 'OPERATIVO' };
             return {
                 success: true,
                 data: mockReservas[index],
@@ -543,8 +563,6 @@ export const reactivarReserva = async (id) => {
     }
 }
 
-// deleteReserva ahora usa desactivarReserva (Soft Delete)
-export const deleteReserva = desactivarReserva;
 
 // ===== UTILIDADES =====
 const mockFilterSortPage = (data, params = {}) => {

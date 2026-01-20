@@ -9,6 +9,7 @@ import { getAllPersonas } from "../../../lib/api/personas.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
 import { set } from "zod";
+import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
@@ -404,6 +405,12 @@ export default function ReservaEditarCard({
   }
 
   async function handleSave() {
+    // Bloquear guardado si está eliminada
+    if (isEliminado(detalle)) {
+      setNumeroError("No se puede editar una reserva eliminada. Reactívala para modificarla.");
+      return;
+    }
+    
     try {
       setSaving(true);
       setNumeroError(null);
@@ -525,6 +532,9 @@ export default function ReservaEditarCard({
 
   if (!open || !detalle) return null;
 
+  const estaEliminada = isEliminado(detalle);
+  const puedeEditar = canEditByEstadoOperativo(detalle);
+
   return (
     <>
       {/* Animación de éxito */}
@@ -542,8 +552,25 @@ export default function ReservaEditarCard({
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
+        saveButtonText={puedeEditar ? "Guardar cambios" : null}
       >
         <div style={{ "--sale-label-w": `${labelW}px` }}>
+          {estaEliminada && (
+            <div 
+              className="alert alert-warning" 
+              style={{ 
+                marginBottom: '1rem', 
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+                borderRadius: '0.375rem',
+                color: '#92400e'
+              }}
+            >
+              <strong>Reserva eliminada:</strong> No se puede editar una reserva eliminada. Reactívala para modificarla.
+            </div>
+          )}
+          
           <h3 className="venta-section-title">Información de la reserva</h3>
 
           <div className="venta-grid" ref={containerRef}>
@@ -558,10 +585,12 @@ export default function ReservaEditarCard({
                 <div className="field-label">FECHA</div>
                 <div className="field-value p0">
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="date"
                     value={fechaReserva}
-                    onChange={(e) => setFechaReserva(e.target.value)}
+                    onChange={(e) => !estaEliminada && setFechaReserva(e.target.value)}
+                    disabled={estaEliminada}
+                    readOnly={estaEliminada}
                     disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                   />
                 </div>
@@ -578,8 +607,8 @@ export default function ReservaEditarCard({
                           options={personaOpts}
                           placeholder="Seleccionar cliente"
                           showPlaceholderOption={false}
-                          onChange={(val) => setClienteId(val || "")}
-                          disabled={String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                          onChange={(val) => !estaEliminada && setClienteId(val || "")}
+                          disabled={estaEliminada || String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                         />
                       </div>
                       <button
@@ -630,7 +659,8 @@ export default function ReservaEditarCard({
                       options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
                       placeholder="La Federala"
                       showPlaceholderOption={false}
-                      onChange={setInmobiliariaId}
+                      onChange={(val) => !estaEliminada && setInmobiliariaId(val)}
+                      disabled={estaEliminada}
                     />
                   </div>
                 )}
@@ -644,8 +674,8 @@ export default function ReservaEditarCard({
                     options={estadosDisponibles}
                     placeholder=""
                     showPlaceholderOption={false}
-                    onChange={setEstado}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    onChange={(val) => !estaEliminada && setEstado(val)}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
                   />
                 </div>
               </div>
@@ -660,14 +690,18 @@ export default function ReservaEditarCard({
                 ) : (
                   <div className="field-value p0">
                     <input
-                      className="field-input"
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                       type="text"
                       value={numero}
                       onChange={(e) => {
-                        setNumero(e.target.value);
-                        if (numeroError) setNumeroError(null);
+                        if (!estaEliminada) {
+                          setNumero(e.target.value);
+                          if (numeroError) setNumeroError(null);
+                        }
                       }}
                       placeholder="Ej: RES-2025-01"
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
                     />
                     {numeroError && (
                       <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
@@ -682,12 +716,12 @@ export default function ReservaEditarCard({
                 <div className="field-label">PLAZO DE RESERVA</div>
                 <div className="field-value p0">
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="date"
                     value={fechaFinReserva}
-                    onChange={(e) => setFechaFinReserva(e.target.value)}
-                    // Deshabilitar si es inmobiliaria y está cancelada (misma lógica que los otros campos)
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    onChange={(e) => !estaEliminada && setFechaFinReserva(e.target.value)}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                    readOnly={estaEliminada}
                   />
                 </div>
               </div>
@@ -696,15 +730,16 @@ export default function ReservaEditarCard({
                 <div className="field-label">SEÑA</div>
                 <div className="field-value p0" style={{ position: "relative" }}>
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="number"
                     inputMode="decimal"
                     min="0"
                     step="100"
                     value={sena}
-                    onChange={(e) => setSena(e.target.value)}
+                    onChange={(e) => !estaEliminada && setSena(e.target.value)}
                     style={{ paddingRight: "50px" }}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                    readOnly={estaEliminada}
                   />
                   <span style={{ 
                     position: "absolute", 
