@@ -69,14 +69,14 @@ export const getReservaParamsSchema = z.object({
 
 /*  Parametros para eliminar, usa el mismo que el de arriba del obtener */
 export const deleteReservaParamsSchema = getReservaParamsSchema;
-export const desactivarReservaParamsSchema = getReservaParamsSchema;
-export const reactivarReservaParamsSchema = getReservaParamsSchema;
+export const patchReservaParamsSchema = getReservaParamsSchema;
 
 /*  Query del listado (GET /reservas) */
 export const queryReservasSchema = z.object({
   desde: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "desde" inválida').optional(),
   hasta: z.string().refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha "hasta" inválida').optional(),
   estado: z.enum(['ACTIVA', 'CANCELADA', 'ACEPTADA', 'RECHAZADA', 'CONTRAOFERTA', 'EXPIRADA']).optional(),
+  estadoOperativo: z.enum(['OPERATIVO', 'ELIMINADO']).optional(),
   loteId: idInt.optional(),
   clienteId: idInt.optional(),
   inmobiliariaId: idInt.optional(),

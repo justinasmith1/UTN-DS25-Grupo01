@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ventaController from '../controllers/venta.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, desactivarVentaSchema, reactivarVentaSchema } from '../validations/venta.validation';
+import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema, reactivarVentaSchema } from '../validations/venta.validation';
 
 const router = Router();
 
@@ -53,21 +53,21 @@ router.delete(
     validateParams(deleteVentaSchema),  
     ventaController.eliminarVenta);
 
-// PATCH /api/Ventas/:id/desactivar
+// PATCH /api/Ventas/:id/eliminar
 router.patch(
-    '/:id/desactivar',
+    '/:id/eliminar',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(desactivarVentaSchema),
-    ventaController.desactivarVenta
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(patchVentaParamsSchema),
+    ventaController.eliminarVenta
 );
 
 // PATCH /api/Ventas/:id/reactivar
 router.patch(
     '/:id/reactivar',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(reactivarVentaSchema),
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(patchVentaParamsSchema),
     ventaController.reactivarVenta
 );
 

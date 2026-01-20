@@ -178,6 +178,7 @@ export async function createPrioridad(
 export async function getAllPrioridades(
   query: {
     estado?: string;
+    estadoOperativo?: string;
     ownerType?: string;
     inmobiliariaId?: number;
     loteId?: number;
@@ -199,6 +200,13 @@ export async function getAllPrioridades(
     if (query.inmobiliariaId) {
       where.inmobiliariaId = query.inmobiliariaId;
     }
+  }
+
+  // Filtro estadoOperativo: default OPERATIVO si no viene
+  if (query.estadoOperativo) {
+    where.estadoOperativo = query.estadoOperativo;
+  } else {
+    where.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
   }
 
   // Filtros opcionales
@@ -240,7 +248,15 @@ export async function getAllPrioridades(
     orderBy: { fechaInicio: 'desc' },
     include: {
       lote: {
-        select: { id: true, numero: true, mapId: true, estado: true },
+        select: { 
+          id: true, 
+          numero: true, 
+          mapId: true, 
+          estado: true,
+          fraccion: {
+            select: { numero: true }
+          }
+        },
       },
       inmobiliaria: {
         select: { id: true, nombre: true },
@@ -249,6 +265,181 @@ export async function getAllPrioridades(
   });
 
   return { prioridades, total: prioridades.length };
+}
+
+// ==============================
+// Eliminar prioridad (soft delete)
+// ==============================
+export async function eliminarPrioridad(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
+  try {
+    // Obtener la prioridad existente
+    const prioridad = await prisma.prioridad.findUnique({
+      where: { id },
+      include: {
+        lote: {
+          select: { 
+            id: true, 
+            numero: true, 
+            mapId: true, 
+            estado: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+      },
+    });
+
+    if (!prioridad) {
+      const err: any = new Error('Prioridad no encontrada');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Validar permisos: INMOBILIARIA solo puede eliminar sus propias prioridades
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (prioridad.inmobiliariaId !== user.inmobiliariaId || prioridad.ownerType !== 'INMOBILIARIA') {
+        const err: any = new Error('No tienes permiso para eliminar esta prioridad');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Validar que no esté ya eliminada
+    if (prioridad.estadoOperativo === 'ELIMINADO') {
+      const err: any = new Error('La prioridad ya está eliminada.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    // Validar que no esté ACTIVA
+    if (prioridad.estado === 'ACTIVA') {
+      const err: any = new Error('No se puede eliminar una prioridad activa. Primero cancelarla o finalizarla.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    // Actualizar estadoOperativo a ELIMINADO
+    const updated = await prisma.prioridad.update({
+      where: { id },
+      data: {
+        estadoOperativo: 'ELIMINADO',
+      },
+      include: {
+        lote: {
+          select: { 
+            id: true, 
+            numero: true, 
+            mapId: true, 
+            estado: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+      },
+    });
+
+    return updated;
+  } catch (e: any) {
+    if (e.statusCode) {
+      throw e;
+    }
+    throw mapPrismaError(e);
+  }
+}
+
+// ==============================
+// Reactivar prioridad
+// ==============================
+export async function reactivarPrioridad(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
+  try {
+    // Obtener la prioridad existente
+    const prioridad = await prisma.prioridad.findUnique({
+      where: { id },
+      include: {
+        lote: {
+          select: { 
+            id: true, 
+            numero: true, 
+            mapId: true, 
+            estado: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+      },
+    });
+
+    if (!prioridad) {
+      const err: any = new Error('Prioridad no encontrada');
+      err.statusCode = 404;
+      throw err;
+    }
+
+    // Validar permisos: INMOBILIARIA solo puede reactivar sus propias prioridades
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (prioridad.inmobiliariaId !== user.inmobiliariaId || prioridad.ownerType !== 'INMOBILIARIA') {
+        const err: any = new Error('No tienes permiso para reactivar esta prioridad');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Validar que no esté ya operativa
+    if (prioridad.estadoOperativo === 'OPERATIVO') {
+      const err: any = new Error('La prioridad ya está operativa.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    // Actualizar estadoOperativo a OPERATIVO
+    const updated = await prisma.prioridad.update({
+      where: { id },
+      data: {
+        estadoOperativo: 'OPERATIVO',
+      },
+      include: {
+        lote: {
+          select: { 
+            id: true, 
+            numero: true, 
+            mapId: true, 
+            estado: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+      },
+    });
+
+    return updated;
+  } catch (e: any) {
+    if (e.statusCode) {
+      throw e;
+    }
+    throw mapPrismaError(e);
+  }
 }
 
 // ==============================
@@ -262,7 +453,7 @@ export async function getPrioridadById(
     where: { id },
     include: {
       lote: {
-        select: { id: true, numero: true, mapId: true, estado: true },
+        select: { id: true, numero: true, mapId: true, estado: true, fraccion: { select: { numero: true } } },
       },
       inmobiliaria: {
         select: { id: true, nombre: true },
@@ -606,7 +797,7 @@ export async function updatePrioridad(
       data: updateData,
       include: {
         lote: {
-          select: { id: true, numero: true, mapId: true, estado: true },
+          select: { id: true, numero: true, mapId: true, estado: true, fraccion: { select: { numero: true } } },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },

@@ -8,6 +8,8 @@ import {
   cancelPrioridad,
   finalizePrioridad,
   expirePrioridadesManual,
+  eliminarPrioridad,
+  reactivarPrioridad,
 } from '../services/prioridad.service';
 
 // ==============================
@@ -100,6 +102,34 @@ export async function expirePrioridadesController(req: Request, res: Response, n
   try {
     const result = await expirePrioridadesManual();
     res.json({ success: true, message: `Se expiraron ${result.expired} prioridades`, data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Eliminar prioridad (soft delete)
+// ==============================
+export async function eliminarPrioridadController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const user = req.user;
+    const data = await eliminarPrioridad(id, user);
+    res.json({ success: true, message: 'Prioridad eliminada exitosamente', data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Reactivar prioridad
+// ==============================
+export async function reactivarPrioridadController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const user = req.user;
+    const data = await reactivarPrioridad(id, user);
+    res.json({ success: true, message: 'Prioridad reactivada exitosamente', data });
   } catch (error) {
     next(error);
   }

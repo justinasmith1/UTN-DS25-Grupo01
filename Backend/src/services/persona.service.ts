@@ -1,5 +1,5 @@
 import prisma from '../config/prisma';
-import type { Persona as PrismaPersona, IdentificadorTipo, EstadoPersona, PersonaCategoria } from "../generated/prisma";
+import type { Persona as PrismaPersona, IdentificadorTipo, PersonaCategoria } from "../generated/prisma";
 import type { Identificador, Persona, DeletePersonaResponse, GetPersonaRequest, GetPersonasResponse, PutPersonaResponse, PostPersonaRequest, PostPersonaResponse } from '../types/interfacesCCLF';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
@@ -28,7 +28,7 @@ export interface UpdatePersonaDto {
   telefono?: number;
   email?: string;
   jefeDeFamiliaId?: number;
-  estado?: EstadoPersona;
+  estadoOperativo?: 'OPERATIVO' | 'ELIMINADO';
   inmobiliariaId?: number | null;
 }
 
@@ -147,7 +147,7 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     email: email,
     telefono: telefono,
     contacto: p.contacto || '',
-    estado: p.estado || 'OPERATIVO',
+    estado: p.estadoOperativo || 'OPERATIVO',
     createdAt: p.createdAt,
     inmobiliariaId: p.inmobiliariaId || null,
     inmobiliaria: p.inmobiliaria || null,
@@ -203,19 +203,19 @@ function buildWhereClause(
   user?: { role: string; inmobiliariaId?: number | null },
   q?: string,
   includeInactive?: boolean,
-  estado?: 'OPERATIVO' | 'ELIMINADO'
+  estadoOperativo?: 'OPERATIVO' | 'ELIMINADO'
 ) {
   const where: any = {};
 
   // Excluir MIEMBRO_FAMILIAR por defecto (solo mostrar personas operativas)
   (where as any).categoria = 'OPERATIVA';
 
-  // Filtro de estado (simple, igual que inmobiliarias)
-  if (estado) {
-    where.estado = estado;
+  // Filtro estadoOperativo: default OPERATIVO si no viene
+  if (estadoOperativo) {
+    where.estadoOperativo = estadoOperativo;
   } else if (!includeInactive) {
-    // Por defecto, solo activas si no se especifica estado
-    where.estado = 'OPERATIVO';
+    // Por defecto, solo operativas si no se especifica estadoOperativo
+    where.estadoOperativo = 'OPERATIVO';
   }
 
   // Filtro por view
@@ -289,14 +289,14 @@ export async function getAllPersonas(
     view?: PersonaView;
     q?: string;
     includeInactive?: boolean;
-    estado?: 'OPERATIVO' | 'ELIMINADO';
+    estadoOperativo?: 'OPERATIVO' | 'ELIMINADO';
     limit?: number;
   }
 ): Promise<GetPersonasResponse> {
   const view = query?.view || 'ALL';
   const q = query?.q;
   const includeInactive = query?.includeInactive === true;
-  const estado = query?.estado;
+  const estadoOperativo = query?.estadoOperativo;
   const limit = query?.limit || 100;
 
   // RBAC: INMOBILIARIA solo puede ver MIS_CLIENTES (forzar view, ignorar query)
@@ -311,7 +311,7 @@ export async function getAllPersonas(
     const effectiveView = 'MIS_CLIENTES';
     // includeInactive solo para ADMIN/GESTOR
     const effectiveIncludeInactive = false;
-    // INMOBILIARIA no puede filtrar por estado específico, solo ve activas
+    // INMOBILIARIA no puede filtrar por estadoOperativo específico, solo ve operativas
     const where = buildWhereClause(effectiveView, user, q, effectiveIncludeInactive);
 
     const personas = await prisma.persona.findMany({
@@ -350,11 +350,11 @@ export async function getAllPersonas(
   const effectiveIncludeInactive = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
     ? includeInactive 
     : false;
-  // Solo ADMIN/GESTOR pueden filtrar por estado específico
-  const effectiveEstado = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
-    ? estado 
+  // Solo ADMIN/GESTOR pueden filtrar por estadoOperativo específico
+  const effectiveEstadoOperativo = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
+    ? estadoOperativo 
     : undefined;
-  const where = buildWhereClause(view, user, q, effectiveIncludeInactive, effectiveEstado);
+  const where = buildWhereClause(view, user, q, effectiveIncludeInactive, effectiveEstadoOperativo);
 
   const personas = await prisma.persona.findMany({
     where,
@@ -485,7 +485,7 @@ export async function getPersonaById(
   }
 
   // Soft delete: solo ADMIN/GESTOR pueden ver personas ELIMINADAS
-  if (persona.estado === 'ELIMINADO') {
+  if (persona.estadoOperativo === 'ELIMINADO') {
     if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
       const error = new Error('Persona no encontrada') as any;
       error.statusCode = 404; // 404 para no revelar existencia
@@ -559,7 +559,7 @@ export async function createPersona(
     razonSocial: req.razonSocial?.trim(),
     contacto: formatContacto(req.email, req.telefono),
     updateAt: new Date(),
-    estado: 'OPERATIVO',
+    estadoOperativo: 'OPERATIVO',
   };
 
   // Incluir inmobiliariaId solo si está definido (puede ser null para "La Federala", ver dsp si esto camnbia a inm)
@@ -711,9 +711,9 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       );
     }
 
-    // Estado solo para ADMIN/GESTOR (validar en controller si es necesario)
-    if (req.estado !== undefined) {
-      updateData.estado = req.estado;
+    // EstadoOperativo solo para ADMIN/GESTOR (validar en controller si es necesario)
+    if (req.estadoOperativo !== undefined) {
+      updateData.estadoOperativo = req.estadoOperativo;
     }
 
     // inmobiliariaId solo para ADMIN/GESTOR (validar en controller si es necesario)
@@ -723,9 +723,9 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
 
     // Lógica de fechaBaja automática (igual que inmobiliarias)
     let fechaBajaCalc: Date | null | undefined = undefined;
-    if (req.estado === 'ELIMINADO') {
+    if (req.estadoOperativo === 'ELIMINADO') {
       fechaBajaCalc = new Date();
-    } else if (req.estado === 'OPERATIVO') {
+    } else if (req.estadoOperativo === 'OPERATIVO') {
       fechaBajaCalc = null;
     }
 
@@ -773,7 +773,10 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
 }
 
 // Desactivar persona (soft delete)
-export async function desactivarPersona(id: number): Promise<DeletePersonaResponse> {
+export async function eliminarPersona(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<DeletePersonaResponse> {
   try {
     const existingPersona = await prisma.persona.findUnique({
       where: { id },
@@ -791,9 +794,9 @@ export async function desactivarPersona(id: number): Promise<DeletePersonaRespon
       throw error;
     }
 
-    if (existingPersona.estado === 'ELIMINADO') {
-      const error = new Error('La persona ya está inactiva') as any;
-      error.statusCode = 400;
+    if (existingPersona.estadoOperativo === 'ELIMINADO') {
+      const error = new Error('La persona ya está eliminada.') as any;
+      error.statusCode = 409;
       throw error;
     }
 
@@ -807,7 +810,7 @@ export async function desactivarPersona(id: number): Promise<DeletePersonaRespon
     await prisma.persona.update({
       where: { id },
       data: {
-        estado: 'ELIMINADO',
+        estadoOperativo: 'ELIMINADO',
         fechaBaja: new Date(),
         updateAt: new Date(),
       },
@@ -826,8 +829,11 @@ export async function desactivarPersona(id: number): Promise<DeletePersonaRespon
   }
 }
 
-// Reactivar persona
-export async function reactivarPersona(id: number): Promise<PutPersonaResponse> {
+// Reactivar persona (estadoOperativo)
+export async function reactivarPersona(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<PutPersonaResponse> {
   try {
     const existingPersona = await prisma.persona.findUnique({
       where: { id },
@@ -839,16 +845,16 @@ export async function reactivarPersona(id: number): Promise<PutPersonaResponse> 
       throw error;
     }
 
-    if (existingPersona.estado === 'OPERATIVO') {
-      const error = new Error('La persona ya está activa') as any;
-      error.statusCode = 400;
+    if (existingPersona.estadoOperativo === 'OPERATIVO') {
+      const error = new Error('La persona ya está operativa.') as any;
+      error.statusCode = 409;
       throw error;
     }
 
     const updated = await prisma.persona.update({
       where: { id },
       data: {
-        estado: 'OPERATIVO',
+        estadoOperativo: 'OPERATIVO',
         fechaBaja: null,
         updateAt: new Date(),
       },
@@ -932,9 +938,14 @@ export async function deletePersonaDefinitivo(id: number): Promise<DeletePersona
   }
 }
 
-// Mantener deletePersona por compatibilidad (ahora llama a desactivar)
+// Mantener deletePersona por compatibilidad (ahora llama a eliminar)
 export async function deletePersona(id: number): Promise<DeletePersonaResponse> {
-  return desactivarPersona(id);
+  return eliminarPersona(id);
+}
+
+// Mantener desactivarPersona por compatibilidad (ahora llama a eliminar)
+export async function desactivarPersona(id: number): Promise<DeletePersonaResponse> {
+  return eliminarPersona(id);
 }
 
 // Buscar persona por identificador (nuevo método)
@@ -1033,7 +1044,7 @@ export class PersonaService {
 
   async findAll(
     user?: { role: string; inmobiliariaId?: number | null },
-    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; estado?: 'OPERATIVO' | 'ELIMINADO'; limit?: number }
+    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; estadoOperativo?: 'OPERATIVO' | 'ELIMINADO'; limit?: number }
   ) {
     const result = await getAllPersonas(user, query);
     return result;
@@ -1150,7 +1161,7 @@ export async function getGrupoFamiliar(titularId: number) {
   }
 
   // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((persona as any).categoria !== 'OPERATIVA' || persona.estado !== 'OPERATIVO') {
+  if ((persona as any).categoria !== 'OPERATIVA' || persona.estadoOperativo !== 'OPERATIVO') {
     const error = new Error('El titular debe ser una persona operativa y activa') as any;
     error.statusCode = 400;
     throw error;
@@ -1218,7 +1229,7 @@ export async function crearMiembroFamiliar(
   }
 
   // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((titular as any).categoria !== 'OPERATIVA' || titular.estado !== 'OPERATIVO') {
+  if ((titular as any).categoria !== 'OPERATIVA' || titular.estadoOperativo !== 'OPERATIVO') {
     const error = new Error('El titular debe ser una persona operativa y activa') as any;
     error.statusCode = 400;
     throw error;
@@ -1253,7 +1264,7 @@ export async function crearMiembroFamiliar(
       categoria: 'MIEMBRO_FAMILIAR',
       jefeDeFamiliaId: titularId,
       inmobiliariaId: titular.inmobiliariaId, // Heredar inmobiliariaId del titular
-      estado: 'OPERATIVO',
+      estadoOperativo: 'OPERATIVO',
       updateAt: new Date(),
     },
     select: {

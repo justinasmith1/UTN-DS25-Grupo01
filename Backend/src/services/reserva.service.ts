@@ -1,7 +1,7 @@
 // src/services/reserva.service.ts
 import prisma from '../config/prisma'; 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { EstadoLote, EstadoReserva, EstadoPrioridad, OwnerPrioridad, EstadoPersona } from '../generated/prisma';
+import { EstadoLote, EstadoReserva, EstadoPrioridad, OwnerPrioridad } from '../generated/prisma';
 import { updateLoteState } from './lote.service';
 import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
 import { assertLoteOperableFor, assertReservaUnicaVigente, computeRestoreStateFromReserva } from '../domain/loteState/loteState.rules';
@@ -39,11 +39,23 @@ function mapPrismaError(e: unknown) {
 // Retorna el listado junto con el total.
 // Si el usuario es INMOBILIARIA, solo devuelve las reservas de su inmobiliaria.
 // ==============================
-export async function getAllReservas(user?: { role: string; inmobiliariaId?: number | null }): Promise<{ reservas: any[]; total: number }> {
+export async function getAllReservas(
+  query?: { estadoOperativo?: string },
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<{ reservas: any[]; total: number }> {
+  const whereClause: any = {};
+  
   // Si el usuario es INMOBILIARIA, filtrar por su inmobiliariaId
-  const whereClause = user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null
-    ? { inmobiliariaId: user.inmobiliariaId }
-    : {};
+  if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+    whereClause.inmobiliariaId = user.inmobiliariaId;
+  }
+
+  // Filtro estadoOperativo: default OPERATIVO si no viene
+  if (query?.estadoOperativo) {
+    whereClause.estadoOperativo = query.estadoOperativo;
+  } else {
+    whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
+  }
   
   const reservas = await prisma.reserva.findMany({
     where: whereClause,
@@ -449,140 +461,159 @@ export async function deleteReserva(id: number): Promise<void> {
   }
 }
 // ==============================
-// Desactivar reserva (Soft Delete)
+// Eliminar reserva (Soft Delete - estadoOperativo)
 // ==============================
-export async function desactivarReserva(id: number): Promise<any> {
+// Solo permite eliminar reservas en estados: CANCELADA, EXPIRADA, RECHAZADA
+// NO modifica el lote ni el estado comercial de la reserva
+export async function eliminarReserva(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
   try {
     const reserva = await prisma.reserva.findUnique({
       where: { id },
-      select: { estado: true, loteId: true, loteEstadoAlCrear: true },
+      include: {
+        cliente: {
+          select: { id: true, nombre: true, apellido: true },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+        lote: {
+          select: { id: true, precio: true, mapId: true },
+        },
+      },
     });
 
     if (!reserva) {
       const err: any = new Error('La reserva no existe');
-      err.status = 404;
+      err.statusCode = 404;
       throw err;
     }
 
-    if (reserva.estado === EstadoReserva.ELIMINADO) {
-      const err: any = new Error('La reserva ya está eliminada');
-      err.status = 400;
+    // Validar permisos: INMOBILIARIA solo puede eliminar sus propias reservas
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (reserva.inmobiliariaId !== user.inmobiliariaId) {
+        const err: any = new Error('No tienes permiso para eliminar esta reserva');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Validar que no esté ya eliminada
+    if (reserva.estadoOperativo === 'ELIMINADO') {
+      const err: any = new Error('La reserva ya está eliminada.');
+      err.statusCode = 409;
       throw err;
     }
 
-    if (reserva.estado === EstadoReserva.ACEPTADA || reserva.estado === EstadoReserva.CONTRAOFERTA) {
-      const err: any = new Error(`No se puede eliminar una reserva en estado ${reserva.estado}`);
-      err.status = 400;
+    // Validar que el estado permita eliminación lógica
+    // Solo se puede eliminar si está en: CANCELADA, EXPIRADA, RECHAZADA
+    const estadosPermitidos = [EstadoReserva.CANCELADA, EstadoReserva.EXPIRADA, EstadoReserva.RECHAZADA];
+    if (!estadosPermitidos.includes(reserva.estado)) {
+      const err: any = new Error(`No se puede eliminar una reserva en estado ${reserva.estado}. Solo se pueden eliminar reservas en estado CANCELADA, EXPIRADA o RECHAZADA.`);
+      err.statusCode = 409;
       throw err;
     }
 
-    // Actualizar a ELIMINADO guardando estado previo
+    // Eliminar lógicamente: solo cambia estadoOperativo a ELIMINADO
+    // NO modifica el estado comercial ni el lote
     const row = await prisma.reserva.update({
       where: { id },
       data: {
-        estado: EstadoReserva.ELIMINADO,
-        estadoPrevio: reserva.estado,
-        fechaBaja: new Date(),
+        estadoOperativo: 'ELIMINADO',
       },
       include: {
         cliente: {
-            select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true },
         },
         inmobiliaria: {
-            select: { id: true, nombre: true },
+          select: { id: true, nombre: true },
         },
         lote: {
-            select: { id: true, precio: true, mapId: true },
+          select: { id: true, precio: true, mapId: true },
         },
-      }
+      },
     });
 
-    // Si la reserva estaba ACTIVA, liberamos el lote (igual que al eliminar físico)
-    if (reserva.estado === EstadoReserva.ACTIVA && reserva.loteId) {
-      const estadoARestaurar = await computeRestoreStateFromReserva(reserva.loteEstadoAlCrear, reserva.loteId);
-      await updateLoteState(reserva.loteId, estadoARestaurar);
-    }
-
     return row;
-  } catch (e) {
+  } catch (e: any) {
+    if (e.statusCode) {
+      throw e;
+    }
     throw mapPrismaError(e);
   }
 }
 
 // ==============================
-// Reactivar reserva
+// Reactivar reserva (estadoOperativo)
 // ==============================
-export async function reactivarReserva(id: number): Promise<any> {
-    try {
-        const reserva = await prisma.reserva.findUnique({
-            where: { id },
-            include: { lote: true }
-        });
+export async function reactivarReserva(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<any> {
+  try {
+    const reserva = await prisma.reserva.findUnique({
+      where: { id },
+      include: {
+        cliente: {
+          select: { id: true, nombre: true, apellido: true },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+        lote: {
+          select: { id: true, precio: true, mapId: true },
+        },
+      },
+    });
 
-        if (!reserva) {
-            const err: any = new Error('La reserva no existe');
-            err.status = 404;
-            throw err;
-        }
-
-        if (reserva.estado !== EstadoReserva.ELIMINADO) {
-            const err: any = new Error('La reserva no está eliminada');
-            err.status = 400;
-            throw err;
-        }
-
-        // Validar que el lote esté disponible para ser reservado nuevamente
-        const lote = await prisma.lote.findUnique({ where: { id: reserva.loteId } });
-        if (!lote) {
-             throw new Error("Lote no encontrado.");
-        }
-
-        // Permitimos reactivar si el lote está DISPONIBLE, EN_PROMOCION o CON_PRIORIDAD.
-        // Si está RESERVADO (por otra), VENDIDO, etc., no se puede.
-        if (lote.estado !== EstadoLote.DISPONIBLE && lote.estado !== EstadoLote.EN_PROMOCION && lote.estado !== EstadoLote.CON_PRIORIDAD) {
-             throw new Error(`No se puede reactivar la reserva porque el lote se encuentra en estado ${lote.estado}.`);
-        }
-        
-        // Validar unicidad de reserva vigente
-        await assertReservaUnicaVigente(reserva.loteId);
-
-        // Reactivar: volver a estado previo o default ACTIVA
-        const nuevoEstado = reserva.estadoPrevio || EstadoReserva.ACTIVA;
-
-        const row = await prisma.reserva.update({
-            where: { id },
-            data: {
-                estado: nuevoEstado,
-                estadoPrevio: null,
-                fechaBaja: null,
-            },
-            include: {
-                cliente: {
-                    select: { id: true, nombre: true, apellido: true },
-                },
-                inmobiliaria: {
-                    select: { id: true, nombre: true },
-                },
-                lote: {
-                    select: { id: true, precio: true, mapId: true },
-                },
-            }
-        });
-
-        // Marcar lote como RESERVADO
-        await updateLoteState(reserva.loteId, ESTADO_LOTE_OP.RESERVADO);
-
-        // Si el lote estaba CON_PRIORIDAD, cancelar prioridad activa?
-        // Simplemente aseguramos que si estaba CON_PRIORIDAD ahora pasa a RESERVADO.
-        // La logica de updateLoteState maneja la transición.
-        // Pero createReserva explícitamente llama a cancelPrioridadActivaOnReserva.
-        // Deberíamos hacer lo mismo para ser consistentes.
-        if (lote.estado === EstadoLote.CON_PRIORIDAD) {
-            await cancelPrioridadActivaOnReserva(lote.id);
-        }
-
-        return row;
-    } catch (e) {
-        throw mapPrismaError(e);
+    if (!reserva) {
+      const err: any = new Error('La reserva no existe');
+      err.statusCode = 404;
+      throw err;
     }
+
+    // Validar permisos: INMOBILIARIA solo puede reactivar sus propias reservas
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (reserva.inmobiliariaId !== user.inmobiliariaId) {
+        const err: any = new Error('No tienes permiso para reactivar esta reserva');
+        err.statusCode = 403;
+        throw err;
+      }
+    }
+
+    // Validar que no esté ya operativa
+    if (reserva.estadoOperativo === 'OPERATIVO') {
+      const err: any = new Error('La reserva ya está operativa.');
+      err.statusCode = 409;
+      throw err;
+    }
+
+    // Reactivar: solo cambia estadoOperativo a OPERATIVO (no valida lote disponible, plazos, etc.)
+    const updated = await prisma.reserva.update({
+      where: { id },
+      data: {
+        estadoOperativo: 'OPERATIVO',
+      },
+      include: {
+        cliente: {
+          select: { id: true, nombre: true, apellido: true },
+        },
+        inmobiliaria: {
+          select: { id: true, nombre: true },
+        },
+        lote: {
+          select: { id: true, precio: true, mapId: true },
+        },
+      },
+    });
+
+    return updated;
+  } catch (e: any) {
+    if (e.statusCode) {
+      throw e;
+    }
+    throw mapPrismaError(e);
+  }
 }

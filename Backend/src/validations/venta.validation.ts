@@ -22,11 +22,11 @@ export const getVentaSchema = z.object({
 });
 
 export const deleteVentaSchema = getVentaSchema;
-export const desactivarVentaSchema = getVentaSchema;
-export const reactivarVentaSchema = getVentaSchema;
+export const patchVentaParamsSchema = getVentaSchema;
 
 export const queryVentaSchema = z.object({
     estado: z.enum(['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO', 'CANCELADA']).optional(),
+    estadoOperativo: z.enum(['OPERATIVO', 'ELIMINADO']).optional(),
     compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo').optional(),
     vendedorId: z.coerce.number().int('El ID del vendedor debe ser un número entero').positive('El ID del vendedor debe ser un número positivo').optional(),
     loteId: z.coerce.number().int('El ID del lote debe ser un número entero').positive('El ID del lote debe ser un número positivo').optional(),

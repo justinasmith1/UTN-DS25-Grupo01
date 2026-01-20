@@ -6,6 +6,7 @@ import {
   createPrioridadSchema,
   updatePrioridadSchema,
   getPrioridadParamsSchema,
+  patchPrioridadParamsSchema,
   queryPrioridadesSchema,
 } from '../validations/prioridad.validation';
 
@@ -87,6 +88,28 @@ router.post(
   authenticate,
   authorize('ADMINISTRADOR', 'GESTOR'),
   prioridadController.expirePrioridadesController
+);
+
+// PATCH /api/prioridades/:id/eliminar
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// INMOBILIARIA solo puede eliminar sus propias prioridades
+router.patch(
+  '/:id/eliminar',
+  authenticate,
+  authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+  validateParams(patchPrioridadParamsSchema),
+  prioridadController.eliminarPrioridadController
+);
+
+// PATCH /api/prioridades/:id/reactivar
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+// INMOBILIARIA solo puede reactivar sus propias prioridades
+router.patch(
+  '/:id/reactivar',
+  authenticate,
+  authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+  validateParams(patchPrioridadParamsSchema),
+  prioridadController.reactivarPrioridadController
 );
 
 export const prioridadRoutes = router;

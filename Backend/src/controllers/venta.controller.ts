@@ -9,7 +9,9 @@ import * as ventaService from '../services/venta.service';
 export async function obtenerTodos(req: Request, res: Response, next: NextFunction) {
        try {
            // Llamo al servicio para obtener todas las Ventas
-           const result = await ventaService.getAllVentas();
+           const user = req.user;
+           const query = req.query as { estadoOperativo?: string };
+           const result = await ventaService.getAllVentas(query, user);
            res.json({success: true,data:result});
        } catch (error) {
            next(error); // Paso el error al middleware de manejo
@@ -74,24 +76,15 @@ export async function actualizarVenta(req: Request, res: Response, next: NextFun
 }
 
 // ========================
-// Eliminar venta
+// Eliminar venta (soft delete)
 // ========================
 
 export async function eliminarVenta(req: Request, res: Response, next: NextFunction) {
     try {
-        const idVenta = parseInt(req.params.id);
-        const result = await ventaService.deleteVenta(idVenta);
-        res.json({success: true,message: "Venta eliminada exitosamente",data:result});
-    } catch (error) {
-        next(error);
-    }
-}
-
-export async function desactivarVenta(req: Request, res: Response, next: NextFunction) {
-    try {
         const id = parseInt(req.params.id);
-        const result = await ventaService.desactivarVenta(id);
-        res.json({success: true, message: "Venta desactivada exitosamente", data: result});
+        const user = req.user;
+        const result = await ventaService.eliminarVenta(id, user);
+        res.json({success: true, message: "Venta eliminada exitosamente", data: result});
     } catch (error) {
         next(error);
     }
@@ -100,7 +93,8 @@ export async function desactivarVenta(req: Request, res: Response, next: NextFun
 export async function reactivarVenta(req: Request, res: Response, next: NextFunction) {
     try {
         const id = parseInt(req.params.id);
-        const result = await ventaService.reactivarVenta(id);
+        const user = req.user;
+        const result = await ventaService.reactivarVenta(id, user);
         res.json({success: true, message: "Venta reactivada exitosamente", data: result});
     } catch (error) {
         next(error);

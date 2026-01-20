@@ -82,6 +82,7 @@ export const getPrioridadParamsSchema = z.object({
 // ==============================
 export const queryPrioridadesSchema = z.object({
   estado: z.enum(['ACTIVA', 'CANCELADA', 'FINALIZADA', 'EXPIRADA']).optional(),
+  estadoOperativo: z.enum(['OPERATIVO', 'ELIMINADO']).optional(),
   ownerType: z.enum(['INMOBILIARIA', 'CCLF']).optional(),
   inmobiliariaId: idInt.optional(),
   loteId: idInt.optional(),
@@ -105,4 +106,11 @@ export const queryPrioridadesSchema = z.object({
 }, {
   message: 'El rango de fechas de fin es inválido (desde > hasta)',
   path: ['fechaFinHasta'],
+});
+
+// ==============================
+// Parámetros para eliminar/reactivar (PATCH /prioridades/:id/eliminar o /reactivar)
+// ==============================
+export const patchPrioridadParamsSchema = z.object({
+  id: idInt,
 });

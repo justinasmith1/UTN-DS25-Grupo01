@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as reservaController from '../controllers/reserva.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema, desactivarReservaParamsSchema, reactivarReservaParamsSchema } from '../validations/reserva.validation';
+import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema, patchReservaParamsSchema } from '../validations/reserva.validation';
 
 const router = Router();
 
@@ -66,21 +66,21 @@ router.delete(
     validateParams(deleteReservaParamsSchema),  
     reservaController.deleteReservaController);
 
-// PATCH /api/Reservas/:id/desactivar
+// PATCH /api/Reservas/:id/eliminar
 router.patch(
-    '/:id/desactivar',
+    '/:id/eliminar',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(desactivarReservaParamsSchema),
-    reservaController.desactivarReservaController
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(patchReservaParamsSchema),
+    reservaController.eliminarReservaController
 );
 
 // PATCH /api/Reservas/:id/reactivar
 router.patch(
     '/:id/reactivar',
     authenticate,
-    authorize('ADMINISTRADOR', 'GESTOR'),
-    validateParams(reactivarReservaParamsSchema),
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(patchReservaParamsSchema),
     reservaController.reactivarReservaController
 );
 

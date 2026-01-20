@@ -12,7 +12,7 @@ import {
 } from '../types/interfacesCCLF';
 import { Inmobiliaria as PrismaInmobiliaria } from '../generated/prisma';
 import prisma from '../config/prisma';
-import { Prisma, EstadoInmobiliaria } from '../generated/prisma'; // 1. Importamos el Enum
+import { Prisma } from '../generated/prisma';
 
 // 2. Mapeamos los nuevos campos en el helper
 const toInmobiliaria = (i: PrismaInmobiliaria & { _count?: { ventas?: number; reservas?: number } }): Inmobiliaria => ({
@@ -22,15 +22,23 @@ const toInmobiliaria = (i: PrismaInmobiliaria & { _count?: { ventas?: number; re
     contacto: i.contacto ?? undefined,
     comxventa: i.comxventa ? parseFloat(i.comxventa.toString()) : undefined,
     // Nuevos campos:
-    estado: i.estado, 
+    estado: i.estadoOperativo, 
     fechaBaja: i.fechaBaja ? i.fechaBaja.toISOString() : undefined,
 });
 
 // ==============================
 // Obtener todas las Inmobiliarias
 // ==============================
-export async function getAllInmobiliarias(filters?: any): Promise<GetInmobiliariasResponse> {
-  const whereClause = filters?.estado ? { estado: filters.estado } : {};
+export async function getAllInmobiliarias(filters?: { estadoOperativo?: string }): Promise<GetInmobiliariasResponse> {
+  const whereClause: any = {};
+  
+  // Filtro estadoOperativo: default OPERATIVO si no viene
+  if (filters?.estadoOperativo) {
+    whereClause.estadoOperativo = filters.estadoOperativo;
+  } else {
+    whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
+  }
+  
   const [rows, total] = await Promise.all([
     prisma.inmobiliaria.findMany({
       where: whereClause,
@@ -110,8 +118,8 @@ export async function createInmobiliaria(req: PostInmobiliariaRequest): Promise<
             comxventa: req.comxventa != null ? new Prisma.Decimal(req.comxventa) : undefined,
             user: req.userId != null ? { connect: { id: req.userId } } : undefined,
             createdAt: new Date(),
-            // 3. Por defecto nace ACTIVA (aunque Prisma lo hace por default, es bueno ser explícito)
-            estado: EstadoInmobiliaria.OPERATIVO, 
+            // Por defecto nace OPERATIVA (aunque Prisma lo hace por default, es bueno ser explícito)
+            estadoOperativo: 'OPERATIVO', 
             fechaBaja: null
         }
     });
@@ -139,15 +147,15 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
     }
   }
 
-  // 4. LÓGICA DE SOFT DELETE AUTOMÁTICO
-  // Calculamos la fecha de baja basándonos en el cambio de estado
+  // LÓGICA DE SOFT DELETE AUTOMÁTICO
+  // Calculamos la fecha de baja basándonos en el cambio de estadoOperativo
   let fechaBajaCalc: Date | null | undefined = undefined;
 
-  // Si envían un estado y es ELIMINADO, ponemos fecha de hoy
+  // Si envían un estadoOperativo y es ELIMINADO, ponemos fecha de hoy
   if (updateData.estado === 'ELIMINADO') {
       fechaBajaCalc = new Date();
   } 
-  // Si envían un estado y es OPERATIVO, limpiamos la fecha (null)
+  // Si envían un estadoOperativo y es OPERATIVO, limpiamos la fecha (null)
   else if (updateData.estado === 'OPERATIVO') {
       fechaBajaCalc = null;
   }
@@ -162,8 +170,8 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
       ...(updateData.comxventa     !== undefined ? { comxventa: new Prisma.Decimal(updateData.comxventa) } : {}),
       ...(updateData.userId        !== undefined ? { userId: updateData.userId } : {}),
       
-      // Aplicamos cambios de estado y fecha calculada
-      ...(updateData.estado        !== undefined ? { estado: updateData.estado as EstadoInmobiliaria } : {}),
+      // Aplicamos cambios de estadoOperativo y fecha calculada
+      ...(updateData.estado        !== undefined ? { estadoOperativo: updateData.estado } : {}),
       ...(fechaBajaCalc            !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
       
       updateAt: new Date(), 
