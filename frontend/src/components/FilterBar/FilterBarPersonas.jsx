@@ -1,11 +1,18 @@
 // components/FilterBar/FilterBarPersonas.jsx
 // Wrapper específico para personas que usa FilterBarBase genérico
+// Sigue el patrón de Visibilidad (Operativas/Eliminadas) igual que Prioridades/Reservas/Ventas/Inmobiliarias
 
 import { useMemo, useState, useEffect } from "react";
 import FilterBarBase from "./FilterBarBase";
-import { ESTADOS_PERSONA, TIPOS_IDENTIFICADOR } from "./presets/personas.preset";
+import { TIPOS_IDENTIFICADOR } from "./presets/personas.preset";
 import { personasChipsFrom, nice } from "./utils/personasChips";
 import { getAllInmobiliarias } from "../../lib/api/inmobiliarias";
+
+// Opciones de visibilidad (consistentes con el resto de módulos)
+const VISIBILIDAD_OPTIONS = [
+  { value: 'OPERATIVO', label: 'Operativas' },
+  { value: 'ELIMINADO', label: 'Eliminadas' }
+];
 
 export default function FilterBarPersonas({
   variant = "dashboard",
@@ -49,7 +56,7 @@ export default function FilterBarPersonas({
       { value: 'FEDERALA', label: 'La Federala' }
     ];
     
-    // Agregar inmobiliarias dinámicamente, por si hay mas de 4 en algun momento cuando creemos alguna otra, funciona ya chequeado
+    // Agregar inmobiliarias dinámicamente
     inmobiliarias.forEach(inm => {
       options.push({
         value: inm.value,
@@ -71,13 +78,12 @@ export default function FilterBarPersonas({
         placeholder: 'Nombre, apellido, identificador...',
         defaultValue: ''
       },
-      // Estado (solo Admin/Gestor)
+      // Visibilidad (solo Admin/Gestor) - igual que otros módulos
       ...(isAdminOrGestor ? [{
-        id: 'estado',
+        id: 'visibilidad',
         type: 'singleSelect',
-        label: 'Estado',
-        defaultValue: 'ACTIVA',
-        options: ESTADOS_PERSONA
+        label: 'Visibilidad',
+        defaultValue: 'OPERATIVO'
       }] : []),
       // Cliente de (solo Admin/Gestor) - unificado con inmobiliarias (multiSelect)
       ...(isAdminOrGestor ? [{
@@ -107,8 +113,8 @@ export default function FilterBarPersonas({
 
   // Catálogos para los campos select
   const catalogs = useMemo(() => ({
-    estado: ESTADOS_PERSONA,
-    clienteDe: clienteDeOptions, // Opciones unificadas (La Federala + inmobiliarias)
+    visibilidad: VISIBILIDAD_OPTIONS,
+    clienteDe: clienteDeOptions,
     identificadorTipo: TIPOS_IDENTIFICADOR
   }), [clienteDeOptions]);
 
@@ -118,32 +124,37 @@ export default function FilterBarPersonas({
     sanitizeForRole: (filters) => {
       // Para INMOBILIARIA, remover filtros que no aplican
       if (userRole === "INMOBILIARIA") {
-        const { estado, clienteDe, ...rest } = filters;
+        const { visibilidad, estado, clienteDe, ...rest } = filters;
         return rest;
       }
       return filters;
     }
   }), [userRole]);
 
-  // Valores por defecto según rol (sin filtros aplicados)
+  // Valores por defecto según rol
   const defaults = useMemo(() => {
     if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
       return {
         q: '',
-        estado: 'OPERATIVO', // Por defecto mostrar solo operativas
-        clienteDe: [], // Array vacío para multiSelect
-        identificadorTipo: [], // Array vacío para multiSelect
+        visibilidad: 'OPERATIVO', // Por defecto mostrar solo operativas
+        clienteDe: [],
+        identificadorTipo: [],
         fechaCreacion: { min: null, max: null }
       };
     } else {
-      // INMOBILIARIA: sin estado ni clienteDe
+      // INMOBILIARIA: sin visibilidad ni clienteDe
       return {
         q: '',
-        identificadorTipo: [], // Array vacío para multiSelect
+        identificadorTipo: [],
         fechaCreacion: { min: null, max: null }
       };
     }
   }, [userRole]);
+
+  // Formateador de opciones para visibilidad
+  const optionFormatter = useMemo(() => ({
+    visibilidad: (val) => val === 'OPERATIVO' ? 'Operativas' : val === 'ELIMINADO' ? 'Eliminadas' : val,
+  }), []);
 
   return (
     <FilterBarBase
@@ -154,8 +165,9 @@ export default function FilterBarPersonas({
       defaults={defaults}
       viewsConfig={viewsConfig}
       onParamsChange={onParamsChange}
-      onSearchChange={onSearchChange} // Pasar callback de búsqueda separado
+      onSearchChange={onSearchChange}
       chipsFormatter={personasChipsFrom}
+      optionFormatter={optionFormatter}
       nice={nice}
       initialValue={initialValue}
     />

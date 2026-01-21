@@ -109,7 +109,7 @@ export default function FilterBarBase({
         return hasChanges ? updated : prev;
       });
     }
-  }, [initialValue]);
+  }, [initialValue, fields]);
 
   // Debounce de búsqueda (solo para búsqueda inmediata)
   // Si hay onSearchChange, usarlo en lugar de onParamsChange para búsqueda

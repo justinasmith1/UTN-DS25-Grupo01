@@ -19,6 +19,7 @@ router.get(
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
     validateParams(getVentaSchema),
+    validateQuery(queryVentaSchema),
     ventaController.obtenerVentasPorInmobiliaria);
 
 // GET /api/Ventas/:id

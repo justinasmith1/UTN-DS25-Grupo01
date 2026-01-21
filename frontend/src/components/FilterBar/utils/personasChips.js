@@ -1,23 +1,26 @@
-import { TIPOS_IDENTIFICADOR, ESTADOS_PERSONA } from '../presets/personas.preset';
+import { TIPOS_IDENTIFICADOR } from '../presets/personas.preset';
 
 // ===================
 // Utilidades para chips de filtros de Personas
+// Sigue el patrón de Visibilidad igual que Prioridades/Reservas/Ventas/Inmobiliarias
 // ===================
 
 /** Convierte los filtros de personas a chips para mostrar */
 export const personasChipsFrom = (filters, catalogs = {}) => {
   const chips = [];
-  // Estado (solo Admin/Gestor)
-  if (filters.estado && filters.estado !== 'OPERATIVO') {
-    const estado = ESTADOS_PERSONA.find(e => e.value === filters.estado);
-    const displayValue = estado ? estado.label : filters.estado;
+  
+  // Visibilidad (estadoOperativo) - solo mostrar si no es el default "OPERATIVO"
+  // Mismo patrón que Prioridades/Reservas/Ventas/Inmobiliarias
+  const visibilidad = filters.visibilidad ?? filters.estado ?? "OPERATIVO";
+  if (visibilidad !== "OPERATIVO") {
+    const visibilidadLabel = visibilidad === "ELIMINADO" ? "Eliminadas" : visibilidad;
     chips.push({
-      id: 'estado',
-      k: 'estado',
-      label: displayValue, // Mostrar solo el valor seleccionado
-      value: displayValue,
-      v: filters.estado,
-      color: filters.estado === 'OPERATIVO' ? 'success' : 'danger'
+      id: 'visibilidad',
+      k: 'visibilidad',
+      label: visibilidadLabel,
+      value: visibilidadLabel,
+      v: visibilidad,
+      color: 'danger'
     });
   }
 

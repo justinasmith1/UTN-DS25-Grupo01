@@ -50,17 +50,21 @@ export default function Inmobiliarias() {
     setParams((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Dataset base: obtenemos todas las inmobiliarias desde la API una sola vez
+  // Dataset base: obtenemos las inmobiliarias desde la API
+  // El backend filtra por estadoOperativo; sin parámetro devuelve solo OPERATIVO.
+  // Al elegir "Eliminadas" hay que pedir estadoOperativo=ELIMINADO y recargar.
   const [allInmobiliarias, setAllInmobiliarias] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Cargar todas las inmobiliarias al montar el componente
+  // Cargar inmobiliarias; refetch cuando cambia la visibilidad (Operativas / Eliminadas)
   useEffect(() => {
     let alive = true;
+    const estadoOperativo = params.visibilidad ?? 'OPERATIVO';
+
     (async () => {
       try {
         setLoading(true);
-        const res = await getAllInmobiliarias({});
+        const res = await getAllInmobiliarias({ estadoOperativo });
         if (alive) {
           const data = res.data || [];
           setAllInmobiliarias(data);
@@ -79,17 +83,20 @@ export default function Inmobiliarias() {
     })();
 
     return () => { alive = false; };
-  }, []); // Dependencias vacías para ejecutar solo una vez
+  }, [params.visibilidad]);
 
   // Pipeline de filtrado: primero búsqueda, luego otros filtros
+  // Siempre aplicar filtros (como Prioridades/Reservas/Ventas): visibilidad OPERATIVO por defecto
+  // cuando params está vacío, para que al eliminar (estado ELIMINADO) el ítem deje de verse al instante
   const inmobiliarias = useMemo(() => {
     // 1. Aplicar búsqueda de texto (100% frontend)
     const afterSearch = applySearch(allInmobiliarias, searchText, getInmobiliariaSearchFields);
-    
-    // 2. Aplicar otros filtros (estado, comxventa, cantidadVentas, etc.)
-    const hasParams = params && Object.keys(params).length > 0;
+
+    // 2. Aplicar filtros (visibilidad, comxventa, cantidadVentas, etc.)
+    // Si params está vacío (FilterBar no ha aplicado aún), usar visibilidad OPERATIVO por defecto
+    const effectiveParams = { visibilidad: 'OPERATIVO', ...params };
     try {
-      return hasParams ? applyInmobiliariaFilters(afterSearch, params) : afterSearch;
+      return applyInmobiliariaFilters(afterSearch, effectiveParams);
     } catch (err) {
       console.error('Error aplicando filtros:', err);
       return afterSearch;
@@ -257,6 +264,7 @@ export default function Inmobiliarias() {
         userRole={user?.role}
         onParamsChange={handleParamsChange}
         onSearchChange={handleSearchChange}
+        value={params} // Pasar params para sincronizar el estado del filtro
       />
 
       {/* Tabla de inmobiliarias */}

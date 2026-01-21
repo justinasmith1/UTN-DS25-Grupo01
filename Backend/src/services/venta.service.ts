@@ -50,9 +50,21 @@ export async function getVentaById(id: number): Promise<Venta> {
 
 }
 
-export async function getVentasByInmobiliaria(inmobiliariaId: number): Promise<Venta[]> {
+export async function getVentasByInmobiliaria(
+  inmobiliariaId: number,
+  query?: { estadoOperativo?: string }
+): Promise<Venta[]> {
+    const whereClause: any = { inmobiliariaId };
+
+    // Filtro estadoOperativo: default OPERATIVO si no viene
+    if (query?.estadoOperativo) {
+      whereClause.estadoOperativo = query.estadoOperativo;
+    } else {
+      whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
+    }
+
     const ventas = await prisma.venta.findMany({
-        where: { inmobiliariaId },
+        where: whereClause,
         include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
         orderBy: { fechaVenta: 'desc' },
     });

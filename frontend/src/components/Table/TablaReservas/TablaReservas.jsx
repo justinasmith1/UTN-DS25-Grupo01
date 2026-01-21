@@ -311,9 +311,14 @@ export default function TablaReservas({
             </button>
           )}
           {onReactivar && (
-             <button className="tl-icon tl-icon--success" aria-label="Reactivar Reserva" data-tooltip="Reactivar Reserva" onClick={() => onReactivar?.(row)}>
-               <RefreshCcw size={18} strokeWidth={2} />
-             </button>
+            <button 
+              className="tl-icon tl-icon--success" 
+              aria-label="Reactivar Reserva" 
+              data-tooltip="Reactivar Reserva" 
+              onClick={() => onReactivar?.(row)}
+            >
+              <RefreshCcw size={18} strokeWidth={2} />
+            </button>
           )}
         </div>
       );

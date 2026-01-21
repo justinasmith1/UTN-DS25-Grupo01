@@ -4,7 +4,7 @@ import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, FileText, X, RotateCcw } from 'lucide-react';
-import { canEditByEstadoOperativo, isEliminado } from '../../../utils/estadoOperativo';
+import { canEditByEstadoOperativo, isEliminado, canDeleteVenta, getVentaDeleteTooltip } from '../../../utils/estadoOperativo';
 import MapaInteractivo from '../../Mapa/MapaInteractivo';
 import {
   normalizeEstadoKey,
@@ -206,6 +206,35 @@ export default function TablaVentas({
   const renderRowActions = (venta) => {
     const estaEliminada = isEliminado(venta);
     const puedeEditar = canEditByEstadoOperativo(venta);
+    const puedeEliminar = canDeleteVenta(venta);
+    const tooltipEliminar = getVentaDeleteTooltip(venta);
+    
+    if (estaEliminada) {
+      return (
+        <div className="tl-actions">
+          {can('ver') && (
+            <button
+              className="tl-icon tl-icon--view"
+              aria-label="Ver Venta"
+              data-tooltip="Ver Venta"
+              onClick={() => onVer?.(venta)}
+            >
+              <Eye size={18} strokeWidth={2} />
+            </button>
+          )}
+          {onReactivar && (
+            <button
+              className="tl-icon tl-icon--success"
+              aria-label="Reactivar Venta"
+              data-tooltip="Reactivar Venta"
+              onClick={() => onReactivar?.(venta)}
+            >
+              <RotateCcw size={18} strokeWidth={2} />
+            </button>
+          )}
+        </div>
+      );
+    }
     
     return (
     <div className="tl-actions">
@@ -241,26 +270,16 @@ export default function TablaVentas({
         </button>
       )}
       {can('eliminar') && (
-        estaEliminada ? (
-           <button
-             className="tl-icon tl-icon--reactivate"
-             aria-label="Reactivar Venta"
-             data-tooltip="Reactivar Venta"
-             onClick={() => onReactivar?.(venta)}
-             style={{ color: '#10b981' }} // Verde esmeralda para diferenciar
-           >
-             <RotateCcw size={18} strokeWidth={2} />
-           </button>
-        ) : (
-          <button
-            className="tl-icon tl-icon--delete"
-            aria-label="Eliminar Venta"
-            data-tooltip="Eliminar Venta"
-            onClick={() => onEliminar?.(venta)}
-          >
-            <Trash2 size={18} strokeWidth={2} />
-          </button>
-        )
+        <button 
+          className={`tl-icon tl-icon--delete ${!puedeEliminar ? 'disabled' : ''}`}
+          aria-label="Eliminar Venta" 
+          data-tooltip={puedeEliminar ? "Eliminar Venta" : tooltipEliminar}
+          disabled={!puedeEliminar}
+          onClick={() => puedeEliminar && onEliminar?.(venta)}
+          style={!puedeEliminar ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        >
+          <Trash2 size={18} strokeWidth={2} />
+        </button>
       )}
     </div>
   );

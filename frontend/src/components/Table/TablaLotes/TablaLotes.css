@@ -206,6 +206,7 @@
   border:1px solid rgba(0,0,0,.08);
   box-shadow:0 1px 2px rgba(16,24,40,.06);
   transition: transform .14s ease, box-shadow .14s ease, outline-color .14s ease, outline-offset .14s ease;
+  cursor: pointer;
 }
 .tl-icon svg{ width:21px; height: 18px; display:block; }
 
@@ -216,6 +217,8 @@
 .tl-icon--docs{   background: #efe2f3; color: rgb(141, 68, 165); }
 .tl-icon--delete{ background:#FEECEC; color:#E05252; }
 .tl-icon--promo{ background:#fdfddc; color:#BA8E23; }
+.tl-icon--success,
+.tl-icon--reactivate{ background:#EAF7EE; color:#10b981; }
 
 /* Hover: anillo finito del color del ícono */
 .tl-icon--view:hover,
@@ -223,7 +226,9 @@
 .tl-icon--docs:hover,
 .tl-icon--money:hover,
 .tl-icon--promo:hover,
-.tl-icon--delete:hover{
+.tl-icon--delete:hover,
+.tl-icon--success:hover,
+.tl-icon--reactivate:hover{
   outline:1px solid currentColor;
   outline-offset:-3px;
   transform:translateY(-1px);

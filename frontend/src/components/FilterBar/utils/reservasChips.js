@@ -26,7 +26,7 @@ export function reservasChipsFrom(applied, catalogs) {
   const visibilidad = applied.visibilidad ?? applied.estadoOperativo ?? "OPERATIVO";
   if (visibilidad !== "OPERATIVO") {
     const visibilidadLabel = visibilidad === "ELIMINADO" ? "Eliminadas" : visibilidad;
-    chips.push({ k: "visibilidad", v: visibilidad, label: `Visibilidad: ${visibilidadLabel}` });
+    chips.push({ k: "visibilidad", v: visibilidad, label: `${visibilidadLabel}` });
   }
 
   // Estado (plural, como el field.id) - estado de negocio

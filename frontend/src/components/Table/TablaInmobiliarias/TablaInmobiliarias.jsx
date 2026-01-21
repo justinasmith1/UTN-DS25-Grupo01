@@ -150,8 +150,8 @@ export default function TablaInmobiliarias({
         return {
           ...col,
           accessor: (row) => {
-            // Opcional: Podrías poner el texto en gris si está inactiva
-            const style = row.estado === 'ELIMINADO' ? { color: '#9ca3af' } : {};
+            // El nombre se muestra igual para operativas y eliminadas
+            // La diferencia se indica con el badge de estado, no con el estilo del nombre
             return (
               <span style={{
                 display: 'inline-block',
@@ -159,7 +159,6 @@ export default function TablaInmobiliarias({
                 lineHeight: '1.2',
                 wordBreak: 'break-word',
                 hyphens: 'auto',
-                ...style
               }}>
                 {row.nombre || '-'}
               </span>
@@ -276,7 +275,6 @@ export default function TablaInmobiliarias({
               aria-label="Reactivar Inmobiliaria"
               data-tooltip="Reactivar Inmobiliaria"
               onClick={() => onReactivarInmobiliaria?.(row)}
-              style={{ color: '#10b981' }}
             >
               <svg
                 width="18"

@@ -64,8 +64,9 @@ const fromApi = (row = {}) => {
     inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
     reservaId: row.reservaId ?? row.reserva_id ?? null,
     observaciones: row.observaciones ?? row.notas ?? "",
-    // Estado operativo: derivado de estado si es OPERATIVO/ELIMINADO, sino default OPERATIVO
-    estadoOperativo: (() => {
+    // Estado operativo: usar campo estadoOperativo directamente si existe, sino default OPERATIVO
+    estadoOperativo: row.estadoOperativo ?? (() => {
+      // Fallback: derivar de estado solo si es OPERATIVO/ELIMINADO (compatibilidad con datos antiguos)
       const estadoStr = String(row.estado ?? "").toUpperCase().trim();
       if (estadoStr === "OPERATIVO" || estadoStr === "ELIMINADO") {
         return estadoStr;
@@ -327,13 +328,10 @@ async function mockReactivar(id) {
 }
 
 async function apiDesactivar(id) {
-  // Ahora usamos PATCH /:id/desactivar en lugar de DELETE si queremos soft delete explicito
-  // Mantendremos deleteVenta apuntando a esto o separado? 
-  // El usuario pidió "implementar la eliminacion logica".
-  // Usaremos el endpoint nuevo.
-  const res = await fetchWithFallback(`${PRIMARY}/${id}/desactivar`, { method: "PATCH" });
+  // Usamos PATCH /:id/eliminar para soft delete (estadoOperativo = ELIMINADO)
+  const res = await fetchWithFallback(`${PRIMARY}/${id}/eliminar`, { method: "PATCH" });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.message || "Error al desactivar venta");
+  if (!res.ok) throw new Error(data?.message || "Error al eliminar venta");
   return ok(fromApi(data?.data ?? data));
 }
 

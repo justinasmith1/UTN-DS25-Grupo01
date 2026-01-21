@@ -589,9 +589,8 @@ export default function ReservaEditarCard({
                     type="date"
                     value={fechaReserva}
                     onChange={(e) => !estaEliminada && setFechaReserva(e.target.value)}
-                    disabled={estaEliminada}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
                     readOnly={estaEliminada}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                   />
                 </div>
               </div>

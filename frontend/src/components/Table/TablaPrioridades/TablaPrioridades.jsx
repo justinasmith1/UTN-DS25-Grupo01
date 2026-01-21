@@ -160,11 +160,10 @@ export default function TablaPrioridades({
           estaEliminada ? (
             // Prioridad eliminada: mostrar botón reactivar
             <button
-              className="tl-icon tl-icon--reactivate"
+              className="tl-icon tl-icon--success"
               aria-label="Reactivar Prioridad"
               data-tooltip="Reactivar Prioridad"
               onClick={() => onReactivar?.(row)}
-              style={{ color: '#10b981' }}
             >
               <RotateCcw size={18} strokeWidth={2} />
             </button>

@@ -29,17 +29,15 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
 
   let rows = [...inmobiliarias];
 
-  // Filtro de estado - multiSelect pattern (siguiendo FilterBarVentas)
-  // Si estado está vacío o undefined, mostrar solo OPERATIVAS
-  // Si tiene valores, filtrar por esos estados
-  if (params.estado && Array.isArray(params.estado) && params.estado.length > 0) {
-    rows = rows.filter((inmobiliaria) =>
-      params.estado.includes(getEstado(inmobiliaria))
-    );
-  } else {
-    // Por defecto, mostrar solo inmobiliarias OPERATIVAS
-    rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === 'OPERATIVO');
-  }
+  // Filtro de visibilidad (estadoOperativo) - igual que Prioridades/Reservas/Ventas
+  // Si visibilidad está definida, usarla; si no, usar estado (compatibilidad)
+  const visibilidadFilter = params.visibilidad ?? (
+    params.estado && Array.isArray(params.estado) && params.estado.length > 0 
+      ? (params.estado.includes('ELIMINADO') ? 'ELIMINADO' : 'OPERATIVO')
+      : 'OPERATIVO'
+  );
+
+  rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === visibilidadFilter);
 
 
   // Filtro de búsqueda general

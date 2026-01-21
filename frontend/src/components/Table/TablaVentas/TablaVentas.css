@@ -4,3 +4,17 @@
 .tabla-ventas .tl-th--actions.tl-th--center {
   padding-left: 40px;
 }
+
+/* Tooltips en botones disabled - asegurar opacidad completa */
+.tl-actions .tl-icon[data-tooltip] {
+  position: relative;
+}
+
+.tl-actions .tl-icon.disabled[data-tooltip]:hover::after,
+.tl-actions .tl-icon.disabled[data-tooltip]:hover::before {
+  opacity: 1 !important;
+  background: #fff !important;
+  color: #0f172a !important;
+  z-index: 10000 !important;
+  border-color: #d9dee5 !important;
+}

@@ -39,7 +39,14 @@ export function applyVentaFilters(rows = [], f = {}) {
 
     // estado puede venir ["Iniciada", "CON_BOLETO", ...]
     estados = [],
+    
+    // estadoOperativo (visibilidad)
+    estadoOperativo = null,
+    visibilidad = null,
   } = f;
+  
+  // Visibilidad (estadoOperativo) - se filtra en backend, pero por si acaso aplicamos también en frontend
+  const visibilidadFilter = estadoOperativo ?? visibilidad ?? "OPERATIVO";
 
   // Normalizaciones base (ya no normalizamos texto aquí)
   const estadosSet =
@@ -80,12 +87,15 @@ export function applyVentaFilters(rows = [], f = {}) {
     const montoNum = toNumber(v.monto);
     const fechaMs = toTime(v.fechaVenta);
 
-    // ----- 1) Estados -----
+    // ----- 0) Visibilidad (estadoOperativo) - se filtra en backend, pero por si acaso aplicamos también en frontend
+    if (visibilidadFilter) {
+      const estadoOp = String(v?.estadoOperativo ?? "OPERATIVO").toUpperCase();
+      if (estadoOp !== visibilidadFilter.toUpperCase()) return false;
+    }
+
+    // ----- 1) Estados (estado de negocio, NO estadoOperativo) -----
     if (estadosSet && estadosSet.size > 0) {
       if (!estadosSet.has(estadoNorm)) return false;
-    } else {
-      // Por defecto (sin filtro) se ocultan los ELIMINADO
-      if (estadoNorm === "eliminado") return false;
     }
 
     // ----- 2) Tipo de Pago (si llega como lista) -----

@@ -115,13 +115,12 @@ const TablaPersonas = ({
         actions.push(
           <button
             key="reactivate"
-            className="tl-icon tl-icon--edit"
-            style={{ color: '#10b981' }}
+            className="tl-icon tl-icon--success"
             aria-label="Reactivar persona"
             data-tooltip="Reactivar persona"
             onClick={() => onEliminarPersona(persona)}
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={18} strokeWidth={2} />
           </button>
         );
       }

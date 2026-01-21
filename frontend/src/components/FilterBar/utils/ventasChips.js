@@ -23,7 +23,14 @@ export function ventasChipsFrom(applied, catalogs = {}) {
     arr.push({ k: "q", label: `Buscar: ${applied.q}` });
   }
 
-  // Estado: soportar 'estado', 'estados' y 'estadoVenta'
+  // Visibilidad (estadoOperativo) - solo mostrar si no es el default "OPERATIVO"
+  const visibilidad = applied.visibilidad ?? applied.estadoOperativo ?? "OPERATIVO";
+  if (visibilidad !== "OPERATIVO") {
+    const visibilidadLabel = visibilidad === "ELIMINADO" ? "Eliminadas" : visibilidad;
+    arr.push({ k: "visibilidad", v: visibilidad, label: `${visibilidadLabel}` });
+  }
+
+  // Estado: soportar 'estado', 'estados' y 'estadoVenta' (estado de negocio, NO estadoOperativo)
   const estados =
     applied.estado || applied.estados || applied.estadoVenta || [];
   (estados || []).forEach((v) =>

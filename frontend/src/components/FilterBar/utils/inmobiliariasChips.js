@@ -1,5 +1,6 @@
 // src/components/FilterBar/utils/inmobiliariasChips.js
 // Utilidades para formatear chips de filtros de inmobiliarias
+// Sigue el patrón de Visibilidad igual que Prioridades/Reservas/Ventas
 
 export const nice = (s) =>
   (s ?? "")
@@ -15,7 +16,16 @@ export function inmobiliariasChipsFrom(applied, catalogs) {
     arr.push({ k: "q", label: `Buscar: ${applied.q}`, v: applied.q });
   }
 
-  // Filtros de selección múltiple
+  // Visibilidad (estadoOperativo) - solo mostrar si no es el default "OPERATIVO"
+  // Mismo patrón que Prioridades/Reservas/Ventas
+  const visibilidad = applied.visibilidad ?? applied.estadoOperativo ?? "OPERATIVO";
+  // Comparar como string para evitar problemas de tipo
+  if (String(visibilidad) !== "OPERATIVO") {
+    const visibilidadLabel = String(visibilidad) === "ELIMINADO" ? "Eliminadas" : String(visibilidad);
+    arr.push({ k: "visibilidad", v: visibilidad, label: visibilidadLabel });
+  }
+
+  // Filtros de selección múltiple (si existieran)
   (applied.nombre || []).forEach((v) => 
     arr.push({ k: "nombre", v, label: `Nombre: ${v}` })
   );
@@ -26,11 +36,6 @@ export function inmobiliariasChipsFrom(applied, catalogs) {
   
   (applied.contacto || []).forEach((v) => 
     arr.push({ k: "contacto", v, label: `Contacto: ${v}` })
-  );
-
-  // Filtro de estado
-  (applied.estado || []).forEach((v) => 
-    arr.push({ k: "estado", v, label: `Estado: ${nice(v)}` })
   );
 
   // Filtros de rango - Comisión x Venta

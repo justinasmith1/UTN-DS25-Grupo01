@@ -19,32 +19,6 @@ import PersonaCrearCard from "../components/Cards/Personas/PersonaCrearCard";
 import PersonaGrupoFamiliarCard from "../components/Cards/Personas/PersonaGrupoFamiliarCard";
 import { desactivarPersona, reactivarPersona, deletePersonaDefinitivo, getPersona } from "../lib/api/personas";
 
-/**
- * Personas
- * - Usa FilterBarPersonas genérico + TablaPersonas para mostrar personas con filtros avanzados
- * - Soporta vistas: ALL, PROPIETARIOS, INQUILINOS, CLIENTES, MIS_CLIENTES
- * - Filtros: estado, clienteDe, identificadorTipo, fechaCreacion (client-side)
- * - Búsqueda: 100% frontend (no se envía al backend)
- */
-
-// Valores por defecto de filtros según rol (sin filtros aplicados)
-const getDefaultFilters = (userRole) => {
-  if (userRole === "ADMINISTRADOR" || userRole === "GESTOR") {
-    return {
-      estado: 'OPERATIVO', // Por defecto mostrar solo operativas
-      clienteDe: [], // Array vacío para multiSelect
-      identificadorTipo: [], // Array vacío para multiSelect
-      fechaCreacion: { min: null, max: null }
-    };
-  } else {
-    // INMOBILIARIA: sin estado ni clienteDe
-    return {
-      identificadorTipo: [], // Array vacío para multiSelect
-      fechaCreacion: { min: null, max: null }
-    };
-  }
-};
-
 export default function Personas() {
   const { user } = useAuth();
   const userRole = (user?.role ?? user?.rol ?? "ADMIN").toString().trim().toUpperCase();
@@ -53,14 +27,21 @@ export default function Personas() {
   // Obtener view de URL (query param) - con default según rol
   const currentView = searchParams.get('view') || (userRole === 'INMOBILIARIA' ? 'MIS_CLIENTES' : 'ALL');
   
-  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  // Estado de búsqueda local
   const [searchText, setSearchText] = useState('');
 
-  // Estado de filtros local (NO se sincroniza con URL)
-  const [filters, setFilters] = useState(() => getDefaultFilters(userRole));
+  // Estado de filtros local
+  const [params, setParams] = useState({});
+  const handleParamsChange = useCallback((patch) => {
+    if (!patch || Object.keys(patch).length === 0) {
+      setParams({});
+      return;
+    }
+    setParams((prev) => ({ ...prev, ...patch }));
+  }, []);
 
-  // Dataset raw: obtenemos personas desde la API solo con view
-  const [personasRaw, setPersonasRaw] = useState([]);
+  // Dataset base: obtenemos TODAS las personas desde la API una sola vez (igual que Inmobiliarias)
+  const [allPersonas, setAllPersonas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
@@ -89,7 +70,7 @@ export default function Personas() {
   
   // Estado para animación de éxito
   const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
-  const [lastAction, setLastAction] = useState(null); // 'desactivate' o 'reactivate'
+  const [lastAction, setLastAction] = useState(null);
 
   // Sincronizar view en URL si no está presente
   useEffect(() => {
@@ -101,76 +82,42 @@ export default function Personas() {
     }
   }, [searchParams, setSearchParams, userRole]);
 
-  // Cargar personas desde backend con view y estado (si hay filtro de estado)
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        setLoading(true);
-        
-        // Enviar view y estado al backend (igual que inmobiliarias)
-        const params = {
-          view: currentView
-        };
-        
-        // Enviar estado al backend (siempre, ya no hay opción "todos")
-        if (filters.estado) {
-          params.estado = filters.estado;
-        }
-        
-        const res = await getAllPersonas(params);
-        if (alive) {
-          setPersonasRaw(res.personas || []);
-        }
-      } catch (err) {
-        console.error('❌ Error al cargar personas:', err);
-        if (alive) setPersonasRaw([]);
-      } finally {
-        if (alive) setLoading(false);
-      }
-    })();
-    return () => { alive = false; };
-  }, [currentView, filters.estado]);
-
-  // Pipeline de filtrado: solo búsqueda (estado se filtra en backend)
-  const personasFiltered = useMemo(() => {
-    // Aplicar búsqueda (100% frontend, sin tocar backend)
-    // Estado ya viene filtrado del backend
-    const personasFiltradasFinal = applySearch(personasRaw, searchText);
-    
-    // Aplicar otros filtros que no son estado (clienteDe, tipoIdent, fecha)
-    const otrosFiltros = { ...filters };
-    delete otrosFiltros.estado; // Estado ya se filtró en backend
-    const personasFiltradasPorModal = applyPersonaFilters(personasFiltradasFinal, otrosFiltros);
-    
-    return personasFiltradasPorModal;
-  }, [personasRaw, filters, searchText]);
-
-  // Handler para cambios en filtros desde FilterBar (solo actualiza estado local)
-  // NO maneja búsqueda (q) - eso se maneja por separado
-  const handleParamsChange = useCallback((newFilters) => {
-    if (!newFilters || Object.keys(newFilters).length === 0) {
-      // Limpiar filtros: resetear a defaults
-      setFilters(getDefaultFilters(userRole));
-      return;
+  // Función para cargar personas
+  const loadPersonas = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Cargar TODAS las personas con includeInactive para poder filtrar en frontend
+      const res = await getAllPersonas({ view: currentView, includeInactive: true });
+      setAllPersonas(res.personas || []);
+    } catch (err) {
+      console.error('❌ Error al cargar personas:', err);
+      setAllPersonas([]);
+    } finally {
+      setLoading(false);
     }
+  }, [currentView]);
+
+  // Cargar personas al montar o cuando cambia la view
+  useEffect(() => {
+    loadPersonas();
+  }, [loadPersonas]);
+
+  // Pipeline de filtrado: búsqueda + filtros (100% frontend, igual que Inmobiliarias)
+  const personasFiltered = useMemo(() => {
+    // 1. Aplicar búsqueda de texto
+    const afterSearch = applySearch(allPersonas, searchText);
     
-    // Actualizar estado local de filtros (excluir q - búsqueda se maneja por separado)
-    setFilters(prev => {
-      const updated = { ...prev };
-      
-      // Actualizar solo los campos que vienen en newFilters (excluir q)
-      Object.keys(newFilters).forEach(key => {
-        if (newFilters[key] !== undefined && key !== 'q') {
-          updated[key] = newFilters[key];
-        }
-      });
-      
-      return updated;
-    });
-  }, [userRole]);
-  
-  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+    // 2. Aplicar filtros (visibilidad, clienteDe, identificadorTipo, fecha)
+    const hasParams = params && Object.keys(params).length > 0;
+    try {
+      return hasParams ? applyPersonaFilters(afterSearch, params) : afterSearch;
+    } catch (err) {
+      console.error('Error aplicando filtros:', err);
+      return afterSearch;
+    }
+  }, [allPersonas, params, searchText]);
+
+  // Handler para cambios en búsqueda
   const handleSearchChange = useCallback((newSearchText) => {
     setSearchText(newSearchText ?? '');
   }, []);
@@ -186,22 +133,18 @@ export default function Personas() {
     setVerPersonaOpen(true);
   };
 
-  // Editar: abre el modal de edición
   const handleEditarPersona = useCallback((persona) => {
     if (!persona) return;
     setPersonaAEditar(persona);
     setEditarPersonaOpen(true);
   }, []);
 
-  // Actualizar: cuando se guarda una persona editada, actualizar la lista
   const handlePersonaActualizada = useCallback((persona) => {
     if (persona && persona.id) {
-      // Cerrar modal de editar
       setEditarPersonaOpen(false);
       setPersonaAEditar(null);
       
-      // Actualizar la lista
-      setPersonasRaw(prev => {
+      setAllPersonas(prev => {
         const index = prev.findIndex(p => p.id === persona.id);
         if (index >= 0) {
           const updated = [...prev];
@@ -211,7 +154,6 @@ export default function Personas() {
         return prev;
       });
       
-      // Actualizar persona seleccionada si está abierta
       if (personaSeleccionada?.id === persona.id) {
         setPersonaSeleccionada(persona);
       }
@@ -221,14 +163,11 @@ export default function Personas() {
   const handleEliminarPersona = useCallback((persona) => {
     if (!persona) return;
     
-    // Si está activa, abrir modal de desactivar
     if (persona.estado === 'OPERATIVO') {
       setPersonaADesactivar(persona);
       setErrorDesactivar(null);
       setDesactivarPersonaOpen(true);
-    } 
-    // Si está inactiva, abrir modal de reactivar
-    else if (persona.estado === 'ELIMINADO') {
+    } else if (persona.estado === 'ELIMINADO') {
       setPersonaADesactivar(persona);
       setReactivarPersonaOpen(true);
     }
@@ -271,25 +210,27 @@ export default function Personas() {
       setLoadingDesactivar(true);
       await desactivarPersona(personaADesactivar.id);
       
-      // Refrescar la lista manteniendo filtros
-      const params = { view: currentView };
-      if (filters.estado) {
-        params.estado = filters.estado;
-      }
-      const res = await getAllPersonas(params);
-      setPersonasRaw(res.personas || []);
+      // Actualizar lista local (cambiar estado a ELIMINADO)
+      setAllPersonas(prev => prev.map(p => 
+        p.id === personaADesactivar.id 
+          ? { ...p, estado: 'ELIMINADO', fechaBaja: new Date().toISOString() } 
+          : p
+      ));
       
       setDesactivarPersonaOpen(false);
       setPersonaADesactivar(null);
-      setErrorDesactivar(null);
+      
+      // Mostrar animación de éxito
+      setLastAction('deactivate');
+      setShowDeleteSuccess(true);
+      setTimeout(() => setShowDeleteSuccess(false), 1500);
     } catch (error) {
       console.error('Error al desactivar persona:', error);
-      // Mostrar error en la UI en lugar de alert
       setErrorDesactivar(error.message || 'Error al desactivar la persona');
     } finally {
       setLoadingDesactivar(false);
     }
-  }, [personaADesactivar, currentView, filters.estado]);
+  }, [personaADesactivar]);
 
   const handleConfirmarReactivar = useCallback(async () => {
     if (!personaADesactivar) return;
@@ -298,29 +239,27 @@ export default function Personas() {
       setLoadingDesactivar(true);
       await reactivarPersona(personaADesactivar.id);
       
-      // Refrescar la lista manteniendo filtros
-      const params = { view: currentView };
-      if (filters.estado) {
-        params.estado = filters.estado;
-      }
-      const res = await getAllPersonas(params);
-      setPersonasRaw(res.personas || []);
+      // Actualizar lista local (cambiar estado a OPERATIVO)
+      setAllPersonas(prev => prev.map(p => 
+        p.id === personaADesactivar.id 
+          ? { ...p, estado: 'OPERATIVO', fechaBaja: null } 
+          : p
+      ));
       
       setReactivarPersonaOpen(false);
       setPersonaADesactivar(null);
-      setLastAction('reactivate');
+      
       // Mostrar animación de éxito
+      setLastAction('reactivate');
       setShowDeleteSuccess(true);
-      setTimeout(() => {
-        setShowDeleteSuccess(false);
-      }, 1500);
+      setTimeout(() => setShowDeleteSuccess(false), 1500);
     } catch (error) {
       console.error('Error al reactivar persona:', error);
       alert(error.message || 'Error al reactivar la persona');
     } finally {
       setLoadingDesactivar(false);
     }
-  }, [personaADesactivar, currentView, filters.estado]);
+  }, [personaADesactivar]);
 
   const handleConfirmarEliminarDefinitivo = useCallback(async () => {
     if (!personaADesactivar) return;
@@ -329,13 +268,8 @@ export default function Personas() {
       setLoadingDesactivar(true);
       await deletePersonaDefinitivo(personaADesactivar.id);
       
-      // Refrescar la lista manteniendo filtros
-      const params = { view: currentView };
-      if (filters.estado) {
-        params.estado = filters.estado;
-      }
-      const res = await getAllPersonas(params);
-      setPersonasRaw(res.personas || []);
+      // Eliminar de la lista local
+      setAllPersonas(prev => prev.filter(p => p.id !== personaADesactivar.id));
       
       setEliminarDefinitivoOpen(false);
       setPersonaADesactivar(null);
@@ -349,36 +283,15 @@ export default function Personas() {
     } finally {
       setLoadingDesactivar(false);
     }
-  }, [personaADesactivar, currentView, filters.estado]);
+  }, [personaADesactivar]);
 
   const handleAgregarPersona = () => {
     setCrearPersonaOpen(true);
   };
 
-  const handlePersonaCreada = useCallback((createdPersona) => {
-    // Refrescar la lista manteniendo filtros
-    (async () => {
-      try {
-        const params = { view: currentView };
-        if (filters.estado) {
-          params.estado = filters.estado;
-        }
-        const res = await getAllPersonas(params);
-        setPersonasRaw(res.personas || []);
-      } catch (err) {
-        console.error('Error al refrescar lista después de crear:', err);
-      }
-    })();
-  }, [currentView, filters.estado]);
-
-  // Construir initialValue para FilterBar desde estado local
-  // IMPORTANTE: Este hook debe estar ANTES de cualquier early return
-  const initialValue = useMemo(() => {
-    return {
-      ...filters,
-      q: searchText // Pasar búsqueda local (no de URL)
-    };
-  }, [filters, searchText]);
+  const handlePersonaCreada = useCallback(() => {
+    loadPersonas(); // Recargar lista
+  }, [loadPersonas]);
 
   if (loading) {
     return (
@@ -391,13 +304,12 @@ export default function Personas() {
 
   return (
     <>
-      {/* Barra de filtros genérica para personas */}
+      {/* Barra de filtros */}
       <FilterBarPersonas 
         variant="dashboard" 
         userRole={userRole} 
         onParamsChange={handleParamsChange}
         onSearchChange={handleSearchChange}
-        initialValue={initialValue}
       />
 
       <TablaPersonas
@@ -425,7 +337,6 @@ export default function Personas() {
           setPersonaSeleccionada(null);
         }}
         onEdit={canPersonaEdit ? (persona) => {
-          // Cerrar modal de ver y abrir modal de editar
           setVerPersonaOpen(false);
           setPersonaAEditar(persona);
           setEditarPersonaOpen(true);
@@ -474,7 +385,7 @@ export default function Personas() {
         onConfirm={handleConfirmarReactivar}
       />
 
-      {/* Modal "Eliminar Definitivamente" (solo Admin, solo si no tiene asociaciones) */}
+      {/* Modal "Eliminar Definitivamente" */}
       {userRole === 'ADMINISTRADOR' && (
         <PersonaEliminarDefinitivoDialog
           open={eliminarDefinitivoOpen}

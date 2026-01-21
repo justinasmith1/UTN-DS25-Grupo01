@@ -104,3 +104,39 @@ export function getReservaDeleteTooltip(reserva) {
   const estadoStr = String(estado).toUpperCase().trim();
   return `No se puede eliminar una reserva en estado ${estadoStr}`;
 }
+
+/**
+ * Verifica si una venta puede eliminarse lógicamente según su estado comercial
+ * Solo se pueden eliminar ventas en estado: CANCELADA
+ * @param {Object} venta - Venta con campo estado
+ * @returns {boolean} - true si puede eliminarse lógicamente
+ */
+export function canDeleteVenta(venta) {
+  if (!venta) return false;
+  
+  // Debe estar operativa para poder eliminarse
+  if (!isOperativo(venta)) return false;
+  
+  const estado = venta.estado;
+  if (!estado) return false;
+  
+  const estadoStr = String(estado).toUpperCase().trim();
+  const estadosPermitidos = ['CANCELADA'];
+  
+  return estadosPermitidos.includes(estadoStr);
+}
+
+/**
+ * Obtiene el mensaje de tooltip para cuando no se puede eliminar una venta
+ * @param {Object} venta - Venta con campo estado
+ * @returns {string} - Mensaje explicativo
+ */
+export function getVentaDeleteTooltip(venta) {
+  if (!venta) return 'No se puede eliminar esta venta';
+  
+  const estado = venta.estado;
+  if (!estado) return 'No se puede eliminar esta venta';
+  
+  const estadoStr = String(estado).toUpperCase().trim();
+  return `No se puede eliminar una venta en estado ${estadoStr}`;
+}

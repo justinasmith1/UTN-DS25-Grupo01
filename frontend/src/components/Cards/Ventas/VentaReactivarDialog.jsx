@@ -29,10 +29,11 @@ export default function VentaReactivarDialog({
 
   const v = detalleCompleto || venta;
   const ventaNumero = v?.numero ?? v?.id ?? "—";
+  const estadoActual = v?.estado ?? "—";
   
   const title = `Reactivar Venta N° ${ventaNumero}`;
 
-  const message = `¿Seguro que deseas reactivar la venta N° ${ventaNumero}? Pasarà a estado OPERATIVO y aparecerá nuevamente en el listado principal.`;
+  const message = `¿Seguro que deseas reactivar la venta N° ${ventaNumero}? Se reactivará la venta (volverá a mostrarse como OPERATIVA) manteniendo su estado actual: ${estadoActual}.`;
 
   const details = [
     `Lote N°: ${v?.lote?.mapId || v?.lotMapId || v?.loteId || "—"}`,

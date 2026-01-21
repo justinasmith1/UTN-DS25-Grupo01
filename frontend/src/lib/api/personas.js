@@ -73,42 +73,20 @@ export const toApi = (frontendPersona) => {
 
 /**
  * Obtiene todas las personas
+ * El filtrado de visibilidad se hace en frontend (igual que Inmobiliarias)
  */
 export const getAllPersonas = async (params = {}) => {
   try {
-    // Construir query string si hay parámetros
     const queryParams = new URLSearchParams();
     
-    // Parámetros básicos
     if (params.view) {
       queryParams.append('view', params.view);
     }
-    // q (búsqueda) ya NO se envía al backend - se maneja 100% en frontend
     if (params.includeInactive === true || params.includeInactive === 'true') {
       queryParams.append('includeInactive', 'true');
     }
     if (params.limit) {
       queryParams.append('limit', params.limit.toString());
-    }
-    
-    // Nuevos filtros
-    if (params.estado) {
-      queryParams.append('estado', params.estado);
-    }
-    if (params.clienteDe) {
-      queryParams.append('clienteDe', params.clienteDe);
-    }
-    if (params.inmobiliariaId) {
-      queryParams.append('inmobiliariaId', String(params.inmobiliariaId));
-    }
-    if (params.identificadorTipo) {
-      queryParams.append('identificadorTipo', params.identificadorTipo);
-    }
-    if (params.createdFrom) {
-      queryParams.append('createdFrom', params.createdFrom);
-    }
-    if (params.createdTo) {
-      queryParams.append('createdTo', params.createdTo);
     }
     
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
