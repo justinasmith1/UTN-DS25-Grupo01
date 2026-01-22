@@ -6,6 +6,7 @@ import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updatePersona, getPersona } from "../../../lib/api/personas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
+import { isEliminado } from "../../../utils/estadoOperativo";
 import { extractEmail, extractTelefono } from "../../../utils/personaContacto";
 
 export default function PersonaEditarCard({
@@ -32,7 +33,6 @@ export default function PersonaEditarCard({
   const [valorIdentificador, setValorIdentificador] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [estado, setEstado] = useState("OPERATIVO");
   const [inmobiliariaId, setInmobiliariaId] = useState(null);
   
   // Estados auxiliares
@@ -111,7 +111,6 @@ export default function PersonaEditarCard({
       setRazonSocial(detalle.razonSocial || "");
       setTipoIdentificador(detalle.identificadorTipo || "CUIL");
       setValorIdentificador(detalle.identificadorValor || "");
-      setEstado(detalle.estado || "OPERATIVO");
       setInmobiliariaId(detalle.inmobiliariaId || null);
       
       // Cargar email y teléfono usando helpers centralizados
@@ -143,7 +142,6 @@ export default function PersonaEditarCard({
     setRazonSocial(detalle.razonSocial || "");
     setTipoIdentificador(detalle.identificadorTipo || "CUIL");
     setValorIdentificador(detalle.identificadorValor || "");
-    setEstado(detalle.estado || "ACTIVA");
     setInmobiliariaId(detalle.inmobiliariaId || null);
     
     // Restablecer email y teléfono desde detalle
@@ -158,6 +156,11 @@ export default function PersonaEditarCard({
   // Handler para guardar cambios
   const handleSave = async () => {
     if (!detalle?.id) return;
+    
+    // Bloquear submit si está eliminado
+    if (isEliminado(detalle)) {
+      return;
+    }
     
     setError(null);
     setSaving(true);
@@ -267,10 +270,9 @@ export default function PersonaEditarCard({
       // IMPORTANTE: enviar null explícitamente cuando está vacío
       payload.email = emailStr;
       
-      // Solo incluir estado e inmobiliariaId para ADMIN/GESTOR
-      // IMPORTANTE: incluir siempre, incluso si es null, para que el backend pueda actualizarlos
+      // Solo incluir inmobiliariaId para ADMIN/GESTOR
+      // IMPORTANTE: NO enviar estado/estadoOperativo - solo endpoints de desactivar/reactivar pueden cambiarlo
       if (isAdminOrGestor) {
-        payload.estado = estado;
         // Incluir inmobiliariaId siempre (puede ser null para "La Federala")
         payload.inmobiliariaId = inmobiliariaId ?? null;
       }
@@ -340,6 +342,7 @@ export default function PersonaEditarCard({
                     value={razonSocial}
                     onChange={(e) => setRazonSocial(e.target.value)}
                     placeholder="Razón social"
+                    disabled={eliminado}
                   />
                 </div>
               </div>
@@ -376,6 +379,7 @@ export default function PersonaEditarCard({
                         }
                       }}
                       placeholder="Apellido (solo letras)"
+                      disabled={eliminado}
                     />
                   </div>
                 </div>
@@ -412,6 +416,7 @@ export default function PersonaEditarCard({
                     tipoIdentificador === "PASAPORTE" ? "Ej: ABC123456 (6-9 caracteres)" :
                     "Ej: 12-34567890-1 (formato CUIT/CUIL)"
                   }
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -444,6 +449,7 @@ export default function PersonaEditarCard({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Opcional"
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -483,6 +489,7 @@ export default function PersonaEditarCard({
                     placeholder={loadingInmobiliarias ? "Cargando..." : "Seleccionar"}
                     onChange={(val) => setInmobiliariaId(val === "" ? null : Number(val))}
                     usePortal={true}
+                    disabled={eliminado}
                   />
                 </div>
               </div>

@@ -6,6 +6,7 @@ import { getReservaById } from "../../../lib/api/reservas";
 import { getVentaById } from "../../../lib/api/ventas";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../../../lib/auth/rbac";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 import { extractEmail, extractTelefono } from "../../../utils/personaContacto";
 import LoteVerCard from "../Lotes/LoteVerCard";
 import ReservaVerCard from "../Reservas/ReservaVerCard";
@@ -421,7 +422,7 @@ export default function PersonaVerCard({
           <div className="cclf-card__header">
             <h2 className="cclf-card__title">{displayName}</h2>
             <div className="cclf-card__actions">
-              {can(user, PERMISSIONS.PEOPLE_EDIT) && (
+              {can(user, PERMISSIONS.PEOPLE_EDIT) && canEditByEstadoOperativo(pers) && (
                 <button
                   type="button"
                   className="cclf-tab thin"
@@ -473,8 +474,8 @@ export default function PersonaVerCard({
                     <div className="col-md-6">
                       <div className="field-row">
                         <div className="field-label">ESTADO</div>
-                        <div className="field-value" style={getValueStyle(pers?.estado || "ACTIVA")}>
-                          {pers?.estado || "ACTIVA"}
+                        <div className="field-value" style={getValueStyle(pers?.estado || "OPERATIVO")}>
+                          {pers?.estado || "OPERATIVO"}
                         </div>
                       </div>
                     </div>

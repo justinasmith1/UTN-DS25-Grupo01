@@ -136,6 +136,13 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
     const e = new Error('Inmobiliaria no encontrada'); (e as any).statusCode = 404; throw e;
   }
 
+  // Bloquear updates si está eliminado
+  if (existing.estadoOperativo === 'ELIMINADO') {
+    const e = new Error('No se puede editar una inmobiliaria eliminada') as any;
+    e.statusCode = 409;
+    throw e;
+  }
+
   // Verificamos duplicados de nombre
   if (updateData.nombre) {
     const dup = await prisma.inmobiliaria.findFirst({
@@ -147,19 +154,9 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
     }
   }
 
-  // LÓGICA DE SOFT DELETE AUTOMÁTICO
-  // Calculamos la fecha de baja basándonos en el cambio de estadoOperativo
-  let fechaBajaCalc: Date | null | undefined = undefined;
-
-  // Si envían un estadoOperativo y es ELIMINADO, ponemos fecha de hoy
-  if (updateData.estado === 'ELIMINADO') {
-      fechaBajaCalc = new Date();
-  } 
-  // Si envían un estadoOperativo y es OPERATIVO, limpiamos la fecha (null)
-  else if (updateData.estado === 'OPERATIVO') {
-      fechaBajaCalc = null;
-  }
-  // Si no envían estado, fechaBajaCalc se queda undefined y no toca la base de datos
+  // IMPORTANTE: NO permitir cambios de estadoOperativo desde update
+  // Solo endpoints de desactivar/reactivar pueden cambiar estadoOperativo
+  // Ignorar cualquier campo estado/estadoOperativo que venga en updateData
 
   const updated = await prisma.inmobiliaria.update({
     where: { id: idActual },
@@ -167,13 +164,10 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
       ...(updateData.nombre        !== undefined ? { nombre: updateData.nombre } : {}),
       ...(updateData.razonSocial   !== undefined ? { razonSocial: updateData.razonSocial } : {}),
       ...(updateData.contacto      !== undefined ? { contacto: updateData.contacto } : {}),
-      ...(updateData.comxventa     !== undefined ? { comxventa: new Prisma.Decimal(updateData.comxventa) } : {}),
-      ...(updateData.userId        !== undefined ? { userId: updateData.userId } : {}),
+      ...(updateData.comxventa      !== undefined ? { comxventa: new Prisma.Decimal(updateData.comxventa) } : {}),
+      ...(updateData.userId         !== undefined ? { userId: updateData.userId } : {}),
       
-      // Aplicamos cambios de estadoOperativo y fecha calculada
-      ...(updateData.estado        !== undefined ? { estadoOperativo: updateData.estado } : {}),
-      ...(fechaBajaCalc            !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
-      
+      // NO incluir estadoOperativo ni fechaBaja - solo endpoints específicos pueden cambiarlos
       updateAt: new Date(), 
     },
     include: {
@@ -198,6 +192,108 @@ export async function updateInmobiliaria(idActual: number, updateData: PutInmobi
 
 // ==============================
 // Eliminar Inmobiliaria (Hard Delete)
+// ==============================
+// Eliminar Inmobiliaria (soft delete - estadoOperativo)
+// ==============================
+export async function eliminarInmobiliaria(id: number): Promise<PutInmobiliariaResponse> {
+  try {
+    const existing = await prisma.inmobiliaria.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      const error = new Error('Inmobiliaria no encontrada') as any;
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (existing.estadoOperativo === 'ELIMINADO') {
+      const error = new Error('La inmobiliaria ya está eliminada.') as any;
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const updated = await prisma.inmobiliaria.update({
+      where: { id },
+      data: {
+        estadoOperativo: 'ELIMINADO',
+        fechaBaja: new Date(),
+        updateAt: new Date(),
+      },
+      include: {
+        _count: {
+          select: { ventas: true, reservas: true }
+        }
+      }
+    });
+
+    const mapped = toInmobiliaria(updated);
+    return { 
+      inmobiliaria: {
+        ...mapped,
+        cantidadVentas: updated._count?.ventas ?? 0,
+        cantidadReservas: updated._count?.reservas ?? 0,
+        createdAt: updated.createdAt,
+        updateAt: updated.updateAt,
+      } as any,
+      message: 'Inmobiliaria eliminada correctamente' 
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
+// ==============================
+// Reactivar Inmobiliaria (estadoOperativo)
+// ==============================
+export async function reactivarInmobiliaria(id: number): Promise<PutInmobiliariaResponse> {
+  try {
+    const existing = await prisma.inmobiliaria.findUnique({
+      where: { id },
+    });
+
+    if (!existing) {
+      const error = new Error('Inmobiliaria no encontrada') as any;
+      error.statusCode = 404;
+      throw error;
+    }
+
+    if (existing.estadoOperativo === 'OPERATIVO') {
+      const error = new Error('La inmobiliaria ya está operativa.') as any;
+      error.statusCode = 409;
+      throw error;
+    }
+
+    const updated = await prisma.inmobiliaria.update({
+      where: { id },
+      data: {
+        estadoOperativo: 'OPERATIVO',
+        fechaBaja: null,
+        updateAt: new Date(),
+      },
+      include: {
+        _count: {
+          select: { ventas: true, reservas: true }
+        }
+      }
+    });
+
+    const mapped = toInmobiliaria(updated);
+    return { 
+      inmobiliaria: {
+        ...mapped,
+        cantidadVentas: updated._count?.ventas ?? 0,
+        cantidadReservas: updated._count?.reservas ?? 0,
+        createdAt: updated.createdAt,
+        updateAt: updated.updateAt,
+      } as any,
+      message: 'Inmobiliaria reactivada correctamente' 
+    };
+  } catch (error) {
+    throw error;
+  }
+}
+
 // ==============================
 export async function deleteInmobiliaria(req: DeleteInmobiliariaRequest): Promise<DeleteInmobiliariaResponse> {
     try {

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import EliminarBase from "../Base/EliminarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getGrupoFamiliar, crearMiembroFamiliar, eliminarMiembroFamiliar } from "../../../lib/api/personas.js";
+import { isEliminado } from "../../../utils/estadoOperativo";
 
 // Schema para crear miembro familiar (solo campos mínimos)
 const miembroFamiliarSchema = z.object({
@@ -123,6 +125,12 @@ export default function PersonaGrupoFamiliarCard({
   }, [open, persona?.id]);
 
   const onSubmitMiembro = async (data) => {
+    // Bloquear si titular está eliminado
+    if (isEliminado(persona)) {
+      setError("No se puede modificar un grupo familiar de un titular eliminado");
+      return;
+    }
+
     setError(null);
     setSaving(true);
     try {
@@ -153,6 +161,13 @@ export default function PersonaGrupoFamiliarCard({
 
   const handleConfirmarEliminar = async () => {
     if (!confirmEliminar) return;
+
+    // Bloquear si titular está eliminado
+    if (isEliminado(persona)) {
+      setError("No se puede modificar un grupo familiar de un titular eliminado");
+      setConfirmEliminar(null);
+      return;
+    }
 
     const { miembroId } = confirmEliminar;
     setConfirmEliminar(null);
@@ -203,6 +218,8 @@ export default function PersonaGrupoFamiliarCard({
   };
 
   if (!open || !persona) return null;
+
+  const titularEliminado = isEliminado(persona);
 
   return (
     <>
@@ -294,6 +311,8 @@ export default function PersonaGrupoFamiliarCard({
                     className="btn btn-primary"
                     onClick={() => setShowAgregarForm(true)}
                     style={{ padding: "8px 16px", fontSize: "14px" }}
+                    disabled={titularEliminado}
+                    title={titularEliminado ? "No se puede modificar un grupo familiar de un titular eliminado" : ""}
                   >
                     + Agregar Miembro
                   </button>
@@ -443,9 +462,14 @@ export default function PersonaGrupoFamiliarCard({
                         type="button"
                         className="tl-icon tl-icon--delete"
                         onClick={() => handleEliminarClick(miembro)}
-                        disabled={eliminandoId === miembro.id || removingId === miembro.id}
+                        disabled={titularEliminado || eliminandoId === miembro.id || removingId === miembro.id}
                         aria-label="Eliminar miembro"
-                        data-tooltip="Eliminar miembro"
+                        data-tooltip={titularEliminado ? "No se puede modificar un grupo familiar de un titular eliminado" : "Eliminar miembro"}
+                        style={{
+                          opacity: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 0.5 : 1,
+                          cursor: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 'not-allowed' : 'pointer',
+                          pointerEvents: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 'none' : 'auto'
+                        }}
                       >
                         {eliminandoId === miembro.id ? (
                           <div

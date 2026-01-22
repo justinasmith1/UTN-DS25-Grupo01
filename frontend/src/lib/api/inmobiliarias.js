@@ -140,6 +140,7 @@ async function mockGetById(id) { ensureSeed(); return ok(INMOS.find((x) => Strin
 async function mockCreate(payload) { ensureSeed(); const row = { id: nextId(), ...fromApi(toApi(payload)) }; INMOS.unshift(row); return ok(row); }
 async function mockUpdate(id, payload) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], ...fromApi(toApi(payload)) }; return ok(INMOS[i]); }
 async function mockDeactivate(id) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], estado: "ELIMINADO", fechaBaja: new Date().toISOString() }; return ok(INMOS[i]); }
+async function mockReactivate(id) { ensureSeed(); const i = INMOS.findIndex((x) => String(x.id) === String(id)); if (i < 0) throw new Error("No encontrada"); INMOS[i] = { ...INMOS[i], estado: "OPERATIVO", fechaBaja: null }; return ok(INMOS[i]); }
 
 /* ------------------------------- API --------------------------------- */
 async function apiGetAll(params = {}) {
@@ -262,14 +263,8 @@ async function apiUpdate(id, payload) {
     body.comxventa = num;
   }
 
-  // Soporte para cambio de estado (baja lógica)
-  if (payload.estado !== undefined && payload.estado !== null) {
-    const estadoUpper = String(payload.estado).toUpperCase();
-    if (estadoUpper !== "OPERATIVO" && estadoUpper !== "ELIMINADO") {
-      throw new Error("El estado debe ser OPERATIVO o ELIMINADO");
-    }
-    body.estado = estadoUpper;
-  }
+  // IMPORTANTE: NO incluir estado/estadoOperativo - solo endpoints de desactivar/reactivar pueden cambiarlo
+  // El backend ignora cualquier campo estado/estadoOperativo que venga en updateData
 
   // Validar que al menos haya un campo (como requiere el schema: .refine((d) => Object.keys(d).length > 0))
   if (Object.keys(body).length === 0) {
@@ -306,15 +301,17 @@ async function apiUpdate(id, payload) {
 }
 
 async function apiDeactivate(id) {
-  // Baja lógica: cambiar estado a ELIMINADO en lugar de DELETE
-  const body = { estado: "ELIMINADO" };
-  const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
+  // Baja lógica: usar endpoint específico PATCH /api/inmobiliarias/:id/eliminar
+  const res = await fetchWithFallback(`${PRIMARY}/${id}/eliminar`, { method: "PATCH" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data?.message || "Error al desactivar inmobiliaria");
+    const errorMsg = data?.message || "Error al desactivar inmobiliaria";
+    const error = new Error(errorMsg);
+    error.status = res.status;
+    throw error;
   }
 
-  // El backend devuelve la inmobiliaria actualizada
+  // El backend devuelve { success: true, data: { inmobiliaria: {...}, message: '...' } }
   const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
   const base = fromApi(raw);
   const normalized = {
@@ -330,14 +327,41 @@ async function apiDeactivate(id) {
   return ok(normalized);
 }
 
+async function apiReactivate(id) {
+  // Reactivar: usar endpoint específico PATCH /api/inmobiliarias/:id/reactivar
+  const res = await fetchWithFallback(`${PRIMARY}/${id}/reactivar`, { method: "PATCH" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const errorMsg = data?.message || "Error al reactivar inmobiliaria";
+    const error = new Error(errorMsg);
+    error.status = res.status;
+    throw error;
+  }
+
+  // El backend devuelve { success: true, data: { inmobiliaria: {...}, message: '...' } }
+  const raw = data?.data?.inmobiliaria ?? data?.data ?? data;
+  const base = fromApi(raw);
+  const normalized = {
+    ...base,
+    createdAt: raw?.createdAt ?? raw?.created_at ?? base.createdAt ?? null,
+    updatedAt: raw?.updateAt ?? raw?.updatedAt ?? raw?.updated_at ?? base.updateAt ?? null,
+    estado: raw?.estado ?? "OPERATIVO",
+    fechaBaja: null, // Al reactivar, fechaBaja se limpia
+    cantidadVentas: raw?.cantidadVentas ?? raw?._count?.ventas ?? raw?.ventas_count ?? base.cantidadVentas ?? 0,
+    cantidadReservas: raw?.cantidadReservas ?? raw?._count?.reservas ?? raw?.reservas_count ?? base.cantidadReservas ?? 0,
+  };
+
+  return ok(normalized);
+}
+
 /* --------------------------- EXPORT PÚBLICO --------------------------- */
 export function getAllInmobiliarias(params) { return USE_MOCK ? mockGetAll(params) : apiGetAll(params); }
 export function getInmobiliariaById(id) { return USE_MOCK ? mockGetById(id) : apiGetById(id); }
 export function createInmobiliaria(payload) { return USE_MOCK ? mockCreate(payload) : apiCreate(payload); }
 export function updateInmobiliaria(id, p) { return USE_MOCK ? mockUpdate(id, p) : apiUpdate(id, p); }
 export function deactivateInmobiliaria(id) { return USE_MOCK ? mockDeactivate(id) : apiDeactivate(id); }
-// Reactivar: cambiar estado de ELIMINADO a OPERATIVO
-export function reactivateInmobiliaria(id) { return updateInmobiliaria(id, { estado: "OPERATIVO" }); }
+// Reactivar: usar endpoint específico PATCH /api/inmobiliarias/:id/reactivar
+export function reactivateInmobiliaria(id) { return USE_MOCK ? mockReactivate(id) : apiReactivate(id); }
 // Mantener deleteInmobiliaria por compatibilidad (ahora hace soft delete)
 export function deleteInmobiliaria(id) { return deactivateInmobiliaria(id); }
 

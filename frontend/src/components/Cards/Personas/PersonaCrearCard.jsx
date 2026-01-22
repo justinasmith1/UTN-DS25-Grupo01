@@ -63,7 +63,7 @@ export default function PersonaCrearCard({
       setLoadingInmobiliarias(true);
       (async () => {
         try {
-          const resp = await getAllInmobiliarias({ estado: "ACTIVA" });
+          const resp = await getAllInmobiliarias({ estadoOperativo: "OPERATIVO" });
           const inmobiliariasList = (resp.data || []).map((inm) => ({
             value: inm.id,
             label: inm.nombre || inm.razonSocial || `Inmobiliaria ${inm.id}`

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 
 /**
  * InmobiliariaVerCard
@@ -74,9 +75,9 @@ export default function InmobiliariaVerCard({
     [
       "ESTADO", 
       inmob?.estado ?? "OPERATIVO", 
-      inmob?.estado === "ELIMINADO" ? "#ef4444" : "#10b981" // Rojo si inactiva, Verde si activa
+      inmob?.estado === "ELIMINADO" ? "#ef4444" : "#10b981" // Rojo si eliminada, Verde si operativa
     ],
-    // 2. Fecha de Baja (Solo si existe y está inactiva)
+    // 2. Fecha de Baja (Solo si existe y está eliminada)
     ...(inmob?.fechaBaja 
         ? [["FECHA DE BAJA", fechaBaja, "#ef4444"]] // Texto en rojo
         : []
@@ -116,13 +117,15 @@ export default function InmobiliariaVerCard({
         <div className="cclf-card__header">
           <h2 className="cclf-card__title">{` ${inmob?.nombre ?? "—"}`}</h2>
           <div className="cclf-card__actions">
-            <button
-              type="button"
-              className="cclf-tab thin"
-              onClick={() => inmob && onEdit?.(inmob)}
-            >
-              Editar Inmobiliaria
-            </button>
+            {canEditByEstadoOperativo(inmob) && (
+              <button
+                type="button"
+                className="cclf-tab thin"
+                onClick={() => inmob && onEdit?.(inmob)}
+              >
+                Editar Inmobiliaria
+              </button>
+            )}
             <button type="button" className="cclf-btn-close" onClick={onClose}>
               <span className="cclf-btn-close__x">×</span>
             </button>

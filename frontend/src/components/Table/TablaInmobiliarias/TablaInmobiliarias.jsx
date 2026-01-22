@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { ListTodo, Percent } from "lucide-react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../../../lib/auth/rbac";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 import TablaBase from "../TablaBase";
 import StatusBadge from "./cells/StatusBadge";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
@@ -227,7 +228,7 @@ export default function TablaInmobiliarias({
         );
       }
 
-      if (can(user, PERMISSIONS.AGENCY_EDIT)) {
+      if (can(user, PERMISSIONS.AGENCY_EDIT) && canEditByEstadoOperativo(row)) {
         actions.push(
           <button
             key="edit"
@@ -266,7 +267,7 @@ export default function TablaInmobiliarias({
 
       // Mostrar botón de eliminar O reactivar según el estado
       if (row.estado === 'ELIMINADO') {
-        // Inmobiliaria inactiva: mostrar botón de REACTIVAR
+        // Inmobiliaria eliminada: mostrar botón de REACTIVAR
         if (can(user, PERMISSIONS.AGENCY_EDIT) && onReactivarInmobiliaria) {
           actions.push(
             <button

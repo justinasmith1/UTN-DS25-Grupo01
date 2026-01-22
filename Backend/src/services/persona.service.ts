@@ -637,6 +637,13 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       throw error;
     }
 
+    // Bloquear updates si está eliminado
+    if (existingPersona.estadoOperativo === 'ELIMINADO') {
+      const error = new Error('No se puede editar una persona eliminada') as any;
+      error.statusCode = 409;
+      throw error;
+    }
+
     const updateData: any = {
       updateAt: new Date(),
     };
@@ -711,28 +718,19 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       );
     }
 
-    // EstadoOperativo solo para ADMIN/GESTOR (validar en controller si es necesario)
-    if (req.estadoOperativo !== undefined) {
-      updateData.estadoOperativo = req.estadoOperativo;
-    }
-
     // inmobiliariaId solo para ADMIN/GESTOR (validar en controller si es necesario)
     if (req.inmobiliariaId !== undefined) {
       updateData.inmobiliariaId = req.inmobiliariaId;
     }
 
-    // Lógica de fechaBaja automática (igual que inmobiliarias)
-    let fechaBajaCalc: Date | null | undefined = undefined;
-    if (req.estadoOperativo === 'ELIMINADO') {
-      fechaBajaCalc = new Date();
-    } else if (req.estadoOperativo === 'OPERATIVO') {
-      fechaBajaCalc = null;
-    }
+    // IMPORTANTE: NO permitir cambios de estadoOperativo desde update
+    // Solo endpoints de desactivar/reactivar pueden cambiar estadoOperativo
+    // Ignorar cualquier campo estado/estadoOperativo que venga en req
 
     // Construir data final para Prisma
     const finalData: any = {
       ...updateData,
-      ...(fechaBajaCalc !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
+      // NO incluir estadoOperativo ni fechaBaja - solo endpoints específicos pueden cambiarlos
     };
 
     const updated = await prisma.persona.update({
@@ -1160,12 +1158,8 @@ export async function getGrupoFamiliar(titularId: number) {
     throw error;
   }
 
-  // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((persona as any).categoria !== 'OPERATIVA' || persona.estadoOperativo !== 'OPERATIVO') {
-    const error = new Error('El titular debe ser una persona operativa y activa') as any;
-    error.statusCode = 400;
-    throw error;
-  }
+  // NOTA: Ya no bloqueamos GET si está eliminado - se permite visualizar
+  // La validación de estadoOperativo solo aplica para mutaciones (POST/DELETE)
 
   return {
     titular: {
@@ -1228,10 +1222,10 @@ export async function crearMiembroFamiliar(
     throw error;
   }
 
-  // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((titular as any).categoria !== 'OPERATIVA' || titular.estadoOperativo !== 'OPERATIVO') {
-    const error = new Error('El titular debe ser una persona operativa y activa') as any;
-    error.statusCode = 400;
+  // Bloquear mutaciones si titular está eliminado
+  if (titular.estadoOperativo === 'ELIMINADO') {
+    const error = new Error('No se puede modificar el grupo familiar de un titular eliminado') as any;
+    error.statusCode = 409;
     throw error;
   }
 

@@ -7,6 +7,7 @@ import TablaBase from '../TablaBase';
 import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { can } from '../../../lib/auth/rbac';
+import { canEditByEstadoOperativo } from '../../../utils/estadoOperativo';
 import './TablaPersonas.css';
 
 const TablaPersonas = ({
@@ -82,7 +83,7 @@ const TablaPersonas = ({
       );
     }
     
-    if (can(user, 'personas.edit') && onEditarPersona) {
+    if (can(user, 'personas.edit') && onEditarPersona && canEditByEstadoOperativo(persona)) {
       actions.push(
         <button
           key="edit"
