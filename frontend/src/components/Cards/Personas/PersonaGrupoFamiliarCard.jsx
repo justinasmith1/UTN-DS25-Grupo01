@@ -280,6 +280,19 @@ export default function PersonaGrupoFamiliarCard({
 
         {!loading && grupoFamiliar && (
           <>
+            {titularEliminado && (
+              <div style={{
+                background: '#FEF3C7',
+                border: '1px solid #F59E0B',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                color: '#92400E',
+                fontWeight: 500
+              }}>
+                No se puede modificar el grupo familiar porque el titular está ELIMINADO.
+              </div>
+            )}
             {/* Titular */}
             <div style={{ marginBottom: "24px" }}>
               <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "12px" }}>

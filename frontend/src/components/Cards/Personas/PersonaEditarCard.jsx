@@ -153,12 +153,15 @@ export default function PersonaEditarCard({
     setError(null);
   };
 
+  // Determinar si está eliminado
+  const eliminado = isEliminado(detalle);
+
   // Handler para guardar cambios
   const handleSave = async () => {
     if (!detalle?.id) return;
     
     // Bloquear submit si está eliminado
-    if (isEliminado(detalle)) {
+    if (eliminado) {
       return;
     }
     
@@ -310,7 +313,7 @@ export default function PersonaEditarCard({
         open={open}
         title="Editar Persona"
         onCancel={onCancel}
-        onSave={handleSave}
+        onSave={eliminado ? undefined : handleSave}
         onReset={detalle ? handleReset : undefined}
         saving={saving}
         saveButtonText="Guardar cambios"
@@ -323,6 +326,19 @@ export default function PersonaEditarCard({
             padding: "0 16px"
           }}
         >
+          {eliminado && (
+            <div style={{
+              background: '#FEF3C7',
+              border: '1px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              color: '#92400E',
+              fontWeight: 500
+            }}>
+              Persona eliminada - solo lectura
+            </div>
+          )}
           <div
             style={{
               display: "grid",
@@ -362,6 +378,7 @@ export default function PersonaEditarCard({
                         }
                       }}
                       placeholder="Nombre (solo letras)"
+                      disabled={eliminado}
                     />
                   </div>
                 </div>
@@ -399,6 +416,7 @@ export default function PersonaEditarCard({
                   ]}
                   placeholder="Seleccionar tipo"
                   onChange={(val) => setTipoIdentificador(val)}
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -436,6 +454,7 @@ export default function PersonaEditarCard({
                     }
                   }}
                   placeholder="Opcional (solo números)"
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -454,20 +473,12 @@ export default function PersonaEditarCard({
               </div>
             </div>
 
-            {/* Estado solo para ADMIN/GESTOR */}
+            {/* Estado solo lectura (mostrar siempre para ADMIN/GESTOR) */}
             {isAdminOrGestor && (
               <div className="field-row">
                 <div className="field-label">ESTADO</div>
-                <div className="field-value p0">
-                  <NiceSelect
-                    value={estado}
-                    options={[
-                      { value: "OPERATIVO", label: "OPERATIVO" },
-                      { value: "ELIMINADO", label: "ELIMINADO" },
-                    ]}
-                    placeholder="Seleccionar estado"
-                    onChange={(val) => setEstado(val)}
-                  />
+                <div className="field-value is-readonly">
+                  {detalle?.estado || "OPERATIVO"}
                 </div>
               </div>
             )}

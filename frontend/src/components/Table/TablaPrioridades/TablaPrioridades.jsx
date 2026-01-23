@@ -5,10 +5,13 @@ import React, { useMemo } from 'react';
 import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, RotateCcw } from 'lucide-react';
+import { Eye, Edit, Trash2, RotateCcw, Map } from 'lucide-react';
 import { prioridadesTablePreset as tablePreset } from './presets/prioridades.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx';
 import { canEditByEstadoOperativo, isEliminado } from '../../../utils/estadoOperativo';
+import { useMapaSeleccion } from '../../../hooks/useMapaSeleccion';
+import MapaPreviewModal from '../../Mapa/MapaPreviewModal';
+import { usePrepareMapaData } from '../../../utils/mapaDataHelper';
 
 // ------------------------
 // Helpers internos
@@ -127,7 +130,43 @@ export default function TablaPrioridades({
     [columnsWithEstado]
   );
 
-  // 8) Acciones por fila
+  // 8) Hook para "Ver en mapa" con selección múltiple
+  const mapaSeleccion = useMapaSeleccion({
+    rows,
+    selectedIds,
+    getLoteData: (prioridad, lotesIdx) => {
+      // Obtener datos del lote desde la prioridad
+      const loteId = prioridad.loteId || prioridad.lotId || prioridad.lote?.id;
+      if (!loteId) return null;
+      
+      const lote = prioridad.lote || (lotesIdx ? lotesIdx[String(loteId)] : null);
+      const mapId = lote?.mapId;
+      
+      if (!mapId) return null;
+      
+      return { loteId, mapId };
+    },
+    getMetadata: (prioridad, loteData) => {
+      // Metadata específica de prioridades para mostrar en el mapa
+      return {
+        type: 'prioridad',
+        prioridadId: prioridad.id,
+        numero: prioridad.numero,
+        estado: prioridad.estado,
+        inmobiliaria: prioridad.inmobiliaria?.nombre || prioridad.ownerType === 'CCLF' ? 'La Federala' : '—',
+        fechaInicio: prioridad.fechaInicio,
+        fechaFin: prioridad.fechaFin,
+        ownerType: prioridad.ownerType,
+      };
+    },
+    lotesIndex: idxLotes,
+    source: 'prioridades'
+  });
+
+  // Preparar datos para el mapa en preview
+  const { variantByMapId, estadoByMapId, labelByMapId, allActiveMapIds } = usePrepareMapaData(lotes);
+
+  // 9) Acciones por fila
   const renderRowActions = (row) => {
     const estado = String(row?.estado ?? "").toUpperCase();
     const isActiva = estado === "ACTIVA";
@@ -185,9 +224,22 @@ export default function TablaPrioridades({
     );
   };
 
-  // 9) Toolbar derecha
+  // 10) Toolbar derecha con botón "Ver en mapa"
   const toolbarRight = (
     <div className="tl-actions-right">
+      <button
+        type="button"
+        className="tl-btn tl-btn--soft"
+        disabled={mapaSeleccion.selectedCount === 0}
+        onClick={mapaSeleccion.openPreview}
+        title="Ver lotes seleccionados en el mapa"
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+          <Map size={16} />
+          <span>Ver en mapa ({mapaSeleccion.selectedCount})</span>
+        </span>
+      </button>
+
       <button
         type="button"
         className="tl-btn tl-btn--soft"
@@ -211,20 +263,34 @@ export default function TablaPrioridades({
   );
 
   return (
-    <div className="tabla-prioridades">
-      <TablaBase
-        rows={rows}
-        rowKey="id"
-        columns={columnsAligned}
-        widthFor={tablePreset.widthFor}
-        defaultVisibleIds={defaultVisibleIds}
-        maxVisible={6} // numero, lote, estado, owner, fechaInicio, fechaFin (createdAt opcional)
-        renderRowActions={renderRowActions}
-        toolbarRight={toolbarRight}
-        defaultPageSize={25}
-        selected={selectedIds}
-        onSelectedChange={onSelectedChange}
+    <>
+      {/* Modal de vista previa del mapa */}
+      <MapaPreviewModal
+        open={mapaSeleccion.previewOpen}
+        onClose={mapaSeleccion.closePreview}
+        onVerMapaCompleto={mapaSeleccion.goToMapaCompleto}
+        selectedMapIds={mapaSeleccion.previewMapIds}
+        variantByMapId={variantByMapId}
+        activeMapIds={allActiveMapIds}
+        labelByMapId={labelByMapId}
+        estadoByMapId={estadoByMapId}
       />
-    </div>
+
+      <div className="tabla-prioridades">
+        <TablaBase
+          rows={rows}
+          rowKey="id"
+          columns={columnsAligned}
+          widthFor={tablePreset.widthFor}
+          defaultVisibleIds={defaultVisibleIds}
+          maxVisible={6} // numero, lote, estado, owner, fechaInicio, fechaFin (createdAt opcional)
+          renderRowActions={renderRowActions}
+          toolbarRight={toolbarRight}
+          defaultPageSize={25}
+          selected={selectedIds}
+          onSelectedChange={onSelectedChange}
+        />
+      </div>
+    </>
   );
 }

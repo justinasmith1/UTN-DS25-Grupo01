@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import { Container } from "react-bootstrap";
-import { useOutletContext, useSearchParams, useNavigate } from "react-router-dom";
+import { useOutletContext, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
@@ -27,23 +27,40 @@ export default function Map() {
     .trim()
     .toUpperCase();
 
-  // Leer parámetros de URL para mapId/mapIds/selectedMapIds
+  // Leer parámetros de URL y location.state para metadata
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
   const mapIdParam = searchParams.get("mapId");
   const mapIdsParam = searchParams.get("mapIds");
   const selectedMapIdsParam = searchParams.get("selectedMapIds");
   const navigate = useNavigate();
 
+  // Leer metadata desde location.state (nuevo formato del hook)
+  const mapHighlight = location.state?.mapHighlight || null;
+
   // Estado local de filtros (misma idea que en el dashboard)
   const [params, setParams] = useState({});
   
   // Estado para lotes resaltados desde la preview (se puede limpiar)
-  // Inicializar desde la URL si existe
+  // Inicializar desde la URL o desde location.state
   const [highlightedFromPreview, setHighlightedFromPreview] = useState(() => {
+    // Prioridad: location.state > query params
+    if (mapHighlight?.loteIds?.length > 0) {
+      return mapHighlight.loteIds;
+    }
     if (selectedMapIdsParam) {
       return selectedMapIdsParam.split(',').filter(Boolean);
     }
     return [];
+  });
+
+  // Estado para metadata de prioridades/reservas/ventas
+  const [highlightMetadata, setHighlightMetadata] = useState(() => {
+    return mapHighlight?.metaByLoteId || {};
+  });
+
+  const [highlightSource, setHighlightSource] = useState(() => {
+    return mapHighlight?.source || null;
   });
   
   // Track si es la primera llamada (inicialización) para no limpiar el resaltado
@@ -171,12 +188,21 @@ export default function Map() {
     return [];
   }, [mapIdParam, mapIdsParam]);
 
-  // Sincronizar highlightedFromPreview con el parámetro de URL al cargar o cuando cambia
+  // Sincronizar con location.state cuando cambie
   useEffect(() => {
-    if (selectedMapIdsParam) {
+    if (mapHighlight) {
+      if (mapHighlight.loteIds?.length > 0) {
+        setHighlightedFromPreview(mapHighlight.loteIds);
+        setHighlightMetadata(mapHighlight.metaByLoteId || {});
+        setHighlightSource(mapHighlight.source || null);
+        
+        // Limpiar el state para que no persista en la navegación
+        window.history.replaceState({}, document.title);
+      }
+    } else if (selectedMapIdsParam) {
+      // Fallback: si viene por query params (viejo formato)
       const ids = selectedMapIdsParam.split(',').filter(Boolean);
       setHighlightedFromPreview((prev) => {
-        // Solo actualizar si es diferente al estado actual para evitar loops
         const currentIds = prev.join(',');
         const newIds = ids.join(',');
         if (currentIds !== newIds) {
@@ -185,8 +211,7 @@ export default function Map() {
         return prev;
       });
     }
-    // No limpiar automáticamente - solo se limpia manualmente o al cambiar filtros
-  }, [selectedMapIdsParam]);
+  }, [mapHighlight, selectedMapIdsParam]);
 
   // Obtener el mapId del lote seleccionado (para destacarlo en el mapa)
   // Prioriza highlightedFromPreview si viene de la preview, sino mapIdsFromUrl, sino selectedLotId del panel
@@ -207,6 +232,8 @@ export default function Map() {
   // Función para limpiar manualmente el resaltado
   const handleClearHighlight = useCallback(() => {
     setHighlightedFromPreview([]);
+    setHighlightMetadata({});
+    setHighlightSource(null);
     const newParams = new URLSearchParams(searchParams);
     newParams.delete('selectedMapIds');
     setSearchParams(newParams, { replace: true });
