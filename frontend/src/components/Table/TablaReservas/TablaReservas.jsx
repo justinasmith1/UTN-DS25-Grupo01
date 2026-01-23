@@ -14,8 +14,9 @@ import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
 import { Eye, Edit, Trash2, FileText, RefreshCcw, Map } from 'lucide-react';
-import { canEditByEstadoOperativo, isEliminado, canDeleteReserva, getReservaDeleteTooltip } from '../../../utils/estadoOperativo';
+import { canEditByEstadoOperativo, isEliminado, canDeleteReserva, getReservaDeleteTooltip, canSelectForMap } from '../../../utils/estadoOperativo';
 import { useMapaSeleccion } from '../../../hooks/useMapaSeleccion';
+import { useMapaVistaControl } from '../../../hooks/useMapaVistaControl';
 import MapaPreviewModal from '../../Mapa/MapaPreviewModal';
 import { usePrepareMapaData } from '../../../utils/mapaDataHelper';
 
@@ -110,6 +111,9 @@ export default function TablaReservas({
 
   // selección
   selectedIds = [], onSelectedChange,
+
+  // filtro de vista (para deshabilitar selección en vista Eliminadas)
+  estadoOperativoFilter,
 
   roleOverride,
 }) {
@@ -248,6 +252,14 @@ export default function TablaReservas({
     source: 'reservas'
   });
 
+  // Hook para controlar selección y "Ver en mapa" según vista (Operativas/Eliminadas)
+  const mapaControl = useMapaVistaControl({
+    rows,
+    selectedIds,
+    onSelectedChange,
+    estadoOperativoFilter
+  });
+
   // Preparar datos para el mapa en preview
   const { variantByMapId, estadoByMapId, labelByMapId, allActiveMapIds } = usePrepareMapaData(lotes);
 
@@ -314,13 +326,14 @@ export default function TablaReservas({
       <button
         type="button"
         className="tl-btn tl-btn--soft"
-        title="Ver en mapa"
-        disabled={mapaSeleccion.selectedCount === 0}
+        disabled={mapaControl.isVerEnMapaDisabled}
         onClick={mapaSeleccion.openPreview}
+        title={mapaControl.isVerEnMapaDisabled ? mapaControl.disabledTooltip : "Ver lotes seleccionados en el mapa"}
+        data-tooltip={mapaControl.isVerEnMapaDisabled ? mapaControl.disabledTooltip : undefined}
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
           <Map size={16} />
-          <span>Ver en mapa ({mapaSeleccion.selectedCount})</span>
+          <span>Ver en mapa ({mapaControl.selectedOperativasCount})</span>
         </span>
       </button>
 
@@ -373,6 +386,9 @@ export default function TablaReservas({
           defaultPageSize={25}
           selected={selectedIds}
           onSelectedChange={onSelectedChange}
+          isSelectionDisabled={mapaControl.isVistaEliminadas}
+          isRowSelectable={(row) => canSelectForMap(row)}
+          disabledSelectionTooltip={mapaControl.disabledTooltip}
         />
       </div>
     </>

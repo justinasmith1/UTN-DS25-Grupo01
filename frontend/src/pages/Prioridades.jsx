@@ -381,6 +381,7 @@ export default function Prioridades() {
         onAgregarPrioridad={canPrioridadCreate ? onAgregarPrioridad : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+        estadoOperativoFilter={params.estadoOperativo}
       />
 
       {/* Modales */}

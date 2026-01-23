@@ -625,6 +625,7 @@ export default function Reservas() {
         onAgregarReserva={can(user, PERMISSIONS.RES_CREATE) ? onAgregarReserva : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+        estadoOperativoFilter={params.estadoOperativo}
       />
 
       {/* Modales */}

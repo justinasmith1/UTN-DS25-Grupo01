@@ -1,10 +1,11 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText, RotateCcw, Map } from 'lucide-react';
-import { canEditByEstadoOperativo, isEliminado, canDeleteVenta, getVentaDeleteTooltip } from '../../../utils/estadoOperativo';
+import { Eye, Edit, Trash2, FileText, RotateCcw, Map as MapIcon } from 'lucide-react';
+import { canEditByEstadoOperativo, isEliminado, canDeleteVenta, getVentaDeleteTooltip, canSelectForMap } from '../../../utils/estadoOperativo';
 import { useMapaSeleccion } from '../../../hooks/useMapaSeleccion';
+import { useMapaVistaControl } from '../../../hooks/useMapaVistaControl';
 import MapaPreviewModal from '../../Mapa/MapaPreviewModal';
 import { usePrepareMapaData } from '../../../utils/mapaDataHelper';
 
@@ -35,6 +36,8 @@ export default function TablaVentas({
   onSelectedChange,
   roleOverride,
   userKey,
+  // filtro de vista (para deshabilitar selección en vista Eliminadas)
+  estadoOperativoFilter,
 }) {
   // Normalizamos la fuente de datos
   // CAMBIO: priorizamos "rows" si es un array (incluso si length === 0)
@@ -314,6 +317,14 @@ export default function TablaVentas({
     source: 'ventas'
   });
 
+  // Hook para controlar selección y "Ver en mapa" según vista (Operativas/Eliminadas)
+  const mapaControl = useMapaVistaControl({
+    rows: source,
+    selectedIds,
+    onSelectedChange,
+    estadoOperativoFilter
+  });
+
   // Preparar datos para el mapa en preview
   const { variantByMapId, estadoByMapId, labelByMapId, allActiveMapIds } = usePrepareMapaData(lotes);
 
@@ -322,12 +333,14 @@ export default function TablaVentas({
       <button
         type="button"
         className="tl-btn tl-btn--soft"
-        disabled={mapaSeleccion.selectedCount === 0}
+        disabled={mapaControl.isVerEnMapaDisabled}
         onClick={mapaSeleccion.openPreview}
+        title={mapaControl.isVerEnMapaDisabled ? mapaControl.disabledTooltip : "Ver lotes seleccionados en el mapa"}
+        data-tooltip={mapaControl.isVerEnMapaDisabled ? mapaControl.disabledTooltip : undefined}
       >
         <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-          <Map size={16} />
-          <span>Ver en mapa ({mapaSeleccion.selectedCount})</span>
+          <MapIcon size={16} />
+          <span>Ver en mapa ({mapaControl.selectedOperativasCount})</span>
         </span>
       </button>
       <button
@@ -377,6 +390,9 @@ export default function TablaVentas({
           defaultPageSize={25}
           selected={selectedIds}
           onSelectedChange={onSelectedChange}
+          isSelectionDisabled={mapaControl.isVistaEliminadas}
+          isRowSelectable={(row) => canSelectForMap(row)}
+          disabledSelectionTooltip={mapaControl.disabledTooltip}
           visibleIds={colIds}
           onVisibleIdsChange={setColIds}
         />

@@ -612,6 +612,7 @@ export default function VentasPage() {
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+        estadoOperativoFilter={filters.estadoOperativo}
       />
 
       {/* Modales */}

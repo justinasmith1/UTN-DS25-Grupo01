@@ -70,6 +70,16 @@ export function canEditByEstadoOperativo(entity) {
 }
 
 /**
+ * Determina si una entidad puede ser seleccionada para "Ver en mapa"
+ * Solo se pueden seleccionar entidades OPERATIVAS
+ * @param {Object} entity - La entidad a verificar
+ * @returns {boolean}
+ */
+export function canSelectForMap(entity) {
+  return isOperativo(entity);
+}
+
+/**
  * Verifica si una reserva puede eliminarse lógicamente según su estado comercial
  * Solo se pueden eliminar reservas en estado: CANCELADA, EXPIRADA, RECHAZADA
  * @param {Object} reserva - Reserva con campo estado
