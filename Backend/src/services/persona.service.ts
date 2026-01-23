@@ -1275,6 +1275,24 @@ export async function crearMiembroFamiliar(
 
 // Eliminar miembro familiar
 export async function eliminarMiembroFamiliar(titularId: number, miembroId: number) {
+  // Validar titular (para verificar estadoOperativo)
+  const titular = await prisma.persona.findUnique({
+    where: { id: titularId },
+  });
+
+  if (!titular) {
+    const error = new Error('Titular no encontrado') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Bloquear mutaciones si titular está eliminado
+  if (titular.estadoOperativo === 'ELIMINADO') {
+    const error = new Error('No se puede modificar el grupo familiar de un titular eliminado') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
   // Validar miembro
   const miembro = await prisma.persona.findUnique({
     where: { id: miembroId },
