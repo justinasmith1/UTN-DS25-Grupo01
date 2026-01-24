@@ -17,17 +17,7 @@ export default function ReservaEliminarDialog({
     return joined || null;
   })();
 
-  const loteInfo = (() => {
-    const mapId = reserva?.lote?.mapId ??  null;
-    if (mapId) {
-      // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
-      if (String(mapId).toLowerCase().startsWith('lote')) {
-        return mapId;
-      }
-      return `Lote N° ${mapId}`;
-    }
-    return reserva?.loteId ? `Lote N° ${reserva.lote.mapId}` : null;
-  })();
+  const loteInfo = `Lote: ${reserva?.lote?.fraccion?.numero ?? '—'} - ${reserva?.lote?.numero ?? '—'}`;
 
   const title = `Eliminar Reserva N° ${reserva?.numero ?? "—"}`;
 

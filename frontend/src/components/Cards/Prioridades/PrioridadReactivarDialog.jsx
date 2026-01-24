@@ -15,7 +15,7 @@ export default function PrioridadReactivarDialog({
   const message = `¿Seguro que deseas reactivar la prioridad N° ${numero}? Pasará a estado OPERATIVO y volverá a aparecer en la lista activa.`;
 
   const details = [
-    `Lote: ${prioridad?.lote?.mapId || prioridad?.lote?.numero || prioridad?.loteId || "—"}`,
+    `Lote: ${prioridad?.lote?.fraccion?.numero} - ${prioridad?.lote?.numero}`,
     `Estado: ${prioridad?.estado || "—"}`,
     prioridad?.inmobiliaria?.nombre 
       ? `Inmobiliaria: ${prioridad.inmobiliaria.nombre}` 

@@ -67,9 +67,7 @@ export async function getAllReservas(
           inmobiliaria: {
             select: { id: true, nombre: true }, // nombre visible
           },
-          lote: {
-            select: { id: true, precio: true, mapId: true }, // id y precio
-          },
+      lote: { select: { id: true, precio: true, mapId: true, numero: true, fraccion: { select: { numero: true } } } },
         },
   });
   return { reservas, total: reservas.length };
@@ -89,9 +87,7 @@ export async function getReservaById(id: number, user?: { role: string; inmobili
       inmobiliaria: {
         select: { id: true, nombre: true },
       },
-      lote: {
-        select: { id: true, precio: true, mapId: true },
-      },
+      lote: { select: { id: true, precio: true, mapId: true, numero: true, fraccion: { select: { numero: true } } } },
     },
   });
   if (!row) {
@@ -224,7 +220,7 @@ export async function createReserva(
       err.status = 404;
       throw err;
     }
-    if (clienteExists.estado !== EstadoPersona.OPERATIVO) {
+    if (clienteExists.estadoOperativo !== EstadoOperativo.OPERATIVO) {
       const err: any = new Error('No se puede crear una reserva con un cliente inactivo');
       err.status = 400;
       throw err;
@@ -408,9 +404,7 @@ export async function updateReserva(
         inmobiliaria: {
           select: { id: true, nombre: true },
         },
-        lote: {
-          select: { id: true, precio: true },
-        },
+        lote: { select: { id: true, precio: true, mapId: true, numero: true, fraccion: { select: { numero: true } } } },
       },
     });
 
@@ -480,7 +474,15 @@ export async function eliminarReserva(
           select: { id: true, nombre: true },
         },
         lote: {
-          select: { id: true, precio: true, mapId: true },
+          select: { 
+            id: true, 
+            precio: true, 
+            mapId: true,
+            numero: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
         },
       },
     });
@@ -531,7 +533,15 @@ export async function eliminarReserva(
           select: { id: true, nombre: true },
         },
         lote: {
-          select: { id: true, precio: true, mapId: true },
+          select: { 
+            id: true, 
+            precio: true, 
+            mapId: true,
+            numero: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
         },
       },
     });
@@ -563,7 +573,15 @@ export async function reactivarReserva(
           select: { id: true, nombre: true },
         },
         lote: {
-          select: { id: true, precio: true, mapId: true },
+          select: { 
+            id: true, 
+            precio: true, 
+            mapId: true,
+            numero: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
         },
       },
     });
@@ -604,7 +622,15 @@ export async function reactivarReserva(
           select: { id: true, nombre: true },
         },
         lote: {
-          select: { id: true, precio: true, mapId: true },
+          select: { 
+            id: true, 
+            precio: true, 
+            mapId: true,
+            numero: true,
+            fraccion: {
+              select: { numero: true }
+            }
+          },
         },
       },
     });

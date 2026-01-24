@@ -27,7 +27,7 @@ export async function getAllVentas(
 
     const ventas = await prisma.venta.findMany({
         where: whereClause,
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true }, 
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true }, 
         orderBy: { id: 'asc' }, // Ordenar por idVenta de forma ascendente
     });
 
@@ -37,7 +37,7 @@ export async function getAllVentas(
 export async function getVentaById(id: number): Promise<Venta> {
     const venta = await prisma.venta.findUnique({
         where: { id },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 
     if (!venta) {
@@ -65,7 +65,7 @@ export async function getVentasByInmobiliaria(
 
     const ventas = await prisma.venta.findMany({
         where: whereClause,
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
         orderBy: { fechaVenta: 'desc' },
     });
     if (ventas.length === 0) {
@@ -215,11 +215,7 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
         const updatedVenta = await prisma.venta.update({
             where: { id }, 
             data: updateData,
-            include: { 
-                comprador: true, 
-                lote: { include: { propietario: true } }, 
-                inmobiliaria: true 
-            }, // Incluir todas las relaciones como en getVentaById
+            include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
         });
 
         // Side effect: si la venta se cancela, restaurar el lote a DISPONIBLE (siempre)
@@ -298,7 +294,7 @@ export async function eliminarVenta(
         data: {
             estadoOperativo: 'ELIMINADO',
         },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 }
 
@@ -338,7 +334,7 @@ export async function reactivarVenta(
         data: {
             estadoOperativo: 'OPERATIVO',
         },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 }
 

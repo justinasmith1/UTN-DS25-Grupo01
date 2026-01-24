@@ -20,9 +20,11 @@ export default function VentaEliminarDialog({
   // Mensaje tipo pregunta
   const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero ?? "—"}?`;
 
+  const loteInfo = `Lote: ${venta?.lote?.fraccion?.numero ?? '—'} - ${venta?.lote?.numero ?? '—'}`;
+
   // Detalles listados con bullets
   const details = [
-    venta?.lote?.mapId ? `Lote N°: ${venta.lote.mapId}` : null,
+    loteInfo,
     comprador ? `Comprador: ${comprador}` : null,
   ].filter(Boolean);
 
