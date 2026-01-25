@@ -125,9 +125,8 @@ export default function FilterBarReservas({
       },
     };
     // Para INMOBILIARIA: no incluir inmobiliarias en optionFormatter
-    if (userRole !== 'INMOBILIARIA') {
-      return { ...base, inmobiliarias: nice };
-    }
+    // FIX: Para resto de roles, tampoco usar 'nice' en inmobiliarias, 
+    // porque 'nice' usa el value (ID) y pisa el label (Nombre)
     return base;
   }, [userRole]);
 

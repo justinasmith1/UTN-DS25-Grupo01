@@ -234,7 +234,7 @@ export default function Reservas() {
           // ADMIN / GESTOR: cargar todo
           const [reservasResp, inmosResp, lotesResp] = await Promise.all([
             getAllReservas(queryParams),
-            getAllInmobiliarias({}),
+            getAllInmobiliarias({ pageSize: 1000 }),
             getAllLotes({}),
           ]);
           
