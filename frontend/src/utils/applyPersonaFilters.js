@@ -1,5 +1,6 @@
 // ===================
 // Lógica de filtrado para Personas (client-side)
+// Igual que Inmobiliarias: filtrado 100% frontend
 // ===================
 
 /**
@@ -11,13 +12,14 @@ export const applyPersonaFilters = (personas, filters = {}) => {
     return [];
   }
 
-  return personas.filter(persona => {
-    // Filtro por estado
-    if (filters.estado) {
-      if (persona.estado !== filters.estado) {
-        return false;
-      }
-    }
+  let rows = [...personas];
+
+  // Filtro de visibilidad (estadoOperativo) - igual que Inmobiliarias
+  // Si visibilidad está definida, usarla; si no, default OPERATIVO
+  const visibilidadFilter = filters.visibilidad ?? 'OPERATIVO';
+  rows = rows.filter((persona) => (persona.estado || 'OPERATIVO') === visibilidadFilter);
+
+  return rows.filter(persona => {
 
     // Filtro por "cliente de" (puede elegir mas de una)
     if (filters.clienteDe && Array.isArray(filters.clienteDe) && filters.clienteDe.length > 0) {

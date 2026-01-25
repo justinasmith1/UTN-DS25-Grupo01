@@ -92,13 +92,20 @@ export const applyReservaFilters = (reservas, params = {}) => {
     });
   }
 
+  // 0) Visibilidad (estadoOperativo) - se filtra en backend, pero por si acaso aplicamos también en frontend
+  const visibilidad = params.estadoOperativo ?? params.visibilidad ?? "OPERATIVO";
+  if (visibilidad) {
+    filtered = filtered.filter((r) => {
+      const estadoOp = String(r?.estadoOperativo ?? "OPERATIVO").toUpperCase();
+      return estadoOp === visibilidad.toUpperCase();
+    });
+  }
+
   // 2) Estado (multi) — comparamos en mayúsculas para evitar mismatches
+  // NOTA: estado es el estado de negocio (ACTIVA, CANCELADA, etc.), NO estadoOperativo
   const estados = normArr(params.estado).map(upper);
   if (estados.length) {
     filtered = filtered.filter((r) => estados.includes(upper(r?.estado)));
-  } else {
-    // Por defecto ocultar ELIMINADO
-    filtered = filtered.filter((r) => upper(r?.estado) !== 'ELIMINADO');
   }
 
   // 3) Inmobiliaria (multi)

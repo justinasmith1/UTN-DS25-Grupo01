@@ -27,18 +27,30 @@ export const getEstadoFromLote = (lote) => lote?.status || lote?.estado || "";
  * VENDIDO tiene un color amarillo brillante especial, diferente de EN PROMOCION
  */
 export const getColorForVariant = (variant, estadoKey = null) => {
-  // VENDIDO tiene un color amarillo brillante especial, diferente de EN PROMOCION
+  // VENDIDO tiene un color amarillo brillante especial
   if (estadoKey && String(estadoKey).toUpperCase() === "VENDIDO") {
-    return "#FBBF24"; // Amarillo brillante (más claro que EN PROMOCION)
+    return "#FBBF24"; // Amarillo brillante
+  }
+
+  // EN_PROMOCION tiene color naranja/ámbar
+  if (estadoKey && String(estadoKey).toUpperCase() === "EN_PROMOCION") {
+    return "#EA580C"; // Naranja/ámbar
+  }
+
+  // CON_PRIORIDAD tiene color violeta/índigo
+  if (estadoKey && String(estadoKey).toUpperCase() === "CON_PRIORIDAD") {
+    return "#7C3AED"; // Violeta/índigo
   }
 
   const colors = {
     success: "#18794E", // color del texto en .tl-badge--success
-    warn: "#9A5C00", // color del texto en .tl-badge--warn (EN PROMOCION)
+    warn: "#FBBF24", // color del texto en .tl-badge--warn (VENDIDO - amarillo)
     info: "#2952CC", // color del texto en .tl-badge--info
     indigo: "#5B6BFF", // color del texto en .tl-badge--indigo
     danger: "#C23B3B", // color del texto en .tl-badge--danger
     muted: "#475467", // color del texto en .tl-badge--muted
+    orange: "#EA580C", // color del texto en .tl-badge--orange (EN_PROMOCION)
+    violet: "#7C3AED", // color del texto en .tl-badge--violet (CON_PRIORIDAD)
   };
   return colors[variant] || colors.muted;
 };
@@ -52,13 +64,25 @@ export const getBorderColorForVariant = (variant, estadoKey = null) => {
     return "#D97706"; // Amarillo/naranja oscuro para borde de VENDIDO
   }
 
+  // EN_PROMOCION tiene borde naranja oscuro
+  if (estadoKey && String(estadoKey).toUpperCase() === "EN_PROMOCION") {
+    return "#C2410C"; // Naranja oscuro para borde de EN_PROMOCION
+  }
+
+  // CON_PRIORIDAD tiene borde violeta oscuro
+  if (estadoKey && String(estadoKey).toUpperCase() === "CON_PRIORIDAD") {
+    return "#6D28D9"; // Violeta oscuro para borde de CON_PRIORIDAD
+  }
+
   const colors = {
     success: "#11633E", // versión más oscura de #18794E
-    warn: "#7A4B00", // versión más oscura de #9A5C00 (EN PROMOCION)
+    warn: "#D97706", // versión más oscura de #FBBF24 (VENDIDO)
     info: "#1E3A8A", // versión más oscura de #2952CC
     indigo: "#4338CA", // versión más oscura de #5B6BFF
     danger: "#991B1B", // versión más oscura de #C23B3B
     muted: "#334155", // versión más oscura de #475467
+    orange: "#C2410C", // versión más oscura de #EA580C (EN_PROMOCION)
+    violet: "#6D28D9", // versión más oscura de #7C3AED (CON_PRIORIDAD)
   };
   return colors[variant] || colors.muted;
 };

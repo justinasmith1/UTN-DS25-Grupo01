@@ -15,6 +15,10 @@ export function chipsFrom(applied, D, isInmo) {
     .forEach((v) => arr.push({ k: "estado", v, label: nice(v) }));
 
   (applied.subestado || []).forEach((v) => arr.push({ k: "subestado", v, label: nice(v) }));
+  if (applied.ocupacion) {
+    const ocupacionLabel = applied.ocupacion === 'ALQUILADO' ? 'Alquilado' : applied.ocupacion === 'NO_ALQUILADO' ? 'No alquilado' : nice(applied.ocupacion);
+    arr.push({ k: "ocupacion", v: applied.ocupacion, label: `Ocupación: ${ocupacionLabel}` });
+  }
   (applied.calle || []).forEach((v) => arr.push({ k: "calle", v, label: nice(v) }));
   (applied.fraccion || []).forEach((v) => arr.push({ k: "fraccion", v, label: `Fracción ${v}` }));
 

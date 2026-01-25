@@ -1,5 +1,5 @@
 import prisma from '../config/prisma';
-import type { Persona as PrismaPersona, IdentificadorTipo, EstadoPersona, PersonaCategoria } from "../generated/prisma";
+import type { Persona as PrismaPersona, IdentificadorTipo, PersonaCategoria } from "../generated/prisma";
 import type { Identificador, Persona, DeletePersonaResponse, GetPersonaRequest, GetPersonasResponse, PutPersonaResponse, PostPersonaRequest, PostPersonaResponse } from '../types/interfacesCCLF';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
@@ -28,18 +28,17 @@ export interface UpdatePersonaDto {
   telefono?: number;
   email?: string;
   jefeDeFamiliaId?: number;
-  estado?: EstadoPersona;
+  estadoOperativo?: 'OPERATIVO' | 'ELIMINADO';
   inmobiliariaId?: number | null;
 }
 
 // Tipo local para incluir relaciones y conteos
 type PersonaWithRelations = PrismaPersona & {
-  _count?: { lotesPropios?: number; lotesAlquilados?: number; Reserva?: number; Venta?: number };
+  _count?: { lotesPropios?: number; lotesAlquilados?: number; alquileres?: number; Reserva?: number; Venta?: number };
   jefeDeFamilia?: Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'> | null;
   miembrosFamilia?: Array<Pick<PrismaPersona, 'id' | 'nombre' | 'apellido' | 'identificadorValor'>>;
   inmobiliaria?: { id: number; nombre: string } | null;
   lotesPropios?: Array<{ id: number; numero: number | null; mapId: string | null; fraccion: { numero: number } }>;
-  lotesAlquilados?: Array<{ id: number; numero: number | null; mapId: string | null; fraccion: { numero: number }; estado: string }>;
   Reserva?: Array<{ id: number; numero: string; createdAt: Date; loteId: number }>;
   Venta?: Array<{ id: number; numero: string }>;
 };
@@ -114,7 +113,10 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
   const telefono = telefonoOverride || parseTelefono(contacto);
 
   const esPropietario = (p._count?.lotesPropios ?? 0) > 0;
-  const esInquilino = (p._count?.lotesAlquilados ?? 0) > 0;
+  // Cambiar lógica: esInquilino se determina por alquileres ACTIVOS
+  // Los alquileres ya vienen filtrados por estado='ACTIVO' en el include, así que contar directamente
+  const alquileresActivosCount = ((p as any).alquileres || []).length;
+  const esInquilino = alquileresActivosCount > 0;
 
   const jefeDeFamilia = p.jefeDeFamilia
     ? {
@@ -145,7 +147,7 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     email: email,
     telefono: telefono,
     contacto: p.contacto || '',
-    estado: p.estado || 'OPERATIVO',
+    estado: p.estadoOperativo || 'OPERATIVO',
     createdAt: p.createdAt,
     inmobiliariaId: p.inmobiliariaId || null,
     inmobiliaria: p.inmobiliaria || null,
@@ -157,9 +159,10 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
     _count: p._count ? {
       lotesPropios: p._count.lotesPropios ?? 0,
       lotesAlquilados: p._count.lotesAlquilados ?? 0,
+      alquileres: ((p as any).alquileres || []).length,
       Reserva: p._count.Reserva ?? 0,
       Venta: p._count.Venta ?? 0,
-    } : { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
+    } : { lotesPropios: 0, lotesAlquilados: 0, alquileres: 0, Reserva: 0, Venta: 0 },
     // Arrays mínimos para mini detalles (campos adicionales al tipo Persona)
     lotesPropios: (p.lotesPropios || []).map(l => ({
       id: l.id,
@@ -173,6 +176,13 @@ const toPersona = (p: PersonaWithRelations, telefonoOverride?: number, emailOver
       mapId: (l as any).mapId ?? null,
       fraccionNumero: l.fraccion?.numero ?? 0,
       estado: l.estado,
+    })),
+    alquileresActivos: ((p as any).alquileres || []).map((a: any) => ({
+      id: a.lote?.id,
+      numero: a.lote?.numero,
+      mapId: a.lote?.mapId ?? null,
+      fraccionNumero: a.lote?.fraccion?.numero ?? 0,
+      estado: 'ALQUILADO',
     })),
     reservas: (p.Reserva || []).map(r => ({
       id: r.id,
@@ -193,19 +203,19 @@ function buildWhereClause(
   user?: { role: string; inmobiliariaId?: number | null },
   q?: string,
   includeInactive?: boolean,
-  estado?: 'OPERATIVO' | 'ELIMINADO'
+  estadoOperativo?: 'OPERATIVO' | 'ELIMINADO'
 ) {
   const where: any = {};
 
   // Excluir MIEMBRO_FAMILIAR por defecto (solo mostrar personas operativas)
   (where as any).categoria = 'OPERATIVA';
 
-  // Filtro de estado (simple, igual que inmobiliarias)
-  if (estado) {
-    where.estado = estado;
+  // Filtro estadoOperativo: default OPERATIVO si no viene
+  if (estadoOperativo) {
+    where.estadoOperativo = estadoOperativo;
   } else if (!includeInactive) {
-    // Por defecto, solo activas si no se especifica estado
-    where.estado = 'OPERATIVO';
+    // Por defecto, solo operativas si no se especifica estadoOperativo
+    where.estadoOperativo = 'OPERATIVO';
   }
 
   // Filtro por view
@@ -215,18 +225,18 @@ function buildWhereClause(
       break;
 
     case 'INQUILINOS':
-      where.lotesAlquilados = {
+      where.alquileres = {
         some: {
-          estado: 'ALQUILADO',
+          estado: 'ACTIVO',
         },
       };
       break;
 
     case 'CLIENTES':
       where.lotesPropios = { none: {} };
-      where.lotesAlquilados = {
+      where.alquileres = {
         none: {
-          estado: 'ALQUILADO',
+          estado: 'ACTIVO',
         },
       };
       break;
@@ -234,9 +244,9 @@ function buildWhereClause(
     case 'MIS_CLIENTES':
       // CLIENTES + filtro por inmobiliariaId
       where.lotesPropios = { none: {} };
-      where.lotesAlquilados = {
+      where.alquileres = {
         none: {
-          estado: 'ALQUILADO',
+          estado: 'ACTIVO',
         },
       };
       if (user?.inmobiliariaId) {
@@ -279,14 +289,14 @@ export async function getAllPersonas(
     view?: PersonaView;
     q?: string;
     includeInactive?: boolean;
-    estado?: 'OPERATIVO' | 'ELIMINADO';
+    estadoOperativo?: 'OPERATIVO' | 'ELIMINADO';
     limit?: number;
   }
 ): Promise<GetPersonasResponse> {
   const view = query?.view || 'ALL';
   const q = query?.q;
   const includeInactive = query?.includeInactive === true;
-  const estado = query?.estado;
+  const estadoOperativo = query?.estadoOperativo;
   const limit = query?.limit || 100;
 
   // RBAC: INMOBILIARIA solo puede ver MIS_CLIENTES (forzar view, ignorar query)
@@ -301,7 +311,7 @@ export async function getAllPersonas(
     const effectiveView = 'MIS_CLIENTES';
     // includeInactive solo para ADMIN/GESTOR
     const effectiveIncludeInactive = false;
-    // INMOBILIARIA no puede filtrar por estado específico, solo ve activas
+    // INMOBILIARIA no puede filtrar por estadoOperativo específico, solo ve operativas
     const where = buildWhereClause(effectiveView, user, q, effectiveIncludeInactive);
 
     const personas = await prisma.persona.findMany({
@@ -310,7 +320,19 @@ export async function getAllPersonas(
       take: limit,
       include: {
         user: { select: { id: true, username: true, email: true, role: true, createdAt: true } },
-        _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
+        _count: { 
+          select: { 
+            lotesPropios: true, 
+            lotesAlquilados: true,
+            alquileres: true,
+            Reserva: true, 
+            Venta: true
+          } 
+        },
+        alquileres: {
+          where: { estado: 'ACTIVO' },
+          select: { id: true, estado: true },
+        },
         jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
         miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
         inmobiliaria: { select: { id: true, nombre: true } },
@@ -328,11 +350,11 @@ export async function getAllPersonas(
   const effectiveIncludeInactive = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
     ? includeInactive 
     : false;
-  // Solo ADMIN/GESTOR pueden filtrar por estado específico
-  const effectiveEstado = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
-    ? estado 
+  // Solo ADMIN/GESTOR pueden filtrar por estadoOperativo específico
+  const effectiveEstadoOperativo = (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') 
+    ? estadoOperativo 
     : undefined;
-  const where = buildWhereClause(view, user, q, effectiveIncludeInactive, effectiveEstado);
+  const where = buildWhereClause(view, user, q, effectiveIncludeInactive, effectiveEstadoOperativo);
 
   const personas = await prisma.persona.findMany({
     where,
@@ -340,7 +362,32 @@ export async function getAllPersonas(
     take: limit,
     include: {
       user: { select: { id: true, username: true, email: true, role: true } },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
+      _count: { 
+        select: { 
+          lotesPropios: true, 
+          lotesAlquilados: true,
+          alquileres: true,
+          Reserva: true, 
+          Venta: true 
+        } 
+      },
+      // Incluir alquileres activos para obtener los lotes alquilados actuales
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+          lote: {
+            select: {
+              id: true,
+              numero: true,
+              mapId: true,
+              fraccion: { select: { numero: true } }
+            }
+          }
+        },
+        take: 10,
+      },
       jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       inmobiliaria: { select: { id: true, nombre: true } },
@@ -362,7 +409,32 @@ export async function getPersonaById(
     where: { id },
     include: {
       user: { select: { id: true, username: true, email: true, role: true } },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true, Reserva: true, Venta: true } },
+      _count: { 
+        select: { 
+          lotesPropios: true, 
+          lotesAlquilados: true, 
+          Reserva: true, 
+          Venta: true,
+          alquileres: true
+        } 
+      },
+      // Incluir alquileres activos para obtener los lotes alquilados actuales
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+          lote: {
+            select: {
+              id: true,
+              numero: true,
+              mapId: true,
+              fraccion: { select: { numero: true } }
+            }
+          }
+        },
+        take: 10,
+      },
       jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       inmobiliaria: { select: { id: true, nombre: true } },
@@ -373,7 +445,24 @@ export async function getPersonaById(
       },
       lotesAlquilados: {
         select: { id: true, numero: true, mapId: true, estado: true, fraccion: { select: { numero: true } } },
-        where: { estado: 'ALQUILADO' }, // Solo inquilinos vigentes
+        where: { estado: 'ALQUILADO' },
+        take: 10,
+      },
+      // Incluir alquileres activos para obtener los lotes alquilados actuales
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+          lote: {
+            select: {
+              id: true,
+              numero: true,
+              mapId: true,
+              fraccion: { select: { numero: true } }
+            }
+          }
+        },
         take: 10,
       },
       Reserva: {
@@ -396,7 +485,7 @@ export async function getPersonaById(
   }
 
   // Soft delete: solo ADMIN/GESTOR pueden ver personas ELIMINADAS
-  if (persona.estado === 'ELIMINADO') {
+  if (persona.estadoOperativo === 'ELIMINADO') {
     if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
       const error = new Error('Persona no encontrada') as any;
       error.statusCode = 404; // 404 para no revelar existencia
@@ -470,7 +559,7 @@ export async function createPersona(
     razonSocial: req.razonSocial?.trim(),
     contacto: formatContacto(req.email, req.telefono),
     updateAt: new Date(),
-    estado: 'OPERATIVO',
+    estadoOperativo: 'OPERATIVO',
   };
 
   // Incluir inmobiliariaId solo si está definido (puede ser null para "La Federala", ver dsp si esto camnbia a inm)
@@ -513,7 +602,19 @@ export async function createPersona(
     where: { id: created.id },
     include: {
       user: { select: { id: true, username: true, email: true, role: true } },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      _count: { 
+        select: { 
+          lotesPropios: true, 
+          alquileres: true 
+        } 
+      },
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+        },
+      },
       jefeDeFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       miembrosFamilia: { select: { id: true, nombre: true, apellido: true, identificadorValor: true } },
       inmobiliaria: { select: { id: true, nombre: true } },
@@ -533,6 +634,13 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
     if (!existingPersona) {
       const error = new Error('Persona no encontrada') as any;
       error.statusCode = 404;
+      throw error;
+    }
+
+    // Bloquear updates si está eliminado
+    if (existingPersona.estadoOperativo === 'ELIMINADO') {
+      const error = new Error('No se puede editar una persona eliminada') as any;
+      error.statusCode = 409;
       throw error;
     }
 
@@ -610,28 +718,19 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
       );
     }
 
-    // Estado solo para ADMIN/GESTOR (validar en controller si es necesario)
-    if (req.estado !== undefined) {
-      updateData.estado = req.estado;
-    }
-
     // inmobiliariaId solo para ADMIN/GESTOR (validar en controller si es necesario)
     if (req.inmobiliariaId !== undefined) {
       updateData.inmobiliariaId = req.inmobiliariaId;
     }
 
-    // Lógica de fechaBaja automática (igual que inmobiliarias)
-    let fechaBajaCalc: Date | null | undefined = undefined;
-    if (req.estado === 'ELIMINADO') {
-      fechaBajaCalc = new Date();
-    } else if (req.estado === 'OPERATIVO') {
-      fechaBajaCalc = null;
-    }
+    // IMPORTANTE: NO permitir cambios de estadoOperativo desde update
+    // Solo endpoints de desactivar/reactivar pueden cambiar estadoOperativo
+    // Ignorar cualquier campo estado/estadoOperativo que venga en req
 
     // Construir data final para Prisma
     const finalData: any = {
       ...updateData,
-      ...(fechaBajaCalc !== undefined ? { fechaBaja: fechaBajaCalc } : {}),
+      // NO incluir estadoOperativo ni fechaBaja - solo endpoints específicos pueden cambiarlos
     };
 
     const updated = await prisma.persona.update({
@@ -672,10 +771,19 @@ export async function updatePersona(idActual: number, req: UpdatePersonaDto): Pr
 }
 
 // Desactivar persona (soft delete)
-export async function desactivarPersona(id: number): Promise<DeletePersonaResponse> {
+export async function eliminarPersona(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<DeletePersonaResponse> {
   try {
     const existingPersona = await prisma.persona.findUnique({
       where: { id },
+      include: {
+        alquileres: {
+          where: { estado: 'ACTIVO' },
+          select: { id: true, loteId: true },
+        },
+      },
     });
 
     if (!existingPersona) {
@@ -684,16 +792,23 @@ export async function desactivarPersona(id: number): Promise<DeletePersonaRespon
       throw error;
     }
 
-    if (existingPersona.estado === 'ELIMINADO') {
-      const error = new Error('La persona ya está inactiva') as any;
-      error.statusCode = 400;
+    if (existingPersona.estadoOperativo === 'ELIMINADO') {
+      const error = new Error('La persona ya está eliminada.') as any;
+      error.statusCode = 409;
+      throw error;
+    }
+
+    // Validar: no se puede desactivar si tiene alquileres activos
+    if (existingPersona.alquileres && existingPersona.alquileres.length > 0) {
+      const error = new Error('No se puede desactivar: la persona es inquilino activo de un lote. Finaliza el alquiler antes.') as any;
+      error.statusCode = 409;
       throw error;
     }
 
     await prisma.persona.update({
       where: { id },
       data: {
-        estado: 'ELIMINADO',
+        estadoOperativo: 'ELIMINADO',
         fechaBaja: new Date(),
         updateAt: new Date(),
       },
@@ -712,8 +827,11 @@ export async function desactivarPersona(id: number): Promise<DeletePersonaRespon
   }
 }
 
-// Reactivar persona
-export async function reactivarPersona(id: number): Promise<PutPersonaResponse> {
+// Reactivar persona (estadoOperativo)
+export async function reactivarPersona(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<PutPersonaResponse> {
   try {
     const existingPersona = await prisma.persona.findUnique({
       where: { id },
@@ -725,16 +843,16 @@ export async function reactivarPersona(id: number): Promise<PutPersonaResponse> 
       throw error;
     }
 
-    if (existingPersona.estado === 'OPERATIVO') {
-      const error = new Error('La persona ya está activa') as any;
-      error.statusCode = 400;
+    if (existingPersona.estadoOperativo === 'OPERATIVO') {
+      const error = new Error('La persona ya está operativa.') as any;
+      error.statusCode = 409;
       throw error;
     }
 
     const updated = await prisma.persona.update({
       where: { id },
       data: {
-        estado: 'OPERATIVO',
+        estadoOperativo: 'OPERATIVO',
         fechaBaja: null,
         updateAt: new Date(),
       },
@@ -770,6 +888,7 @@ export async function deletePersonaDefinitivo(id: number): Promise<DeletePersona
           select: {
             lotesPropios: true,
             lotesAlquilados: true,
+            alquileres: true,
             Reserva: true,
             Venta: true,
           },
@@ -788,6 +907,7 @@ export async function deletePersonaDefinitivo(id: number): Promise<DeletePersona
     const tieneAsociaciones = 
       (counts.lotesPropios || 0) > 0 ||
       (counts.lotesAlquilados || 0) > 0 ||
+      (counts.alquileres || 0) > 0 ||
       (counts.Reserva || 0) > 0 ||
       (counts.Venta || 0) > 0;
 
@@ -816,9 +936,14 @@ export async function deletePersonaDefinitivo(id: number): Promise<DeletePersona
   }
 }
 
-// Mantener deletePersona por compatibilidad (ahora llama a desactivar)
+// Mantener deletePersona por compatibilidad (ahora llama a eliminar)
 export async function deletePersona(id: number): Promise<DeletePersonaResponse> {
-  return desactivarPersona(id);
+  return eliminarPersona(id);
+}
+
+// Mantener desactivarPersona por compatibilidad (ahora llama a eliminar)
+export async function desactivarPersona(id: number): Promise<DeletePersonaResponse> {
+  return eliminarPersona(id);
 }
 
 // Buscar persona por identificador (nuevo método)
@@ -879,7 +1004,7 @@ export async function getPersonaByCuil(cuil: string): Promise<Persona | null> {
     },
   });
 
-  // 2. Si no se encuentra, fallback al campo legacy cuil
+  // 2. Si no se encuentra, buscar por campo cuil
   if (!persona) {
     persona = await prisma.persona.findFirst({
       where: {
@@ -917,7 +1042,7 @@ export class PersonaService {
 
   async findAll(
     user?: { role: string; inmobiliariaId?: number | null },
-    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; estado?: 'OPERATIVO' | 'ELIMINADO'; limit?: number }
+    query?: { view?: PersonaView; q?: string; includeInactive?: boolean; estadoOperativo?: 'OPERATIVO' | 'ELIMINADO'; limit?: number }
   ) {
     const result = await getAllPersonas(user, query);
     return result;
@@ -982,7 +1107,19 @@ export async function getGrupoFamiliar(titularId: number) {
         where: { categoria: 'MIEMBRO_FAMILIAR' as any },
         select: { id: true, nombre: true, apellido: true, identificadorTipo: true, identificadorValor: true }
       },
-      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      _count: { 
+        select: { 
+          lotesPropios: true, 
+          alquileres: true 
+        } 
+      },
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+        },
+      },
     },
   });
 
@@ -1012,9 +1149,8 @@ export async function getGrupoFamiliar(titularId: number) {
     };
   }
 
-  // Validar que el titular sea aplicable (propietario o inquilino)
   const esPropietario = (persona._count?.lotesPropios ?? 0) > 0;
-  const esInquilino = (persona._count?.lotesAlquilados ?? 0) > 0;
+  const esInquilino = ((persona as any).alquileres || []).length > 0;
   
   if (!esPropietario && !esInquilino) {
     const error = new Error('Grupo familiar aplica solo a propietarios o inquilinos') as any;
@@ -1022,12 +1158,8 @@ export async function getGrupoFamiliar(titularId: number) {
     throw error;
   }
 
-  // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((persona as any).categoria !== 'OPERATIVA' || persona.estado !== 'OPERATIVO') {
-    const error = new Error('El titular debe ser una persona operativa y activa') as any;
-    error.statusCode = 400;
-    throw error;
-  }
+  // NOTA: Ya no bloqueamos GET si está eliminado - se permite visualizar
+  // La validación de estadoOperativo solo aplica para mutaciones (POST/DELETE)
 
   return {
     titular: {
@@ -1057,7 +1189,19 @@ export async function crearMiembroFamiliar(
   const titular = await prisma.persona.findUnique({
     where: { id: titularId },
     include: {
-      _count: { select: { lotesPropios: true, lotesAlquilados: true } },
+      _count: { 
+        select: { 
+          lotesPropios: true, 
+          alquileres: true 
+        } 
+      },
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        select: {
+          id: true,
+          estado: true,
+        },
+      },
     },
   });
 
@@ -1069,7 +1213,8 @@ export async function crearMiembroFamiliar(
 
   // Validar que el titular sea aplicable
   const esPropietario = (titular._count?.lotesPropios ?? 0) > 0;
-  const esInquilino = (titular._count?.lotesAlquilados ?? 0) > 0;
+  const alquileresActivosCount = ((titular as any).alquileres || []).length;
+  const esInquilino = alquileresActivosCount > 0;
   
   if (!esPropietario && !esInquilino) {
     const error = new Error('Grupo familiar aplica solo a propietarios o inquilinos') as any;
@@ -1077,10 +1222,10 @@ export async function crearMiembroFamiliar(
     throw error;
   }
 
-  // Validar que el titular sea OPERATIVA y OPERATIVO
-  if ((titular as any).categoria !== 'OPERATIVA' || titular.estado !== 'OPERATIVO') {
-    const error = new Error('El titular debe ser una persona operativa y activa') as any;
-    error.statusCode = 400;
+  // Bloquear mutaciones si titular está eliminado
+  if (titular.estadoOperativo === 'ELIMINADO') {
+    const error = new Error('No se puede modificar el grupo familiar de un titular eliminado') as any;
+    error.statusCode = 409;
     throw error;
   }
 
@@ -1113,7 +1258,7 @@ export async function crearMiembroFamiliar(
       categoria: 'MIEMBRO_FAMILIAR',
       jefeDeFamiliaId: titularId,
       inmobiliariaId: titular.inmobiliariaId, // Heredar inmobiliariaId del titular
-      estado: 'OPERATIVO',
+      estadoOperativo: 'OPERATIVO',
       updateAt: new Date(),
     },
     select: {
@@ -1130,6 +1275,24 @@ export async function crearMiembroFamiliar(
 
 // Eliminar miembro familiar
 export async function eliminarMiembroFamiliar(titularId: number, miembroId: number) {
+  // Validar titular (para verificar estadoOperativo)
+  const titular = await prisma.persona.findUnique({
+    where: { id: titularId },
+  });
+
+  if (!titular) {
+    const error = new Error('Titular no encontrado') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  // Bloquear mutaciones si titular está eliminado
+  if (titular.estadoOperativo === 'ELIMINADO') {
+    const error = new Error('No se puede modificar el grupo familiar de un titular eliminado') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
   // Validar miembro
   const miembro = await prisma.persona.findUnique({
     where: { id: miembroId },

@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { updateInmobiliaria, getInmobiliariaById } from "../../../lib/api/inmobiliarias.js";
+import { isEliminado } from "../../../utils/estadoOperativo";
+import { useAuth } from "../../../app/providers/AuthProvider";
 
 /* -------------------------- Helper dinero -------------------------- */
 function fmtMoney(val) {
@@ -98,31 +100,35 @@ export default function InmobiliariaEditarCard({
     razonSocial: detalle?.razonSocial ?? "",
     contacto: detalle?.contacto ?? "",
     comxventa: detalle?.comxventa != null ? String(detalle.comxventa) : "",
-    estado: detalle?.estado ?? "OPERATIVO", // <--- NUEVO
+    maxPrioridadesActivas: detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "",
   };
 
   const [nombre, setNombre] = useState(base.nombre);
   const [razonSocial, setRazonSocial] = useState(base.razonSocial);
   const [contacto, setContacto] = useState(base.contacto);
   const [comxventa, setComxventa] = useState(base.comxventa);
-  const [estado, setEstado] = useState(base.estado); // <--- NUEVO
+  const [maxPrioridadesActivas, setMaxPrioridadesActivas] = useState(base.maxPrioridadesActivas);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Obtener rol del usuario
+  const { user } = useAuth();
+  const isAdminOrGestor = user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR';
 
   // re-sync cuando cambia 'detalle' o se reabre
   useEffect(() => {
     if (!open || !detalle) return;
-    setNombre(base.nombre);
-    setRazonSocial(base.razonSocial);
-    setContacto(base.contacto);
-    setComxventa(base.comxventa);
-    setEstado(base.estado); // <--- NUEVO
+    setNombre(detalle?.nombre ?? "");
+    setRazonSocial(detalle?.razonSocial ?? "");
+    setContacto(detalle?.contacto ?? "");
+    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
+    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id]);
+  }, [open, detalle?.id, detalle?.maxPrioridadesActivas]);
 
   /* 5) ancho de label como en VerCard */
   useEffect(() => {
     const labels = [
-      "NOMBRE", "RAZÓN SOCIAL", "CONTACTO", "COMISIÓN X VENTA",
+      "NOMBRE", "RAZÓN SOCIAL", "CONTACTO", "COMISIÓN X VENTA", "LÍMITE PRIORIDADES ACTIVAS",
       "FECHA DE ACTUALIZACIÓN", "FECHA DE CREACIÓN"
     ];
     const longest = Math.max(...labels.map(s => s.length));
@@ -134,24 +140,49 @@ export default function InmobiliariaEditarCard({
   function buildPatch() {
     const patch = {};
 
-    // ... (validaciones existentes de razonSocial y contacto) ...
-
     if (razonSocial !== (detalle?.razonSocial ?? "")) {
-       // ... (tu código existente)
+      patch.razonSocial = razonSocial.trim();
     }
 
-    // ... (tu código de contacto y comxventa) ...
-
-    // --- NUEVO BLOQUE PARA ESTADO ---
-    if (estado !== (detalle?.estado ?? "OPERATIVO")) {
-      patch.estado = estado;
-      // Nota: No enviamos fechaBaja, el backend la calcula solo.
+    if (contacto !== (detalle?.contacto ?? "")) {
+      patch.contacto = contacto.trim();
     }
 
+    if (comxventa !== (detalle?.comxventa != null ? String(detalle.comxventa) : "")) {
+      const num = Number(comxventa);
+      if (!isNaN(num) && num >= 0) {
+        patch.comxventa = num;
+      }
+    }
+
+    // maxPrioridadesActivas - solo Admin/Gestor puede editar
+    if (isAdminOrGestor) {
+      const valorActual = detalle?.maxPrioridadesActivas;
+      const valorActualString = valorActual != null ? String(valorActual) : "";
+      const valorNuevoString = maxPrioridadesActivas || "";
+      
+      if (valorNuevoString !== valorActualString) {
+        if (valorNuevoString === "") {
+          patch.maxPrioridadesActivas = null; // Limpiar límite
+        } else {
+          const num = Number(valorNuevoString);
+          if (!isNaN(num) && num >= 0) {
+            patch.maxPrioridadesActivas = Math.floor(num); // Entero positivo
+          }
+        }
+      }
+    }
+
+    // IMPORTANTE: NO enviar estado/estadoOperativo - solo endpoints de desactivar/reactivar pueden cambiarlo
     return patch;
   }
 
   async function handleSave() {
+    // Bloquear submit si está eliminado
+    if (isEliminado(detalle)) {
+      return;
+    }
+
     try {
       setSaving(true);
       const patch = buildPatch();
@@ -186,11 +217,11 @@ export default function InmobiliariaEditarCard({
   }
 
   function handleReset() {
-    setNombre(base.nombre);
-    setRazonSocial(base.razonSocial);
-    setContacto(base.contacto);
-    setComxventa(base.comxventa);
-    setEstado(base.estado); // <--- NUEVO
+    setNombre(detalle?.nombre ?? "");
+    setRazonSocial(detalle?.razonSocial ?? "");
+    setContacto(detalle?.contacto ?? "");
+    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
+    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
   }
 
   /* 7) Render */
@@ -211,6 +242,8 @@ export default function InmobiliariaEditarCard({
 
   if (!open || !detalle) return null;
 
+  const eliminado = isEliminado(detalle);
+
   return (
     <>
       {/* Animación de éxito */}
@@ -225,11 +258,24 @@ export default function InmobiliariaEditarCard({
           setShowSuccess(false);
           onCancel?.();
         }}
-        onSave={handleSave}
+        onSave={eliminado ? undefined : handleSave}
         onReset={handleReset}
         saving={saving}
       >
         <div style={{ "--sale-label-w": `${labelW}px` }}>
+          {eliminado && (
+            <div style={{
+              background: '#FEF3C7',
+              border: '1px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              color: '#92400E',
+              fontWeight: 500
+            }}>
+              Inmobiliaria eliminada - solo lectura
+            </div>
+          )}
           <h3 className="venta-section-title">Información de la inmobiliaria</h3>
 
           <div className="venta-grid" ref={containerRef}>
@@ -249,6 +295,7 @@ export default function InmobiliariaEditarCard({
                     value={razonSocial}
                     onChange={(e) => setRazonSocial(e.target.value)}
                     placeholder="Razón social"
+                    disabled={eliminado}
                   />
                 </div>
               </div>
@@ -262,6 +309,7 @@ export default function InmobiliariaEditarCard({
                     value={contacto}
                     onChange={(e) => setContacto(e.target.value)}
                     placeholder="Teléfono o email"
+                    disabled={eliminado}
                   />
                 </div>
               </div>
@@ -279,6 +327,7 @@ export default function InmobiliariaEditarCard({
                     onChange={(e) => setComxventa(e.target.value)}
                     placeholder="0.00"
                     style={{ paddingRight: "50px" }}
+                    disabled={eliminado}
                   />
                   {/* Mostrar % como símbolo al final */}
                   <span style={{ 
@@ -299,24 +348,15 @@ export default function InmobiliariaEditarCard({
 
             {/* Columna derecha */}
             <div className="venta-col">
-              
-              {/* --- NUEVO SELECTOR DE ESTADO --- */}
+              {/* Estado (solo lectura) */}
               <div className="field-row">
                 <div className="field-label">ESTADO</div>
-                <div className="field-value p0">
-                  <select
-                    className="field-input" // Reusamos estilo de input
-                    value={estado}
-                    onChange={(e) => setEstado(e.target.value)}
-                    style={{ background: estado === 'INACTIVA' ? '#fef2f2' : '#fff' }}
-                  >
-                    <option value="ACTIVA">ACTIVA</option>
-                    <option value="INACTIVA">INACTIVA</option>
-                  </select>
+                <div className="field-value is-readonly">
+                  {detalle?.estado === 'ELIMINADO' ? 'ELIMINADO' : 'OPERATIVO'}
                 </div>
               </div>
 
-              {/* --- MOSTRAR FECHA BAJA SOLO SI ESTÁ INACTIVA --- */}
+              {/* Fecha de baja (solo si está eliminada) */}
               {detalle?.fechaBaja && (
                 <div className="field-row">
                   <div className="field-label" style={{ color: '#ef4444' }}>FECHA DE BAJA</div>
@@ -335,6 +375,26 @@ export default function InmobiliariaEditarCard({
                 <div className="field-label">FECHA DE CREACIÓN</div>
                 <div className="field-value is-readonly">{fechaCre}</div>
               </div>
+
+              {/* Campo maxPrioridadesActivas - solo visible para Admin/Gestor */}
+              {isAdminOrGestor && (
+                <div className="field-row">
+                  <div className="field-label">LÍMITE PRIORIDADES ACTIVAS</div>
+                  <div className="field-value p0">
+                    <input
+                      className="field-input"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="1"
+                      value={maxPrioridadesActivas}
+                      onChange={(e) => setMaxPrioridadesActivas(e.target.value)}
+                      placeholder="Sin límite"
+                      disabled={eliminado}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

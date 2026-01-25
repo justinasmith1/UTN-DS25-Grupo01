@@ -41,7 +41,7 @@ export default function PersonaEliminarDefinitivoDialog({
     `Cliente de: ${pers?.inmobiliaria?.nombre || "La Federala"}`,
     pers?._count ? [
       `Propietario: ${pers._count.lotesPropios || 0} lote(s)`,
-      `Inquilino: ${pers._count.lotesAlquilados || 0} lote(s)`,
+      `Inquilino: ${pers._count?.alquileres ?? pers._count?.lotesAlquilados ?? 0} lote(s)`,
       `Reservas: ${pers._count.Reserva || 0}`,
       `Ventas: ${pers._count.Venta || 0}`,
     ] : [],

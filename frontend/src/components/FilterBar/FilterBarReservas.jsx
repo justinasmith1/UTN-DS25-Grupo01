@@ -7,6 +7,7 @@ import { reservasChipsFrom, nice } from "./utils/reservasChips";
 export default function FilterBarReservas({
   value,
   onChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
   isLoading,
   total,
   filtrados,
@@ -33,8 +34,9 @@ export default function FilterBarReservas({
   const fields = useMemo(
     () => {
       const allFields = [
-      { id: "q",              type: "search",     label: "Buscar",             placeholder: "Cliente, inmobiliaria, lote...", defaultValue: "" },
+      { id: "q",              type: "search",     label: "Búsqueda",             placeholder: "N° reserva, cliente, lote...", defaultValue: "" },
       { id: "estado",         type: "multiSelect",label: "Estado",             defaultValue: [] },
+      { id: "visibilidad",    type: "singleSelect",label: "Visibilidad",       defaultValue: "OPERATIVO" },
       { id: "inmobiliarias",  type: "multiSelect",label: "Inmobiliaria",       defaultValue: [] },
       { id: "fechaReserva",   type: "dateRange",  label: "Fecha de Reserva",   defaultValue: { min: null, max: null } },
       { id: "fechaFinReserva",  type: "dateRange",  label: "Plazo Reserva",  defaultValue: { min: null, max: null } },
@@ -52,11 +54,23 @@ export default function FilterBarReservas({
   // ===== Catálogos (IDs reales para Inmobiliarias) =====
   const catalogs = useMemo(() => {
     // ESTADOS: aceptamos strings o {id/nombre}
-    const ESTADOS = normOptions(estadosOpts ?? reservasFilterPreset?.catalogs?.ESTADOS ?? []);
+    // IMPORTANTE: Filtrar OPERATIVO y ELIMINADO del catálogo de estados (son de estadoOperativo, no de estado de negocio)
+    const estadosRaw = normOptions(estadosOpts ?? reservasFilterPreset?.catalogs?.ESTADOS ?? []);
+    const ESTADOS = estadosRaw.filter(opt => {
+      const value = opt.value ?? opt.label ?? opt;
+      const valueStr = String(value).toUpperCase().trim();
+      return valueStr !== "OPERATIVO" && valueStr !== "ELIMINADO";
+    });
+
+    // VISIBILIDAD (estadoOperativo)
+    const VISIBILIDAD_OPTIONS = [
+      { value: "OPERATIVO", label: "Operativas" },
+      { value: "ELIMINADO", label: "Eliminadas" },
+    ];
 
     // Para INMOBILIARIA: no incluir catálogo de inmobiliarias (no pueden filtrar por inmobiliaria)
     if (userRole === 'INMOBILIARIA') {
-      return { estado: ESTADOS };
+      return { estado: ESTADOS, visibilidad: VISIBILIDAD_OPTIONS };
     }
 
     // INM: priorizamos lo que venga del container (de Ventas),
@@ -69,7 +83,7 @@ export default function FilterBarReservas({
     const hasLF = INM.some((o) => (o.label ?? "").toLowerCase().includes("la federala"));
     const INMOBILIARIAS = hasLF ? INM : [{ value: "La Federala", label: "La Federala" }, ...INM];
 
-    return { estado: ESTADOS, inmobiliarias: INMOBILIARIAS };
+    return { estado: ESTADOS, visibilidad: VISIBILIDAD_OPTIONS, inmobiliarias: INMOBILIARIAS };
   }, [estadosOpts, inmobiliariasOpts, userRole]);
 
   // ===== Rangos / Defaults =====
@@ -87,6 +101,7 @@ export default function FilterBarReservas({
       const baseDefaults = {
       q: "",
       estado: [],
+      visibilidad: "OPERATIVO", // Default: mostrar solo operativas
       fechaReserva:  { min: null, max: null },
       fechaFinReserva: { min: null, max: null },
       seña:          { min: null, max: null },
@@ -101,7 +116,14 @@ export default function FilterBarReservas({
   );
 
   const optionFormatter = useMemo(() => {
-    const base = { estado: nice };
+    const base = { 
+      estado: nice,
+      visibilidad: (val) => {
+        if (val === "OPERATIVO") return "Operativas";
+        if (val === "ELIMINADO") return "Eliminadas";
+        return val;
+      },
+    };
     // Para INMOBILIARIA: no incluir inmobiliarias en optionFormatter
     if (userRole !== 'INMOBILIARIA') {
       return { ...base, inmobiliarias: nice };
@@ -118,6 +140,9 @@ export default function FilterBarReservas({
   const toPageShape = (p) => {
     // ESTADO en mayúsculas
     const estado = toUpperArray(p?.estado);
+
+    // VISIBILIDAD (estadoOperativo)
+    const visibilidad = p?.visibilidad ?? "OPERATIVO"; // Default OPERATIVO
 
     // INMOBILIARIAS: enviamos por ID (value). Si value no es numérico, igual lo mandamos
     const inmoValues = Array.isArray(p?.inmobiliarias) ? p.inmobiliarias : [];
@@ -139,7 +164,8 @@ export default function FilterBarReservas({
     return {
       // ===== NUEVO =====
       q: p?.q ?? "",
-      estado,                       // ["ACTIVA", ...]
+      estado,                       // ["ACTIVA", ...] - estado de negocio
+      estadoOperativo: visibilidad, // Mapear visibilidad a estadoOperativo para backend
       inmobiliarias: inmoIds,       // IMPORTANTE: por ID
       fechaReserva:  { min: frMin, max: frMax },
       fechaFinReserva: { min: ffrMin, max: ffrMax },
@@ -173,6 +199,7 @@ export default function FilterBarReservas({
     return {
       q: v.q ?? "",
       estado: v.estado ?? v.estados ?? [],
+      visibilidad: v.estadoOperativo ?? v.visibilidad ?? "OPERATIVO", // Mapear desde estadoOperativo o visibilidad
       // aceptamos ids o labels
       inmobiliarias: v.inmobiliarias ?? v.inmobiliaria ?? v.inmobiliariaIds ?? [],
       fechaReserva: {
@@ -191,17 +218,19 @@ export default function FilterBarReservas({
   };
 
   const handleParamsChange = (paramsFromFB) => {
-    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // Excluir 'q' del procesamiento (se maneja con onSearchChange)
+    const { q, ...paramsSinQ } = paramsFromFB || {};
+    
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial), 
     // no convertir con toPageShape porque agrega todos los campos con defaults
-    const isPartialUpdate = paramsFromFB && (
-      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
-      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    const isPartialUpdate = paramsSinQ && (
+      Object.keys(paramsSinQ).length < 3 && !paramsSinQ.inmobiliarias
     );
     
     if (isPartialUpdate) {
-      onChange?.(paramsFromFB);
+      onChange?.(paramsSinQ);
     } else {
-      onChange?.(toPageShape(paramsFromFB));
+      onChange?.(toPageShape(paramsSinQ));
     }
   };
 
@@ -226,6 +255,7 @@ export default function FilterBarReservas({
       filtrados={filtrados}
       onClear={onClear}
       onParamsChange={handleParamsChange}
+      onSearchChange={onSearchChange}
       initialValue={fromPageShape(value)}
     />
   );

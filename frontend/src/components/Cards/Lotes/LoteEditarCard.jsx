@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { Info } from "lucide-react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateLote, getLoteById } from "../../../lib/api/lotes.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getAllVentas } from "../../../lib/api/ventas.js";
@@ -9,79 +10,8 @@ import { getAllPersonas } from "../../../lib/api/personas.js";
 import { uploadArchivo, getArchivosByLote, deleteArchivo, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { useToast } from "../../../app/providers/ToastProvider.jsx";
 import { getLoteIdFormatted } from "../../Table/TablaLotes/utils/getters.js";
-import { applySearch } from "../../../utils/personaSearch.js";
+import PersonaSearchSelect from "./PersonaSearchSelect.jsx";
 import LoteImageUploader from "./LoteImageUploader.jsx";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    if (disabled) {
-      setOpen(false);
-      return;
-    }
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [disabled]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  if (disabled) {
-    return (
-      <div className="ns-wrap" style={{ position: "relative" }}>
-        <div className="ns-trigger" style={{ opacity: 0.6, cursor: "not-allowed", pointerEvents: "none" }}>
-          <span>{label}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && !disabled && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {(placeholder ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 const TIPOS = [
   { value: "Lote Venta", label: "Lote Venta" },
@@ -101,8 +31,8 @@ const SUBESTADOS = [
   { value: "Construido", label: "Construido" },
 ];
 
-// Estados derivados (NO editables manualmente)
-const ESTADOS_DERIVADOS = ["Reservado", "Alquilado", "En Promoción", "Con Prioridad"];
+// Estados derivados (NO editables manualmente) - ALQUILADO ya no es estado derivado
+const ESTADOS_DERIVADOS = ["Reservado", "En Promoción", "Con Prioridad"];
 
 // Listado de calles disponibles (enum NombreCalle del backend)
 const CALLES_OPTIONS = [
@@ -131,7 +61,7 @@ const LABELS = [
   "PRECIO",
   "PROPIETARIO",
   "UBICACIÓN",
-  "ALQUILER",
+  "OCUPACIÓN",
   "DEUDA",
   "DESCRIPCIÓN",
 ];
@@ -143,13 +73,17 @@ const FROM_PRISMA_MAP = {
   RESERVADO: "Reservado",
   VENDIDO: "Vendido",
   NO_DISPONIBLE: "No Disponible",
-  ALQUILADO: "Alquilado",
   EN_PROMOCION: "En Promoción",
   CON_PRIORIDAD: "Con Prioridad",
   EN_CONSTRUCCION: "En Construccion",
   NO_CONSTRUIDO: "No Construido",
   CONSTRUIDO: "Construido",
 };
+
+const OCUPACION_OPTIONS = [
+  { value: "NO_ALQUILADO", label: "No alquilado" },
+  { value: "ALQUILADO", label: "Alquilado" },
+];
 
 const toFriendly = (value) => {
   if (value == null) return "";
@@ -173,7 +107,7 @@ const buildInitialForm = (lot) => {
       propietarioId: "",
       superficie: "",
       precio: "",
-      alquiler: false,
+      ocupacion: "NO_ALQUILADO",
       deuda: false,
       descripcion: "",
       ubicacionId: "",
@@ -186,7 +120,18 @@ const buildInitialForm = (lot) => {
   }
 
   const propietario = lot?.propietario || lot?.owner || lot?.Propietario || {};
+  // Preferir inquilino de alquilerActivo si existe
+  const inquilino = lot?.alquilerActivo?.inquilino || lot?.inquilino || {};
   const ubicacion = lot?.ubicacion ?? {};
+
+  // Calcular ocupación inicial
+  let ocupacionInicial = "NO_ALQUILADO";
+  if (lot?.ocupacion === 'ALQUILADO' || lot?.alquilerActivo || (lot?.alquiler === true && lot?.inquilinoId)) {
+    ocupacionInicial = "ALQUILADO";
+  }
+
+  // Obtener inquilinoId (preferir alquilerActivo)
+  const inquilinoId = lot?.alquilerActivo?.inquilino?.id || lot?.alquilerActivo?.inquilinoId || lot?.inquilinoId || inquilino?.id || "";
 
   return {
     id: lot.id ?? "",
@@ -195,9 +140,10 @@ const buildInitialForm = (lot) => {
     subestado: toFriendly(lot?.subestado ?? lot?.subStatus),
     numPartido: lot?.numPartido ?? lot?.numeroPartida ?? "",
     propietarioId: lot?.propietarioId ?? propietario?.id ?? "",
+    inquilinoId: inquilinoId,
     superficie: lot?.superficie ?? lot?.surface ?? "",
     precio: lot?.precio ?? lot?.price ?? "",
-    alquiler: Boolean(lot?.alquiler),
+    ocupacion: ocupacionInicial,
     deuda: Boolean(lot?.deuda),
     descripcion: lot?.descripcion ?? lot?.description ?? "",
     ubicacionId: lot?.ubicacionId ?? ubicacion?.id ?? "",
@@ -231,9 +177,7 @@ export default function LoteEditarCard({
   const [archivosParaBorrar, setArchivosParaBorrar] = useState([]);
   const [personas, setPersonas] = useState([]);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
-  const [busquedaPropietario, setBusquedaPropietario] = useState(null);
-  const inputPropietarioRef = useRef(null);
-  const dropdownPropietarioRef = useRef(null);
+  const [errors, setErrors] = useState({});
 
   // Cargar personas al abrir
   useEffect(() => {
@@ -254,37 +198,7 @@ export default function LoteEditarCard({
     })();
   }, [open, personas.length]);
 
-  // Cerrar dropdown de propietario al hacer click fuera
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (
-        inputPropietarioRef.current &&
-        !inputPropietarioRef.current.contains(event.target) &&
-        dropdownPropietarioRef.current &&
-        !dropdownPropietarioRef.current.contains(event.target)
-      ) {
-        setBusquedaPropietario(null);
-      }
-    }
-    if (busquedaPropietario) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
-  }, [busquedaPropietario]);
-
-  // Obtener la persona seleccionada para mostrar en el input
-  const personaSeleccionada = useMemo(() => {
-    if (!form.propietarioId) return null;
-    return personas.find((p) => `${p.id ?? p.idPersona}` === `${form.propietarioId}`);
-  }, [personas, form.propietarioId]);
-
-  // Filtrar personas por búsqueda
-  const personasFiltradas = useMemo(() => {
-    if (!busquedaPropietario || !busquedaPropietario.trim()) {
-      return [];
-    }
-    return applySearch(personas, busquedaPropietario).slice(0, 10); // Limitar a 10 resultados
-  }, [personas, busquedaPropietario]);
+  // Validación solo al guardar, no en tiempo real
 
   const computedLabelWidth = useMemo(() => {
     const longest = Math.max(...LABELS.map((l) => l.length));
@@ -313,11 +227,16 @@ export default function LoteEditarCard({
   const getTooltipEstadoDerivado = () => {
     const estado = form.estado;
     if (estado === "Reservado") return "Este estado se gestiona desde el módulo de Reservas.";
-    if (estado === "Alquilado") return "Este estado se gestiona desde el módulo de Alquiler.";
     if (estado === "En Promoción") return "Este estado se gestiona desde el módulo de Promociones.";
     if (estado === "Con Prioridad") return "Este estado se gestiona desde el módulo de Prioridades.";
     return "Este estado se gestiona desde su módulo correspondiente.";
   };
+
+  // Validar si se puede cambiar ocupación a ALQUILADO
+  const puedeAlquilar = useMemo(() => {
+    const estadoUpper = String(form.estado || "").toUpperCase();
+    return estadoUpper !== "NO_DISPONIBLE" && estadoUpper !== "NO DISPONIBLE";
+  }, [form.estado]);
 
   // Formatear ID del lote
   const loteDisplayId = useMemo(() => {
@@ -363,6 +282,7 @@ export default function LoteEditarCard({
     setForm(buildInitialForm(detalle));
     setArchivosParaBorrar([]);
     setError(null);
+    setErrors({}); // Limpiar errores de validación al abrir
     setShowSuccess(false);
   }, [detalle?.id, open]);
 
@@ -427,6 +347,7 @@ export default function LoteEditarCard({
   const handleReset = () => {
     setForm(buildInitialForm(detalle));
     setError(null);
+    setErrors({}); // Limpiar errores de validación al resetear
     setArchivosParaBorrar([]);
   };
 
@@ -462,11 +383,24 @@ export default function LoteEditarCard({
       if (precio != null) payload.precio = precio;
 
       if (form.descripcion != null) payload.descripcion = form.descripcion;
-      payload.alquiler = Boolean(form.alquiler);
       payload.deuda = Boolean(form.deuda);
 
       const propietarioId = toNumberOrNull(form.propietarioId);
       if (propietarioId) payload.propietarioId = propietarioId;
+
+      // Manejar ocupación (nueva lógica)
+      if (form.ocupacion) {
+        payload.ocupacion = form.ocupacion;
+
+        // Si ocupación = ALQUILADO, enviar inquilinoId (obligatorio)
+        if (form.ocupacion === "ALQUILADO") {
+          const inquilinoId = toNumberOrNull(form.inquilinoId);
+          if (inquilinoId) {
+            payload.inquilinoId = inquilinoId;
+          }
+        }
+        // Si ocupación = NO_ALQUILADO, no enviar inquilinoId (el backend finalizará el alquiler activo)
+      }
 
       // Ubicación: enviar solo si hay cambios
       const ubicacionOriginal = detalle?.ubicacion;
@@ -514,15 +448,33 @@ export default function LoteEditarCard({
 
   const handleSave = async () => {
     if (!detalle?.id) return;
+    
+    // Validación: si ocupación=ALQUILADO, inquilinoId es requerido
+    if (form.ocupacion === "ALQUILADO" && !form.inquilinoId) {
+      setErrors({ inquilinoId: "Debes seleccionar un inquilino si la ocupación es Alquilado." });
+      setSaving(false);
+      return;
+    }
+
+    // Validación: NO_DISPONIBLE no permite ocupación ALQUILADO
+    const estadoUpper = String(form.estado || "").toUpperCase();
+    if (form.ocupacion === "ALQUILADO" && (estadoUpper === "NO_DISPONIBLE" || estadoUpper === "NO DISPONIBLE")) {
+      setError("No se puede alquilar un lote en estado NO DISPONIBLE.");
+      setSaving(false);
+      return;
+    }
+    
+    // Limpiar errores de validación si todo está bien
+    setErrors({});
     setSaving(true);
     setError(null);
     try {
       const payload = buildPayload();
       const nuevoEstado = payload.estado || form.estado;
-      const estadoUpper = String(nuevoEstado || "").toUpperCase();
+      const estadoUpperPayload = String(nuevoEstado || "").toUpperCase();
 
       // Validación de VENDIDO: solo permitir si hay venta registrada
-      if (estadoUpper === "VENDIDO") {
+      if (estadoUpperPayload === "VENDIDO") {
         if (ventasLote.length === 0) {
           setError("No se puede establecer el estado VENDIDO sin una venta registrada para este lote.");
           setSaving(false);
@@ -599,22 +551,24 @@ export default function LoteEditarCard({
         setForm(prev => ({ ...prev, images: imagenesActualizadas }));
       }
 
+      // Usar los datos actualizados del backend que ya incluyen todas las relaciones y la ocupación correcta
       const enriched = {
-        ...(detalle || {}),
         ...(updated || {}),
         images: imagenesActualizadas,
-        descripcion: form.descripcion,
-        alquiler: payload.alquiler,
-        deuda: payload.deuda,
-        estado: payload.estado ?? updated?.estado ?? detalle?.estado,
-        superficie: payload.superficie ?? updated?.superficie ?? detalle?.superficie,
-        precio: payload.precio ?? updated?.precio ?? detalle?.precio,
-        propietarioId: payload.propietarioId ?? updated?.propietarioId ?? detalle?.propietarioId,
-        ubicacion: updated?.ubicacion ?? detalle?.ubicacion,
+        // Asegurar que el estado viene del backend
+        estado: updated?.estado ?? detalle?.estado,
+        // Asegurar que ocupación viene del backend
+        ocupacion: updated?.ocupacion ?? payload.ocupacion ?? detalle?.ocupacion,
+        // Asegurar que alquilerActivo viene del backend
+        alquilerActivo: updated?.alquilerActivo ?? null,
+        // Asegurar que inquilino viene del backend con la relación completa (preferir alquilerActivo)
+        inquilino: updated?.alquilerActivo?.inquilino || updated?.inquilino || null,
+        inquilinoId: updated?.alquilerActivo?.inquilinoId || updated?.inquilinoId || null,
       };
 
       setDetalle(enriched);
       onSaved?.(enriched);
+      setErrors({}); // Limpiar errores de validación al guardar exitosamente
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
@@ -637,7 +591,17 @@ export default function LoteEditarCard({
       <EditarBase
         open={open}
         title={`Editar Lote N° ${loteDisplayId}`}
-        onCancel={() => { if (showSuccess) return; setSaving(false); setShowSuccess(false); onCancel?.(); }}
+        onCancel={() => { 
+          if (showSuccess) return; 
+          setSaving(false); 
+          setShowSuccess(false);
+          setErrors({}); // Limpiar errores al cancelar
+          // Resetear formulario al cancelar para que no persistan cambios no guardados
+          if (detalle) {
+            setForm(buildInitialForm(detalle));
+          }
+          onCancel?.(); 
+        }}
         saveButtonText={saving ? "Guardando..." : "Guardar cambios"}
         onSave={handleSave}
         onReset={detalle ? handleReset : undefined}
@@ -692,121 +656,75 @@ export default function LoteEditarCard({
               <div className="field-row"><div className="field-label">Superficie</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.superficie ?? ""} onChange={(e) => updateForm({ superficie: e.target.value })} placeholder="m²" /></div></div>
               <div className="field-row"><div className="field-label">Precio</div><div className="field-value p0"><input className="field-input" type="number" inputMode="decimal" value={form.precio ?? ""} onChange={(e) => updateForm({ precio: e.target.value })} placeholder="USD" /></div></div>
               
-              <div className="field-row">
-                <div className="field-label">Propietario</div>
-                <div className="field-value p0">
-                  <div ref={inputPropietarioRef} className="propietario-search-wrapper">
-                    <div className="propietario-search-input-wrapper">
-                      <input
-                        className="field-input"
-                        type="text"
-                        placeholder={loadingPersonas ? "Cargando..." : "Buscar por nombre, apellido o DNI"}
-                        value={
-                          busquedaPropietario !== null && busquedaPropietario !== undefined
-                            ? busquedaPropietario
-                            : personaSeleccionada
-                            ? (() => {
-                                const nombre = personaSeleccionada.nombre ?? "";
-                                const apellido = personaSeleccionada.apellido ?? "";
-                                const razonSocial = personaSeleccionada.razonSocial;
-                                return razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${personaSeleccionada.id}`;
-                              })()
-                            : ""
-                        }
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          setBusquedaPropietario(value);
-                          // Si el usuario está escribiendo, limpiar propietarioId si hay texto que no coincide
-                          if (value) {
-                            if (personaSeleccionada) {
-                              const nombre = personaSeleccionada.nombre ?? "";
-                              const apellido = personaSeleccionada.apellido ?? "";
-                              const razonSocial = personaSeleccionada.razonSocial;
-                              const displayText = razonSocial || `${nombre} ${apellido}`.trim();
-                              if (!displayText.toLowerCase().includes(value.toLowerCase())) {
-                                updateForm({ propietarioId: "" });
-                              }
-                            }
-                          } else {
-                            updateForm({ propietarioId: "" });
-                          }
-                        }}
-                        onFocus={(e) => {
-                          // Al hacer focus, si hay persona seleccionada y no hay texto de búsqueda activa, activar modo búsqueda
-                          if (personaSeleccionada && busquedaPropietario === null) {
-                            setBusquedaPropietario("");
-                            updateForm({ propietarioId: "" });
-                            setTimeout(() => {
-                              e.target.select();
-                            }, 0);
-                          }
-                        }}
-                      />
-                      <svg
-                        width="18"
-                        height="18"
-                        viewBox="0 0 24 24"
-                        className="propietario-search-icon"
-                      >
-                        <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none" />
-                        <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2" />
-                      </svg>
-                      <span
-                        className="propietario-info-icon-inline"
-                        data-tooltip="Si no aparece en la lista, primero registrá a la persona en el módulo Personas."
-                      >
-                        <Info size={16} />
-                      </span>
-                    </div>
-                    {busquedaPropietario !== null && busquedaPropietario !== undefined && busquedaPropietario !== "" && (
-                      <div
-                        ref={dropdownPropietarioRef}
-                        className="propietario-dropdown"
-                      >
-                        {personasFiltradas.length === 0 ? (
-                          <div className="propietario-dropdown-empty">
-                            Sin resultados
-                          </div>
-                        ) : (
-                          personasFiltradas.map((p) => {
-                            const id = p.id ?? p.idPersona;
-                            const nombre = p.nombre ?? "";
-                            const apellido = p.apellido ?? "";
-                            const razonSocial = p.razonSocial;
-                            const identificadorTipo = p.identificadorTipo;
-                            const identificadorValor = p.identificadorValor;
-                            const displayText = razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${id}`;
-                            return (
-                              <button
-                                key={id}
-                                type="button"
-                                className="propietario-dropdown-item"
-                                onClick={() => {
-                                  updateForm({ propietarioId: Number(id) });
-                                  setBusquedaPropietario(null);
-                                  inputPropietarioRef.current?.blur();
-                                }}
-                              >
-                                <div className="propietario-dropdown-item-name">{displayText}</div>
-                                {identificadorValor && (
-                                  <div className="propietario-dropdown-item-id">
-                                    {identificadorTipo ? `${identificadorTipo} ${identificadorValor}` : identificadorValor}
-                                  </div>
-                                )}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <PersonaSearchSelect
+                label="Propietario"
+                value={form.propietarioId}
+                onSelect={(id) => updateForm({ propietarioId: id || "" })}
+                personas={personas}
+                loading={loadingPersonas}
+                placeholder="Buscar por nombre, apellido o DNI"
+                tooltipText="Si no aparece en la lista, primero registrá a la persona en el módulo Personas."
+              />
 
               <div className="field-row"><div className="field-label">Calle</div><div className="field-value p0"><NiceSelect value={form.ubicacionCalle ?? ""} options={CALLES_OPTIONS} placeholder="Seleccionar calle" onChange={(value) => updateForm({ ubicacionCalle: value || "" })} /></div></div>
               <div className="field-row"><div className="field-label">Número</div><div className="field-value p0"><input className="field-input" type="number" inputMode="numeric" value={form.ubicacionNumero ?? ""} onChange={(e) => updateForm({ ubicacionNumero: e.target.value })} placeholder="Ej. 202" /></div></div>
               
-              <div className="field-row"><div className="field-label">Alquiler</div><div className="field-value boolean-value"><input type="checkbox" checked={form.alquiler} onChange={(e) => updateForm({ alquiler: e.target.checked })} /><span>{form.alquiler ? "Sí" : "No"}</span></div></div>
+              <div className="field-row">
+                <div className="field-label">Ocupación</div>
+                <div className="field-value p0">
+                  <NiceSelect 
+                    value={form.ocupacion} 
+                    options={OCUPACION_OPTIONS} 
+                    placeholder="Seleccionar ocupación" 
+                    onChange={(value) => {
+                      // Prevenir cambio a ALQUILADO si no puede alquilar
+                      if (value === "ALQUILADO" && !puedeAlquilar) {
+                        return;
+                      }
+                      updateForm({ 
+                        ocupacion: value || "NO_ALQUILADO",
+                        // Si se cambia a NO_ALQUILADO, limpiar inquilinoId
+                        inquilinoId: value === "ALQUILADO" ? form.inquilinoId : ""
+                      });
+                      // Limpiar errores al cambiar ocupación
+                      setErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.inquilinoId;
+                        return newErrors;
+                      });
+                    }}
+                    disabled={!puedeAlquilar}
+                  />
+                </div>
+              </div>
+
+              {form.ocupacion === "ALQUILADO" && (
+                <div className={errors.inquilinoId ? "hasError" : ""}>
+                  <PersonaSearchSelect
+                    label="Inquilino"
+                    value={form.inquilinoId}
+                    onSelect={(id) => {
+                      updateForm({ inquilinoId: id || "" });
+                      // Limpiar error cuando se selecciona un inquilino
+                      if (id) {
+                        setErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors.inquilinoId;
+                          return newErrors;
+                        });
+                      }
+                    }}
+                    personas={personas}
+                    loading={loadingPersonas}
+                    placeholder="Buscar por nombre, apellido o DNI"
+                    tooltipText="Para elegir un inquilino, la persona debe existir como cliente previamente."
+                    error={errors.inquilinoId ? true : false}
+                  />
+                  {errors.inquilinoId && (
+                    <div className="fieldError">{errors.inquilinoId}</div>
+                  )}
+                </div>
+              )}
               <div className="field-row"><div className="field-label">Deuda</div><div className="field-value boolean-value"><input type="checkbox" checked={form.deuda} onChange={(e) => updateForm({ deuda: e.target.checked })} /><span>{form.deuda ? "Sí" : "No"}</span></div></div>
             </div>
 

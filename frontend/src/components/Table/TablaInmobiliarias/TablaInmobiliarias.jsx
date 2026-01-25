@@ -7,10 +7,12 @@ import { useNavigate } from "react-router-dom";
 import { ListTodo, Percent } from "lucide-react";
 import { useAuth } from "../../../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../../../lib/auth/rbac";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 import TablaBase from "../TablaBase";
 import StatusBadge from "./cells/StatusBadge";
 import { inmobiliariasTablePreset } from "./presets/inmobiliarias.table";
 import { fmtComxVenta, fmtCantidadVentas, fmtFecha, fmtContacto } from "./utils/formatters";
+import "./TablaInmobiliarias.css";
 
 // Componente dropdown para "Ver asociadas" (ventas y reservas)
 function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) {
@@ -149,8 +151,8 @@ export default function TablaInmobiliarias({
         return {
           ...col,
           accessor: (row) => {
-            // Opcional: Podrías poner el texto en gris si está inactiva
-            const style = row.estado === 'ELIMINADO' ? { color: '#9ca3af' } : {};
+            // El nombre se muestra igual para operativas y eliminadas
+            // La diferencia se indica con el badge de estado, no con el estilo del nombre
             return (
               <span style={{
                 display: 'inline-block',
@@ -158,7 +160,6 @@ export default function TablaInmobiliarias({
                 lineHeight: '1.2',
                 wordBreak: 'break-word',
                 hyphens: 'auto',
-                ...style
               }}>
                 {row.nombre || '-'}
               </span>
@@ -185,19 +186,15 @@ export default function TablaInmobiliarias({
     });
   }, []);
 
-  // Columnas visibles por defecto (7 columnas - excluyendo cantidadReservas)
+  // Columnas visibles por defecto - ahora incluye prioridadesActivas, excluye fechaBaja
   const defaultVisibleIds = useMemo(() => [
     'nombre',
     'estado',
     'razonSocial',
-    'fechaBaja',
     'comxventa',
     'contacto',
-    'cantidadVentas'
-    // 'cantidadReservas' excluida para mostrar solo 7
+    'prioridadesActivas',
   ], []);
-
-
 
 
   // -----------------------------------------
@@ -231,7 +228,7 @@ export default function TablaInmobiliarias({
         );
       }
 
-      if (can(user, PERMISSIONS.AGENCY_EDIT)) {
+      if (can(user, PERMISSIONS.AGENCY_EDIT) && canEditByEstadoOperativo(row)) {
         actions.push(
           <button
             key="edit"
@@ -270,7 +267,7 @@ export default function TablaInmobiliarias({
 
       // Mostrar botón de eliminar O reactivar según el estado
       if (row.estado === 'ELIMINADO') {
-        // Inmobiliaria inactiva: mostrar botón de REACTIVAR
+        // Inmobiliaria eliminada: mostrar botón de REACTIVAR
         if (can(user, PERMISSIONS.AGENCY_EDIT) && onReactivarInmobiliaria) {
           actions.push(
             <button
@@ -279,7 +276,6 @@ export default function TablaInmobiliarias({
               aria-label="Reactivar Inmobiliaria"
               data-tooltip="Reactivar Inmobiliaria"
               onClick={() => onReactivarInmobiliaria?.(row)}
-              style={{ color: '#10b981' }}
             >
               <svg
                 width="18"
@@ -421,16 +417,6 @@ export default function TablaInmobiliarias({
     [columns, renderRowActions, topActions, user]
   );
 
-  // Debug logs
-  console.log(
-    "🏢 TablaInmobiliarias render - data length:",
-    data.length,
-    "loading:",
-    loading,
-    "config:",
-    config
-  );
-
   // Función para obtener el ancho de las columnas
   const widthFor = useCallback((id) => {
     const col = config.columns.find((c) => c.id === id);
@@ -454,7 +440,7 @@ export default function TablaInmobiliarias({
         selectable={config.selectable}
         rowKey="id"
         defaultVisibleIds={defaultVisibleIds}
-        maxVisible={7}
+        maxVisible={6}
       />
     </div>
   );

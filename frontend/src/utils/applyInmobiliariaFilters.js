@@ -6,7 +6,13 @@ const getNombre = (inmobiliaria) => inmobiliaria?.nombre || '';
 const getRazonSocial = (inmobiliaria) => inmobiliaria?.razonSocial || '';
 const getContacto = (inmobiliaria) => inmobiliaria?.contacto || '';
 const getComxventa = (inmobiliaria) => Number(inmobiliaria?.comxventa) || 0;
-const getCantidadVentas = (inmobiliaria) => Number(inmobiliaria?.cantidadVentas) || 0;
+// Nuevos getters con fallback a nombres legacy
+const getVentasTotales = (inmobiliaria) => Number(inmobiliaria?.ventasTotales ?? inmobiliaria?.cantidadVentas) || 0;
+const getReservasTotales = (inmobiliaria) => Number(inmobiliaria?.reservasTotales ?? inmobiliaria?.cantidadReservas) || 0;
+const getPrioridadesTotales = (inmobiliaria) => Number(inmobiliaria?.prioridadesTotales) || 0;
+// Legacy getters (mantener compatibilidad)
+const getCantidadVentas = (inmobiliaria) => getVentasTotales(inmobiliaria);
+const getCantidadReservas = (inmobiliaria) => getReservasTotales(inmobiliaria);
 const getEstado = (inmobiliaria) => inmobiliaria?.estado || 'OPERATIVO';
 const getCreatedAt = (inmobiliaria) => {
   const date = inmobiliaria?.createdAt;
@@ -28,17 +34,15 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
 
   let rows = [...inmobiliarias];
 
-  // Filtro de estado - multiSelect pattern (siguiendo FilterBarVentas)
-  // Si estado está vacío o undefined, mostrar solo OPERATIVAS
-  // Si tiene valores, filtrar por esos estados
-  if (params.estado && Array.isArray(params.estado) && params.estado.length > 0) {
-    rows = rows.filter((inmobiliaria) =>
-      params.estado.includes(getEstado(inmobiliaria))
-    );
-  } else {
-    // Por defecto, mostrar solo inmobiliarias OPERATIVAS
-    rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === 'OPERATIVO');
-  }
+  // Filtro de visibilidad (estadoOperativo) - igual que Prioridades/Reservas/Ventas
+  // Si visibilidad está definida, usarla; si no, usar estado (compatibilidad)
+  const visibilidadFilter = params.visibilidad ?? (
+    params.estado && Array.isArray(params.estado) && params.estado.length > 0 
+      ? (params.estado.includes('ELIMINADO') ? 'ELIMINADO' : 'OPERATIVO')
+      : 'OPERATIVO'
+  );
+
+  rows = rows.filter((inmobiliaria) => getEstado(inmobiliaria) === visibilidadFilter);
 
 
   // Filtro de búsqueda general
@@ -83,10 +87,40 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
     );
   }
 
+  // Filtros nuevos (con fallback a nombres legacy)
+  if ((params.prioridadesTotales?.min !== undefined && params.prioridadesTotales?.min !== null) ||
+    (params.prioridadesTotales?.max !== undefined && params.prioridadesTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getPrioridadesTotales(inmobiliaria), params.prioridadesTotales?.min, params.prioridadesTotales?.max)
+    );
+  }
+
+  if ((params.ventasTotales?.min !== undefined && params.ventasTotales?.min !== null) ||
+    (params.ventasTotales?.max !== undefined && params.ventasTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getVentasTotales(inmobiliaria), params.ventasTotales?.min, params.ventasTotales?.max)
+    );
+  }
+
+  if ((params.reservasTotales?.min !== undefined && params.reservasTotales?.min !== null) ||
+    (params.reservasTotales?.max !== undefined && params.reservasTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getReservasTotales(inmobiliaria), params.reservasTotales?.min, params.reservasTotales?.max)
+    );
+  }
+
+  // Legacy filters (compatibilidad - aplican los mismos filtros que los nuevos)
   if ((params.cantidadVentas?.min !== undefined && params.cantidadVentas?.min !== null) ||
     (params.cantidadVentas?.max !== undefined && params.cantidadVentas?.max !== null)) {
     rows = rows.filter((inmobiliaria) =>
       inRange(getCantidadVentas(inmobiliaria), params.cantidadVentas?.min, params.cantidadVentas?.max)
+    );
+  }
+
+  if ((params.cantidadReservas?.min !== undefined && params.cantidadReservas?.min !== null) ||
+    (params.cantidadReservas?.max !== undefined && params.cantidadReservas?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getCantidadReservas(inmobiliaria), params.cantidadReservas?.min, params.cantidadReservas?.max)
     );
   }
 

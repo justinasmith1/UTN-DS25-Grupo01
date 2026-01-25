@@ -1,114 +1,13 @@
 // src/components/Cards/Personas/PersonaEditarCard.jsx
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updatePersona, getPersona } from "../../../lib/api/personas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
+import { isEliminado } from "../../../utils/estadoOperativo";
 import { extractEmail, extractTelefono } from "../../../utils/personaContacto";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Seleccionar", onChange, usePortal = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (open && usePortal && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom, left: rect.left });
-    }
-  }, [open, usePortal]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e) => {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  // Renderizar menú
-  const menuContent = open ? (
-    <ul 
-      ref={listRef} 
-      className="ns-list" 
-      role="listbox" 
-      tabIndex={-1}
-      style={usePortal ? {
-        position: 'fixed',
-        top: `${pos.top}px`,
-        left: `${pos.left}px`,
-        width: '233px',
-        zIndex: 10000,
-        maxHeight: '300px',
-        overflowY: 'auto',
-        backgroundColor: '#fff',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        margin: 0,
-        padding: 0,
-        listStyle: 'none'
-      } : {}}
-    >
-      {options.map(opt => (
-        <li
-          key={`${opt.value}::${opt.label}`}
-          role="option"
-          aria-selected={`${opt.value}` === `${value}`}
-          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-          onClick={() => {
-            onChange?.(opt.value || "");
-            setOpen(false);
-          }}
-        >
-          {opt.label}
-        </li>
-      ))}
-    </ul>
-  ) : null;
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%'
-        }}
-      >
-        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-        <svg 
-          width="18" 
-          height="18" 
-          viewBox="0 0 20 20" 
-          aria-hidden
-          style={{ marginLeft: '8px', flexShrink: 0 }}
-        >
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {usePortal && typeof document !== 'undefined' 
-        ? createPortal(menuContent, document.body)
-        : menuContent
-      }
-    </div>
-  );
-}
 
 export default function PersonaEditarCard({
   open,
@@ -134,7 +33,6 @@ export default function PersonaEditarCard({
   const [valorIdentificador, setValorIdentificador] = useState("");
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
-  const [estado, setEstado] = useState("OPERATIVO");
   const [inmobiliariaId, setInmobiliariaId] = useState(null);
   
   // Estados auxiliares
@@ -213,7 +111,6 @@ export default function PersonaEditarCard({
       setRazonSocial(detalle.razonSocial || "");
       setTipoIdentificador(detalle.identificadorTipo || "CUIL");
       setValorIdentificador(detalle.identificadorValor || "");
-      setEstado(detalle.estado || "OPERATIVO");
       setInmobiliariaId(detalle.inmobiliariaId || null);
       
       // Cargar email y teléfono usando helpers centralizados
@@ -245,7 +142,6 @@ export default function PersonaEditarCard({
     setRazonSocial(detalle.razonSocial || "");
     setTipoIdentificador(detalle.identificadorTipo || "CUIL");
     setValorIdentificador(detalle.identificadorValor || "");
-    setEstado(detalle.estado || "ACTIVA");
     setInmobiliariaId(detalle.inmobiliariaId || null);
     
     // Restablecer email y teléfono desde detalle
@@ -257,9 +153,17 @@ export default function PersonaEditarCard({
     setError(null);
   };
 
+  // Determinar si está eliminado
+  const eliminado = isEliminado(detalle);
+
   // Handler para guardar cambios
   const handleSave = async () => {
     if (!detalle?.id) return;
+    
+    // Bloquear submit si está eliminado
+    if (eliminado) {
+      return;
+    }
     
     setError(null);
     setSaving(true);
@@ -369,10 +273,9 @@ export default function PersonaEditarCard({
       // IMPORTANTE: enviar null explícitamente cuando está vacío
       payload.email = emailStr;
       
-      // Solo incluir estado e inmobiliariaId para ADMIN/GESTOR
-      // IMPORTANTE: incluir siempre, incluso si es null, para que el backend pueda actualizarlos
+      // Solo incluir inmobiliariaId para ADMIN/GESTOR
+      // IMPORTANTE: NO enviar estado/estadoOperativo - solo endpoints de desactivar/reactivar pueden cambiarlo
       if (isAdminOrGestor) {
-        payload.estado = estado;
         // Incluir inmobiliariaId siempre (puede ser null para "La Federala")
         payload.inmobiliariaId = inmobiliariaId ?? null;
       }
@@ -410,7 +313,7 @@ export default function PersonaEditarCard({
         open={open}
         title="Editar Persona"
         onCancel={onCancel}
-        onSave={handleSave}
+        onSave={eliminado ? undefined : handleSave}
         onReset={detalle ? handleReset : undefined}
         saving={saving}
         saveButtonText="Guardar cambios"
@@ -423,6 +326,19 @@ export default function PersonaEditarCard({
             padding: "0 16px"
           }}
         >
+          {eliminado && (
+            <div style={{
+              background: '#FEF3C7',
+              border: '1px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              color: '#92400E',
+              fontWeight: 500
+            }}>
+              Persona eliminada - solo lectura
+            </div>
+          )}
           <div
             style={{
               display: "grid",
@@ -442,6 +358,7 @@ export default function PersonaEditarCard({
                     value={razonSocial}
                     onChange={(e) => setRazonSocial(e.target.value)}
                     placeholder="Razón social"
+                    disabled={eliminado}
                   />
                 </div>
               </div>
@@ -461,6 +378,7 @@ export default function PersonaEditarCard({
                         }
                       }}
                       placeholder="Nombre (solo letras)"
+                      disabled={eliminado}
                     />
                   </div>
                 </div>
@@ -478,6 +396,7 @@ export default function PersonaEditarCard({
                         }
                       }}
                       placeholder="Apellido (solo letras)"
+                      disabled={eliminado}
                     />
                   </div>
                 </div>
@@ -497,6 +416,7 @@ export default function PersonaEditarCard({
                   ]}
                   placeholder="Seleccionar tipo"
                   onChange={(val) => setTipoIdentificador(val)}
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -514,6 +434,7 @@ export default function PersonaEditarCard({
                     tipoIdentificador === "PASAPORTE" ? "Ej: ABC123456 (6-9 caracteres)" :
                     "Ej: 12-34567890-1 (formato CUIT/CUIL)"
                   }
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -533,6 +454,7 @@ export default function PersonaEditarCard({
                     }
                   }}
                   placeholder="Opcional (solo números)"
+                  disabled={eliminado}
                 />
               </div>
             </div>
@@ -546,24 +468,17 @@ export default function PersonaEditarCard({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Opcional"
+                  disabled={eliminado}
                 />
               </div>
             </div>
 
-            {/* Estado solo para ADMIN/GESTOR */}
+            {/* Estado solo lectura (mostrar siempre para ADMIN/GESTOR) */}
             {isAdminOrGestor && (
               <div className="field-row">
                 <div className="field-label">ESTADO</div>
-                <div className="field-value p0">
-                  <NiceSelect
-                    value={estado}
-                    options={[
-                      { value: "OPERATIVO", label: "OPERATIVO" },
-                      { value: "ELIMINADO", label: "ELIMINADO" },
-                    ]}
-                    placeholder="Seleccionar estado"
-                    onChange={(val) => setEstado(val)}
-                  />
+                <div className="field-value is-readonly">
+                  {detalle?.estado || "OPERATIVO"}
                 </div>
               </div>
             )}
@@ -585,6 +500,7 @@ export default function PersonaEditarCard({
                     placeholder={loadingInmobiliarias ? "Cargando..." : "Seleccionar"}
                     onChange={(val) => setInmobiliariaId(val === "" ? null : Number(val))}
                     usePortal={true}
+                    disabled={eliminado}
                   />
                 </div>
               </div>

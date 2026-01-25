@@ -7,9 +7,27 @@ import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
 import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
 
 
-export async function getAllVentas(): Promise<Venta[]> {
+export async function getAllVentas(
+  query?: { estadoOperativo?: string },
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<Venta[]> {
+    const whereClause: any = {};
+
+    // Si el usuario es INMOBILIARIA, filtrar por su inmobiliariaId
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      whereClause.inmobiliariaId = user.inmobiliariaId;
+    }
+
+    // Filtro estadoOperativo: default OPERATIVO si no viene
+    if (query?.estadoOperativo) {
+      whereClause.estadoOperativo = query.estadoOperativo;
+    } else {
+      whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
+    }
+
     const ventas = await prisma.venta.findMany({
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true }, 
+        where: whereClause,
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true }, 
         orderBy: { id: 'asc' }, // Ordenar por idVenta de forma ascendente
     });
 
@@ -19,7 +37,7 @@ export async function getAllVentas(): Promise<Venta[]> {
 export async function getVentaById(id: number): Promise<Venta> {
     const venta = await prisma.venta.findUnique({
         where: { id },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 
     if (!venta) {
@@ -32,10 +50,22 @@ export async function getVentaById(id: number): Promise<Venta> {
 
 }
 
-export async function getVentasByInmobiliaria(inmobiliariaId: number): Promise<Venta[]> {
+export async function getVentasByInmobiliaria(
+  inmobiliariaId: number,
+  query?: { estadoOperativo?: string }
+): Promise<Venta[]> {
+    const whereClause: any = { inmobiliariaId };
+
+    // Filtro estadoOperativo: default OPERATIVO si no viene
+    if (query?.estadoOperativo) {
+      whereClause.estadoOperativo = query.estadoOperativo;
+    } else {
+      whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
+    }
+
     const ventas = await prisma.venta.findMany({
-        where: { inmobiliariaId },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        where: whereClause,
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
         orderBy: { fechaVenta: 'desc' },
     });
     if (ventas.length === 0) {
@@ -63,11 +93,7 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
     }
     // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
     assertLoteOperableFor('crear venta', loteExists.estado);
-    if (loteExists.estado === 'ALQUILADO') {
-        const error = new Error('No se puede vender un lote que está alquilado');
-        (error as any).statusCode = 400;
-        throw error;
-    }
+    // Nota: No se bloquea la venta de lotes alquilados según requerimientos
     // Obtener la reserva asociada al lote (si existe y está aceptada)
     const reserva = await prisma.reserva.findFirst({
       where: {
@@ -189,11 +215,7 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
         const updatedVenta = await prisma.venta.update({
             where: { id }, 
             data: updateData,
-            include: { 
-                comprador: true, 
-                lote: { include: { propietario: true } }, 
-                inmobiliaria: true 
-            }, // Incluir todas las relaciones como en getVentaById
+            include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
         });
 
         // Side effect: si la venta se cancela, restaurar el lote a DISPONIBLE (siempre)
@@ -229,83 +251,90 @@ export async function deleteVenta(id: number): Promise<DeleteVentaResponse> {
     }
 }
 
-export async function desactivarVenta(id: number): Promise<Venta> {
-    const venta = await prisma.venta.findUnique({ where: { id } });
+export async function eliminarVenta(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<Venta> {
+    const venta = await prisma.venta.findUnique({ 
+      where: { id },
+      include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+    });
+    
     if (!venta) {
         const error = new Error('Venta no encontrada') as any;
         error.statusCode = 404;
         throw error;
     }
 
-    if (venta.estado === 'ELIMINADO') {
-        const error = new Error('La venta ya está eliminada') as any;
-        error.statusCode = 400;
+    // Validar permisos: INMOBILIARIA solo puede eliminar sus propias ventas
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (venta.inmobiliariaId !== user.inmobiliariaId) {
+        const error = new Error('No tienes permiso para eliminar esta venta') as any;
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+
+    if (venta.estadoOperativo === 'ELIMINADO') {
+        const error = new Error('La venta ya está eliminada.') as any;
+        error.statusCode = 409;
         throw error;
     }
 
-    // Al eliminar (lógico), liberamos el lote si estaba vendido?
-    // "Eliminar una venta" conceptualmente anula la operación. 
-    // Si es "papelera de reciclaje", quizás no deberíamos liberar el lote todavía hasta que sea defintivo?
-    // PERO: Si el usuario borra la venta, espera que el lote quede libre.
-    // Sin embargo, Venta tiene estados complejos (cancelada, etc).
-    // Si usamos ELIMINADO como "papelera", quizás deberíamos mantener el lote ocupado?
-    // En Personas/Inmobiliarias, eliminar es "ocultar".
-    // En Venta, es transaccional.
-    // Voy a asumir que desactivar es solo "soft delete" y NO altera el lote por ahora, 
-    // SALVO que el usuario pida explicitamente anular la venta (que seria CANCELADA).
-    // Pero espera, el usuario quiere "eliminacion logica".
-    // Si elimino logicamente, ¿aparece en los listados? Normalmente no.
-    // Si no aparece, y el lote sigue VENDIDO, es un problema de integridad.
-    // Si la venta se elimina, el lote debería volver a DISPONIBLE?
-    // Eso ya lo hace "CANCELADA".
-    // "ELIMINADO" suele ser "borré este registro por error" o "ya no interesa".
-    // Voy a hacer que cambie el estado y ponga fechaBaja, sin tocar el lote automágicamente, 
-    // para evitar efectos secundarios peligrosos. El usuario debería Cancelar primero si quiere liberar.
+    // Regla de negocio: solo se puede eliminar si estado === CANCELADA
+    const estadoStr = String(venta.estado).toUpperCase();
+    if (estadoStr !== 'CANCELADA') {
+        const error = new Error(`No se puede eliminar una venta en estado ${venta.estado}. Solo se pueden eliminar ventas canceladas.`) as any;
+        error.statusCode = 409;
+        throw error;
+    }
 
     return await prisma.venta.update({
         where: { id },
         data: {
-            estado: 'ELIMINADO',
-            estadoPrevio: venta.estado,
-            fechaBaja: new Date(),
+            estadoOperativo: 'ELIMINADO',
         },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 }
 
-export async function reactivarVenta(id: number): Promise<Venta> {
-    const venta = await prisma.venta.findUnique({ where: { id } });
+export async function reactivarVenta(
+  id: number,
+  user?: { role: string; inmobiliariaId?: number | null }
+): Promise<Venta> {
+    const venta = await prisma.venta.findUnique({ 
+      where: { id },
+      include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+    });
+    
     if (!venta) {
         const error = new Error('Venta no encontrada') as any;
         error.statusCode = 404;
         throw error;
     }
 
-    if (venta.estado !== 'ELIMINADO') {
-        const error = new Error('La venta no está eliminada') as any;
-        error.statusCode = 400;
+    // Validar permisos: INMOBILIARIA solo puede reactivar sus propias ventas
+    if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
+      if (venta.inmobiliariaId !== user.inmobiliariaId) {
+        const error = new Error('No tienes permiso para reactivar esta venta') as any;
+        error.statusCode = 403;
+        throw error;
+      }
+    }
+
+    if (venta.estadoOperativo === 'OPERATIVO') {
+        const error = new Error('La venta ya está operativa.') as any;
+        error.statusCode = 409;
         throw error;
     }
 
-    // Al reactivar, volvemos a INICIADA o OPERATIVO?
-    // Dado que el sistema usa INICIADA como default, y OPERATIVO es el genérico...
-    // Voy a usar INICIADA si no tengo historial, o OPERATIVO si queremos ser consistentes con "Active".
-    // Pero EstadoVenta tiene INICIADA, CON_BOLETO...
-    // Si estaba ESCRITURADO y lo borré, y lo reactivo... volver a INICIADA es perder datos.
-    // Como no guardé el "estadoAnterior", tengo un problema.
-    // ASUMIRÉ: Volver a OPERATIVO (si el enum lo tiene, que sí lo tiene). 
-    // El usuario podrá cambiarlo manualmente después.
-
-    const nuevoEstado = venta.estadoPrevio || 'INICIADA';
-
+    // Reactivar: solo cambia estadoOperativo a OPERATIVO (no valida lote disponible, plazos, etc.)
     return await prisma.venta.update({
         where: { id },
         data: {
-            estado: nuevoEstado,
-            estadoPrevio: null,
-            fechaBaja: null,
+            estadoOperativo: 'OPERATIVO',
         },
-        include: { comprador: true, lote: { include: { propietario: true } }, inmobiliaria: true },
+        include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });
 }
 

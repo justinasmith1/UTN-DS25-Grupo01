@@ -37,12 +37,22 @@ export function getFraccion(l) {
 }
 
 export function getInquilino(l) {
-  const i = l?.inquilino;
-  if (!i) return 'Sin inquilino';
-  if (i.nombreCompleto) return i.nombreCompleto;
-  const partes = [i.nombre, i.apellido].filter(Boolean);
+  // Preferir inquilino activo desde alquilerActivo (solo mostrar inquilino activo)
+  const inquilino = l?.alquilerActivo?.inquilino || null;
+  
+  if (!inquilino) {
+    return '—';
+  }
+  
+  if (inquilino.nombreCompleto) return inquilino.nombreCompleto;
+  const partes = [inquilino.nombre, inquilino.apellido].filter(Boolean);
   if (partes.length) return partes.join(' ');
-  return i.razonSocial ?? 'Sin inquilino';
+  return inquilino.razonSocial ?? '—';
+}
+
+export function getOcupacion(l) {
+  const ocupacionFinal = l?.ocupacion || (l?.alquilerActivo ? 'ALQUILADO' : 'NO_ALQUILADO');
+  return ocupacionFinal;
 }
 
 export function getNumPartida(l) {

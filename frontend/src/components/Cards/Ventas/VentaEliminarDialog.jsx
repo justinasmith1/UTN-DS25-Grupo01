@@ -18,16 +18,19 @@ export default function VentaEliminarDialog({
   const title = `Eliminar Venta N° ${venta?.numero ?? "—"}`;
 
   // Mensaje tipo pregunta
-  const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero}?. La venta pasará a estado ELIMINADO.`;
+  const message = `¿Seguro que deseas eliminar la venta N° ${venta?.numero ?? "—"}?`;
+
+  const loteInfo = `Lote: ${venta?.lote?.fraccion?.numero ?? '—'} - ${venta?.lote?.numero ?? '—'}`;
 
   // Detalles listados con bullets
   const details = [
-    `${venta?.lote?.mapId ?? "—"}`,
+    loteInfo,
     comprador ? `Comprador: ${comprador}` : null,
   ].filter(Boolean);
 
   // Nota final en negrita
-  const noteBold = "Podrás recuperarla luego desde los filtros de estado.";
+  // IMPORTANTE: No mencionar el lote. El eliminado lógico solo cambia estadoOperativo.
+  const noteBold = "La venta pasará a estado operativo ELIMINADO. El estado comercial de la venta y el estado del lote no se modificarán.";
 
   return (
     <EliminarBase

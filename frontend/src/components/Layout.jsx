@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Outlet, useSearchParams, useLocation } from "react-router-dom";
 import { useToast } from "../app/providers/ToastProvider";
 import { mockUser } from "../lib/data";
@@ -22,6 +22,11 @@ export default function Layout() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
+
+  // Leer metadata de lotes resaltados desde location.state (para el flujo de Ver en mapa)
+  const mapHighlight = useMemo(() => {
+    return location.state?.mapHighlight || null;
+  }, [location.state]);
 
   // El fetch de lotes está centralizado en Dashboard.jsx para evitar múltiples llamadas.
   // Layout solo carga lotes si no estamos en el Dashboard (para otras páginas como Map).
@@ -194,6 +199,7 @@ export default function Layout() {
         selectedLotId={selectedLotId}
         onViewDetail={handleViewDetail}
         lots={filteredLots}
+        mapHighlight={mapHighlight}
         onLoteUpdated={(updatedLot) => {
           // Actualizar el estado del Layout cuando se edita un lote desde el SidePanel
           if (updatedLot?.id) {

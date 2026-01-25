@@ -37,6 +37,17 @@ export function applyLoteFilters(allLots = [], p = {}) {
     rows = rows.filter((l) => set.has(norm(getEstado(l))));
   }
 
+  // Filtro por ocupación (usar campo ocupacion del backend)
+  if (p.ocupacion === 'ALQUILADO' || p.ocupacion === 'NO_ALQUILADO') {
+    rows = rows.filter((l) => {
+      const ocupacion = l?.ocupacion || (l?.alquilerActivo ? 'ALQUILADO' : 'NO_ALQUILADO');
+      // Fallback legacy: usar campo alquiler si existe
+      const ocupacionLegacy = l?.alquiler === true ? 'ALQUILADO' : 'NO_ALQUILADO';
+      const ocupacionFinal = ocupacion || ocupacionLegacy;
+      return ocupacionFinal === p.ocupacion;
+    });
+  }
+
   if (Array.isArray(p.subestado) && p.subestado.length > 0) {
     const set = new Set(p.subestado.map(norm));
     rows = rows.filter((l) => set.has(norm(getSub(l))));

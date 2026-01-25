@@ -7,6 +7,7 @@ export default function PersonaDesactivarDialog({
   open,
   persona,
   loading = false,
+  error = null,
   onCancel,
   onConfirm,
 }) {
@@ -48,7 +49,8 @@ export default function PersonaDesactivarDialog({
     `Cliente de: ${clienteDe}`,
     pers?._count ? [
       pers._count.lotesPropios > 0 ? `Propietario: ${pers._count.lotesPropios} lote(s)` : null,
-      pers._count.lotesAlquilados > 0 ? `Inquilino: ${pers._count.lotesAlquilados} lote(s)` : null,
+      (pers._count?.alquileres ?? 0) > 0 ? `Inquilino: ${pers._count.alquileres} lote(s) alquilado(s)` : 
+      (pers._count?.lotesAlquilados ?? 0) > 0 ? `Inquilino: ${pers._count.lotesAlquilados} lote(s)` : null,
       pers._count.Reserva > 0 ? `Reservas: ${pers._count.Reserva}` : null,
       pers._count.Venta > 0 ? `Ventas: ${pers._count.Venta}` : null,
     ].filter(Boolean) : [],
@@ -65,6 +67,7 @@ export default function PersonaDesactivarDialog({
       noteBold={noteBold}
       confirmLabel="Desactivar Persona"
       loading={loading}
+      error={error}
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

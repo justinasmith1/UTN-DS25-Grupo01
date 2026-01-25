@@ -24,9 +24,9 @@ function useUserRole() {
 const MODULES_META = {
   prioridades: {
     icon: Flag03Icon,
-    path: null, // No navega a ninguna ruta
+    path: '/prioridades',
     label: 'Prioridades',
-    disabled: true, // Marcado como deshabilitado
+    disabled: false,
   },
   reservas: {
     icon: Appointment02Icon,
@@ -89,6 +89,10 @@ export default function Sidebar() {
 
   // Menús por módulo - EXACTAMENTE igual que ModulePills
   const MENU = useMemo(() => ({
+    prioridades: [
+      { label: 'Ver Prioridades', to: '/prioridades', disabled: false },
+      { label: 'Registrar Prioridad', to: '/prioridades?crear=true', disabled: false },
+    ],
     ventas: [
       { label: 'Ver Ventas', to: '/ventas', disabled: false },
       { label: 'Registrar Venta', to: '/ventas?crear=true', disabled: false },

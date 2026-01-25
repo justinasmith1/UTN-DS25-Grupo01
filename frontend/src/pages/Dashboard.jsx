@@ -4,6 +4,8 @@ import { useAuth } from "../app/providers/AuthProvider";
 import { useToast } from "../app/providers/ToastProvider";
 import FilterBarLotes from "../components/FilterBar/FilterBarLotes";
 import { applyLoteFilters } from "../utils/applyLoteFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getLoteSearchFields } from "../utils/search/fields/loteSearchFields";
 import TablaLotes from "../components/Table/TablaLotes/TablaLotes";
 import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import LoteVerCard from "../components/Cards/Lotes/LoteVerCard.jsx";
@@ -13,6 +15,7 @@ import LoteCrearCard from "../components/Cards/Lotes/LoteCrearCard.jsx";
 import PromocionCard from "../components/Cards/Lotes/PromocionCard.jsx";
 import ReservaCrearCard from "../components/Cards/Reservas/ReservaCrearCard.jsx";
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
+import PrioridadCrearCard from "../components/Cards/Prioridades/PrioridadCrearCard.jsx";
 import { getAllLotes, getLoteById, deleteLote } from "../lib/api/lotes";
 import { getAllReservas, getReservaById } from "../lib/api/reservas";
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
@@ -49,6 +52,9 @@ export default function Dashboard() {
   const [loteParaVenta, setLoteParaVenta] = useState(null);
   const [lockLoteVenta, setLockLoteVenta] = useState(false);
   const [lockLoteReserva, setLockLoteReserva] = useState(false);
+  const [openPrioridadCrear, setOpenPrioridadCrear] = useState(false);
+  const [loteParaPrioridad, setLoteParaPrioridad] = useState(null);
+  const [lockLotePrioridad, setLockLotePrioridad] = useState(false);
   const [openPromocion, setOpenPromocion] = useState(false);
   const [loteParaPromocion, setLoteParaPromocion] = useState(null);
   const [modoPromocion, setModoPromocion] = useState("aplicar"); // "aplicar" o "ver"
@@ -75,8 +81,11 @@ export default function Dashboard() {
       setLoteSel(lote);
       setLockLoteReserva(true); // Bloquear lote cuando viene desde fila
       setOpenReservaCrear(true);
+    } else if (tipo === 'prioridad') {
+      setLoteParaPrioridad(lote);
+      setLockLotePrioridad(true); // Bloquear lote cuando viene desde fila
+      setOpenPrioridadCrear(true);
     }
-    // tipo === 'prioridad' no hace nada (disabled)
   }, []);
 
   const handleAplicarPromo = useCallback((lote, modo = "aplicar") => {
@@ -253,6 +262,14 @@ export default function Dashboard() {
         []
       );
 
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   const [params, setParams] = useState({});
   const handleParamsChange = useCallback((patch) => {
     if (!patch || Object.keys(patch).length === 0) { 
@@ -348,15 +365,22 @@ export default function Dashboard() {
     };
   }, []); // Sin dependencias: solo se ejecuta una vez al montar
 
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
   const lots = useMemo(() => {
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allLotes, searchText, getLoteSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, calle, fraccion, etc.)
     const hasParams = params && Object.keys(params).length > 0;
-    const result = hasParams ? applyLoteFilters(allLotes, params) : allLotes;
+    const result = hasParams ? applyLoteFilters(afterSearch, params) : afterSearch;
+    
+    // 3. Ordenar
     return [...result].sort((a, b) => {
       const idA = a?.id ?? a?.idLote ?? 0;
       const idB = b?.id ?? b?.idLote ?? 0;
       return idA - idB;
     });
-  }, [allLotes, params]);
+  }, [allLotes, params, searchText]);
 
   // Mostrar loading mientras se cargan los datos
   if (loading) {
@@ -373,7 +397,8 @@ export default function Dashboard() {
       <FilterBarLotes 
         variant="dashboard" 
         userRole={userRole} 
-        onParamsChange={handleParamsChange} 
+        onParamsChange={handleParamsChange}
+        onSearchChange={handleSearchChange}
       />
 
       <TablaLotes
@@ -479,6 +504,26 @@ export default function Dashboard() {
         }}
         loteIdPreSeleccionado={loteParaVenta?.id ?? loteParaVenta?.idLote}
         lockLote={lockLoteVenta}
+      />
+
+      <PrioridadCrearCard
+        open={openPrioridadCrear}
+        onCancel={() => {
+          setOpenPrioridadCrear(false);
+          setLoteParaPrioridad(null);
+          setLockLotePrioridad(false);
+        }}
+        onCreated={(newPrioridad) => {
+          setOpenPrioridadCrear(false);
+          // Refrescar el lote después de crear prioridad (el backend cambia el estado a CON_PRIORIDAD)
+          if (loteParaPrioridad?.id) {
+            fetchAndMergeLote(loteParaPrioridad);
+          }
+          setLoteParaPrioridad(null);
+          setLockLotePrioridad(false);
+        }}
+        loteIdPreSeleccionado={loteParaPrioridad?.id ?? loteParaPrioridad?.idLote}
+        lockLote={lockLotePrioridad}
       />
 
       <PromocionCard

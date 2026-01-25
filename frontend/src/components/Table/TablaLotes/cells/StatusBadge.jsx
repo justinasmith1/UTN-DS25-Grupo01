@@ -22,10 +22,11 @@ export const getEstadoVariant = (raw) => {
   const s = fmtEstadoLote(raw).toUpperCase(); // DISPO / EN PROMOCION / etc.
   const map = {
     'DISPONIBLE': 'info', // Color que tenía RESERVADO (azul)
-    'EN PROMOCION': 'warn',
+    'EN PROMOCION': 'orange', // Naranja/ámbar (nuevo variant)
     'RESERVADO': 'success', // Color que tenía DISPONIBLE (verde)
     'ALQUILADO': 'indigo',
-    'VENDIDO': 'warn', // Amarillo/naranja
+    'VENDIDO': 'warn', // Amarillo (mantener)
+    'CON PRIORIDAD': 'violet', // Violeta/índigo (nuevo variant)
     'NO DISPONIBLE': 'danger',
   };
   return map[s] || 'muted';

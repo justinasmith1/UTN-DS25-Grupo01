@@ -38,6 +38,22 @@ router.put(
     validate(updateInmobiliariaSchema),
     inmobiliariaController.updateInmobiliariaController);
 
+//PATCH /api/inmobiliarias/:id/eliminar
+router.patch(
+    '/:id/eliminar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(idParamSchema),
+    inmobiliariaController.eliminarInmobiliariaController);
+
+//PATCH /api/inmobiliarias/:id/reactivar
+router.patch(
+    '/:id/reactivar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(idParamSchema),
+    inmobiliariaController.reactivarInmobiliariaController);
+
 //DELETE /api/inmobiliarias/:id
 router.delete(
     '/:id',

@@ -65,6 +65,7 @@ export default function LoteSidePanel({
   onViewDetail,
   lots = [],
   onLoteUpdated,
+  mapHighlight = null,
 }) {
   // TODOS LOS HOOKS DEBEN IR AQUÍ, ANTES DE CUALQUIER RETURN CONDICIONAL
   const navigate = useNavigate();
@@ -77,6 +78,9 @@ export default function LoteSidePanel({
   const [loading, setLoading] = useState(false);
   const [descripcionExpanded, setDescripcionExpanded] = useState(false);
   const [loteImages, setLoteImages] = useState([]);
+  
+  // Estado para metadata de prioridades/reservas/ventas
+  const [metadataExpanded, setMetadataExpanded] = useState(false);
   
   // Estados para controlar qué card se muestra
   const [showEditCard, setShowEditCard] = useState(false);
@@ -295,10 +299,30 @@ export default function LoteSidePanel({
   const isReserveButtonDisabled = useMemo(() => {
     if (!currentLot) return true;
     const estado = estadoLote;
-    // Deshabilitado si está NO_DISPONIBLE, ALQUILADO
+    // Deshabilitado si está NO_DISPONIBLE (ocupación se maneja por separado)
     // NO deshabilitado si está DISPONIBLE, RESERVADO (muestra "Ver Reserva"), o VENDIDO (muestra "Ver Venta")
-    return estado === "NO_DISPONIBLE" || estado === "NO DISPONIBLE" || estado === "ALQUILADO";
+    return estado === "NO_DISPONIBLE" || estado === "NO DISPONIBLE";
   }, [currentLot, estadoLote]);
+
+  // Obtener metadata de prioridades/reservas/ventas para el lote actual
+  const loteMetadata = useMemo(() => {
+    if (!mapHighlight || !currentLot?.id) return null;
+    
+    const metaByLoteId = mapHighlight.metaByLoteId || {};
+    const source = mapHighlight.source;
+    
+    // Buscar metadata por el ID del lote actual
+    const metadata = metaByLoteId[currentLot.id];
+    
+    if (!metadata || (Array.isArray(metadata) && metadata.length === 0)) {
+      return null;
+    }
+    
+    // Retornar array completo con source
+    const items = Array.isArray(metadata) ? metadata : [metadata];
+    
+    return { items, source, count: items.length };
+  }, [mapHighlight, currentLot]);
 
   // Texto del botón según el estado
   const reserveButtonText = useMemo(() => {
@@ -674,6 +698,24 @@ export default function LoteSidePanel({
           white-space: pre-wrap;
           word-wrap: break-word;
         }
+        .lote-side-panel__metadata-header {
+          background-color: #f0f9ff;
+        }
+        .lote-side-panel__metadata-list {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+          font-size: 13px;
+        }
+        .lote-side-panel__metadata-item {
+          display: grid;
+          grid-template-columns: auto 1fr;
+          gap: 8px 16px;
+        }
+        .lote-side-panel__metadata-item--separated {
+          padding-bottom: 16px;
+          border-bottom: 1px solid #e5e7eb;
+        }
         @keyframes spin {
           to {
             transform: rotate(360deg);
@@ -883,6 +925,156 @@ export default function LoteSidePanel({
                       aria-labelledby="descripcion-header"
                     >
                       {safe(currentLot.descripcion)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sección de metadata de prioridades/reservas/ventas */}
+              {loteMetadata && (
+                <div className="lote-side-panel__descripcion" style={{ marginTop: "18px" }}>
+                  <div
+                    className="lote-side-panel__descripcion-header lote-side-panel__metadata-header"
+                    id="metadata-header"
+                    onClick={() => setMetadataExpanded(!metadataExpanded)}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={metadataExpanded}
+                    aria-label={metadataExpanded ? `Ocultar información de ${loteMetadata.source}` : `Mostrar información de ${loteMetadata.source}`}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        setMetadataExpanded(!metadataExpanded);
+                      }
+                    }}
+                  >
+                    <div className="lote-side-panel__descripcion-label">
+                      {loteMetadata.source === "prioridades" && (loteMetadata.count > 1 ? `Prioridades Seleccionadas (${loteMetadata.count})` : "Prioridad Seleccionada")}
+                      {loteMetadata.source === "reservas" && (loteMetadata.count > 1 ? `Reservas Seleccionadas (${loteMetadata.count})` : "Reserva Seleccionada")}
+                      {loteMetadata.source === "ventas" && (loteMetadata.count > 1 ? `Ventas Seleccionadas (${loteMetadata.count})` : "Venta Seleccionada")}
+                    </div>
+                    <span
+                      className={`lote-side-panel__descripcion-icon ${metadataExpanded ? "expanded" : ""}`}
+                      aria-hidden="true"
+                    >
+                      ▾
+                    </span>
+                  </div>
+                  {metadataExpanded && (
+                    <div 
+                      className="lote-side-panel__descripcion-content lote-side-panel__metadata-list"
+                      role="region"
+                      aria-labelledby="metadata-header"
+                    >
+                      {loteMetadata.items.map((item, index) => (
+                        <div 
+                          key={index}
+                          className={`lote-side-panel__metadata-item ${index < loteMetadata.items.length - 1 ? "lote-side-panel__metadata-item--separated" : ""}`}
+                        >
+                          {loteMetadata.source === "prioridades" && (
+                            <>
+                              {item.numero && (
+                                <>
+                                  <strong>N° Prioridad:</strong>
+                                  <span>{item.numero}</span>
+                                </>
+                              )}
+                              {item.estado && (
+                                <>
+                                  <strong>Estado:</strong>
+                                  <span>{item.estado}</span>
+                                </>
+                              )}
+                              {item.inmobiliaria && (
+                                <>
+                                  <strong>Inmobiliaria:</strong>
+                                  <span>{item.inmobiliaria}</span>
+                                </>
+                              )}
+                              {item.fechaInicio && (
+                                <>
+                                  <strong>Inicio:</strong>
+                                  <span>{new Date(item.fechaInicio).toLocaleDateString()}</span>
+                                </>
+                              )}
+                              {item.fechaFin && (
+                                <>
+                                  <strong>Vence:</strong>
+                                  <span>{new Date(item.fechaFin).toLocaleDateString()}</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {loteMetadata.source === "reservas" && (
+                            <>
+                              {item.numero && (
+                                <>
+                                  <strong>N° Reserva:</strong>
+                                  <span>{item.numero}</span>
+                                </>
+                              )}
+                              {item.estado && (
+                                <>
+                                  <strong>Estado:</strong>
+                                  <span>{item.estado}</span>
+                                </>
+                              )}
+                              {item.cliente && (
+                                <>
+                                  <strong>Cliente:</strong>
+                                  <span>{item.cliente}</span>
+                                </>
+                              )}
+                              {item.inmobiliaria && (
+                                <>
+                                  <strong>Inmobiliaria:</strong>
+                                  <span>{item.inmobiliaria}</span>
+                                </>
+                              )}
+                              {item.montoSeña && (
+                                <>
+                                  <strong>Seña:</strong>
+                                  <span>{fmtMoney(item.montoSeña)}</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                          {loteMetadata.source === "ventas" && (
+                            <>
+                              {item.numero && (
+                                <>
+                                  <strong>N° Venta:</strong>
+                                  <span>{item.numero}</span>
+                                </>
+                              )}
+                              {item.estado && (
+                                <>
+                                  <strong>Estado:</strong>
+                                  <span>{item.estado}</span>
+                                </>
+                              )}
+                              {item.comprador && (
+                                <>
+                                  <strong>Comprador:</strong>
+                                  <span>{item.comprador}</span>
+                                </>
+                              )}
+                              {item.inmobiliaria && (
+                                <>
+                                  <strong>Inmobiliaria:</strong>
+                                  <span>{item.inmobiliaria}</span>
+                                </>
+                              )}
+                              {item.montoTotal && (
+                                <>
+                                  <strong>Monto Total:</strong>
+                                  <span>{fmtMoney(item.montoTotal)}</span>
+                                </>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>

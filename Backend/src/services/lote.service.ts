@@ -61,11 +61,123 @@ function normalizeSuperficie(payload: any) {
   // Esta función puede eliminarse en el futuro si no se usa en otros lugares
 }
 
+// ===================
+// Funciones auxiliares para Alquileres y Ocupación
+// ===================
+
+// Calcular ocupación de un lote (derivada de alquiler activo)
+export type OcupacionLote = 'ALQUILADO' | 'NO_ALQUILADO';
+
+async function calcularOcupacion(loteId: number): Promise<OcupacionLote> {
+  const alquilerActivo = await prisma.alquiler.findFirst({
+    where: {
+      loteId,
+      estado: 'ACTIVO',
+    },
+  });
+  return alquilerActivo ? 'ALQUILADO' : 'NO_ALQUILADO';
+}
+
+// Obtener alquiler activo de un lote
+async function getAlquilerActivo(loteId: number) {
+  return prisma.alquiler.findFirst({
+    where: {
+      loteId,
+      estado: 'ACTIVO',
+    },
+    include: {
+      inquilino: {
+        select: {
+          id: true,
+          nombre: true,
+          apellido: true,
+          razonSocial: true,
+          identificadorTipo: true,
+          identificadorValor: true,
+        },
+      },
+    },
+  });
+}
+
+// Crear o mantener alquiler activo
+async function crearOMantenerAlquiler(loteId: number, inquilinoId: number): Promise<void> {
+  // Validar que la persona esté activa
+  const persona = await prisma.persona.findUnique({
+    where: { id: inquilinoId },
+    select: { estado: true },
+  });
+
+  if (!persona) {
+    const error: any = new Error('Persona no encontrada');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (persona.estado !== 'OPERATIVO') {
+    const error: any = new Error('No se puede asignar un inquilino inactivo');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  // Verificar si ya existe un alquiler activo
+  const alquilerExistente = await getAlquilerActivo(loteId);
+
+  if (alquilerExistente) {
+    // Si el inquilino es el mismo, no hacer nada
+    if (alquilerExistente.inquilinoId === inquilinoId) {
+      return;
+    }
+    // Si es diferente, finalizar el anterior y crear uno nuevo
+    await prisma.alquiler.update({
+      where: { id: alquilerExistente.id },
+      data: {
+        estado: 'FINALIZADO',
+        fechaFin: new Date(),
+      },
+    });
+  }
+
+  // Crear nuevo alquiler activo
+  await prisma.alquiler.create({
+    data: {
+      loteId,
+      inquilinoId,
+      estado: 'ACTIVO',
+      fechaInicio: new Date(),
+    },
+  });
+}
+
+// Finalizar alquiler activo si existe
+async function finalizarAlquilerActivo(loteId: number): Promise<void> {
+  const alquilerActivo = await getAlquilerActivo(loteId);
+  if (alquilerActivo) {
+    await prisma.alquiler.update({
+      where: { id: alquilerActivo.id },
+      data: {
+        estado: 'FINALIZADO',
+        fechaFin: new Date(),
+      },
+    });
+  }
+}
+
 // Normaliza filtros de query (DTO) a enums Prisma
 function buildWhereFromQueryDTO(query: any, role?: string) {
   const where: any = {};
 
-  if (query?.estado)      where.estado      = estadoLoteToPrisma(query.estado);
+  // Filtrar por estado (excluir ALQUILADO si viene en el filtro, ya que no es un estado válido)
+  if (query?.estado) {
+    const estado = Array.isArray(query.estado) ? query.estado : [query.estado];
+    const estadosFiltrados = estado
+      .map((e: string) => estadoLoteToPrisma(e))
+      .filter((e: any) => e && e !== 'ALQUILADO'); // Excluir ALQUILADO
+    if (estadosFiltrados.length > 0) {
+      where.estado = estadosFiltrados.length === 1 ? estadosFiltrados[0] : { in: estadosFiltrados };
+    }
+  }
+
   if (query?.subestado)   where.subestado   = subestadoLoteToPrisma(query.subestado);
   if (query?.tipo)        where.tipo        = tipoLoteToPrisma(query.tipo);
   if (query?.propietarioId) where.propietarioId = Number(query.propietarioId) || undefined;
@@ -82,6 +194,20 @@ function buildWhereFromQueryDTO(query: any, role?: string) {
   // Los técnicos ya no se limitan a EN_CONSTRUCCION; visibilidad controlada más abajo.
   return where;
 }
+
+// Filtrar por ocupación (aplicado después de obtener los lotes)
+function filterByOcupacion(lotes: any[], ocupacion?: 'ALQUILADO' | 'NO_ALQUILADO') {
+  if (!ocupacion) return lotes;
+  
+  return lotes.filter((lote) => {
+    const tieneAlquilerActivo = lote.alquilerActivo != null;
+    if (ocupacion === 'ALQUILADO') {
+      return tieneAlquilerActivo;
+    } else {
+      return !tieneAlquilerActivo;
+    }
+  });
+}
 // ---------------------------------------
 
 export async function getAllLotes(query: any = {}, role?: string) {
@@ -93,9 +219,25 @@ export async function getAllLotes(query: any = {}, role?: string) {
       orderBy: { id: 'asc' },
       include: {
         ubicacion: { select: { calle: true, numero: true} },
-        propietario: { select: { nombre: true, apellido: true, razonSocial: true } },
+        propietario: { select: { id: true, nombre: true, apellido: true, razonSocial: true, identificadorTipo: true, identificadorValor: true } },
         fraccion: { select: { numero: true } },
-        inquilino: { select: { nombre: true, apellido: true, razonSocial: true } },
+        inquilino: { select: { id: true, nombre: true, apellido: true, razonSocial: true, identificadorTipo: true, identificadorValor: true } },
+        alquileres: {
+          where: { estado: 'ACTIVO' },
+          include: {
+            inquilino: {
+              select: {
+                id: true,
+                nombre: true,
+                apellido: true,
+                razonSocial: true,
+                identificadorTipo: true,
+                identificadorValor: true,
+              },
+            },
+          },
+          take: 1,
+        },
         promociones: {
           where: { activa: true },
           select: {
@@ -113,11 +255,36 @@ export async function getAllLotes(query: any = {}, role?: string) {
     prisma.lote.count({ where }),
   ]);
 
-  const lotesVisibles = role === 'TECNICO'
-    ? lotes.map((lote) => stripFieldsForTecnico(lote))
-    : lotes;
+  // Enriquecer lotes con alquilerActivo y ocupacion
+  const lotesEnriquecidos = lotes.map((lote) => {
+    const alquilerActivo = lote.alquileres?.[0] || null;
+    const ocupacion: OcupacionLote = alquilerActivo ? 'ALQUILADO' : 'NO_ALQUILADO';
+    
+    return {
+      ...lote,
+      alquilerActivo: alquilerActivo ? {
+        id: alquilerActivo.id,
+        inquilino: alquilerActivo.inquilino,
+        fechaInicio: alquilerActivo.fechaInicio,
+      } : null,
+      ocupacion,
+      // Mantener inquilino legacy por compatibilidad (usar alquilerActivo.inquilino si existe)
+      inquilino: alquilerActivo?.inquilino || lote.inquilino || null,
+      inquilinoId: alquilerActivo?.inquilinoId || lote.inquilinoId || null,
+    };
+  });
 
-  return { lotes: lotesVisibles, total };
+  // Filtrar por ocupación si viene en query
+  let lotesFiltrados = lotesEnriquecidos;
+  if (query?.ocupacion === 'ALQUILADO' || query?.ocupacion === 'NO_ALQUILADO') {
+    lotesFiltrados = filterByOcupacion(lotesEnriquecidos, query.ocupacion);
+  }
+
+  const lotesVisibles = role === 'TECNICO'
+    ? lotesFiltrados.map((lote) => stripFieldsForTecnico(lote))
+    : lotesFiltrados;
+
+  return { lotes: lotesVisibles, total: lotesFiltrados.length };
 }
 
 
@@ -127,9 +294,25 @@ export async function getLoteById(id: number, role?: string) {
     where: { id: id },
     include: {
       ubicacion: { select: { calle: true, numero: true } },
-      propietario: { select: { nombre: true, apellido: true, razonSocial: true } },
+      propietario: { select: { nombre: true, apellido: true, razonSocial: true, id: true, identificadorTipo: true, identificadorValor: true } },
       fraccion: { select: { numero: true } },
-      inquilino: { select: { nombre: true, apellido: true, razonSocial: true } },
+      inquilino: { select: { nombre: true, apellido: true, razonSocial: true, id: true, identificadorTipo: true, identificadorValor: true } },
+      alquileres: {
+        where: { estado: 'ACTIVO' },
+        include: {
+          inquilino: {
+            select: {
+              id: true,
+              nombre: true,
+              apellido: true,
+              razonSocial: true,
+              identificadorTipo: true,
+              identificadorValor: true,
+            },
+          },
+        },
+        take: 1,
+      },
       promociones: {
         where: { activa: true },
         select: {
@@ -148,10 +331,27 @@ export async function getLoteById(id: number, role?: string) {
     const e: any = new Error('Lote no encontrado'); e.statusCode = 404; throw e;
   }
 
+  // Enriquecer con alquilerActivo y ocupacion
+  const alquilerActivo = lote.alquileres?.[0] || null;
+  const ocupacion: OcupacionLote = alquilerActivo ? 'ALQUILADO' : 'NO_ALQUILADO';
+  
+  const loteEnriquecido = {
+    ...lote,
+    alquilerActivo: alquilerActivo ? {
+      id: alquilerActivo.id,
+      inquilino: alquilerActivo.inquilino,
+      fechaInicio: alquilerActivo.fechaInicio,
+    } : null,
+    ocupacion,
+    // Mantener inquilino legacy por compatibilidad
+    inquilino: alquilerActivo?.inquilino || lote.inquilino || null,
+    inquilinoId: alquilerActivo?.inquilinoId || lote.inquilinoId || null,
+  };
+
   if (role === 'TECNICO') {
-    return stripFieldsForTecnico(lote);
+    return stripFieldsForTecnico(loteEnriquecido);
   }
-  return lote;
+  return loteEnriquecido;
 }
 
 
@@ -284,12 +484,80 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
 
   normalizeSuperficie(payload);
 
+  // Obtener estado actual del lote para validaciones
+  const loteActual = await prisma.lote.findUnique({
+    where: { id },
+    select: { estado: true },
+  });
+
+  if (!loteActual) {
+    const error: any = new Error('Lote no encontrado');
+    error.statusCode = 404;
+    throw error;
+  }
+
   // La autorización para TECNICO ya fue manejada por el middleware y la lógica en getLoteById.
   // Aquí solo transformamos el DTO para la actualización.
   const dataToUpdate: Prisma.LoteUpdateInput = {};
-  const { estado, subestado, tipo, propietarioId, ubicacionId, superficie, calle, numeroCalle, ...rest } = payload;
+  const { estado, subestado, tipo, propietarioId, inquilinoId, ocupacion, ubicacionId, superficie, calle, numeroCalle, ...rest } = payload;
 
-  if (estado) dataToUpdate.estado = estadoLoteToPrisma(estado);
+  // ===================
+  // Manejo de OCUPACIÓN (nueva lógica)
+  // ===================
+  if (ocupacion !== undefined) {
+    // Validación: NO_DISPONIBLE no permite ocupación ALQUILADO
+    if (ocupacion === 'ALQUILADO' && loteActual.estado === 'NO_DISPONIBLE') {
+      const error: any = new Error('No se puede alquilar un lote en estado NO DISPONIBLE');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // Validación: si ocupacion=ALQUILADO, inquilinoId es requerido
+    if (ocupacion === 'ALQUILADO' && (!inquilinoId || inquilinoId <= 0)) {
+      const error: any = new Error('Debes seleccionar un inquilino si la ocupación es Alquilado');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    if (ocupacion === 'ALQUILADO') {
+      // Validar que la persona inquilino esté activa
+      const personaInquilino = await prisma.persona.findUnique({
+        where: { id: inquilinoId },
+        select: { estado: true },
+      });
+
+      if (!personaInquilino) {
+        const error: any = new Error('Persona inquilino no encontrada');
+        error.statusCode = 404;
+        throw error;
+      }
+
+      if (personaInquilino.estado !== 'OPERATIVO') {
+        const error: any = new Error('No se puede asignar un inquilino inactivo');
+        error.statusCode = 400;
+        throw error;
+      }
+
+      // Crear o mantener alquiler activo
+      await crearOMantenerAlquiler(id, inquilinoId);
+    } else if (ocupacion === 'NO_ALQUILADO') {
+      // Finalizar alquiler activo si existe
+      await finalizarAlquilerActivo(id);
+    }
+  }
+  
+  // Procesar estado (NO debe incluir ALQUILADO como estado válido)
+  if (estado) {
+    const estadoPrisma = estadoLoteToPrisma(estado);
+    // Validar que no se intente establecer ALQUILADO como estado (ya no es válido)
+    if (estadoPrisma === EstadoLotePrisma.ALQUILADO) {
+      const error: any = new Error('ALQUILADO ya no es un estado válido. Usa Ocupación en su lugar');
+      error.statusCode = 400;
+      throw error;
+    }
+    dataToUpdate.estado = estadoPrisma;
+  }
+  
   if (subestado) dataToUpdate.subestado = subestadoLoteToPrisma(subestado);
   if (tipo) dataToUpdate.tipo = tipoLoteToPrisma(tipo);
   if (propietarioId) dataToUpdate.propietario = { connect: { id: propietarioId } };
@@ -331,9 +599,9 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
     dataToUpdate.superficie = superficie;
   }
 
-  // Asignar el resto de los campos (excluyendo calle y numeroCalle que ya se procesaron)
+  // Asignar el resto de los campos (excluyendo calle, numeroCalle, inquilinoId y ocupacion que ya se procesaron)
   // Excluir también campos que no deben actualizarse directamente
-  const { calle: _, numeroCalle: __, ...restFields } = rest;
+  const { calle: _, numeroCalle: __, inquilinoId: ___, ocupacion: ____, ...restFields } = rest;
   Object.assign(dataToUpdate, restFields);
 
   // Detectar transición a NO_DISPONIBLE y cancelar operaciones activas (efecto centralizado)
@@ -350,10 +618,29 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
   }
 
   try {
-    return await prisma.lote.update({
+    const updated = await prisma.lote.update({
       where: { id },
       data: dataToUpdate,
+      include: {
+        ubicacion: { select: { calle: true, numero: true } },
+        propietario: { select: { id: true, nombre: true, apellido: true, razonSocial: true, identificadorTipo: true, identificadorValor: true } },
+        fraccion: { select: { numero: true } },
+        inquilino: { select: { id: true, nombre: true, apellido: true, razonSocial: true, identificadorTipo: true, identificadorValor: true } },
+        promociones: {
+          where: { activa: true },
+          select: {
+            id: true,
+            precioPromocional: true,
+            precioAnterior: true,
+            inicio: true,
+            fin: true,
+            explicacion: true,
+          },
+          take: 1,
+        },
+      },
     });
+    return updated;
   } catch (e: any) {
     if (e.code === 'P2025') { // Código de error de Prisma para "registro no encontrado"
       const error = new Error('Lote no encontrado');

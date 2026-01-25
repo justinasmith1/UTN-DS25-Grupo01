@@ -42,10 +42,11 @@ export const fromApi = (apiPersona) => {
     jefeDeFamilia: apiPersona.jefeDeFamilia || null,
     miembrosFamilia: apiPersona.miembrosFamilia || [],
     esJefeDeFamilia: Boolean(apiPersona.esJefeDeFamilia),
-    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, Reserva: 0, Venta: 0 },
+    _count: apiPersona._count || { lotesPropios: 0, lotesAlquilados: 0, alquileres: 0, Reserva: 0, Venta: 0 },
     // Arrays mínimos para mini detalles
     lotesPropios: apiPersona.lotesPropios || [],
     lotesAlquilados: apiPersona.lotesAlquilados || [],
+    alquileresActivos: apiPersona.alquileresActivos || [],
     reservas: apiPersona.reservas || [],
     ventas: apiPersona.ventas || [],
   };
@@ -72,42 +73,20 @@ export const toApi = (frontendPersona) => {
 
 /**
  * Obtiene todas las personas
+ * El filtrado de visibilidad se hace en frontend (igual que Inmobiliarias)
  */
 export const getAllPersonas = async (params = {}) => {
   try {
-    // Construir query string si hay parámetros
     const queryParams = new URLSearchParams();
     
-    // Parámetros básicos
     if (params.view) {
       queryParams.append('view', params.view);
     }
-    // q (búsqueda) ya NO se envía al backend - se maneja 100% en frontend
     if (params.includeInactive === true || params.includeInactive === 'true') {
       queryParams.append('includeInactive', 'true');
     }
     if (params.limit) {
       queryParams.append('limit', params.limit.toString());
-    }
-    
-    // Nuevos filtros
-    if (params.estado) {
-      queryParams.append('estado', params.estado);
-    }
-    if (params.clienteDe) {
-      queryParams.append('clienteDe', params.clienteDe);
-    }
-    if (params.inmobiliariaId) {
-      queryParams.append('inmobiliariaId', String(params.inmobiliariaId));
-    }
-    if (params.identificadorTipo) {
-      queryParams.append('identificadorTipo', params.identificadorTipo);
-    }
-    if (params.createdFrom) {
-      queryParams.append('createdFrom', params.createdFrom);
-    }
-    if (params.createdTo) {
-      queryParams.append('createdTo', params.createdTo);
     }
     
     const queryString = queryParams.toString() ? `?${queryParams.toString()}` : '';
@@ -479,167 +458,5 @@ export const list = async (params = {}) => {
     throw error;
   }
 };
-
-// ===================
-// Mock Data (para desarrollo)
-// ===================
-
-const mockPersonas = [
-  {
-    idPersona: 1,
-    nombre: 'Juan',
-    apellido: 'Pérez',
-    identificador: 'DNI',
-    cuil: '12345678',
-    telefono: 1123456789,
-    email: 'juan.perez@email.com',
-    contacto: 'juan.perez@email.com,1123456789',
-    createdAt: '2024-01-15T10:30:00Z',
-    esPropietario: true,
-    esInquilino: false,
-  },
-  {
-    idPersona: 2,
-    nombre: 'María',
-    apellido: 'González',
-    identificador: 'CUIT',
-    cuil: '20-12345678-9',
-    telefono: 1198765432,
-    email: 'maria.gonzalez@email.com',
-    contacto: 'maria.gonzalez@email.com,1198765432',
-    createdAt: '2024-01-20T14:15:00Z',
-    esPropietario: false,
-    esInquilino: true,
-  },
-  {
-    idPersona: 3,
-    nombre: 'Carlos',
-    apellido: 'López',
-    identificador: 'CUIL',
-    cuil: '27-87654321-0',
-    telefono: 1156789012,
-    email: null,
-    contacto: '1156789012',
-    createdAt: '2024-02-01T09:45:00Z',
-    esPropietario: false,
-    esInquilino: false,
-  },
-  {
-    idPersona: 4,
-    nombre: 'Ana',
-    apellido: 'Martínez',
-    identificador: 'Pasaporte',
-    cuil: 'AB123456',
-    telefono: null,
-    email: 'ana.martinez@email.com',
-    contacto: 'ana.martinez@email.com',
-    createdAt: '2024-02-10T16:20:00Z',
-    esPropietario: true,
-    esInquilino: false,
-  }
-];
-
-/**
- * Función mock para desarrollo
- */
-export const mockFilterSortPage = (personas, filters = {}, sort = {}, pagination = {}) => {
-  let filtered = [...personas];
-
-  // Aplicar filtros
-  if (filters.q) {
-    const query = filters.q.toLowerCase();
-    filtered = filtered.filter(persona => 
-      (persona.idPersona != null && persona.idPersona.toString().includes(query)) ||
-      persona.nombre.toLowerCase().includes(query) ||
-      persona.apellido.toLowerCase().includes(query) ||
-      persona.cuil.toLowerCase().includes(query) ||
-      (persona.email && persona.email.toLowerCase().includes(query)) ||
-      (persona.telefono && persona.telefono.toString().includes(query))
-    );
-  }
-
-  if (filters.tipoIdentificador) {
-    filtered = filtered.filter(persona => persona.identificador === filters.tipoIdentificador);
-  }
-
-  if (filters.tieneEmail !== undefined) {
-    filtered = filtered.filter(persona => !!persona.email === filters.tieneEmail);
-  }
-
-  if (filters.tieneTelefono !== undefined) {
-    filtered = filtered.filter(persona => !!persona.telefono === filters.tieneTelefono);
-  }
-
-  if (filters.tipo === 'propietario') {
-    filtered = filtered.filter(persona => persona.esPropietario);
-  } else if (filters.tipo === 'inquilino') {
-    filtered = filtered.filter(persona => persona.esInquilino);
-  }
-
-  if (filters.fechaCreacion) {
-    const { min, max } = filters.fechaCreacion;
-    filtered = filtered.filter(persona => {
-      const fecha = new Date(persona.createdAt);
-      return (!min || fecha >= new Date(min)) && (!max || fecha <= new Date(max));
-    });
-  }
-
-  // Aplicar ordenamiento
-  if (sort.field) {
-    filtered.sort((a, b) => {
-      let aVal = a[sort.field];
-      let bVal = b[sort.field];
-
-      if (sort.field === 'nombreCompleto') {
-        aVal = `${a.nombre} ${a.apellido}`;
-        bVal = `${b.nombre} ${b.apellido}`;
-      }
-
-      if (typeof aVal === 'string') {
-        aVal = aVal.toLowerCase();
-        bVal = bVal.toLowerCase();
-      }
-
-      if (sort.direction === 'desc') {
-        return bVal > aVal ? 1 : -1;
-      }
-      return aVal > bVal ? 1 : -1;
-    });
-  }
-
-  // Aplicar paginación
-  const total = filtered.length;
-  const page = pagination.page || 1;
-  const pageSize = pagination.pageSize || 10;
-  const start = (page - 1) * pageSize;
-  const end = start + pageSize;
-
-  return {
-    data: filtered.slice(start, end),
-    total,
-    page,
-    pageSize,
-    totalPages: Math.ceil(total / pageSize)
-  };
-};
-
-// Variable para controlar el uso de mock
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-
-// Exportar funciones con mock condicional
-export const getAllPersonasWithMock = async (params = {}) => {
-  if (USE_MOCK) {
-    const result = mockFilterSortPage(mockPersonas, params.filters, params.sort, params.pagination);
-    return {
-      personas: result.data.map(fromApi),
-      total: result.total
-    };
-  }
-  return getAllPersonas(params);
-};
-
-
-
-
 
 

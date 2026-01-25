@@ -9,6 +9,7 @@ function LoteLegend({ className = "" }) {
     "DISPONIBLE",
     "RESERVADO",
     "EN PROMOCION",
+    "CON PRIORIDAD",
     "ALQUILADO",
     "VENDIDO",
     "NO DISPONIBLE",

@@ -29,6 +29,10 @@ export default function TablaBase({
   selected,
   onSelectedChange,
   allowHorizontalScroll = false,
+  // Nuevos props para control de selección
+  isSelectionDisabled = false,          // Deshabilita toda la selección
+  isRowSelectable = null,               // Función (row) => boolean para determinar si una fila es seleccionable
+  disabledSelectionTooltip = '',        // Tooltip para checkboxes deshabilitados
 }) {
   const rowsNorm = useMemo(() => toArray(rows), [rows]);
 
@@ -173,7 +177,13 @@ export default function TablaBase({
         <div className="tl-thead">
           <div className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
             <div className="tl-th tl-th--checkbox">
-              <input type="checkbox" checked={allOnPageSelected} onChange={toggleAllOnPage} />
+              <input 
+                type="checkbox" 
+                checked={allOnPageSelected} 
+                onChange={toggleAllOnPage}
+                disabled={isSelectionDisabled}
+                title={isSelectionDisabled ? disabledSelectionTooltip : ''}
+              />
             </div>
             {visibleCols.map((c) => (
               <div key={c.id} className={`tl-th tl-th--${c.align || 'left'}`}>
@@ -192,6 +202,7 @@ export default function TablaBase({
           {!empty &&
             pageItems.map((row) => {
               const id = getId(row);
+              const isRowDisabled = isSelectionDisabled || (typeof isRowSelectable === 'function' && !isRowSelectable(row));
               return (
                 <div key={id} className="tl-tr" style={{ gridTemplateColumns: gridTemplate }}>
                   <div className="tl-td tl-td--checkbox">
@@ -199,6 +210,8 @@ export default function TablaBase({
                       type="checkbox"
                       checked={selectedIds.includes(id)}
                       onChange={() => toggleRow(id)}
+                      disabled={isRowDisabled}
+                      title={isRowDisabled ? disabledSelectionTooltip : ''}
                     />
                   </div>
 

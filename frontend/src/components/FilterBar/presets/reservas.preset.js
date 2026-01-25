@@ -6,14 +6,12 @@ export const reservasFilterPreset = {
     // Estados: dejalo vacío si los vas a inyectar desde el container;
     // o completalo acá con tus 9 estados reales
     ESTADOS: [
-      "OPERATIVO",
       "ACTIVA",
       "CANCELADA",
       "ACEPTADA",
       "RECHAZADA",
       "EXPIRADA",
       "CONTRAOFERTA",
-      "ELIMINADO",
     ],
     // Reutilizamos los nombres tal cual, así no sale [Object Object]
     INMOBILIARIAS: [

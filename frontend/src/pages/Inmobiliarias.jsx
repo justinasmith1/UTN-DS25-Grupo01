@@ -15,6 +15,8 @@ import {
   reactivateInmobiliaria
 } from "../lib/api/inmobiliarias";
 import { applyInmobiliariaFilters } from "../utils/applyInmobiliariaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getInmobiliariaSearchFields } from "../utils/search/fields/inmobiliariaSearchFields";
 
 import InmobiliariaVerCard from "../components/Cards/Inmobiliarias/InmobiliariaVerCard.jsx";
 import InmobiliariaEditarCard from "../components/Cards/Inmobiliarias/InmobiliariaEditarCard.jsx";
@@ -30,6 +32,14 @@ export default function Inmobiliarias() {
   const [searchParams, setSearchParams] = useSearchParams();
   const crearParam = searchParams.get('crear') === 'true';
 
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   // Estado de filtros
   const [params, setParams] = useState({});
   const handleParamsChange = useCallback((patch) => {
@@ -40,17 +50,21 @@ export default function Inmobiliarias() {
     setParams((prev) => ({ ...prev, ...patch }));
   }, []);
 
-  // Dataset base: obtenemos todas las inmobiliarias desde la API una sola vez
+  // Dataset base: obtenemos las inmobiliarias desde la API
+  // El backend filtra por estadoOperativo; sin parámetro devuelve solo OPERATIVO.
+  // Al elegir "Eliminadas" hay que pedir estadoOperativo=ELIMINADO y recargar.
   const [allInmobiliarias, setAllInmobiliarias] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Cargar todas las inmobiliarias al montar el componente
+  // Cargar inmobiliarias; refetch cuando cambia la visibilidad (Operativas / Eliminadas)
   useEffect(() => {
     let alive = true;
+    const estadoOperativo = params.visibilidad ?? 'OPERATIVO';
+
     (async () => {
       try {
         setLoading(true);
-        const res = await getAllInmobiliarias({});
+        const res = await getAllInmobiliarias({ estadoOperativo });
         if (alive) {
           const data = res.data || [];
           setAllInmobiliarias(data);
@@ -69,18 +83,25 @@ export default function Inmobiliarias() {
     })();
 
     return () => { alive = false; };
-  }, []); // Dependencias vacías para ejecutar solo una vez
+  }, [params.visibilidad]);
 
-  // Aplicar filtros localmente
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
+  // Siempre aplicar filtros (como Prioridades/Reservas/Ventas): visibilidad OPERATIVO por defecto
+  // cuando params está vacío, para que al eliminar (estado ELIMINADO) el ítem deje de verse al instante
   const inmobiliarias = useMemo(() => {
-    const hasParams = params && Object.keys(params).length > 0;
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allInmobiliarias, searchText, getInmobiliariaSearchFields);
+
+    // 2. Aplicar filtros (visibilidad, comxventa, cantidadVentas, etc.)
+    // Si params está vacío (FilterBar no ha aplicado aún), usar visibilidad OPERATIVO por defecto
+    const effectiveParams = { visibilidad: 'OPERATIVO', ...params };
     try {
-      return hasParams ? applyInmobiliariaFilters(allInmobiliarias, params) : allInmobiliarias;
+      return applyInmobiliariaFilters(afterSearch, effectiveParams);
     } catch (err) {
       console.error('Error aplicando filtros:', err);
-      return allInmobiliarias;
+      return afterSearch;
     }
-  }, [allInmobiliarias, params]);
+  }, [allInmobiliarias, params, searchText]);
 
   // Estado de selección - TablaBase espera array de IDs (strings)
   const [selectedRows, setSelectedRows] = useState([]);
@@ -184,12 +205,12 @@ export default function Inmobiliarias() {
     try {
       setDeleting(true);
       const response = await deleteInmobiliaria(inmobiliariaSel.id);
-      // La API ahora devuelve la inmobiliaria con estado ELIMINADO
+      // La API devuelve la inmobiliaria actualizada con estadoOperativo = ELIMINADO
       const updated = response?.data ?? response;
 
-      // Actualizar el estado de la inmobiliaria en lugar de eliminarla
-      setAllInmobiliarias((prev) => prev.map((i) =>
-        i.id === inmobiliariaSel.id ? { ...i, estado: "ELIMINADO", fechaBaja: updated?.fechaBaja ?? new Date().toISOString() } : i
+      // Actualizar en lista con el objeto completo devuelto por el backend
+      setAllInmobiliarias((prev) => prev.map((i) => 
+        i.id === inmobiliariaSel.id ? updated : i
       ));
 
       setOpenEliminar(false);
@@ -242,6 +263,8 @@ export default function Inmobiliarias() {
         variant="dashboard"
         userRole={user?.role}
         onParamsChange={handleParamsChange}
+        onSearchChange={handleSearchChange}
+        value={params} // Pasar params para sincronizar el estado del filtro
       />
 
       {/* Tabla de inmobiliarias */}
@@ -311,9 +334,9 @@ export default function Inmobiliarias() {
             const response = await reactivateInmobiliaria(inmobiliariaSel.id);
             const updated = response?.data ?? response;
 
-            // Actualizar el estado de la inmobiliaria
-            setAllInmobiliarias((prev) => prev.map((i) =>
-              i.id === inmobiliariaSel.id ? { ...i, estado: "OPERATIVO" } : i
+            // Actualizar en lista con el objeto completo devuelto por el backend
+            setAllInmobiliarias((prev) => prev.map((i) => 
+              i.id === inmobiliariaSel.id ? updated : i
             ));
 
             setOpenReactivar(false);

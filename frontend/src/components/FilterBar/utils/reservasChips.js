@@ -22,7 +22,14 @@ export function reservasChipsFrom(applied, catalogs) {
     chips.push({ k: "q", label: `Buscar: ${applied.q}` });
   }
 
-  // Estado (plural, como el field.id)
+  // Visibilidad (estadoOperativo) - solo mostrar si no es el default "OPERATIVO"
+  const visibilidad = applied.visibilidad ?? applied.estadoOperativo ?? "OPERATIVO";
+  if (visibilidad !== "OPERATIVO") {
+    const visibilidadLabel = visibilidad === "ELIMINADO" ? "Eliminadas" : visibilidad;
+    chips.push({ k: "visibilidad", v: visibilidad, label: `${visibilidadLabel}` });
+  }
+
+  // Estado (plural, como el field.id) - estado de negocio
   (applied.estado || []).forEach((v) => {
     chips.push({ k: "estado", v, label: `Estado: ${nice(v)}` });
   });

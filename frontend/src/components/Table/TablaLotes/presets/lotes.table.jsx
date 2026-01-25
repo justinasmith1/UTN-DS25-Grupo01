@@ -22,6 +22,7 @@ export const lotesTablePreset = {
       case 'tipo':       return '140px';
       case 'fraccion':   return '120px';
       case 'inquilino':  return '200px';
+      case 'ocupacion':  return '141px';
       case 'numPartida': return '120px';
       case 'descripcion':return 'minmax(280px,370px)';
       case 'superficie': return '120px';
@@ -45,6 +46,7 @@ export const lotesTablePreset = {
     const getTipo              = getters.getTipo;
     const getFraccion          = getters.getFraccion;
     const getInquilino         = getters.getInquilino;
+    const getOcupacion         = getters.getOcupacion;
     const getNumPartida        = getters.getNumPartida;
     const getLoteIdFormatted   = getters.getLoteIdFormatted;
 
@@ -79,6 +81,19 @@ export const lotesTablePreset = {
       { id: 'superficie',  titulo: 'Superficie',  accessor: (l) => fmtM2(l.superficie ?? l.metros ?? l.m2), align: 'right' },
       { id: 'descripcion', titulo: 'Descripción', accessor: (l) => l.descripcion ?? '—',                align: 'left'   },
       { id: 'inquilino',   titulo: 'Inquilino',   accessor: (l) => getInquilino(l),                      align: 'center' },
+      {
+        id: 'ocupacion',
+        titulo: 'Ocupación',
+        accessor: (l) => {
+          const ocupacion = getOcupacion(l);
+          return ocupacion === 'ALQUILADO' ? (
+            <span className="tl-badge tl-badge--indigo">Alquilado</span>
+          ) : (
+            <span className="tl-badge tl-badge--muted">No alquilado</span>
+          );
+        },
+        align: 'center',
+      },
     ];
   },
 };

@@ -14,9 +14,34 @@ export const inmobiliariasFilterPreset = {
       step: 0.1, 
       unit: "%" 
     },
+    prioridadesTotales: { 
+      minLimit: 0, 
+      maxLimit: 100, 
+      step: 1, 
+      unit: "prioridades" 
+    },
+    reservasTotales: { 
+      minLimit: 0, 
+      maxLimit: 300, 
+      step: 1, 
+      unit: "reservas" 
+    },
+    ventasTotales: { 
+      minLimit: 0, 
+      maxLimit: 300, 
+      step: 1, 
+      unit: "ventas" 
+    },
+    // Legacy (mantener por compatibilidad)
+    cantidadReservas: { 
+      minLimit: 0, 
+      maxLimit: 300, 
+      step: 1, 
+      unit: "reservas" 
+    },
     cantidadVentas: { 
       minLimit: 0, 
-      maxLimit: 1000, 
+      maxLimit: 300, 
       step: 1, 
       unit: "ventas" 
     },
@@ -32,7 +57,9 @@ export const inmobiliariasFilterPreset = {
     // Valores por defecto para todos los filtros
     q: "", // Búsqueda general (cubre nombre, razón social, contacto)
     comxventa: { min: null, max: null }, // Rango de comisión
-    cantidadVentas: { min: null, max: null }, // Rango de cantidad de ventas
+    prioridadesTotales: { min: null, max: null }, // Rango de prioridades totales
+    reservasTotales: { min: null, max: null }, // Rango de reservas totales
+    ventasTotales: { min: null, max: null }, // Rango de ventas totales
     createdAt: { min: null, max: null }, // Rango de fechas de creación
   },
 };

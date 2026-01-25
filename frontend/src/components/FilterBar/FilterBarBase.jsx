@@ -109,30 +109,49 @@ export default function FilterBarBase({
         return hasChanges ? updated : prev;
       });
     }
-  }, [initialValue]);
+  }, [initialValue, fields]);
 
   // Debounce de búsqueda (solo para búsqueda inmediata)
   // Si hay onSearchChange, usarlo en lugar de onParamsChange para búsqueda
   const searchField = fields.find(f => f.type === 'search');
   const searchValue = searchField ? filterState[searchField.id] : '';
   
+  // Debounce de búsqueda: solo actualizar appliedFilters cuando NO hay onSearchChange
+  // o al final del debounce si hay onSearchChange (para evitar rebotes)
   useEffect(() => {
     if (!searchField) return;
     
     const timeoutId = setTimeout(() => {
-      setAppliedFilters((prev) => ({ ...prev, [searchField.id]: searchValue }));
-      
-      // Si hay onSearchChange, usarlo para búsqueda (no dispara fetch)
-      // Si no, usar onParamsChange (comportamiento por defecto)
       if (onSearchChange) {
+        // Con onSearchChange: solo llamar al callback, NO actualizar appliedFilters durante escritura
+        // Esto evita re-renders innecesarios que causan el "rebote" en el input
         onSearchChange(searchValue);
       } else {
-      onParamsChange?.({ [searchField.id]: searchValue });
+        // Sin onSearchChange: comportamiento por defecto (actualizar appliedFilters y llamar onParamsChange)
+        setAppliedFilters((prev) => ({ ...prev, [searchField.id]: searchValue }));
+        onParamsChange?.({ [searchField.id]: searchValue });
       }
     }, DEBOUNCE_MS);
     
     return () => clearTimeout(timeoutId);
   }, [searchValue, searchField, onSearchChange, onParamsChange]);
+  
+  // Actualizar appliedFilters para el chip de búsqueda solo cuando hay onSearchChange
+  // y el valor se estabiliza (después del debounce), pero sin causar re-render del input
+  useEffect(() => {
+    if (!searchField || !onSearchChange) return;
+    
+    // Usar un timeout adicional para actualizar appliedFilters sin afectar el input
+    const timeoutId = setTimeout(() => {
+      setAppliedFilters((prev) => {
+        // Solo actualizar si el valor realmente cambió
+        if (prev[searchField.id] === searchValue) return prev;
+        return { ...prev, [searchField.id]: searchValue };
+      });
+    }, DEBOUNCE_MS + 50); // Ligeramente después del debounce para no interferir
+    
+    return () => clearTimeout(timeoutId);
+  }, [searchValue, searchField, onSearchChange]);
 
   const toggle = (fieldId, value) => {
     const currentValue = filterState[fieldId];
@@ -146,8 +165,9 @@ export default function FilterBarBase({
         : [...currentArray, value];
       setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
     } else if (field?.type === 'singleSelect') {
-      const newValue = currentValue === value ? null : value;
-      setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
+      // Para singleSelect, siempre establecer el valor (no resetear a null al hacer click en el mismo)
+      // Esto permite que el usuario pueda cambiar entre opciones sin perder la selección
+      setFilterState(prev => ({ ...prev, [fieldId]: value }));
     }
   };
 
@@ -243,9 +263,14 @@ export default function FilterBarBase({
       .map(field => {
         const value = appliedFilters[field.id];
         let isEmpty = false;
-        if (!value) isEmpty = true;
-        else if (Array.isArray(value) && value.length === 0) isEmpty = true;
-        else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
+        // Para singleSelect, considerar vacío solo si es null o undefined (no si es string vacío o valor válido)
+        if (field.type === 'singleSelect') {
+          isEmpty = value === null || value === undefined;
+        } else if (!value) {
+          isEmpty = true;
+        } else if (Array.isArray(value) && value.length === 0) {
+          isEmpty = true;
+        } else if ((field.type === 'range' || field.type === 'dateRange') && typeof value === 'object' && value !== null && value.min === null && value.max === null) {
           isEmpty = true;
         }
         if (isEmpty) return null;

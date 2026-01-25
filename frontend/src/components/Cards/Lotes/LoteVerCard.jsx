@@ -1,78 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
 import { getLoteById } from "../../../lib/api/lotes.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { ChevronLeft, ChevronRight, Image as ImageIcon } from "lucide-react";
 import { getLoteIdFormatted } from "../../Table/TablaLotes/utils/getters.js";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, disabled = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  if (disabled) {
-    return (
-      <div className="ns-wrap" style={{ position: "relative" }}>
-        <div className="ns-trigger" style={{ opacity: 1, cursor: "default", pointerEvents: "none" }}>
-          <span>{label}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {[{ value: "", label: placeholder }, ...options].map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
 
 const ESTADOS_LOTE = [
   { value: "DISPONIBLE", label: "Disponible" },
@@ -136,9 +71,12 @@ export default function LoteVerCard({
       // Verificar si ya tenemos las relaciones necesarias (objeto completo con nombre/calle)
       const hasPropietario = currentLot?.propietario && typeof currentLot.propietario === 'object' && (currentLot.propietario.nombre || currentLot.propietario.apellido);
       const hasUbicacion = currentLot?.ubicacion && typeof currentLot.ubicacion === 'object' && currentLot.ubicacion.calle;
+      const hasInquilino = currentLot?.inquilino && typeof currentLot.inquilino === 'object' && (currentLot.inquilino.nombre || currentLot.inquilino.apellido || currentLot.inquilino.razonSocial);
 
       // Si ya tenemos los datos completos, no hacer la llamada
-      if (hasPropietario && hasUbicacion) return;
+      // Si el lote tiene ocupación ALQUILADO o alquilerActivo, también necesitamos verificar inquilino
+      const needsInquilino = currentLot?.ocupacion === 'ALQUILADO' || currentLot?.alquilerActivo || currentLot?.alquiler === true;
+      if (hasPropietario && hasUbicacion && (!needsInquilino || hasInquilino)) return;
 
       try {
         const response = await getLoteById(idToUse);
@@ -275,8 +213,22 @@ export default function LoteVerCard({
     const nombre =
       p.nombre || p.firstName || p.username || p.name;
     const apellido = p.apellido || p.lastName || p.surname;
-    const full = [nombre, apellido].filter(Boolean).join(" ");
+    const razonSocial = p.razonSocial;
+    const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
     return safe(full || nombre || apellido);
+  }, [lot]);
+
+  const tenantName = useMemo(() => {
+    const i =
+      lot?.inquilino ||
+      null;
+    if (!i) return null;
+    const nombre =
+      i.nombre || i.firstName || i.username || i.name;
+    const apellido = i.apellido || i.lastName || i.surname;
+    const razonSocial = i.razonSocial;
+    const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
+    return full || nombre || apellido || null;
   }, [lot]);
 
   const ubicacion = useMemo(() => {
@@ -304,6 +256,26 @@ export default function LoteVerCard({
     return normalized;
   };
 
+  // Calcular ocupación desde alquilerActivo
+  const ocupacion = useMemo(() => {
+    if (lot?.ocupacion) return lot.ocupacion === 'ALQUILADO' ? 'Alquilado' : 'No alquilado';
+    return 'No alquilado';
+  }, [lot]);
+
+  // Obtener inquilino activo (preferir alquilerActivo.inquilino)
+  const inquilinoActivo = useMemo(() => {
+    if (lot?.alquilerActivo?.inquilino) {
+      const i = lot.alquilerActivo.inquilino;
+      const nombre = i.nombre || i.firstName || i.username || i.name;
+      const apellido = i.apellido || i.lastName || i.surname;
+      const razonSocial = i.razonSocial;
+      const full = razonSocial || [nombre, apellido].filter(Boolean).join(" ");
+      return full || nombre || apellido || null;
+    }
+    // Fallback: usar inquilino legacy si existe
+    return tenantName;
+  }, [lot, tenantName]);
+
   const leftPairs = [
     ["ID", loteDisplayId],
       ["NUMERO PARTIDA", safe(lot?.numPartido ?? lot?.numeroPartida)],
@@ -313,12 +285,17 @@ export default function LoteVerCard({
       ["SUB-ESTADO", getEstadoValue(lot?.subestado ?? lot?.subStatus)],
       ["PROPIETARIO", ownerName],
       ["UBICACION", ubicacion],
+      ["OCUPACIÓN", ocupacion], // Reemplazar ALQUILER por OCUPACIÓN
     ];
+    
+    // Agregar INQUILINO solo si está alquilado (ocupación === 'Alquilado')
+    if (ocupacion === 'Alquilado' && inquilinoActivo) {
+      leftPairs.push(["INQUILINO", safe(inquilinoActivo)]);
+    }
 
   const rightPairs = [
     ["SUPERFICIE", fmtSurface(lot?.superficie ?? lot?.surface)],
     ["PRECIO", fmtMoney(lot?.precio ?? lot?.price)],
-    ["ALQUILER", fmtBoolean(lot?.alquiler)],
     ["DEUDA", fmtBoolean(lot?.deuda)],
     ["CREADO", fmtDate(lot?.createdAt ?? lot?.creadoEl)],
     ["ACTUALIZADO", fmtDate(lot?.updateAt ?? lot?.updatedAt)],

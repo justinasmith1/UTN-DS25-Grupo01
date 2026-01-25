@@ -12,11 +12,12 @@ export default function FilterBarLotes({
   variant = "dashboard",
   userRole = "GENERAL",
   onParamsChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
 }) {
   const authUser = useMemo(() => ({ role: String(userRole).toUpperCase() }), [userRole]);
-  // Catálogos desde preset, filtrados por RBAC
+  // Catálogos desde preset, filtrados por RBAC (ALQUILADO removido como estado)
   const ALL_ESTADOS = useMemo(
-    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO", "EN_PROMOCION"],
+    () => preset?.catalogs?.ESTADOS ?? ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "EN_PROMOCION"],
     [preset]
   );
   const ESTADOS = useMemo(
@@ -45,7 +46,7 @@ export default function FilterBarLotes({
       id: 'q',
       type: 'search',
       label: 'Búsqueda',
-      placeholder: 'ID, calle, precio...',
+      placeholder: 'Lote, propietario, ubicación...',
       defaultValue: ''
     },
     {
@@ -53,6 +54,12 @@ export default function FilterBarLotes({
       type: 'multiSelect',
       label: 'Estado',
       defaultValue: []
+    },
+    {
+      id: 'ocupacion',
+      type: 'singleSelect',
+      label: 'Ocupación',
+      defaultValue: null
     },
     {
       id: 'subestado',
@@ -103,6 +110,10 @@ export default function FilterBarLotes({
   // Catálogos para lotes (filtrados por RBAC)
   const catalogs = useMemo(() => ({
     estado: ESTADOS,
+    ocupacion: [
+      { value: 'ALQUILADO', label: 'Alquilado' },
+      { value: 'NO_ALQUILADO', label: 'No alquilado' }
+    ],
     subestado: SUBESTADOS,
     calle: CALLES,
     fraccion: FRACCIONES,
@@ -123,6 +134,7 @@ export default function FilterBarLotes({
   const defaults = useMemo(() => ({
     q: "",
     estado: [],
+    ocupacion: null,
     subestado: [],
     calle: [],
     fraccion: [],
@@ -151,6 +163,7 @@ export default function FilterBarLotes({
   // Función para formatear opciones en el modal
   const optionFormatter = useMemo(() => ({
     estado: nice,
+    ocupacion: (val) => val === 'ALQUILADO' ? 'Alquilado' : val === 'NO_ALQUILADO' ? 'No alquilado' : val,
     subestado: nice,
     calle: nice,
     fraccion: (val) => `Fracción ${val}`,
@@ -172,6 +185,7 @@ export default function FilterBarLotes({
       viewsConfig={viewsConfig}
       variant={variant}
       onParamsChange={onParamsChange}
+      onSearchChange={onSearchChange}
       chipsFormatter={chipsFormatter}
       optionFormatter={optionFormatter}
     />

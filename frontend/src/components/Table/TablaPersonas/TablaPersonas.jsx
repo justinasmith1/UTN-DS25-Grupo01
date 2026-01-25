@@ -7,6 +7,7 @@ import TablaBase from '../TablaBase';
 import { personasTablePreset, getColumnsForRole, getDefaultVisibleIds } from './presets/personas.table';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { can } from '../../../lib/auth/rbac';
+import { canEditByEstadoOperativo } from '../../../utils/estadoOperativo';
 import './TablaPersonas.css';
 
 const TablaPersonas = ({
@@ -82,7 +83,7 @@ const TablaPersonas = ({
       );
     }
     
-    if (can(user, 'personas.edit') && onEditarPersona) {
+    if (can(user, 'personas.edit') && onEditarPersona && canEditByEstadoOperativo(persona)) {
       actions.push(
         <button
           key="edit"
@@ -115,13 +116,12 @@ const TablaPersonas = ({
         actions.push(
           <button
             key="reactivate"
-            className="tl-icon tl-icon--edit"
-            style={{ color: '#10b981' }}
+            className="tl-icon tl-icon--success"
             aria-label="Reactivar persona"
             data-tooltip="Reactivar persona"
             onClick={() => onEliminarPersona(persona)}
           >
-            <RotateCcw size={18} />
+            <RotateCcw size={18} strokeWidth={2} />
           </button>
         );
       }
@@ -130,7 +130,7 @@ const TablaPersonas = ({
     // Botón "Grupo familiar" (solo para propietarios/inquilinos operativos)
     if (onGrupoFamiliar) {
       const esPropietario = (persona._count?.lotesPropios ?? 0) > 0;
-      const esInquilino = (persona._count?.lotesAlquilados ?? 0) > 0;
+      const esInquilino = (persona._count?.alquileres ?? 0) > 0 || persona.esInquilino === true;
       const esAplicable = esPropietario || esInquilino;
       const esMiembroFamiliar = persona.categoria === 'MIEMBRO_FAMILIAR';
       

@@ -5,9 +5,8 @@ import {
   getReservaById,
   createReserva,
   updateReserva,
-  deleteReserva,
-  desactivarReserva, // <- NUEVO
-  reactivarReserva,  // <- NUEVO
+  eliminarReserva,
+  reactivarReserva,
   getReservaByImmobiliariaId,
   getReservaByEstado
 } from '../services/reserva.service';
@@ -21,7 +20,8 @@ import { EstadoReserva } from '../types/interfacesCCLF';
 export async function getAllReservasController(req: Request, res: Response, next: NextFunction) {
   try {
     const user = req.user; // Usuario autenticado desde el middleware
-    const data = await getAllReservas(user);
+    const query = req.query as { estadoOperativo?: string };
+    const data = await getAllReservas(query, user);
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -56,10 +56,7 @@ export async function getAllReservasByInmobiliariaController(req: Request, res: 
 
 export async function getAllReservasByEstadoController(req: Request, res: Response, next: NextFunction) {
   try {
-
-    console.log('Query Params:', req.query);  // Imprime todo el query para depuración
     const estadoR = req.query.estado as EstadoReserva;
-    console.log('Estado recibido:', estadoR);  // Imprime el valor de 'estado'
     const data = await getReservaByEstado(estadoR);
     res.json({ success: true, data });
   } catch (error) {
@@ -97,27 +94,25 @@ export async function updateReservaController(req: Request, res: Response, next:
 }
 
 // ==============================
-// Eliminar reserva
-// ==============================
-// ==============================
-// Eliminar reserva
+// Eliminar reserva (soft delete - estadoOperativo)
 // ==============================
 export async function deleteReservaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number(req.params.id);
-    // IMPORTANTE: Cambiamos comportamiento a Soft Delete
-    const data = await desactivarReserva(id);
+    const user = req.user;
+    const data = await eliminarReserva(id, user);
     res.json({ success: true, message: 'Reserva eliminada exitosamente', data });
   } catch (error) {
     next(error);
   }
-} 
+}
 
-export async function desactivarReservaController(req: Request, res: Response, next: NextFunction) {
+export async function eliminarReservaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number(req.params.id);
-    const data = await desactivarReserva(id);
-    res.json({ success: true, message: 'Reserva desactivada exitosamente', data });
+    const user = req.user;
+    const data = await eliminarReserva(id, user);
+    res.json({ success: true, message: 'Reserva eliminada exitosamente', data });
   } catch (error) {
     next(error);
   }
@@ -126,7 +121,8 @@ export async function desactivarReservaController(req: Request, res: Response, n
 export async function reactivarReservaController(req: Request, res: Response, next: NextFunction) {
   try {
     const id = Number(req.params.id);
-    const data = await reactivarReserva(id);
+    const user = req.user;
+    const data = await reactivarReserva(id, user);
     res.json({ success: true, message: 'Reserva reactivada exitosamente', data });
   } catch (error) {
     next(error);

@@ -129,6 +129,7 @@ export interface Inmobiliaria {
     razonSocial?: string;
     comxventa?: number;
     contacto?: string;
+    maxPrioridadesActivas?: number | null;
     reservas?: Reserva[];
     venta?: Venta;
     user?: Usuario;
@@ -363,6 +364,7 @@ export interface PostInmobiliariaRequest{
   razonSocial: string; //Razon social (opcional)
   comxventa?: number; //Comision por venta (opcional)
   contacto?: string; //Telefono de contacto (opcional)
+  maxPrioridadesActivas?: number | null; //Limite de prioridades activas (opcional)
   reservas?: Reserva[]; //Reservas asociadas (opcional)
   ventaId?: number; //Ventas asociadas (opcional)
   userId?: number; //Usuario asociado (opcional)
@@ -397,6 +399,7 @@ export interface PutInmobiliariaRequest {
   contacto?: string; //Telefono de contacto (opcional)
   razonSocial?: string; //Razon social (opcional)
   comxventa?: number; //Comision por venta (opcional) 
+  maxPrioridadesActivas?: number | null; //Limite de prioridades activas (opcional)
   userId?: number; //Usuario asociado (opcional)
   reservas?: Reserva[]; //Reservas asociadas (opcional)
   ventaId?: number; //Ventas asociadas (opcional)

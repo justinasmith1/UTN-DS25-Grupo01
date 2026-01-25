@@ -1,8 +1,6 @@
 // src/lib/api/lotes.js
 // Cliente de API para LOTES. Devuelve SIEMPRE { data: Array<LoteUI> }.
 
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
-console.log(USE_MOCK)
 import { http } from "../http/http"; // usa Authorization y maneja 401/refresh
 
 const PRIMARY = "/lotes";
@@ -102,40 +100,6 @@ async function fetchWithFallback(path, options) {
   }
   return res;
 }
-
-/* ================================= MOCK ================================= */
-let LOTES = [];
-let seeded = false;
-const nextId = () => `L${String(LOTES.length + 1).padStart(3, "0")}`;
-
-function ensureSeed() {
-  if (seeded) return;
-  LOTES = [
-    { id: "L001", manzana: "A", numero: 1, estado: "DISPONIBLE", superficieM2: 300, propietarioId: null, observaciones: "" },
-    { id: "L002", manzana: "A", numero: 2, estado: "RESERVADO",  superficieM2: 280, propietarioId: null, observaciones: "" },
-  ];
-  seeded = true;
-}
-async function mockGetAll(params = {}) {
-  ensureSeed();
-  let out = [...LOTES];
-  const q = (params.q || "").toLowerCase();
-  if (q) out = out.filter(l =>
-    String(l.id).toLowerCase().includes(q) ||
-    String(l.manzana).toLowerCase().includes(q) ||
-    String(l.numero).toLowerCase().includes(q)
-  );
-  const page = Math.max(1, Number(params.page || 1));
-  const pageSize = Math.max(1, Number(params.pageSize || 12));
-  const total = out.length;
-  const start = (page - 1) * pageSize;
-  const data = out.slice(start, start + pageSize).map(fromApi);
-  return ok(data);
-}
-async function mockGetById(id)      { ensureSeed(); const f = LOTES.find(l => String(l.id) === String(id)); if (!f) throw new Error("Lote no encontrado"); return ok(fromApi(f)); }
-async function mockCreate(payload)   { ensureSeed(); const row = payload; row.id = nextId(); LOTES.unshift(row); return ok(fromApi(row)); }
-async function mockUpdate(id, p)     { ensureSeed(); const i = LOTES.findIndex(l => String(l.id) === String(id)); if (i < 0) throw new Error("Lote no encontrado"); LOTES[i] = { ...LOTES[i], ...p }; return ok(fromApi(LOTES[i])); }
-async function mockDelete(id)        { ensureSeed(); const n = LOTES.length; LOTES = LOTES.filter(l => String(l.id) !== String(id)); if (LOTES.length === n) throw new Error("Lote no encontrado"); return ok(true); }
 
 /* ================================ API REAL ================================ */
 function pickArrayFromApi(json) {
@@ -244,11 +208,11 @@ async function apiGetPromocionActiva(loteId) {
 }
 
 /* ------------------------------ EXPORTS ------------------------------ */
-export function getAllLotes(params)   { return USE_MOCK ? mockGetAll(params)   : apiGetAll(params); }
-export function getLoteById(id)       { return USE_MOCK ? mockGetById(id)      : apiGetById(id); }
-export function createLote(payload)   { return USE_MOCK ? mockCreate(payload)  : apiCreate(payload); }
-export function updateLote(id, data)  { return USE_MOCK ? mockUpdate(id, data) : apiUpdate(id, data); }
-export function deleteLote(id)        { return USE_MOCK ? mockDelete(id)       : apiDelete(id); }
+export const getAllLotes = apiGetAll;
+export const getLoteById = apiGetById;
+export const createLote = apiCreate;
+export const updateLote = apiUpdate;
+export const deleteLote = apiDelete;
 
 // ===================
 // Promociones

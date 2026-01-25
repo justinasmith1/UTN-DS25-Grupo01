@@ -1,115 +1,13 @@
 import { useEffect, useState, useRef } from "react";
-import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { createPersona } from "../../../lib/api/personas.js";
 import { getAllInmobiliarias, getInmobiliariaById } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { personaCreateSchema } from "../../../lib/validations/personaCreate.schema.js";
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Seleccionar", onChange, usePortal = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (open && usePortal && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom, left: rect.left });
-    }
-  }, [open, usePortal]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e) => {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  // Renderizar menú
-  const menuContent = open ? (
-    <ul 
-      ref={listRef} 
-      className="ns-list" 
-      role="listbox" 
-      tabIndex={-1}
-      style={usePortal ? {
-        position: 'fixed',
-        top: `${pos.top}px`,
-        left: `${pos.left}px`,
-        width: '233px',
-        zIndex: 10000,
-        maxHeight: '300px',
-        overflowY: 'auto',
-        backgroundColor: '#fff',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        margin: 0,
-        padding: 0,
-        listStyle: 'none'
-      } : {}}
-    >
-      {options.map(opt => (
-        <li
-          key={`${opt.value}::${opt.label}`}
-          role="option"
-          aria-selected={`${opt.value}` === `${value}`}
-          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-          onClick={() => {
-            onChange?.(opt.value || "");
-            setOpen(false);
-          }}
-        >
-          {opt.label}
-        </li>
-      ))}
-    </ul>
-  ) : null;
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%'
-        }}
-      >
-        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-        <svg 
-          width="18" 
-          height="18" 
-          viewBox="0 0 20 20" 
-          aria-hidden
-          style={{ marginLeft: '8px', flexShrink: 0 }}
-        >
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {usePortal && typeof document !== 'undefined' 
-        ? createPortal(menuContent, document.body)
-        : menuContent
-      }
-    </div>
-  );
-}
 
 const TIPOS_IDENTIFICADOR = [
   { value: "DNI", label: "DNI" },
@@ -165,7 +63,7 @@ export default function PersonaCrearCard({
       setLoadingInmobiliarias(true);
       (async () => {
         try {
-          const resp = await getAllInmobiliarias({ estado: "ACTIVA" });
+          const resp = await getAllInmobiliarias({ estadoOperativo: "OPERATIVO" });
           const inmobiliariasList = (resp.data || []).map((inm) => ({
             value: inm.id,
             label: inm.nombre || inm.razonSocial || `Inmobiliaria ${inm.id}`

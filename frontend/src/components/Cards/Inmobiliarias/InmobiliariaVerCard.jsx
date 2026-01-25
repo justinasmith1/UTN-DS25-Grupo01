@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
 
 /**
  * InmobiliariaVerCard
@@ -64,7 +65,7 @@ export default function InmobiliariaVerCard({
     ["NOMBRE", safe(inmob?.nombre)],
     ["RAZÓN SOCIAL", safe(inmob?.razonSocial)],
     ["CONTACTO", safe(inmob?.contacto)],
-    ["COMISIÓN X VENTA", inmob?.comxventa != null ? fmtMoney(inmob.comxventa) : NA],
+    ["COMISIÓN X VENTA", inmob?.comxventa != null ? `${inmob.comxventa}%` : NA],
   ];
 
   // --- COLUMNA DERECHA (Con lógica de colores) ---
@@ -74,9 +75,9 @@ export default function InmobiliariaVerCard({
     [
       "ESTADO", 
       inmob?.estado ?? "OPERATIVO", 
-      inmob?.estado === "ELIMINADO" ? "#ef4444" : "#10b981" // Rojo si inactiva, Verde si activa
+      inmob?.estado === "ELIMINADO" ? "#ef4444" : "#10b981" // Rojo si eliminada, Verde si operativa
     ],
-    // 2. Fecha de Baja (Solo si existe y está inactiva)
+    // 2. Fecha de Baja (Solo si existe y está eliminada)
     ...(inmob?.fechaBaja 
         ? [["FECHA DE BAJA", fechaBaja, "#ef4444"]] // Texto en rojo
         : []
@@ -116,13 +117,15 @@ export default function InmobiliariaVerCard({
         <div className="cclf-card__header">
           <h2 className="cclf-card__title">{` ${inmob?.nombre ?? "—"}`}</h2>
           <div className="cclf-card__actions">
-            <button
-              type="button"
-              className="cclf-tab thin"
-              onClick={() => inmob && onEdit?.(inmob)}
-            >
-              Editar Inmobiliaria
-            </button>
+            {canEditByEstadoOperativo(inmob) && (
+              <button
+                type="button"
+                className="cclf-tab thin"
+                onClick={() => inmob && onEdit?.(inmob)}
+              >
+                Editar Inmobiliaria
+              </button>
+            )}
             <button type="button" className="cclf-btn-close" onClick={onClose}>
               <span className="cclf-btn-close__x">×</span>
             </button>
@@ -158,6 +161,68 @@ export default function InmobiliariaVerCard({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Bloques de Métricas: Prioridades/Reservas/Ventas */}
+          <div style={{ marginTop: "32px" }}>
+            <h3 className="venta-section-title">Métricas</h3>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+              {/* Bloque Prioridades */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Prioridades
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.prioridadesActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.prioridadesTotales ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Límite:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.maxPrioridadesActivas ?? '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Reservas */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Reservas
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.reservasActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.reservasTotales ?? inmob?.cantidadReservas ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Ventas */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Ventas
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.ventasActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.ventasTotales ?? inmob?.cantidadVentas ?? 0}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

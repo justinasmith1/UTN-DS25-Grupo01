@@ -10,6 +10,7 @@ export const createInmobiliariaSchema = z.object({
     // IMPORTANTE: z.coerce convierte el string del JSON a número automáticamente
     comxventa: z.coerce.number().min(0, 'La comisión por venta no puede ser negativa').max(100, 'La comisión por venta no puede ser mayor a 100').optional(),
     userId: z.coerce.number().int().positive().optional(),
+    maxPrioridadesActivas: z.coerce.number().int().min(0).nullable().optional(),
     
     // Recomendación: Al crear, no deberíamos permitir enviar fechaBaja ni estado ELIMINADO.
     // Lo forzamos por defecto y ocultamos la fechaBaja en la creación.
@@ -23,6 +24,7 @@ export const updateInmobiliariaSchema = z.object({
     contacto: z.string().max(100).optional(),
     comxventa: z.coerce.number().min(0).max(100).optional(),
     userId: z.coerce.number().int().positive().optional(),
+    maxPrioridadesActivas: z.coerce.number().int().min(0).nullable().optional(),
     
     // Acá si permito cambiar el estado
     estado: EstadoInmobiliariaEnum.optional(),

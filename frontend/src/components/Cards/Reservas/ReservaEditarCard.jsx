@@ -2,12 +2,14 @@
 import { useEffect, useRef, useState, useMemo } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
 import { set } from "zod";
+import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
@@ -36,73 +38,6 @@ function fromDateInputToISO(s) {
   const date = new Date(`${s}T00:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
-}
-
-/* ----------------------- Select custom sin librerías ----------------------- */
-function NiceSelect({ value, options, placeholder = "Sin información", onChange, showPlaceholderOption = true, disabled = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-
-  useEffect(() => {
-    function onDoc(e) {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, []);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  if (disabled) {
-    return (
-      <div className="ns-wrap" style={{ position: "relative" }}>
-        <div className="ns-trigger" style={{ opacity: 1, cursor: "default", pointerEvents: "none" }}>
-          <span>{label}</span>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        disabled={disabled}
-      >
-        <span>{label}</span>
-        <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden>
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-
-      {open && (
-        <ul ref={listRef} className="ns-list" role="listbox" tabIndex={-1}>
-          {(showPlaceholderOption ? [{ value: "", label: placeholder }, ...options] : options).map(opt => (
-            <li
-              key={`${opt.value}::${opt.label}`}
-              role="option"
-              aria-selected={`${opt.value}` === `${value}`}
-              className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-              onClick={() => {
-                onChange?.(opt.value || "");
-                setOpen(false);
-              }}
-            >
-              {opt.label}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
 }
 
 /* ========================================================================== */
@@ -470,6 +405,12 @@ export default function ReservaEditarCard({
   }
 
   async function handleSave() {
+    // Bloquear guardado si está eliminada
+    if (isEliminado(detalle)) {
+      setNumeroError("No se puede editar una reserva eliminada. Reactívala para modificarla.");
+      return;
+    }
+    
     try {
       setSaving(true);
       setNumeroError(null);
@@ -591,6 +532,9 @@ export default function ReservaEditarCard({
 
   if (!open || !detalle) return null;
 
+  const estaEliminada = isEliminado(detalle);
+  const puedeEditar = canEditByEstadoOperativo(detalle);
+
   return (
     <>
       {/* Animación de éxito */}
@@ -608,8 +552,25 @@ export default function ReservaEditarCard({
         onSave={handleSave}
         onReset={handleReset}
         saving={saving}
+        saveButtonText={puedeEditar ? "Guardar cambios" : null}
       >
         <div style={{ "--sale-label-w": `${labelW}px` }}>
+          {estaEliminada && (
+            <div 
+              className="alert alert-warning" 
+              style={{ 
+                marginBottom: '1rem', 
+                padding: '0.75rem 1rem',
+                backgroundColor: '#fef3c7',
+                border: '1px solid #fbbf24',
+                borderRadius: '0.375rem',
+                color: '#92400e'
+              }}
+            >
+              <strong>Reserva eliminada:</strong> No se puede editar una reserva eliminada. Reactívala para modificarla.
+            </div>
+          )}
+          
           <h3 className="venta-section-title">Información de la reserva</h3>
 
           <div className="venta-grid" ref={containerRef}>
@@ -624,11 +585,12 @@ export default function ReservaEditarCard({
                 <div className="field-label">FECHA</div>
                 <div className="field-value p0">
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="date"
                     value={fechaReserva}
-                    onChange={(e) => setFechaReserva(e.target.value)}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    onChange={(e) => !estaEliminada && setFechaReserva(e.target.value)}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                    readOnly={estaEliminada}
                   />
                 </div>
               </div>
@@ -644,8 +606,8 @@ export default function ReservaEditarCard({
                           options={personaOpts}
                           placeholder="Seleccionar cliente"
                           showPlaceholderOption={false}
-                          onChange={(val) => setClienteId(val || "")}
-                          disabled={String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                          onChange={(val) => !estaEliminada && setClienteId(val || "")}
+                          disabled={estaEliminada || String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
                         />
                       </div>
                       <button
@@ -696,7 +658,8 @@ export default function ReservaEditarCard({
                       options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
                       placeholder="La Federala"
                       showPlaceholderOption={false}
-                      onChange={setInmobiliariaId}
+                      onChange={(val) => !estaEliminada && setInmobiliariaId(val)}
+                      disabled={estaEliminada}
                     />
                   </div>
                 )}
@@ -710,8 +673,8 @@ export default function ReservaEditarCard({
                     options={estadosDisponibles}
                     placeholder=""
                     showPlaceholderOption={false}
-                    onChange={setEstado}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    onChange={(val) => !estaEliminada && setEstado(val)}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
                   />
                 </div>
               </div>
@@ -726,14 +689,18 @@ export default function ReservaEditarCard({
                 ) : (
                   <div className="field-value p0">
                     <input
-                      className="field-input"
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                       type="text"
                       value={numero}
                       onChange={(e) => {
-                        setNumero(e.target.value);
-                        if (numeroError) setNumeroError(null);
+                        if (!estaEliminada) {
+                          setNumero(e.target.value);
+                          if (numeroError) setNumeroError(null);
+                        }
                       }}
                       placeholder="Ej: RES-2025-01"
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
                     />
                     {numeroError && (
                       <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
@@ -748,12 +715,12 @@ export default function ReservaEditarCard({
                 <div className="field-label">PLAZO DE RESERVA</div>
                 <div className="field-value p0">
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="date"
                     value={fechaFinReserva}
-                    onChange={(e) => setFechaFinReserva(e.target.value)}
-                    // Deshabilitar si es inmobiliaria y está cancelada (misma lógica que los otros campos)
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    onChange={(e) => !estaEliminada && setFechaFinReserva(e.target.value)}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                    readOnly={estaEliminada}
                   />
                 </div>
               </div>
@@ -762,15 +729,16 @@ export default function ReservaEditarCard({
                 <div className="field-label">SEÑA</div>
                 <div className="field-value p0" style={{ position: "relative" }}>
                   <input
-                    className="field-input"
+                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
                     type="number"
                     inputMode="decimal"
                     min="0"
                     step="100"
                     value={sena}
-                    onChange={(e) => setSena(e.target.value)}
+                    onChange={(e) => !estaEliminada && setSena(e.target.value)}
                     style={{ paddingRight: "50px" }}
-                    disabled={isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
+                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                    readOnly={estaEliminada}
                   />
                   <span style={{ 
                     position: "absolute", 

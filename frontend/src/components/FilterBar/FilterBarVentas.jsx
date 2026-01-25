@@ -10,6 +10,7 @@ import { ventasChipsFrom, nice } from "./utils/ventasChips";
 export default function FilterBarVentas({
   value,
   onChange,
+  onSearchChange, // Callback opcional para búsqueda (manejo separado)
   isLoading,
   total,
   filtrados,
@@ -22,8 +23,9 @@ export default function FilterBarVentas({
   // ===== Definición de campos que maneja FilterBarBase =====
   const fields = useMemo(
     () => [
-      { id: "q",              type: "search",      label: "Búsqueda",       placeholder: "ID, lote, monto...", defaultValue: "" },
+      { id: "q",              type: "search",      label: "Búsqueda",       placeholder: "ID, lote, cliente...", defaultValue: "" },
       { id: "estado",         type: "multiSelect", label: "Estado",         defaultValue: [] },
+      { id: "visibilidad",    type: "singleSelect",label: "Visibilidad",   defaultValue: "OPERATIVO" },
       { id: "tipoPago",       type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect", label: "Inmobiliaria",   defaultValue: [] },
       { id: "fechaVenta",     type: "dateRange",   label: "Fecha de Venta", defaultValue: { min: null, max: null } },
@@ -45,7 +47,20 @@ export default function FilterBarVentas({
         return { value: id ?? label, label };
       });
 
-    const ESTADOS = normOptions(ventasFilterPreset?.catalogs?.ESTADOS ?? []);
+    // ESTADOS: Filtrar OPERATIVO y ELIMINADO del catálogo de estados (son de estadoOperativo, no de estado de negocio)
+    const estadosRaw = normOptions(ventasFilterPreset?.catalogs?.ESTADOS ?? []);
+    const ESTADOS = estadosRaw.filter(opt => {
+      const value = opt.value ?? opt.label ?? opt;
+      const valueStr = String(value).toUpperCase().trim();
+      return valueStr !== "OPERATIVO" && valueStr !== "ELIMINADO";
+    });
+
+    // VISIBILIDAD (estadoOperativo)
+    const VISIBILIDAD_OPTIONS = [
+      { value: "OPERATIVO", label: "Operativas" },
+      { value: "ELIMINADO", label: "Eliminadas" },
+    ];
+
     const TIPO_PAGO = normOptions(ventasFilterPreset?.catalogs?.TIPO_PAGO ?? tipoPagoOpts ?? []);
     
     // INM: priorizamos lo que venga del container, luego preset. Normalizamos a { value: ID, label: nombre }
@@ -59,6 +74,7 @@ export default function FilterBarVentas({
 
     return {
       estado: ESTADOS,
+      visibilidad: VISIBILIDAD_OPTIONS,
       tipoPago: TIPO_PAGO,
       inmobiliarias: INMOBILIARIAS,
     };
@@ -76,6 +92,7 @@ export default function FilterBarVentas({
     () => ({
       q: "",
       estado: [],
+      visibilidad: "OPERATIVO", // Default: mostrar solo operativas
       tipoPago: [],
       inmobiliarias: [],
       fechaVenta: { min: null, max: null },
@@ -95,6 +112,11 @@ export default function FilterBarVentas({
   const optionFormatter = useMemo(
     () => ({
       estado: nice,
+      visibilidad: (val) => {
+        if (val === "OPERATIVO") return "Operativas";
+        if (val === "ELIMINADO") return "Eliminadas";
+        return val;
+      },
       tipoPago: nice,
       inmobiliarias: nice,
     }),
@@ -114,6 +136,9 @@ export default function FilterBarVentas({
     // Inmobiliarias se mantiene como texto (no uppercasing)
     const inmobiliarias = Array.isArray(p?.inmobiliarias) ? p.inmobiliarias : [];
 
+    // VISIBILIDAD (estadoOperativo)
+    const visibilidad = p?.visibilidad ?? "OPERATIVO"; // Default OPERATIVO
+
     const fvMin = p?.fechaVenta?.min != null ? +p.fechaVenta.min : null;
     const fvMax = p?.fechaVenta?.max != null ? +p.fechaVenta.max : null;
     const mMin = p?.monto?.min != null ? +p.monto.min : null;
@@ -123,6 +148,7 @@ export default function FilterBarVentas({
     return {
       // NUEVO
       estado,
+      estadoOperativo: visibilidad, // Mapear visibilidad a estadoOperativo para backend
       tipoPago,
       inmobiliarias,
       fechaVenta: { min: fvMin, max: fvMax },
@@ -142,6 +168,7 @@ export default function FilterBarVentas({
   const fromPageShape = (v = {}) => ({
     q: v.q ?? "",
     estado: v.estado ?? v.estados ?? v.estadoVenta ?? [],
+    visibilidad: v.estadoOperativo ?? v.visibilidad ?? "OPERATIVO", // Mapear desde estadoOperativo o visibilidad
     tipoPago: v.tipoPago ?? [],
     inmobiliarias: v.inmobiliarias ?? v.inmobiliaria ?? [],
     fechaVenta: {
@@ -155,19 +182,41 @@ export default function FilterBarVentas({
   });
 
   const handleParamsChange = (paramsFromFB) => {
-    // Si paramsFromFB solo tiene algunos campos (actualización parcial como solo 'q'), 
+    // Excluir 'q' del procesamiento (se maneja con onSearchChange)
+    const { q, ...paramsSinQ } = paramsFromFB || {};
+    
+    // Si paramsFromFB solo tiene algunos campos (actualización parcial), 
     // no convertir con toPageShape porque agrega todos los campos con defaults
-    const isPartialUpdate = paramsFromFB && (
-      Object.keys(paramsFromFB).length === 1 && paramsFromFB.q !== undefined ||
-      (Object.keys(paramsFromFB).length < 3 && !paramsFromFB.inmobiliarias)
+    const isPartialUpdate = paramsSinQ && (
+      Object.keys(paramsSinQ).length < 3 && !paramsSinQ.inmobiliarias
     );
     
     if (isPartialUpdate) {
-      onChange?.(paramsFromFB);
+      // Si viene visibilidad, mapearla a estadoOperativo para el onChange
+      if (paramsSinQ.visibilidad !== undefined) {
+        onChange?.({ estadoOperativo: paramsSinQ.visibilidad });
+      } else {
+        // Para otros campos parciales, usar toPageShape para mapear correctamente
+        onChange?.(toPageShape(paramsSinQ));
+      }
     } else {
-      onChange?.(toPageShape(paramsFromFB));
+      onChange?.(toPageShape(paramsSinQ));
     }
   };
+
+  // Memoizar initialValue para que el useEffect en FilterBarBase detecte cambios correctamente
+  // Depender específicamente de estadoOperativo para detectar cambios en visibilidad
+  const initialValueMemo = useMemo(() => fromPageShape(value), [
+    value?.estadoOperativo, 
+    value?.visibilidad, 
+    JSON.stringify(value?.estado || []), 
+    JSON.stringify(value?.tipoPago || []), 
+    JSON.stringify(value?.inmobiliarias || []), 
+    value?.fechaVenta?.min, 
+    value?.fechaVenta?.max, 
+    value?.monto?.min, 
+    value?.monto?.max
+  ]);
 
   return (
     <FilterBarBase
@@ -184,7 +233,8 @@ export default function FilterBarVentas({
       filtrados={filtrados}
       onClear={onClear}
       onParamsChange={handleParamsChange}
-      initialValue={fromPageShape(value)}
+      onSearchChange={onSearchChange}
+      initialValue={initialValueMemo}
     />
   );
 }

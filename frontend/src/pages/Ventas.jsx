@@ -19,6 +19,8 @@ import { getAllLotes } from "../lib/api/lotes";
 import TablaVentas from "../components/Table/TablaVentas/TablaVentas";
 import FilterBarVentas from "../components/FilterBar/FilterBarVentas";
 import { applyVentaFilters } from "../utils/applyVentaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getVentaSearchFields } from "../utils/search/fields/ventaSearchFields";
 
 import VentaVerCard from "../components/Cards/Ventas/VentaVerCard.jsx";
 import VentaEditarCard from "../components/Cards/Ventas/VentaEditarCard.jsx";
@@ -116,9 +118,16 @@ export default function VentasPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedIds, setSelectedIds] = useState([]);
 
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   // Filtros - inicializar con inmobiliariaId de la URL si existe
   const [filters, setFilters] = useState(() => ({
-    texto: "",
     tipoPago: [],
     inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
     fechaVentaMin: null,
@@ -126,6 +135,7 @@ export default function VentasPage() {
     montoMin: null,
     montoMax: null,
     estados: [],
+    estadoOperativo: "OPERATIVO", // Default: mostrar solo operativas
   }));
 
   // Aplicar filtro de inmobiliaria cuando cambia desde la URL
@@ -170,10 +180,15 @@ export default function VentasPage() {
   const loadVentasData = useCallback(async () => {
     setIsLoading(true);
     try {
+      // Construir query con estadoOperativo desde filters
+      const queryParams = {
+        ...(filters.estadoOperativo ? { estadoOperativo: filters.estadoOperativo } : {}),
+      };
+      
       const ventasRequest =
         selectedInmobiliariaRequest != null
-          ? getVentasByInmobiliaria(selectedInmobiliariaRequest)
-          : getAllVentas({});
+          ? getVentasByInmobiliaria(selectedInmobiliariaRequest, queryParams)
+          : getAllVentas(queryParams);
       const [ventasResp, personasResp, inmosResp, lotesResp] = await Promise.all([
         ventasRequest,
         getAllPersonas({}),
@@ -229,7 +244,7 @@ export default function VentasPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedInmobiliariaRequest]);
+  }, [selectedInmobiliariaRequest, filters.estadoOperativo]);
 
   // Carga inicial + join con personas/inmobiliarias
   useEffect(() => {
@@ -241,13 +256,17 @@ export default function VentasPage() {
     return () => {
       alive = false;
     };
-  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest, loadVentasData]);
+  }, [selectedInmobiliariaParam, selectedInmobiliariaRequest, filters.estadoOperativo, loadVentasData]);
 
-  // Aplicar filtros
-  const ventasFiltradas = useMemo(
-    () => applyVentaFilters(ventas, filters),
-    [ventas, filters]
-  );
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
+  const ventasFiltradas = useMemo(() => {
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(ventas, searchText, getVentaSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, tipoPago, inmobiliarias, fechas, montos)
+    // Nota: applyVentaFilters ya no usa filters.texto porque se maneja con searchText
+    return applyVentaFilters(afterSearch, filters);
+  }, [ventas, filters, searchText]);
 
   // Modales/cards
   const [ventaSel, setVentaSel] = useState(null);
@@ -394,32 +413,40 @@ export default function VentasPage() {
     []
   );
 
-  // DELETE (Eliminar -> Desactivar)
-  // Estado local para success message ya declarado arriba
+  // DELETE (Eliminar lógico - estadoOperativo)
   const handleDelete = useCallback(async () => {
     if (!ventaSel?.id) return;
     try {
       setDeleting(true);
       
-      // Usamos soft delete (desactivar)
+      // Usamos soft delete (eliminar lógico)
       const res = await desactivarVenta(ventaSel.id);
-      const deactivated = res.data || res;
+      const updated = res.data || res;
       
-      // Actualizar en lista (no borrar, solo cambiar estado)
-      const personasById = {};
-      const [personasResp, inmosResp] = await Promise.all([
-          getAllPersonas({}),
-          getAllInmobiliarias({})
-      ]);
-      const personasApi = pickArray(personasResp, ["personas"]);
-      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
-        
-      const inmosById = {};
-      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
-      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+      // Actualizar en lista: si estoy en vista "Operativas", la venta debe desaparecer
+      // Si estoy en vista "Eliminadas", debe aparecer ahí
+      const currentVisibilidad = filters.estadoOperativo ?? "OPERATIVO";
+      
+      if (currentVisibilidad === "OPERATIVO") {
+        // Si estoy viendo operativas, remover la venta de la lista (ya no es operativa)
+        setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
+      } else {
+        // Si estoy viendo eliminadas, actualizar la venta con estadoOperativo = ELIMINADO
+        const personasById = {};
+        const [personasResp, inmosResp] = await Promise.all([
+            getAllPersonas({}),
+            getAllInmobiliarias({})
+        ]);
+        const personasApi = pickArray(personasResp, ["personas"]);
+        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+          
+        const inmosById = {};
+        const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
 
-      const enriched = enrichVenta(deactivated, personasById, inmosById);
-      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
+        const enriched = enrichVenta(updated, personasById, inmosById);
+        setVentas((prev) => prev.map((v) => v.id === ventaSel.id ? { ...v, ...enriched, estadoOperativo: 'ELIMINADO' } : v));
+      }
       
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
@@ -427,11 +454,11 @@ export default function VentasPage() {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      console.error("Error desactivando venta:", e);
+      console.error("Error eliminando venta:", e);
     } finally {
       setDeleting(false);
     }
-  }, [ventaSel]);
+  }, [ventaSel, filters.estadoOperativo]);
 
   // REACTIVAR
   const [openReactivar, setOpenReactivar] = useState(false);
@@ -447,23 +474,32 @@ export default function VentasPage() {
     try {
       setReactivating(true);
       const res = await reactivarVenta(ventaSel.id);
-      const reactivated = res.data || res;
+      const updated = res.data || res;
       
-      // Actualizar en lista
-      const personasById = {};
-      const  [personasResp, inmosResp] = await Promise.all([
-         getAllPersonas({}),
-         getAllInmobiliarias({})
-      ]);
-      const personasApi = pickArray(personasResp, ["personas"]);
-      for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
-        
-      const inmosById = {};
-      const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
-      for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
+      // Actualizar en lista: si estoy en vista "Eliminadas", la venta debe desaparecer
+      // Si estoy en vista "Operativas", debe aparecer ahí
+      const currentVisibilidad = filters.estadoOperativo ?? "OPERATIVO";
+      
+      if (currentVisibilidad === "ELIMINADO") {
+        // Si estoy viendo eliminadas, remover la venta de la lista (ya no está eliminada)
+        setVentas((prev) => prev.filter((v) => v.id !== ventaSel.id));
+      } else {
+        // Si estoy viendo operativas, actualizar la venta con estadoOperativo = OPERATIVO
+        const personasById = {};
+        const  [personasResp, inmosResp] = await Promise.all([
+           getAllPersonas({}),
+           getAllInmobiliarias({})
+        ]);
+        const personasApi = pickArray(personasResp, ["personas"]);
+        for (const p of personasApi) if (p && p.id != null) personasById[String(p.id)] = p;
+          
+        const inmosById = {};
+        const inmosApi = pickArray(inmosResp, ["inmobiliarias"]);
+        for (const i of inmosApi) if (i && i.id != null) inmosById[String(i.id)] = i;
 
-      const enriched = enrichVenta(reactivated, personasById, inmosById);
-      setVentas((prev) => prev.map((v) => v.id === enriched.id ? enriched : v));
+        const enriched = enrichVenta(updated, personasById, inmosById);
+        setVentas((prev) => prev.map((v) => v.id === ventaSel.id ? { ...v, ...enriched, estadoOperativo: 'OPERATIVO' } : v));
+      }
 
       setOpenReactivar(false);
       setShowReactivarSuccess(true);
@@ -475,7 +511,7 @@ export default function VentasPage() {
     } finally {
       setReactivating(false);
     }
-  }, [ventaSel]);
+  }, [ventaSel, filters.estadoOperativo]);
 
   // Mostrar loading mientras se cargan los datos
   if (isLoading) {
@@ -541,14 +577,15 @@ export default function VentasPage() {
         total={ventas.length}
         filtrados={ventasFiltradas.length}
         inmobiliariasOpts={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+        onSearchChange={handleSearchChange}
         onClear={() => {
           const next = new URLSearchParams(searchParams);
           if (next.has("inmobiliariaId")) {
             next.delete("inmobiliariaId");
             setSearchParams(next, { replace: true });
           }
+          setSearchText('');
           setFilters({
-            texto: "",
             tipoPago: [],
             inmobiliarias: [],
             fechaVentaMin: null,
@@ -556,6 +593,7 @@ export default function VentasPage() {
             montoMin: null,
             montoMax: null,
             estados: [],
+            estadoOperativo: "OPERATIVO",
           });
         }}
       />
@@ -574,6 +612,7 @@ export default function VentasPage() {
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+        estadoOperativoFilter={filters.estadoOperativo}
       />
 
       {/* Modales */}
@@ -759,71 +798,6 @@ export default function VentasPage() {
                 width: "64px",
                 height: "64px",
                 borderRadius: "50%",
-                background: "#10b981", // Green for success
-                display: "grid",
-                placeItems: "center",
-                animation: "checkmark 0.5s ease-in-out",
-              }}
-            >
-              <svg
-                width="36"
-                height="36"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="white"
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <polyline points="20 6 9 17 4 12"></polyline>
-              </svg>
-            </div>
-            <h3
-              style={{
-                margin: 0,
-                fontSize: "20px",
-                fontWeight: 600,
-                color: "#111",
-              }}
-            >
-              ¡Venta reactivada exitosamente!
-            </h3>
-          </div>
-        </div>
-      )}
-
-      {/* Animación de éxito al eliminar */}
-      {showDeleteSuccess && (
-        <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0, 0, 0, 0.5)",
-            display: "grid",
-            placeItems: "center",
-            zIndex: 10000,
-            animation: "fadeIn 0.2s ease-in",
-            pointerEvents: "auto",
-          }}
-        >
-          <div
-            style={{
-              background: "#fff",
-              padding: "32px 48px",
-              borderRadius: "12px",
-              boxShadow: "0 12px 32px rgba(0,0,0,0.3)",
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              gap: "16px",
-              animation: "scaleIn 0.3s ease-out",
-            }}
-          >
-            <div
-              style={{
-                width: "64px",
-                height: "64px",
-                borderRadius: "50%",
                 background: "#10b981",
                 display: "grid",
                 placeItems: "center",
@@ -851,7 +825,7 @@ export default function VentasPage() {
                 color: "#111",
               }}
             >
-              ¡Venta eliminada exitosamente!
+              ¡Venta reactivada exitosamente!
             </h3>
           </div>
         </div>

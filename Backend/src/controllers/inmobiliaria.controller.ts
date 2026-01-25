@@ -72,11 +72,39 @@ export async function updateInmobiliariaController(req: Request, res: Response, 
     const id = Number(req.params.id);
     const data = req.body; 
     
-    // NOTA: No hace falta cambiar nada aquí. 
-    // La lógica de cambiar estado -> fechaBaja la maneja el servicio automáticamente.
+    // NOTA: El servicio bloquea updates si está eliminado y no permite cambios de estadoOperativo
+    // Solo endpoints de desactivar/reactivar pueden cambiar estadoOperativo
     const result = await inmobiliariaService.updateInmobiliaria(id, data);
     
     res.json({ success: true, message: 'Inmobiliaria actualizada exitosamente', data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Eliminar Inmobiliaria (soft delete - estadoOperativo)
+// ==============================
+export async function eliminarInmobiliariaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const result = await inmobiliariaService.eliminarInmobiliaria(id);
+    
+    res.json({ success: true, message: 'Inmobiliaria eliminada exitosamente', data: result });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Reactivar Inmobiliaria (estadoOperativo)
+// ==============================
+export async function reactivarInmobiliariaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const result = await inmobiliariaService.reactivarInmobiliaria(id);
+    
+    res.json({ success: true, message: 'Inmobiliaria reactivada exitosamente', data: result });
   } catch (error) {
     next(error);
   }

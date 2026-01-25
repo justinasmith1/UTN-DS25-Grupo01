@@ -12,6 +12,40 @@ import { getAllReservas, getReservaById, updateReserva, deleteReserva, reactivar
 import { getAllInmobiliarias } from "../lib/api/inmobiliarias";
 import { getAllLotes } from "../lib/api/lotes";
 import { applyReservaFilters } from "../utils/applyReservaFilters";
+import { applySearch } from "../utils/search/searchCore";
+import { getReservaSearchFields } from "../utils/search/fields/reservaSearchFields";
+
+// Helper para enriquecer reserva con mapId del lote
+const enrichReservaWithMapId = (reserva, lotesById = {}) => {
+  const lookupId = reserva?.loteId ?? reserva?.lotId ?? reserva?.lote?.id ?? null;
+  const loteRef =
+    reserva?.lote?.mapId
+      ? reserva.lote
+      : lookupId != null
+      ? lotesById[String(lookupId)] || null
+      : null;
+  const displayMapId =
+    loteRef?.mapId ??
+    reserva?.lotMapId ??
+    (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ??
+    null;
+
+  return {
+    ...reserva,
+    lotMapId: displayMapId ?? reserva?.lotMapId ?? null,
+    lote: loteRef
+      ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
+      : reserva.lote ?? null,
+    loteInfo: reserva.loteInfo
+      ? {
+          ...reserva.loteInfo,
+          mapId: reserva.loteInfo.mapId ?? displayMapId ?? null,
+        }
+      : displayMapId
+      ? { mapId: displayMapId }
+      : reserva.loteInfo ?? null,
+  };
+};
 
 import ReservaVerCard from "../components/Cards/Reservas/ReservaVerCard.jsx";
 import ReservaEditarCard from "../components/Cards/Reservas/ReservaEditarCard.jsx";
@@ -41,8 +75,17 @@ export default function Reservas() {
   
   const selectedInmobiliariaKey = selectedInmobiliariaParam != null ? selectedInmobiliariaParam : null;
   
+  // Estado de búsqueda local (NO se sincroniza con URL, NO dispara fetch)
+  const [searchText, setSearchText] = useState('');
+  
+  // Handler para cambios en búsqueda (solo actualiza estado local, NO dispara fetch)
+  const handleSearchChange = useCallback((newSearchText) => {
+    setSearchText(newSearchText ?? '');
+  }, []);
+
   const [params, setParams] = useState(() => ({
     inmobiliarias: selectedInmobiliariaKey ? [selectedInmobiliariaKey] : [],
+    estadoOperativo: "OPERATIVO", // Default: mostrar solo operativas
   }));
 
   // Aplicar filtro de inmobiliaria cuando cambia desde la URL
@@ -145,7 +188,8 @@ export default function Reservas() {
     }
     
     // Evitar doble llamada en React StrictMode (solo en el mismo render)
-    if (hasLoadedRef.current) return;
+    // Si ya se cargó y no hay cambio en estadoOperativo, no recargar
+    if (hasLoadedRef.current && !params.estadoOperativo) return;
     hasLoadedRef.current = true;
 
     let alive = true;
@@ -153,10 +197,15 @@ export default function Reservas() {
       try {
         setLoading(true);
         
+        // Construir query con estadoOperativo desde params
+        const queryParams = {
+          ...(params.estadoOperativo ? { estadoOperativo: params.estadoOperativo } : {}),
+        };
+        
         // Si el usuario es INMOBILIARIA, no cargar inmobiliarias (no las necesita)
         if (user?.role === 'INMOBILIARIA') {
           const [reservasResp, lotesResp] = await Promise.all([
-            getAllReservas({}), // Backend ya las devuelve filtradas por inmobiliaria
+            getAllReservas(queryParams), // Backend ya las devuelve filtradas por inmobiliaria y estadoOperativo
             getAllLotes({}),
           ]);
           
@@ -173,36 +222,9 @@ export default function Reservas() {
                 lotesById[String(lote.id)] = lote;
               }
             });
-            const reservasWithMapId = (Array.isArray(reservasData) ? reservasData : []).map((reserva) => {
-              const lookupId = reserva?.loteId ?? reserva?.lotId ?? reserva?.lote?.id ?? null;
-              const loteRef =
-                reserva?.lote?.mapId
-                  ? reserva.lote
-                  : lookupId != null
-                  ? lotesById[String(lookupId)] || null
-                  : null;
-              const displayMapId =
-                loteRef?.mapId ??
-                reserva?.lotMapId ??
-                (lookupId != null ? lotesById[String(lookupId)]?.mapId : null) ??
-                null;
-
-              return {
-                ...reserva,
-                lotMapId: displayMapId ?? reserva?.lotMapId ?? null,
-                lote: loteRef
-                  ? { ...loteRef, mapId: loteRef.mapId ?? displayMapId ?? null }
-                  : reserva.lote ?? null,
-                loteInfo: reserva.loteInfo
-                  ? {
-                      ...reserva.loteInfo,
-                      mapId: reserva.loteInfo.mapId ?? displayMapId ?? null,
-                    }
-                  : displayMapId
-                  ? { mapId: displayMapId }
-                  : reserva.loteInfo ?? null,
-              };
-            });
+            const reservasWithMapId = (Array.isArray(reservasData) ? reservasData : []).map((reserva) => 
+              enrichReservaWithMapId(reserva, lotesById)
+            );
             setAllReservas(reservasWithMapId);
             setLotes(Array.isArray(lotesData) ? lotesData : []);
             // INMOBILIARIA no necesita inmobiliarias
@@ -211,7 +233,7 @@ export default function Reservas() {
         } else {
           // ADMIN / GESTOR: cargar todo
           const [reservasResp, inmosResp, lotesResp] = await Promise.all([
-            getAllReservas({}),
+            getAllReservas(queryParams),
             getAllInmobiliarias({}),
             getAllLotes({}),
           ]);
@@ -291,12 +313,16 @@ export default function Reservas() {
       // Resetear el flag si el componente se desmonta para permitir recarga al volver a montar
       hasLoadedRef.current = false;
     };
-  }, [user?.role]); // Solo dependemos del rol del usuario, no de la función error
+  }, [user?.role, params.estadoOperativo]); // Depender de estadoOperativo para recargar cuando cambia el filtro
 
-  // Aplicar filtros localmente
+  // Pipeline de filtrado: primero búsqueda, luego otros filtros
   const reservas = useMemo(() => {
-    return applyReservaFilters(allReservas, params);
-  }, [allReservas, params]);
+    // 1. Aplicar búsqueda de texto (100% frontend)
+    const afterSearch = applySearch(allReservas, searchText, getReservaSearchFields);
+    
+    // 2. Aplicar otros filtros (estado, inmobiliarias, fechas, etc.)
+    return applyReservaFilters(afterSearch, params);
+  }, [allReservas, params, searchText]);
 
   // Modales/cards
   const [reservaSel, setReservaSel] = useState(null);
@@ -361,23 +387,8 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        // Preservar mapId del lote si viene del backend o de la reserva original
-        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
-        const enrichedDetail = mapId && detail?.lote
-          ? {
-              ...detail,
-              lotMapId: mapId,
-              lote: {
-                ...detail.lote,
-                mapId: mapId,
-              },
-            }
-          : mapId
-          ? {
-              ...detail,
-              lotMapId: mapId,
-            }
-          : detail;
+        // Enriquecer con mapId del lote
+        const enrichedDetail = enrichReservaWithMapId(detail, {});
         setReservaSel((prev) => ({ ...(prev || reserva), ...(enrichedDetail || {}) }));
       } catch (e) {
         console.error("Error obteniendo reserva por id:", e);
@@ -396,23 +407,8 @@ export default function Reservas() {
       try {
         const resp = await getReservaById(reserva.id);
         const detail = resp?.data ?? resp ?? {};
-        // Preservar mapId del lote si viene del backend o de la reserva original
-        const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
-        const enrichedDetail = mapId && detail?.lote
-          ? {
-              ...detail,
-              lotMapId: mapId,
-              lote: {
-                ...detail.lote,
-                mapId: mapId,
-              },
-            }
-          : mapId
-          ? {
-              ...detail,
-              lotMapId: mapId,
-            }
-          : detail;
+        // Enriquecer con mapId del lote
+        const enrichedDetail = enrichReservaWithMapId(detail, {});
         setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
       } catch (e) {
         console.error("Error obteniendo reserva por id para editar:", e);
@@ -421,13 +417,11 @@ export default function Reservas() {
   }, []);
 
   const onEliminar = useCallback((reserva) => {
-    if (reserva.estado === 'ACEPTADA' || reserva.estado === 'CONTRAOFERTA') {
-      error(`No se puede eliminar una reserva en estado ${reserva.estado}`);
-      return;
-    }
+    // No mostrar toast aquí. El botón ya está deshabilitado con tooltip si no se puede eliminar.
+    // Solo abrir el modal si se puede eliminar (validación ya hecha en TablaReservas)
     setReservaSel(reserva);
     setOpenEliminar(true);
-  }, [error]);
+  }, []);
 
   const onReactivar = useCallback((reserva) => {
     setReservaSel(reserva);
@@ -501,10 +495,21 @@ export default function Reservas() {
     if (!reservaSel?.id) return;
     try {
       setDeleting(true);
-      await deleteReserva(reservaSel.id);
-      // Actualizamos el estado local a ELIMINADO en lugar de quitarlo, 
-      // para que si el filtro permite ver eliminados, se vea.
-      setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, estado: 'ELIMINADO' } : r));
+      const result = await deleteReserva(reservaSel.id);
+      const updated = result?.data || result;
+      
+      // Actualizar en lista: si estoy en vista "Operativas", la reserva debe desaparecer
+      // Si estoy en vista "Eliminadas", debe aparecer ahí
+      const currentVisibilidad = params.estadoOperativo ?? "OPERATIVO";
+      
+      if (currentVisibilidad === "OPERATIVO") {
+        // Si estoy viendo operativas, remover la reserva de la lista (ya no es operativa)
+        setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
+      } else {
+        // Si estoy viendo eliminadas, actualizar la reserva con estadoOperativo = ELIMINADO
+        setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, ...updated, estadoOperativo: 'ELIMINADO' } : r));
+      }
+      
       setOpenEliminar(false);
       setShowDeleteSuccess(true);
       window.dispatchEvent(new CustomEvent('reloadLotes'));
@@ -512,11 +517,11 @@ export default function Reservas() {
         setShowDeleteSuccess(false);
       }, 1500);
     } catch (e) {
-      alert(e?.message || "No se pudo desactivar la reserva.");
+      alert(e?.message || "No se pudo eliminar la reserva.");
     } finally {
       setDeleting(false);
     }
-  }, [reservaSel]);
+  }, [reservaSel, params.estadoOperativo]);
 
   const handleReactivar = useCallback(async () => {
     if (!reservaSel?.id) return;
@@ -524,7 +529,19 @@ export default function Reservas() {
       setReactivating(true);
       const res = await reactivarReserva(reservaSel.id);
       const updated = res.data || res;
-      setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, ...updated } : r));
+      
+      // Actualizar en lista: si estoy en vista "Eliminadas", la reserva debe desaparecer
+      // Si estoy en vista "Operativas", debe aparecer ahí
+      const currentVisibilidad = params.estadoOperativo ?? "OPERATIVO";
+      
+      if (currentVisibilidad === "ELIMINADO") {
+        // Si estoy viendo eliminadas, remover la reserva de la lista (ya no está eliminada)
+        setAllReservas((prev) => prev.filter((r) => r.id !== reservaSel.id));
+      } else {
+        // Si estoy viendo operativas, actualizar la reserva con estadoOperativo = OPERATIVO
+        setAllReservas((prev) => prev.map((r) => r.id === reservaSel.id ? { ...r, ...updated, estadoOperativo: 'OPERATIVO' } : r));
+      }
+      
       setOpenReactivar(false);
       setShowReactivarSuccess(true);
       window.dispatchEvent(new CustomEvent('reloadLotes'));
@@ -536,7 +553,7 @@ export default function Reservas() {
     } finally {
       setReactivating(false);
     }
-  }, [reservaSel]);
+  }, [reservaSel, params.estadoOperativo]);
 
   // Verificar permisos
   if (!canReservaView) {
@@ -571,6 +588,7 @@ export default function Reservas() {
         variant="dashboard" 
         userRole={user?.role} 
         value={params} 
+        onSearchChange={handleSearchChange}
         onChange={(newParams) => {
           handleParamsChange(newParams);
           // Si se quitó el filtro de inmobiliaria, limpiar la URL
@@ -607,6 +625,7 @@ export default function Reservas() {
         onAgregarReserva={can(user, PERMISSIONS.RES_CREATE) ? onAgregarReserva : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
+        estadoOperativoFilter={params.estadoOperativo}
       />
 
       {/* Modales */}
@@ -626,23 +645,8 @@ export default function Reservas() {
             try {
               const resp = await getReservaById(reserva.id);
               const detail = resp?.data ?? resp ?? {};
-              // Preservar mapId del lote si viene del backend o de la reserva original
-              const mapId = detail?.lote?.mapId ?? reserva?.lote?.mapId ?? reserva?.lotMapId ?? detail?.lotMapId ?? null;
-              const enrichedDetail = mapId && detail?.lote
-                ? {
-                    ...detail,
-                    lotMapId: mapId,
-                    lote: {
-                      ...detail.lote,
-                      mapId: mapId,
-                    },
-                  }
-                : mapId
-                ? {
-                    ...detail,
-                    lotMapId: mapId,
-                  }
-                : detail;
+              // Enriquecer con mapId del lote
+              const enrichedDetail = enrichReservaWithMapId(detail, {});
               setReservaSel({ ...(reserva || {}), ...(enrichedDetail || {}) });
             } catch (e) {
               console.error("Error obteniendo reserva por id para editar:", e);
@@ -705,10 +709,10 @@ export default function Reservas() {
         loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
         documentoUrl={null}
         onModificar={(url) => {
-          console.log("Modificar documento:", url);
+          // TODO: Implementar modificación de documento
         }}
         onDescargar={(url) => {
-          console.log("Descargar documento:", url);
+          // TODO: Implementar descarga de documento
         }}
       />
 

@@ -1,7 +1,7 @@
 // src/components/FilterBar/presets/ventas.preset.js
 export const ventasFilterPreset = {
   catalogs: {
-    ESTADOS: ["OPERATIVO", "INICIADA", "CON_BOLETO", "ESCRITURA_PROGRAMADA", "ESCRITURADO", "CANCELADA", "ELIMINADO"],
+    ESTADOS: ["INICIADA", "CON_BOLETO", "ESCRITURA_PROGRAMADA", "ESCRITURADO", "CANCELADA"],
     TIPO_PAGO: ["CONTADO", "TRANSFERENCIA", "FINANCIADO", "CHEQUE", "TARJETA"],
     // Incluimos "La Federala" para poder filtrar ventas sin inmobiliaria asociada
     INMOBILIARIAS: [

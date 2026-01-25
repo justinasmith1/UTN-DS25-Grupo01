@@ -8,7 +8,9 @@ import "../Base/cards.css";
 import "../../Table/TablaLotes/TablaLotes.css";
 import EliminarBase from "../Base/EliminarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
+import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getGrupoFamiliar, crearMiembroFamiliar, eliminarMiembroFamiliar } from "../../../lib/api/personas.js";
+import { isEliminado } from "../../../utils/estadoOperativo";
 
 // Schema para crear miembro familiar (solo campos mínimos)
 const miembroFamiliarSchema = z.object({
@@ -54,106 +56,6 @@ const TIPOS_IDENTIFICADOR = [
   { value: "PASAPORTE", label: "Pasaporte" },
   { value: "OTRO", label: "Otro" },
 ];
-
-// NiceSelect component (copiado de PersonaCrearCard para evitar dependencias)
-function NiceSelect({ value, options, placeholder = "Seleccionar", onChange, usePortal = false }) {
-  const [open, setOpen] = useState(false);
-  const btnRef = useRef(null);
-  const listRef = useRef(null);
-  const [pos, setPos] = useState({ top: 0, left: 0 });
-
-  useEffect(() => {
-    if (open && usePortal && btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom, left: rect.left });
-    }
-  }, [open, usePortal]);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleClick = (e) => {
-      if (!btnRef.current?.contains(e.target) && !listRef.current?.contains(e.target)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [open]);
-
-  const label = options.find(o => `${o.value}` === `${value}`)?.label ?? placeholder;
-
-  const menuContent = open ? (
-    <ul 
-      ref={listRef} 
-      className="ns-list" 
-      role="listbox" 
-      tabIndex={-1}
-      style={usePortal ? {
-        position: 'fixed',
-        top: `${pos.top}px`,
-        left: `${pos.left}px`,
-        width: '233px',
-        zIndex: 10000,
-        maxHeight: '300px',
-        overflowY: 'auto',
-        backgroundColor: '#fff',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        margin: 0,
-        padding: 0,
-        listStyle: 'none'
-      } : {}}
-    >
-      {options.map(opt => (
-        <li
-          key={`${opt.value}::${opt.label}`}
-          role="option"
-          aria-selected={`${opt.value}` === `${value}`}
-          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
-          onClick={() => {
-            onChange?.(opt.value || "");
-            setOpen(false);
-          }}
-        >
-          {opt.label}
-        </li>
-      ))}
-    </ul>
-  ) : null;
-
-  return (
-    <div className="ns-wrap" style={{ position: "relative" }}>
-      <button
-        type="button"
-        ref={btnRef}
-        className="ns-trigger"
-        onClick={() => setOpen(o => !o)}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          width: '100%'
-        }}
-      >
-        <span style={{ flex: 1, textAlign: 'left' }}>{label}</span>
-        <svg 
-          width="18" 
-          height="18" 
-          viewBox="0 0 20 20" 
-          aria-hidden
-          style={{ marginLeft: '8px', flexShrink: 0 }}
-        >
-          <polyline points="5,7 10,12 15,7" stroke="#222" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </button>
-      {usePortal && typeof document !== 'undefined' 
-        ? createPortal(menuContent, document.body)
-        : menuContent
-      }
-    </div>
-  );
-}
 
 export default function PersonaGrupoFamiliarCard({
   open,
@@ -223,6 +125,12 @@ export default function PersonaGrupoFamiliarCard({
   }, [open, persona?.id]);
 
   const onSubmitMiembro = async (data) => {
+    // Bloquear si titular está eliminado
+    if (isEliminado(persona)) {
+      setError("No se puede modificar un grupo familiar de un titular eliminado");
+      return;
+    }
+
     setError(null);
     setSaving(true);
     try {
@@ -253,6 +161,13 @@ export default function PersonaGrupoFamiliarCard({
 
   const handleConfirmarEliminar = async () => {
     if (!confirmEliminar) return;
+
+    // Bloquear si titular está eliminado
+    if (isEliminado(persona)) {
+      setError("No se puede modificar un grupo familiar de un titular eliminado");
+      setConfirmEliminar(null);
+      return;
+    }
 
     const { miembroId } = confirmEliminar;
     setConfirmEliminar(null);
@@ -303,6 +218,8 @@ export default function PersonaGrupoFamiliarCard({
   };
 
   if (!open || !persona) return null;
+
+  const titularEliminado = isEliminado(persona);
 
   return (
     <>
@@ -363,6 +280,19 @@ export default function PersonaGrupoFamiliarCard({
 
         {!loading && grupoFamiliar && (
           <>
+            {titularEliminado && (
+              <div style={{
+                background: '#FEF3C7',
+                border: '1px solid #F59E0B',
+                borderRadius: '8px',
+                padding: '12px 16px',
+                marginBottom: '20px',
+                color: '#92400E',
+                fontWeight: 500
+              }}>
+                No se puede modificar el grupo familiar porque el titular está ELIMINADO.
+              </div>
+            )}
             {/* Titular */}
             <div style={{ marginBottom: "24px" }}>
               <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "12px" }}>
@@ -394,6 +324,8 @@ export default function PersonaGrupoFamiliarCard({
                     className="btn btn-primary"
                     onClick={() => setShowAgregarForm(true)}
                     style={{ padding: "8px 16px", fontSize: "14px" }}
+                    disabled={titularEliminado}
+                    title={titularEliminado ? "No se puede modificar un grupo familiar de un titular eliminado" : ""}
                   >
                     + Agregar Miembro
                   </button>
@@ -543,9 +475,14 @@ export default function PersonaGrupoFamiliarCard({
                         type="button"
                         className="tl-icon tl-icon--delete"
                         onClick={() => handleEliminarClick(miembro)}
-                        disabled={eliminandoId === miembro.id || removingId === miembro.id}
+                        disabled={titularEliminado || eliminandoId === miembro.id || removingId === miembro.id}
                         aria-label="Eliminar miembro"
-                        data-tooltip="Eliminar miembro"
+                        data-tooltip={titularEliminado ? "No se puede modificar un grupo familiar de un titular eliminado" : "Eliminar miembro"}
+                        style={{
+                          opacity: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 0.5 : 1,
+                          cursor: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 'not-allowed' : 'pointer',
+                          pointerEvents: (titularEliminado || eliminandoId === miembro.id || removingId === miembro.id) ? 'none' : 'auto'
+                        }}
                       >
                         {eliminandoId === miembro.id ? (
                           <div

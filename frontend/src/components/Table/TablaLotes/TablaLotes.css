@@ -206,6 +206,7 @@
   border:1px solid rgba(0,0,0,.08);
   box-shadow:0 1px 2px rgba(16,24,40,.06);
   transition: transform .14s ease, box-shadow .14s ease, outline-color .14s ease, outline-offset .14s ease;
+  cursor: pointer;
 }
 .tl-icon svg{ width:21px; height: 18px; display:block; }
 
@@ -216,6 +217,8 @@
 .tl-icon--docs{   background: #efe2f3; color: rgb(141, 68, 165); }
 .tl-icon--delete{ background:#FEECEC; color:#E05252; }
 .tl-icon--promo{ background:#fdfddc; color:#BA8E23; }
+.tl-icon--success,
+.tl-icon--reactivate{ background:#EAF7EE; color:#10b981; }
 
 /* Hover: anillo finito del color del ícono */
 .tl-icon--view:hover,
@@ -223,7 +226,9 @@
 .tl-icon--docs:hover,
 .tl-icon--money:hover,
 .tl-icon--promo:hover,
-.tl-icon--delete:hover{
+.tl-icon--delete:hover,
+.tl-icon--success:hover,
+.tl-icon--reactivate:hover{
   outline:1px solid currentColor;
   outline-offset:-3px;
   transform:translateY(-1px);
@@ -247,9 +252,11 @@
 .tl-badge--muted  { background:#F2F4F7; color:#475467; border-color:#E5E7EB; }
 .tl-badge--success{ background:#E7F7EE; color:#18794E; border-color:#BCE8D3; }
 .tl-badge--danger { background:#FEECEC; color:#C23B3B; border-color:#FAC5C5; }
-.tl-badge--warn   { background:#FFF6E5; color:#9A5C00; border-color:#FFE2B8; }
+.tl-badge--warn   { background:#FFF6E5; color:#FBBF24; border-color:#FCD34D; } /* Amarillo para VENDIDO */
 .tl-badge--info   { background:#EAF2FF; color:#2952CC; border-color:#CBDCFF; }
 .tl-badge--indigo { background:#EEF0FF; color:#5B6BFF; border-color:#D9DDFF; }
+.tl-badge--orange { background:#FFF4E6; color:#EA580C; border-color:#FDBA74; } /* Naranja/ámbar para EN_PROMOCION */
+.tl-badge--violet { background:#F3E8FF; color:#7C3AED; border-color:#C4B5FD; } /* Violeta/índigo para CON_PRIORIDAD */
 /* --------------------------------------------- */
 
 

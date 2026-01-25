@@ -7,7 +7,7 @@
 export const lotesFilterPreset = {
   // Catálogos visibles (se filtran por RBAC dentro del componente)
   catalogs: {
-    ESTADOS: ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "ALQUILADO", "EN_PROMOCION"],
+    ESTADOS: ["DISPONIBLE", "NO_DISPONIBLE", "RESERVADO", "VENDIDO", "EN_PROMOCION"], // ALQUILADO removido como estado
     SUBESTADOS: ["CONSTRUIDO", "EN_CONSTRUCCION", "NO_CONSTRUIDO"],
     CALLES: [
       "REINAMORA",
