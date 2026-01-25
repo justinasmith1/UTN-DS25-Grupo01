@@ -51,29 +51,46 @@ export function inmobiliariasChipsFrom(applied, catalogs) {
     }
   }
 
-  // Filtros de rango - Cantidad de Ventas
-  if (applied.cantidadVentas && (applied.cantidadVentas.min !== null || applied.cantidadVentas.max !== null)) {
-    const min = applied.cantidadVentas.min !== null ? applied.cantidadVentas.min : '';
-    const max = applied.cantidadVentas.max !== null ? applied.cantidadVentas.max : '';
+  // Filtros de rango - Prioridades Totales
+  if (applied.prioridadesTotales && (applied.prioridadesTotales.min !== null || applied.prioridadesTotales.max !== null)) {
+    const min = applied.prioridadesTotales.min !== null ? applied.prioridadesTotales.min : '';
+    const max = applied.prioridadesTotales.max !== null ? applied.prioridadesTotales.max : '';
     if (min && max) {
-      arr.push({ k: "cantidadVentas", v: applied.cantidadVentas, label: `Ventas: ${min} - ${max}` });
+      arr.push({ k: "prioridadesTotales", v: applied.prioridadesTotales, label: `Prioridades Totales: ${min} - ${max}` });
     } else if (min) {
-      arr.push({ k: "cantidadVentas", v: applied.cantidadVentas, label: `Ventas: desde ${min}` });
+      arr.push({ k: "prioridadesTotales", v: applied.prioridadesTotales, label: `Prioridades Totales: desde ${min}` });
     } else if (max) {
-      arr.push({ k: "cantidadVentas", v: applied.cantidadVentas, label: `Ventas: hasta ${max}` });
+      arr.push({ k: "prioridadesTotales", v: applied.prioridadesTotales, label: `Prioridades Totales: hasta ${max}` });
     }
   }
 
-  // Filtros de rango - Cantidad de Reservas
-  if (applied.cantidadReservas && (applied.cantidadReservas.min !== null || applied.cantidadReservas.max !== null)) {
-    const min = applied.cantidadReservas.min !== null ? applied.cantidadReservas.min : '';
-    const max = applied.cantidadReservas.max !== null ? applied.cantidadReservas.max : '';
+  // Filtros de rango - Ventas Totales (con compatibilidad legacy cantidadVentas)
+  const ventasField = applied.ventasTotales || applied.cantidadVentas;
+  if (ventasField && (ventasField.min !== null || ventasField.max !== null)) {
+    const min = ventasField.min !== null ? ventasField.min : '';
+    const max = ventasField.max !== null ? ventasField.max : '';
+    const key = applied.ventasTotales ? "ventasTotales" : "cantidadVentas";
     if (min && max) {
-      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: ${min} - ${max}` });
+      arr.push({ k: key, v: ventasField, label: `Ventas Totales: ${min} - ${max}` });
     } else if (min) {
-      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: desde ${min}` });
+      arr.push({ k: key, v: ventasField, label: `Ventas Totales: desde ${min}` });
     } else if (max) {
-      arr.push({ k: "cantidadReservas", v: applied.cantidadReservas, label: `Reservas: hasta ${max}` });
+      arr.push({ k: key, v: ventasField, label: `Ventas Totales: hasta ${max}` });
+    }
+  }
+
+  // Filtros de rango - Reservas Totales (con compatibilidad legacy cantidadReservas)
+  const reservasField = applied.reservasTotales || applied.cantidadReservas;
+  if (reservasField && (reservasField.min !== null || reservasField.max !== null)) {
+    const min = reservasField.min !== null ? reservasField.min : '';
+    const max = reservasField.max !== null ? reservasField.max : '';
+    const key = applied.reservasTotales ? "reservasTotales" : "cantidadReservas";
+    if (min && max) {
+      arr.push({ k: key, v: reservasField, label: `Reservas Totales: ${min} - ${max}` });
+    } else if (min) {
+      arr.push({ k: key, v: reservasField, label: `Reservas Totales: desde ${min}` });
+    } else if (max) {
+      arr.push({ k: key, v: reservasField, label: `Reservas Totales: hasta ${max}` });
     }
   }
 

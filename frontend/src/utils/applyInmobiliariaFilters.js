@@ -6,8 +6,13 @@ const getNombre = (inmobiliaria) => inmobiliaria?.nombre || '';
 const getRazonSocial = (inmobiliaria) => inmobiliaria?.razonSocial || '';
 const getContacto = (inmobiliaria) => inmobiliaria?.contacto || '';
 const getComxventa = (inmobiliaria) => Number(inmobiliaria?.comxventa) || 0;
-const getCantidadVentas = (inmobiliaria) => Number(inmobiliaria?.cantidadVentas) || 0;
-const getCantidadReservas = (inmobiliaria) => Number(inmobiliaria?.cantidadReservas) || 0;
+// Nuevos getters con fallback a nombres legacy
+const getVentasTotales = (inmobiliaria) => Number(inmobiliaria?.ventasTotales ?? inmobiliaria?.cantidadVentas) || 0;
+const getReservasTotales = (inmobiliaria) => Number(inmobiliaria?.reservasTotales ?? inmobiliaria?.cantidadReservas) || 0;
+const getPrioridadesTotales = (inmobiliaria) => Number(inmobiliaria?.prioridadesTotales) || 0;
+// Legacy getters (mantener compatibilidad)
+const getCantidadVentas = (inmobiliaria) => getVentasTotales(inmobiliaria);
+const getCantidadReservas = (inmobiliaria) => getReservasTotales(inmobiliaria);
 const getEstado = (inmobiliaria) => inmobiliaria?.estado || 'OPERATIVO';
 const getCreatedAt = (inmobiliaria) => {
   const date = inmobiliaria?.createdAt;
@@ -82,6 +87,29 @@ export function applyInmobiliariaFilters(inmobiliarias, params) {
     );
   }
 
+  // Filtros nuevos (con fallback a nombres legacy)
+  if ((params.prioridadesTotales?.min !== undefined && params.prioridadesTotales?.min !== null) ||
+    (params.prioridadesTotales?.max !== undefined && params.prioridadesTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getPrioridadesTotales(inmobiliaria), params.prioridadesTotales?.min, params.prioridadesTotales?.max)
+    );
+  }
+
+  if ((params.ventasTotales?.min !== undefined && params.ventasTotales?.min !== null) ||
+    (params.ventasTotales?.max !== undefined && params.ventasTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getVentasTotales(inmobiliaria), params.ventasTotales?.min, params.ventasTotales?.max)
+    );
+  }
+
+  if ((params.reservasTotales?.min !== undefined && params.reservasTotales?.min !== null) ||
+    (params.reservasTotales?.max !== undefined && params.reservasTotales?.max !== null)) {
+    rows = rows.filter((inmobiliaria) =>
+      inRange(getReservasTotales(inmobiliaria), params.reservasTotales?.min, params.reservasTotales?.max)
+    );
+  }
+
+  // Legacy filters (compatibilidad - aplican los mismos filtros que los nuevos)
   if ((params.cantidadVentas?.min !== undefined && params.cantidadVentas?.min !== null) ||
     (params.cantidadVentas?.max !== undefined && params.cantidadVentas?.max !== null)) {
     rows = rows.filter((inmobiliaria) =>

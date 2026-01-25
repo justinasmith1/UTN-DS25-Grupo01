@@ -8,8 +8,10 @@ import NiceSelect from "../../Base/NiceSelect.jsx";
 import { createPrioridad } from "../../../lib/api/prioridades.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
+import { getInmobiliariaById } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { prioridadCreateSchema } from "../../../lib/validations/prioridadCreate.schema.js";
+import { isInmobiliariaSaturada, formatCupo, getSaturadaTooltip } from "../../../utils/inmobiliariaHelpers.js";
 
 /* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
@@ -54,6 +56,7 @@ export default function PrioridadCrearCard({
   // Estados de datos
   const [lotes, setLotes] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
+  const [miInmobiliaria, setMiInmobiliaria] = useState(null); // Para usuario INMOBILIARIA
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [loadingInmobiliarias, setLoadingInmobiliarias] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -120,17 +123,41 @@ export default function PrioridadCrearCard({
       }
     })();
 
-    if (!isInmobiliaria) {
+    if (isInmobiliaria) {
+      // Si es INMOBILIARIA, cargar su propia inmobiliaria con datos de cupo
+      if (user?.inmobiliariaId) {
+        setLoadingInmobiliarias(true);
+        (async () => {
+          try {
+            const resp = await getInmobiliariaById(user.inmobiliariaId);
+            const inmob = resp?.data || resp;
+            setMiInmobiliaria(inmob);
+          } catch (err) {
+            console.error("Error cargando mi inmobiliaria:", err);
+            setMiInmobiliaria(null);
+          } finally {
+            setLoadingInmobiliarias(false);
+          }
+        })();
+      }
+      setInmobiliarias([]);
+    } else {
+      // Admin/Gestor: cargar todas las inmobiliarias con datos de cupo
       setLoadingInmobiliarias(true);
       (async () => {
         try {
           const resp = await getAllInmobiliarias({});
           const inmobData = resp?.data || resp?.inmobiliarias || [];
-          const inmobNormalizadas = inmobData.map(i => ({
-            value: String(i.id),
-            label: i.nombre || `ID: ${i.id}`,
-            inmobiliaria: i
-          }));
+          const inmobNormalizadas = inmobData.map(i => {
+            const saturada = isInmobiliariaSaturada(i);
+            const cupoLabel = formatCupo(i);
+            return {
+              value: String(i.id),
+              label: saturada ? `${i.nombre || `ID: ${i.id}`} (${cupoLabel})` : (i.nombre || `ID: ${i.id}`),
+              inmobiliaria: i,
+              disabled: saturada
+            };
+          });
           setInmobiliarias(inmobNormalizadas);
         } catch (err) {
           console.error("Error cargando inmobiliarias:", err);
@@ -139,8 +166,6 @@ export default function PrioridadCrearCard({
           setLoadingInmobiliarias(false);
         }
       })();
-    } else {
-      setInmobiliarias([]);
     }
 
     setBusquedaLote("");
@@ -189,6 +214,25 @@ export default function PrioridadCrearCard({
   const onSubmit = async (data) => {
     clearErrors();
     setShowSuccess(false);
+
+    // Validación de cupo ANTES de enviar
+    if (isInmobiliaria && miInmobiliaria && isInmobiliariaSaturada(miInmobiliaria)) {
+      alert(`No se puede crear la prioridad. ${getSaturadaTooltip(miInmobiliaria)}`);
+      return;
+    }
+
+    // Validación de cupo para Admin/Gestor si selecciona inmobiliaria saturada
+    if (!isInmobiliaria && data.inmobiliariaId) {
+      const inmobValue = data.inmobiliariaId.trim();
+      if (inmobValue !== "La Federala" && !inmobValue.toLowerCase().includes("federala")) {
+        const inmobSeleccionada = inmobiliarias.find(i => i.value === inmobValue);
+        if (inmobSeleccionada?.inmobiliaria && isInmobiliariaSaturada(inmobSeleccionada.inmobiliaria)) {
+          alert(`No se puede crear la prioridad. La inmobiliaria seleccionada está saturada (${formatCupo(inmobSeleccionada.inmobiliaria)})`);
+          return;
+        }
+      }
+    }
+
     setSaving(true);
 
     try {
@@ -292,6 +336,10 @@ export default function PrioridadCrearCard({
   const shouldRender = open || showSuccess;
   if (!shouldRender) return null;
 
+  // Validar si está saturado (para INMOBILIARIA)
+  const estaSaturado = isInmobiliaria && miInmobiliaria && isInmobiliariaSaturada(miInmobiliaria);
+  const mensajeSaturado = estaSaturado ? getSaturadaTooltip(miInmobiliaria) : "";
+
   const loteIdValue = formValues.loteId || "";
   const loteSeleccionado = lotes.find(l => String(l.id) === String(loteIdValue));
   const loteDisplayText = loteIdValue && !busquedaLote && loteSeleccionado ? (() => {
@@ -317,7 +365,7 @@ export default function PrioridadCrearCard({
           setSaving(false);
           onCancel?.();
         }}
-        onSave={handleSubmit(onSubmit)}
+        onSave={estaSaturado ? undefined : handleSubmit(onSubmit)}
         onReset={handleReset}
         saving={saving}
         saveButtonText="Confirmar Prioridad"
@@ -327,6 +375,21 @@ export default function PrioridadCrearCard({
           <h3 className="venta-section-title" style={{ paddingBottom: "6px", marginBottom: "18px" }}>
             Información de la Prioridad
           </h3>
+
+          {/* Banner de límite alcanzado para INMOBILIARIA */}
+          {estaSaturado && (
+            <div style={{
+              background: '#FEF3C7',
+              border: '1px solid #F59E0B',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              marginBottom: '20px',
+              color: '#92400E',
+              fontWeight: 500
+            }}>
+              {mensajeSaturado}
+            </div>
+          )}
 
           {errors.root && (
             <div style={{ padding: "12px", marginBottom: "18px", background: "#fee", border: "1px solid #fcc", borderRadius: "6px", color: "#c00" }}>

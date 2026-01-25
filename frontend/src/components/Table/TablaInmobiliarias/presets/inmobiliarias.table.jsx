@@ -30,17 +30,6 @@ export const inmobiliariasTablePreset = {
       align: 'center',
 
     },
-    // --- NUEVA COLUMNA: FECHA BAJA ---
-    // Solo mostramos algo si existe fechaBaja
-    {
-      id: 'fechaBaja',
-      header: 'Fecha Baja',
-      accessor: (row) => row.fechaBaja || null,
-      width: 140,
-      sortable: true,
-      align: 'center',
-
-    },
     {
       id: 'comxventa',
       header: 'Comisión x Venta (%)',
@@ -57,19 +46,72 @@ export const inmobiliariasTablePreset = {
       sortable: true,
       align: 'center',
     },
+    // Prioridades - visible por default
     {
-      id: 'cantidadVentas',
-      header: 'Ventas Asociadas',
-      accessor: (row) => row.cantidadVentas || 0,
+      id: 'prioridadesActivas',
+      header: 'Prioridades Activas',
+      accessor: (row) => row.prioridadesActivas ?? 0,
+      width: 150,
+      sortable: true,
+      align: 'center',
+    },
+    // Prioridades - opcional
+    {
+      id: 'prioridadesTotales',
+      header: 'Prioridades Totales',
+      accessor: (row) => row.prioridadesTotales ?? 0,
       width: 150,
       sortable: true,
       align: 'center',
     },
     {
-      id: 'cantidadReservas',
-      header: 'Reservas asociadas',
-      accessor: (row) => row.cantidadReservas || 0,
-      width: 160,
+      id: 'maxPrioridadesActivas',
+      header: 'Límite Prioridades',
+      accessor: (row) => row.maxPrioridadesActivas ?? '-',
+      width: 150,
+      sortable: true,
+      align: 'center',
+    },
+    // Reservas
+    {
+      id: 'reservasActivas',
+      header: 'Reservas Activas',
+      accessor: (row) => row.reservasActivas ?? 0,
+      width: 140,
+      sortable: true,
+      align: 'center',
+    },
+    {
+      id: 'reservasTotales',
+      header: 'Reservas Totales',
+      accessor: (row) => row.reservasTotales ?? row.cantidadReservas ?? 0,
+      width: 140,
+      sortable: true,
+      align: 'center',
+    },
+    // Ventas
+    {
+      id: 'ventasActivas',
+      header: 'Ventas Activas',
+      accessor: (row) => row.ventasActivas ?? 0,
+      width: 130,
+      sortable: true,
+      align: 'center',
+    },
+    {
+      id: 'ventasTotales',
+      header: 'Ventas Totales',
+      accessor: (row) => row.ventasTotales ?? row.cantidadVentas ?? 0,
+      width: 130,
+      sortable: true,
+      align: 'center',
+    },
+    // Fecha baja - ahora opcional (no default)
+    {
+      id: 'fechaBaja',
+      header: 'Fecha Baja',
+      accessor: (row) => row.fechaBaja || null,
+      width: 140,
       sortable: true,
       align: 'center',
     },

@@ -186,14 +186,14 @@ export default function TablaInmobiliarias({
     });
   }, []);
 
-  // Columnas visibles por defecto (7 columnas - excluyendo cantidadReservas)
+  // Columnas visibles por defecto - ahora incluye prioridadesActivas, excluye fechaBaja
   const defaultVisibleIds = useMemo(() => [
     'nombre',
     'estado',
     'razonSocial',
-    'fechaBaja',
     'comxventa',
     'contacto',
+    'prioridadesActivas',
   ], []);
 
 

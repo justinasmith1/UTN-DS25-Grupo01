@@ -163,6 +163,68 @@ export default function InmobiliariaVerCard({
               ))}
             </div>
           </div>
+
+          {/* Bloques de Métricas: Prioridades/Reservas/Ventas */}
+          <div style={{ marginTop: "32px" }}>
+            <h3 className="venta-section-title">Métricas</h3>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+              {/* Bloque Prioridades */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Prioridades
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.prioridadesActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.prioridadesTotales ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Límite:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.maxPrioridadesActivas ?? '—'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Reservas */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Reservas
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.reservasActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.reservasTotales ?? inmob?.cantidadReservas ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bloque Ventas */}
+              <div style={{ padding: "16px", background: "#f9fafb", borderRadius: "8px", border: "1px solid #e5e7eb" }}>
+                <h4 style={{ margin: "0 0 12px 0", fontSize: "14px", fontWeight: 600, color: "#6b7280", textTransform: "uppercase" }}>
+                  Ventas
+                </h4>
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Activas:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.ventasActivas ?? 0}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px" }}>
+                    <span style={{ color: "#6b7280" }}>Totales:</span>
+                    <span style={{ fontWeight: 600, color: "#111827" }}>{inmob?.ventasTotales ?? inmob?.cantidadVentas ?? 0}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -4,6 +4,7 @@ import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { updateInmobiliaria, getInmobiliariaById } from "../../../lib/api/inmobiliarias.js";
 import { isEliminado } from "../../../utils/estadoOperativo";
+import { useAuth } from "../../../app/providers/AuthProvider";
 
 /* -------------------------- Helper dinero -------------------------- */
 function fmtMoney(val) {
@@ -99,28 +100,35 @@ export default function InmobiliariaEditarCard({
     razonSocial: detalle?.razonSocial ?? "",
     contacto: detalle?.contacto ?? "",
     comxventa: detalle?.comxventa != null ? String(detalle.comxventa) : "",
+    maxPrioridadesActivas: detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "",
   };
 
   const [nombre, setNombre] = useState(base.nombre);
   const [razonSocial, setRazonSocial] = useState(base.razonSocial);
   const [contacto, setContacto] = useState(base.contacto);
   const [comxventa, setComxventa] = useState(base.comxventa);
+  const [maxPrioridadesActivas, setMaxPrioridadesActivas] = useState(base.maxPrioridadesActivas);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Obtener rol del usuario
+  const { user } = useAuth();
+  const isAdminOrGestor = user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR';
 
   // re-sync cuando cambia 'detalle' o se reabre
   useEffect(() => {
     if (!open || !detalle) return;
-    setNombre(base.nombre);
-    setRazonSocial(base.razonSocial);
-    setContacto(base.contacto);
-    setComxventa(base.comxventa);
+    setNombre(detalle?.nombre ?? "");
+    setRazonSocial(detalle?.razonSocial ?? "");
+    setContacto(detalle?.contacto ?? "");
+    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
+    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id]);
+  }, [open, detalle?.id, detalle?.maxPrioridadesActivas]);
 
   /* 5) ancho de label como en VerCard */
   useEffect(() => {
     const labels = [
-      "NOMBRE", "RAZÓN SOCIAL", "CONTACTO", "COMISIÓN X VENTA",
+      "NOMBRE", "RAZÓN SOCIAL", "CONTACTO", "COMISIÓN X VENTA", "LÍMITE PRIORIDADES ACTIVAS",
       "FECHA DE ACTUALIZACIÓN", "FECHA DE CREACIÓN"
     ];
     const longest = Math.max(...labels.map(s => s.length));
@@ -144,6 +152,24 @@ export default function InmobiliariaEditarCard({
       const num = Number(comxventa);
       if (!isNaN(num) && num >= 0) {
         patch.comxventa = num;
+      }
+    }
+
+    // maxPrioridadesActivas - solo Admin/Gestor puede editar
+    if (isAdminOrGestor) {
+      const valorActual = detalle?.maxPrioridadesActivas;
+      const valorActualString = valorActual != null ? String(valorActual) : "";
+      const valorNuevoString = maxPrioridadesActivas || "";
+      
+      if (valorNuevoString !== valorActualString) {
+        if (valorNuevoString === "") {
+          patch.maxPrioridadesActivas = null; // Limpiar límite
+        } else {
+          const num = Number(valorNuevoString);
+          if (!isNaN(num) && num >= 0) {
+            patch.maxPrioridadesActivas = Math.floor(num); // Entero positivo
+          }
+        }
       }
     }
 
@@ -191,10 +217,11 @@ export default function InmobiliariaEditarCard({
   }
 
   function handleReset() {
-    setNombre(base.nombre);
-    setRazonSocial(base.razonSocial);
-    setContacto(base.contacto);
-    setComxventa(base.comxventa);
+    setNombre(detalle?.nombre ?? "");
+    setRazonSocial(detalle?.razonSocial ?? "");
+    setContacto(detalle?.contacto ?? "");
+    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
+    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
   }
 
   /* 7) Render */
@@ -348,6 +375,26 @@ export default function InmobiliariaEditarCard({
                 <div className="field-label">FECHA DE CREACIÓN</div>
                 <div className="field-value is-readonly">{fechaCre}</div>
               </div>
+
+              {/* Campo maxPrioridadesActivas - solo visible para Admin/Gestor */}
+              {isAdminOrGestor && (
+                <div className="field-row">
+                  <div className="field-label">LÍMITE PRIORIDADES ACTIVAS</div>
+                  <div className="field-value p0">
+                    <input
+                      className="field-input"
+                      type="number"
+                      inputMode="numeric"
+                      min="0"
+                      step="1"
+                      value={maxPrioridadesActivas}
+                      onChange={(e) => setMaxPrioridadesActivas(e.target.value)}
+                      placeholder="Sin límite"
+                      disabled={eliminado}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

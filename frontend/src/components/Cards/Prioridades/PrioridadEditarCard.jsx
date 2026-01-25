@@ -7,6 +7,7 @@ import { getPrioridadById, updatePrioridad, cancelPrioridad, finalizePrioridad }
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
+import { isInmobiliariaSaturada, formatCupo, getSaturadaTooltip } from "../../../utils/inmobiliariaHelpers.js";
 
 /** Estados editables de prioridad: solo FINALIZADA y CANCELADA (no EXPIRADA manualmente) */
 const ESTADOS_PRIORIDAD = [
@@ -99,11 +100,19 @@ export default function PrioridadEditarCard({
       try {
         const resp = await getAllInmobiliarias({});
         const inmobData = resp?.data || resp?.inmobiliarias || [];
-        const inmobNormalizadas = inmobData.map(i => ({
-          value: String(i.id),
-          label: i.nombre || `ID: ${i.id}`,
-          inmobiliaria: i
-        }));
+        const inmobNormalizadas = inmobData.map(i => {
+          const saturada = isInmobiliariaSaturada(i);
+          const cupoInfo = formatCupo(i);
+          return {
+            value: String(i.id),
+            label: i.nombre || `ID: ${i.id}`,
+            cupoInfo,
+            saturada,
+            disabled: saturada,
+            title: saturada ? getSaturadaTooltip(i) : undefined,
+            inmobiliaria: i
+          };
+        });
         setInmobiliarias(inmobNormalizadas);
       } catch (err) {
         console.error("Error cargando inmobiliarias:", err);
@@ -171,11 +180,23 @@ export default function PrioridadEditarCard({
   // Opciones de inmobiliaria para el select (ADMIN/GESTOR)
   const inmobiliariaOpts = useMemo(() => {
     if (isInmobiliaria) return [];
-    // "La Federala" + inmobiliarias reales
+    
+    // Agregar "La Federala" si no está
     const hasLF = inmobiliarias.some(i => (i.label || "").toLowerCase().includes("la federala"));
-    const opts = hasLF 
-      ? inmobiliarias 
-      : [{ value: "La Federala", label: "La Federala" }, ...inmobiliarias];
+    const lfOption = { value: "La Federala", label: "La Federala", disabled: false };
+    
+    // Enriquecer labels con cupo si está saturada
+    const inmobsEnriquecidas = inmobiliarias.map(opt => {
+      if (opt.saturada && opt.cupoInfo) {
+        return {
+          ...opt,
+          label: `${opt.label} ${opt.cupoInfo}`
+        };
+      }
+      return opt;
+    });
+    
+    const opts = hasLF ? inmobsEnriquecidas : [lfOption, ...inmobsEnriquecidas];
     return opts;
   }, [inmobiliarias, isInmobiliaria]);
 
@@ -249,6 +270,20 @@ export default function PrioridadEditarCard({
         }
       }
 
+      // Validación de cupo si se cambió la inmobiliaria
+      if (cambioInmobiliaria && (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR')) {
+        // Buscar la inmobiliaria destino en el array cargado
+        const inmobDestino = inmobiliarias.find(i => String(i.value) === String(nuevoInmobiliariaIdValue));
+        
+        // Si es una inmobiliaria real (no "La Federala" que es null) y está saturada
+        if (inmobDestino && inmobDestino.saturada) {
+          const cupoMsg = inmobDestino.cupoInfo || '';
+          setNumeroError(`No se puede asignar a esta inmobiliaria. Límite alcanzado ${cupoMsg}`);
+          setSaving(false);
+          return;
+        }
+      }
+
       // Actualizar numero, inmobiliariaId y fechaFin si cambiaron (vía updatePrioridad)
       if (cambioNumero || cambioInmobiliaria || cambioFechaFin) {
         const updatePayload = {};
@@ -265,6 +300,12 @@ export default function PrioridadEditarCard({
         try {
           await updatePrioridad(detalle.id, updatePayload);
         } catch (e) {
+          // Manejar error de cupo (409) desde el backend
+          if (e?.response?.status === 409 && (e?.message?.toLowerCase().includes('cupo') || e?.message?.toLowerCase().includes('límite') || e?.message?.toLowerCase().includes('limite'))) {
+            setNumeroError(e.message || "Límite de prioridades activas alcanzado para esta inmobiliaria");
+            setSaving(false);
+            return;
+          }
           // Manejar error de unicidad de numero
           if (e?.response?.status === 409 || e?.message?.toLowerCase().includes('numero') || e?.message?.toLowerCase().includes('número')) {
             setNumeroError("Ya existe una prioridad con este número");

@@ -1,7 +1,6 @@
 // src/lib/api/reservas.js
 // API adapter para reservas
  
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http, httpJson, normalizeApiListResponse } from "../http/http";
 
 // ===== NORMALIZADORES =====
@@ -93,82 +92,8 @@ const toApi = (data = {}) => ({
   fechaFinReserva: data.fechaFinReserva,
 });
 
-// ===== MOCK DATA =====
-const mockReservas = [
-  {
-    id: 1,
-    loteId: 1,
-    clienteId: 1,
-    cliente: { id: 1, nombre: 'Juan', apellido: 'Pérez', nombreCompleto: 'Juan Pérez' },
-    fechaReserva: '2024-01-15T10:00:00Z',
-    seña: 50000,
-    inmobiliariaId: 1,
-    inmobiliaria: { id: 1, nombre: 'Inmobiliaria Central' },
-    lote: {
-      id: 1,
-      fraccion: 1,
-      ubicacion: { calle: 'REINAMORA', numero: 123 },
-      estado: 'RESERVADO',
-      precio: 250000
-    },
-    createdAt: '2024-01-15T10:00:00Z'
-  },
-  {
-    id: 2,
-    loteId: 2,
-    clienteId: 2,
-    cliente: { id: 2, nombre: 'María', apellido: 'González', nombreCompleto: 'María González' },
-    fechaReserva: '2024-01-20T14:30:00Z',
-    seña: 75000,
-    inmobiliariaId: 2,
-    inmobiliaria: { id: 2, nombre: 'Propiedades del Sur' },
-    lote: {
-      id: 2,
-      fraccion: 2,
-      ubicacion: { calle: 'MACA', numero: 456 },
-      estado: 'RESERVADO',
-      precio: 300000
-    },
-    createdAt: '2024-01-20T14:30:00Z'
-  },
-  {
-    id: 3,
-    loteId: 3,
-    clienteId: 3,
-    cliente: { id: 3, nombre: 'Carlos', apellido: 'López', nombreCompleto: 'Carlos López' },
-    fechaReserva: '2024-02-01T09:15:00Z',
-    seña: 60000,
-    inmobiliariaId: 1,
-    inmobiliaria: { id: 1, nombre: 'Inmobiliaria Central' },
-    lote: {
-      id: 3,
-      fraccion: 3,
-      ubicacion: { calle: 'ZORZAL', numero: 789 },
-      estado: 'RESERVADO',
-      precio: 280000
-    },
-    createdAt: '2024-02-01T09:15:00Z'
-  }
-];
-
 // ===== FUNCIONES DE API =====
 export const getAllReservas = async (params = {}) => {
-  if (USE_MOCK) {
-    console.log('🔍 [MOCK] Obteniendo reservas...', params);
-    
-    // Simular delay de red
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const filtered = mockFilterSortPage(mockReservas, params);
-    
-    return {
-      success: true,
-      data: filtered.data,
-      total: filtered.total,
-      message: 'Reservas obtenidas correctamente (MOCK)'
-    };
-  }
-
   try {
     // Construir query string
     const queryParams = new URLSearchParams();
@@ -248,15 +173,6 @@ export const getAllReservas = async (params = {}) => {
 };
 
 export const getReservaById = async (id) => {
-  if (USE_MOCK) {
-    const reserva = mockReservas.find(r => r.id === parseInt(id));
-    return {
-      success: true,
-      data: reserva || null,
-      message: reserva ? 'Reserva encontrada (MOCK)' : 'Reserva no encontrada (MOCK)'
-    };
-  }
-
   try {
     // Usar httpJson que maneja el parsing de manera segura y consistente
     const response = await httpJson(`/reservas/${id}`, {
@@ -324,20 +240,6 @@ export const getReservaById = async (id) => {
 export const getReserva = getReservaById;
 
 export const createReserva = async (data) => {
-  if (USE_MOCK) {
-    const newReserva = {
-      id: mockReservas.length + 1,
-      ...data,
-      createdAt: new Date().toISOString()
-    };
-    mockReservas.push(newReserva);
-    return {
-      success: true,
-      data: newReserva,
-      message: 'Reserva creada correctamente (MOCK)'
-    };
-  }
-
   try {
     const body = toApi(data);
     const response = await http('/reservas', {
@@ -471,22 +373,6 @@ export const updateReserva = async (id, payload) => {
 };
 
 export const eliminarReserva = async (id) => {
-  if (USE_MOCK) {
-    const index = mockReservas.findIndex(r => r.id === parseInt(id));
-    if (index !== -1) {
-      mockReservas[index] = { ...mockReservas[index], estadoOperativo: 'ELIMINADO' };
-      return {
-        success: true,
-        data: mockReservas[index],
-        message: 'Reserva eliminada correctamente (MOCK)'
-      };
-    }
-    return {
-      success: false,
-      message: 'Reserva no encontrada (MOCK)'
-    };
-  }
-
   try {
     const response = await http(`/reservas/${id}/eliminar`, {
       method: 'PATCH'
@@ -521,22 +407,6 @@ export const desactivarReserva = eliminarReserva;
 export const deleteReserva = eliminarReserva;
 
 export const reactivarReserva = async (id) => {
-    if (USE_MOCK) {
-        const index = mockReservas.findIndex(r => r.id === parseInt(id));
-        if (index !== -1) {
-            mockReservas[index] = { ...mockReservas[index], estadoOperativo: 'OPERATIVO' };
-            return {
-                success: true,
-                data: mockReservas[index],
-                message: 'Reserva reactivada correctamente (MOCK)'
-            };
-        }
-        return {
-            success: false,
-            message: 'Reserva no encontrada (MOCK)'
-        };
-    }
-
     try {
         const response = await http(`/reservas/${id}/reactivar`, {
             method: 'PATCH'

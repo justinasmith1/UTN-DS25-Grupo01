@@ -767,6 +767,43 @@ export async function updatePrioridad(
     }
   }
 
+  // Validar cupo si se está cambiando a una inmobiliaria diferente (solo para Admin/Gestor)
+  if (body.inmobiliariaId !== undefined && 
+      (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') &&
+      body.inmobiliariaId !== prioridadActual.inmobiliariaId) {
+    
+    // Si se está asignando a una inmobiliaria (no a La Federala que es null)
+    if (body.inmobiliariaId !== null) {
+      const inmobDestino = await prisma.inmobiliaria.findUnique({
+        where: { id: body.inmobiliariaId },
+        select: { maxPrioridadesActivas: true },
+      });
+
+      if (!inmobDestino) {
+        const err: any = new Error('La inmobiliaria destino no existe');
+        err.status = 404;
+        throw err;
+      }
+
+      const limite = inmobDestino.maxPrioridadesActivas ?? 5;
+      
+      // Contar prioridades activas de la inmobiliaria destino (excluyendo la prioridad actual)
+      const activas = await prisma.prioridad.count({
+        where: { 
+          inmobiliariaId: body.inmobiliariaId, 
+          estado: EstadoPrioridad.ACTIVA,
+          id: { not: id } // Excluir la prioridad actual del conteo
+        },
+      });
+      
+      if (activas >= limite) {
+        const err: any = new Error(`La inmobiliaria alcanzó el límite de prioridades activas (${activas}/${limite})`);
+        err.status = 409;
+        throw err;
+      }
+    }
+  }
+
   // Construir objeto de actualización
   const updateData: any = {};
   if (body.numero !== undefined) {

@@ -1,7 +1,6 @@
 // src/lib/api/prioridades.js
 // API adapter para prioridades
 
-const USE_MOCK = import.meta.env.VITE_AUTH_USE_MOCK === "true";
 import { http, httpJson } from "../http/http";
 
 // ===== NORMALIZADORES =====
@@ -37,19 +36,6 @@ const toApi = (data = {}) => ({
 
 // ===== FUNCIONES DE API =====
 export const getAllPrioridades = async (params = {}) => {
-  if (USE_MOCK) {
-    console.log('🔍 [MOCK] Obteniendo prioridades...', params);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return {
-      success: true,
-      data: {
-        prioridades: [],
-        total: 0,
-      },
-      message: 'Prioridades obtenidas correctamente (MOCK)'
-    };
-  }
-
   try {
     const queryParams = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
@@ -117,14 +103,6 @@ export const getAllPrioridades = async (params = {}) => {
 };
 
 export const getPrioridadById = async (id) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: null,
-      message: 'Prioridad no encontrada (MOCK)'
-    };
-  }
-
   try {
     const response = await httpJson(`/prioridades/${id}`, {
       method: 'GET'
@@ -145,20 +123,6 @@ export const getPrioridadById = async (id) => {
 };
 
 export const createPrioridad = async (data) => {
-  if (USE_MOCK) {
-    const newPrioridad = {
-      id: Math.floor(Math.random() * 1000),
-      ...data,
-      estado: 'ACTIVA',
-      createdAt: new Date().toISOString()
-    };
-    return {
-      success: true,
-      data: fromApi(newPrioridad),
-      message: 'Prioridad creada correctamente (MOCK)'
-    };
-  }
-
   try {
     const body = toApi(data);
     const response = await http('/prioridades', {
@@ -202,14 +166,6 @@ export const createPrioridad = async (data) => {
 };
 
 export const updatePrioridad = async (id, data) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: { ...data, id },
-      message: 'Prioridad actualizada correctamente (MOCK)'
-    };
-  }
-
   try {
     const body = {
       ...(data.numero !== undefined ? { numero: data.numero } : {}),
@@ -244,14 +200,6 @@ export const updatePrioridad = async (id, data) => {
 };
 
 export const cancelPrioridad = async (id) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: null,
-      message: 'Prioridad cancelada correctamente (MOCK)'
-    };
-  }
-
   try {
     const response = await http(`/prioridades/${id}/cancelar`, {
       method: 'PATCH'
@@ -279,14 +227,6 @@ export const cancelPrioridad = async (id) => {
 };
 
 export const finalizePrioridad = async (id) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: null,
-      message: 'Prioridad finalizada correctamente (MOCK)'
-    };
-  }
-
   try {
     const response = await http(`/prioridades/${id}/finalizar`, {
       method: 'PATCH'
@@ -314,14 +254,6 @@ export const finalizePrioridad = async (id) => {
 };
 
 export const expirePrioridadesManual = async () => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: { expired: 0 },
-      message: 'No hay prioridades vencidas (MOCK)'
-    };
-  }
-
   try {
     const response = await http('/prioridades/jobs/expire', {
       method: 'POST'
@@ -346,14 +278,6 @@ export const expirePrioridadesManual = async () => {
 };
 
 export const softDeletePrioridad = async (id) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: null,
-      message: 'Prioridad eliminada correctamente (MOCK)'
-    };
-  }
-
   try {
     const response = await http(`/prioridades/${id}/eliminar`, {
       method: 'PATCH'
@@ -384,14 +308,6 @@ export const softDeletePrioridad = async (id) => {
 };
 
 export const reactivatePrioridad = async (id) => {
-  if (USE_MOCK) {
-    return {
-      success: true,
-      data: null,
-      message: 'Prioridad reactivada correctamente (MOCK)'
-    };
-  }
-
   try {
     const response = await http(`/prioridades/${id}/reactivar`, {
       method: 'PATCH'

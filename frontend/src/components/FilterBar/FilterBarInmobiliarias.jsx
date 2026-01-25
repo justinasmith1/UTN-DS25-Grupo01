@@ -36,15 +36,21 @@ export default function FilterBarInmobiliarias({
       defaultValue: { min: null, max: null }
     },
     {
-      id: 'cantidadReservas',
+      id: 'prioridadesTotales',
       type: 'range',
-      label: 'Cantidad de Reservas',
+      label: 'Prioridades Totales',
       defaultValue: { min: null, max: null }
     },
     {
-      id: 'cantidadVentas',
+      id: 'reservasTotales',
       type: 'range',
-      label: 'Cantidad de Ventas',
+      label: 'Reservas Totales',
+      defaultValue: { min: null, max: null }
+    },
+    {
+      id: 'ventasTotales',
+      type: 'range',
+      label: 'Ventas Totales',
       defaultValue: { min: null, max: null }
     },
     {
@@ -66,8 +72,9 @@ export default function FilterBarInmobiliarias({
   // Rangos para los filtros numéricos
   const ranges = useMemo(() => ({
     comxventa: inmobiliariasFilterPreset.ranges.comxventa,
-    cantidadReservas: inmobiliariasFilterPreset.ranges.cantidadReservas,
-    cantidadVentas: inmobiliariasFilterPreset.ranges.cantidadVentas,
+    prioridadesTotales: inmobiliariasFilterPreset.ranges.prioridadesTotales || { min: 0, max: 100 },
+    reservasTotales: inmobiliariasFilterPreset.ranges.reservasTotales || inmobiliariasFilterPreset.ranges.cantidadReservas,
+    ventasTotales: inmobiliariasFilterPreset.ranges.ventasTotales || inmobiliariasFilterPreset.ranges.cantidadVentas,
     createdAt: inmobiliariasFilterPreset.ranges.createdAt,
   }), []);
 

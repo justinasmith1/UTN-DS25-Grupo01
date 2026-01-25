@@ -6,12 +6,12 @@ import { createPortal } from "react-dom";
  * NiceSelect - Componente de select personalizado reutilizable
  * 
  * @param {string} value - Valor seleccionado
- * @param {Array<{value: string|number, label: string}>} options - Opciones disponibles
+ * @param {Array<{value: string|number, label: string, disabled?: boolean}>} options - Opciones disponibles (con disabled opcional)
  * @param {string} placeholder - Texto placeholder (default: "Seleccionar")
  * @param {Function} onChange - Callback cuando cambia el valor
  * @param {boolean} usePortal - Si true, renderiza el menú en un portal (útil para modales)
  * @param {boolean} showPlaceholderOption - Si true, incluye el placeholder como opción seleccionable
- * @param {boolean} disabled - Si true, deshabilita el select
+ * @param {boolean} disabled - Si true, deshabilita el select completo
  */
 export default function NiceSelect({
   value,
@@ -88,11 +88,15 @@ export default function NiceSelect({
           key={`${opt.value}::${opt.label}`}
           role="option"
           aria-selected={`${opt.value}` === `${value}`}
-          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""}`}
+          aria-disabled={opt.disabled}
+          className={`ns-item ${`${opt.value}` === `${value}` ? "is-active" : ""} ${opt.disabled ? "is-disabled" : ""}`}
           onClick={() => {
+            if (opt.disabled) return;
             onChange?.(opt.value || "");
             setOpen(false);
           }}
+          style={opt.disabled ? { opacity: 0.5, cursor: 'not-allowed', color: '#9ca3af' } : {}}
+          title={opt.disabled ? "Esta opción no está disponible" : undefined}
         >
           {opt.label}
         </li>
