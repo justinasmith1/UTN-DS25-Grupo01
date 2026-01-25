@@ -7,7 +7,7 @@ import { createReserva } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
-import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
+import PersonaSearchSelect from "../Lotes/PersonaSearchSelect.jsx";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 
 /* -------------------------- Helpers fechas -------------------------- */
@@ -63,7 +63,6 @@ export default function ReservaCrearCard({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [openCrearPersona, setOpenCrearPersona] = useState(false);
   const [busquedaLote, setBusquedaLote] = useState("");
 
   // Calcular el mapId del lote seleccionado cuando viene del side panel o desde fila
@@ -188,24 +187,7 @@ export default function ReservaCrearCard({
     });
   }, [busquedaLote, lotes]);
 
-  // Opciones de personas para el selector (igual que en VentaCrearCard)
-  const personaOpts = useMemo(
-    () => personas.map((p) => ({
-      value: String(p.id ?? p.idPersona ?? ""),
-      label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
-      persona: p
-    })),
-    [personas]
-  );
 
-  // Handler para cuando se crea una nueva persona
-  const handlePersonaCreated = (nuevaPersona) => {
-    // Agregar la nueva persona a la lista (como objeto, igual que en VentaCrearCard)
-    setPersonas(prev => [nuevaPersona, ...prev]);
-    // Seleccionar automáticamente la nueva persona
-    setClienteId(String(nuevaPersona.id));
-    setOpenCrearPersona(false);
-  };
 
   // Calcular ancho de labels
   const LABELS = ["N° RESERVA", "LOTE", "FECHA RESERVA", "COMPRADOR", "INMOBILIARIA", "PLAZO RESERVA", "MONTO RESERVA/SEÑA"];
@@ -485,46 +467,14 @@ export default function ReservaCrearCard({
                 </div>
               </div>
 
-              <div className="field-row">
-                <div className="field-label">COMPRADOR</div>
-                <div className="field-value p0" style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                  <div style={{ flex: 1 }}>
-                    <NiceSelect
-                      value={clienteId || ""}
-                      options={personaOpts}
-                      placeholder="Seleccionar cliente"
-                      onChange={(val) => setClienteId(val || "")}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenCrearPersona(true);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      background: "white",
-                      color: "#111",
-                      border: "1px solid rgba(0,0,0,.3)",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "16px",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                      marginLeft: "8px",
-                      flexShrink: 0,
-                      height: "44px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                    title="Crear nuevo cliente"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+              <PersonaSearchSelect
+                label="COMPRADOR"
+                value={clienteId}
+                onSelect={(val) => setClienteId(val ? String(val) : "")}
+                personas={personas}
+                loading={loadingPersonas}
+                placeholder="Buscar por nombre, apellido o DNI"
+              />
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
@@ -608,11 +558,7 @@ export default function ReservaCrearCard({
           </div>
         </div>
 
-        <PersonaCrearCard
-          open={openCrearPersona}
-          onCancel={() => setOpenCrearPersona(false)}
-          onCreated={handlePersonaCreated}
-        />
+
         {error && (
           <div
             style={{
