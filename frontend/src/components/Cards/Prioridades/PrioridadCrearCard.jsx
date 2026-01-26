@@ -26,10 +26,9 @@ function toDateInputValue(v) {
 
 function fromDateInputToISO(s, useEndOfDay = false) {
   if (!s || !s.trim()) return null;
-  const timeStr = useEndOfDay ? 'T23:59:59.999Z' : 'T00:00:00.000Z';
+  const timeStr = useEndOfDay ? 'T23:59:59.999Z' : 'T12:00:00.000Z';
   const date = new Date(`${s}${timeStr}`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 function buildInitialForm(loteIdPreSeleccionado = null) {

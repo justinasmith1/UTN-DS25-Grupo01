@@ -19,7 +19,7 @@ function toDateInputValue(v) {
 }
 function fromDateInputToISO(s) {
   if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T00:00:00.000Z`);
+  const date = new Date(`${s}T12:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 

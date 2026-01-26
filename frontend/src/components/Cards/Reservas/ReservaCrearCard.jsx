@@ -23,7 +23,7 @@ function toDateInputValue(v) {
 
 function fromDateInputToISO(s) {
   if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T00:00:00.000Z`);
+  const date = new Date(`${s}T12:00:00.000Z`);
   if (Number.isNaN(date.getTime())) return null;
   return date.toISOString();
 }
@@ -39,14 +39,20 @@ export default function ReservaCrearCard({
   lockLote = false, // Si viene desde fila del tablero, bloquear el campo lote
 }) {
   const { user } = useAuth();
-  const isInmobiliaria = user?.role === 'INMOBILIARIA';
+  const isInmobiliaria = user?.role === "INMOBILIARIA";
 
   // Estados de formulario
-  const [fechaReserva, setFechaReserva] = useState(toDateInputValue(new Date()));
-  const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
+  const [fechaReserva, setFechaReserva] = useState(
+    toDateInputValue(new Date()),
+  );
+  const [loteId, setLoteId] = useState(
+    loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "",
+  );
   const [clienteId, setClienteId] = useState("");
   const [inmobiliariaId, setInmobiliariaId] = useState("");
-  const [plazoReserva, setPlazoReserva] = useState(toDateInputValue(new Date()));
+  const [plazoReserva, setPlazoReserva] = useState(
+    toDateInputValue(new Date()),
+  );
   const [sena, setSena] = useState("");
   const [numero, setNumero] = useState(""); // Número de reserva editable
   const [numeroError, setNumeroError] = useState(null); // Error de validación de numero
@@ -68,11 +74,13 @@ export default function ReservaCrearCard({
   // Calcular el mapId del lote seleccionado cuando viene del side panel o desde fila
   const loteSeleccionadoMapId = useMemo(() => {
     if ((!fromSidePanel && !lockLote) || !loteId) return null;
-    const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
+    const loteSeleccionado = lotes.find((l) => String(l.id) === String(loteId));
     if (!loteSeleccionado) return null;
     const mapId = loteSeleccionado.mapId;
     if (!mapId) return null;
-    return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
+    return String(mapId).toLowerCase().startsWith("lote")
+      ? mapId
+      : `Lote ${mapId}`;
   }, [fromSidePanel, lockLote, loteId, lotes]);
 
   // Cargar datos al abrir
@@ -90,15 +98,22 @@ export default function ReservaCrearCard({
           const st = String(l.estado || l.status || "").toUpperCase();
           return st === "DISPONIBLE";
         });
-        
+
         // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
         if (lockLote && loteIdPreSeleccionado) {
-          const lotePrecargado = lotesData.find(l => String(l.id) === String(loteIdPreSeleccionado));
-          if (lotePrecargado && !filteredLots.find(l => String(l.id) === String(lotePrecargado.id))) {
+          const lotePrecargado = lotesData.find(
+            (l) => String(l.id) === String(loteIdPreSeleccionado),
+          );
+          if (
+            lotePrecargado &&
+            !filteredLots.find(
+              (l) => String(l.id) === String(lotePrecargado.id),
+            )
+          ) {
             filteredLots = [lotePrecargado, ...filteredLots];
           }
         }
-        
+
         setLotes(filteredLots);
       } catch (err) {
         console.error("Error cargando lotes:", err);
@@ -113,7 +128,8 @@ export default function ReservaCrearCard({
     (async () => {
       try {
         const resp = await getAllPersonas({});
-        const personasData = resp?.personas ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
+        const personasData =
+          resp?.personas ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
         setPersonas(Array.isArray(personasData) ? personasData : []);
       } catch (err) {
         console.error("Error cargando personas:", err);
@@ -133,10 +149,10 @@ export default function ReservaCrearCard({
         try {
           const resp = await getAllInmobiliarias({});
           const inmobData = resp?.data || resp?.inmobiliarias || [];
-          const inmobNormalizadas = inmobData.map(i => ({
+          const inmobNormalizadas = inmobData.map((i) => ({
             value: String(i.id),
             label: i.nombre || `ID: ${i.id}`,
-            inmobiliaria: i
+            inmobiliaria: i,
           }));
           setInmobiliarias(inmobNormalizadas);
         } catch (err) {
@@ -182,16 +198,36 @@ export default function ReservaCrearCard({
       const numero = String(l.numero || "").toLowerCase();
       const id = String(l.id || l.loteId || "").toLowerCase();
       const textoLote = `Lote ${l.mapId || l.numero || l.id}`.toLowerCase();
-      const calle = String(l.ubicacion?.calle || l.location || "").toLowerCase();
-      return mapId.includes(q) || numero.includes(q) || id.includes(q) || textoLote.includes(q) || calle.includes(q);
+      const calle = String(
+        l.ubicacion?.calle || l.location || "",
+      ).toLowerCase();
+      return (
+        mapId.includes(q) ||
+        numero.includes(q) ||
+        id.includes(q) ||
+        textoLote.includes(q) ||
+        calle.includes(q)
+      );
     });
   }, [busquedaLote, lotes]);
 
-
-
   // Calcular ancho de labels
-  const LABELS = ["N° RESERVA", "LOTE", "FECHA RESERVA", "COMPRADOR", "INMOBILIARIA", "PLAZO RESERVA", "MONTO RESERVA/SEÑA"];
-  const computedLabelWidth = Math.min(260, Math.max(160, Math.round(Math.max(...LABELS.map(l => l.length)) * 8.2) + 22));
+  const LABELS = [
+    "N° RESERVA",
+    "LOTE",
+    "FECHA RESERVA",
+    "COMPRADOR",
+    "INMOBILIARIA",
+    "PLAZO RESERVA",
+    "MONTO RESERVA/SEÑA",
+  ];
+  const computedLabelWidth = Math.min(
+    260,
+    Math.max(
+      160,
+      Math.round(Math.max(...LABELS.map((l) => l.length)) * 8.2) + 22,
+    ),
+  );
 
   async function handleSave() {
     setError(null);
@@ -258,9 +294,11 @@ export default function ReservaCrearCard({
       }
 
       if (new Date(fechaFinISO) < new Date(fechaISO)) {
-         setError("El plazo de reserva no puede ser anterior a la fecha de inicio.");
-         setSaving(false);
-         return;
+        setError(
+          "El plazo de reserva no puede ser anterior a la fecha de inicio.",
+        );
+        setSaving(false);
+        return;
       }
 
       // Normalizar IDs numéricos
@@ -271,15 +309,18 @@ export default function ReservaCrearCard({
         fechaReserva: fechaISO,
         loteId: loteIdNum,
         clienteId: clienteIdNum,
-       // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
+        // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
 
         // Para ADMIN/GESTOR: enviar inmobiliariaId si fue seleccionada
 
-        ...(isInmobiliaria ? {} : {
-
-          inmobiliariaId: inmobiliariaId && inmobiliariaId.trim() ? Number(inmobiliariaId) : null,
-
-        }),
+        ...(isInmobiliaria
+          ? {}
+          : {
+              inmobiliariaId:
+                inmobiliariaId && inmobiliariaId.trim()
+                  ? Number(inmobiliariaId)
+                  : null,
+            }),
         sena: senaNum,
         numero: numeroTrim,
         fechaFinReserva: fechaFinISO,
@@ -295,9 +336,7 @@ export default function ReservaCrearCard({
 
       // Manejar respuesta del backend de forma más informativa
       if (!response || !response.success) {
-
         throw new Error(response?.message || "Error al crear la reserva");
-
       }
 
       // Éxito
@@ -312,28 +351,41 @@ export default function ReservaCrearCard({
     } catch (err) {
       console.error("Error creando reserva:", err);
 
-      let errorMessage = err?.message || "No se pudo crear la reserva. Intenta nuevamente.";
+      let errorMessage =
+        err?.message || "No se pudo crear la reserva. Intenta nuevamente.";
 
       // Manejar errores específicos (unicidad numero)
-      if (err?.response?.data?.errors && Array.isArray(err.response.data.errors)) {
+      if (
+        err?.response?.data?.errors &&
+        Array.isArray(err.response.data.errors)
+      ) {
         const mensajes = err.response.data.errors.map((e) => {
-          if (typeof e === 'string') return e;
-          const campo = e.path?.[0] || '';
-          const msg = e.message || '';
-          if (campo === 'numero') {
-            if (msg.toLowerCase().includes('unique') || msg.toLowerCase().includes('exist')) {
+          if (typeof e === "string") return e;
+          const campo = e.path?.[0] || "";
+          const msg = e.message || "";
+          if (campo === "numero") {
+            if (
+              msg.toLowerCase().includes("unique") ||
+              msg.toLowerCase().includes("exist")
+            ) {
               setNumeroError("Ya existe una reserva con este número");
               return "Número de reserva ya existente";
             }
             setNumeroError("Número de reserva inválido");
           }
-          return msg || 'Error de validación';
+          return msg || "Error de validación";
         });
         errorMessage = mensajes.join(", ");
-      } else if (typeof errorMessage === "string" && /numero/i.test(errorMessage)) {
+      } else if (
+        typeof errorMessage === "string" &&
+        /numero/i.test(errorMessage)
+      ) {
         setNumeroError("Ya existe una reserva con este número");
       } else if (err?.response?.data?.message) {
-        if (String(err.response.data.message).toLowerCase().includes('número') || String(err.response.data.message).toLowerCase().includes('numero')) {
+        if (
+          String(err.response.data.message).toLowerCase().includes("número") ||
+          String(err.response.data.message).toLowerCase().includes("numero")
+        ) {
           setNumeroError("Ya existe una reserva con este número");
         }
         errorMessage = err.response.data.message;
@@ -351,7 +403,10 @@ export default function ReservaCrearCard({
   return (
     <>
       {/* Animación de éxito */}
-      <SuccessAnimation show={showSuccess} message={`¡${entityType} creada exitosamente!`} />
+      <SuccessAnimation
+        show={showSuccess}
+        message={`¡${entityType} creada exitosamente!`}
+      />
 
       <EditarBase
         open={open}
@@ -366,13 +421,18 @@ export default function ReservaCrearCard({
         saving={saving}
         saveButtonText="Confirmar Reserva"
         headerRight={
-          (loadingLotes || loadingPersonas || (!isInmobiliaria && loadingInmobiliarias)) ? (
+          loadingLotes ||
+          loadingPersonas ||
+          (!isInmobiliaria && loadingInmobiliarias) ? (
             <span className="badge bg-warning text-dark">Cargando...</span>
           ) : null
         }
       >
         <div>
-          <h3 className="venta-section-title" style={{ paddingBottom: "6px", marginBottom: "18px" }}>
+          <h3
+            className="venta-section-title"
+            style={{ paddingBottom: "6px", marginBottom: "18px" }}
+          >
             Información de la Reserva
           </h3>
           <div
@@ -388,22 +448,37 @@ export default function ReservaCrearCard({
                   <div className="field-value is-readonly">
                     {loteSeleccionadoMapId}
                   </div>
-                ) : (fromSidePanel || lockLote) ? (
+                ) : fromSidePanel || lockLote ? (
                   // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
                   <div className="field-value is-readonly">—</div>
                 ) : (
-                  <div className="field-value p0" style={{ alignItems: "flex-start" }}>
+                  <div
+                    className="field-value p0"
+                    style={{ alignItems: "flex-start" }}
+                  >
                     <div style={{ width: "100%", position: "relative" }}>
                       <div style={{ position: "relative" }}>
                         <input
                           className="field-input"
-                          placeholder={loteId ? "" : "Buscar lote por número o calle"}
-                          value={loteId && !busquedaLote ? (() => {
-                            const loteSeleccionado = lotes.find(l => String(l.id) === String(loteId));
-                            if (!loteSeleccionado) return "";
-                            const mapId = loteSeleccionado.mapId;
-                            return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
-                          })() : busquedaLote}
+                          placeholder={
+                            loteId ? "" : "Buscar lote por número o calle"
+                          }
+                          value={
+                            loteId && !busquedaLote
+                              ? (() => {
+                                  const loteSeleccionado = lotes.find(
+                                    (l) => String(l.id) === String(loteId),
+                                  );
+                                  if (!loteSeleccionado) return "";
+                                  const mapId = loteSeleccionado.mapId;
+                                  return String(mapId)
+                                    .toLowerCase()
+                                    .startsWith("lote")
+                                    ? mapId
+                                    : `Lote ${mapId}`;
+                                })()
+                              : busquedaLote
+                          }
                           onChange={(e) => {
                             setBusquedaLote(e.target.value);
                             // Si empieza a escribir, limpiar la selección para permitir buscar otro lote
@@ -419,31 +494,92 @@ export default function ReservaCrearCard({
                             }
                           }}
                         />
-                        <svg width="18" height="18" viewBox="0 0 24 24" style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: .6 }}>
-                          <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none"/>
-                          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2"/>
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          style={{
+                            position: "absolute",
+                            right: 10,
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            opacity: 0.6,
+                          }}
+                        >
+                          <circle
+                            cx="11"
+                            cy="11"
+                            r="7"
+                            stroke="#666"
+                            strokeWidth="2"
+                            fill="none"
+                          />
+                          <line
+                            x1="16.5"
+                            y1="16.5"
+                            x2="21"
+                            y2="21"
+                            stroke="#666"
+                            strokeWidth="2"
+                          />
                         </svg>
                       </div>
                       {busquedaLote && (
-                        <div style={{ marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden", border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff" }}>
+                        <div
+                          style={{
+                            marginTop: 8,
+                            maxHeight: 220,
+                            overflowY: "auto",
+                            overflowX: "hidden",
+                            border: "1px solid #e5e7eb",
+                            borderRadius: 8,
+                            position: "absolute",
+                            width: "100%",
+                            zIndex: 1000,
+                            background: "#fff",
+                          }}
+                        >
                           {lotesFiltrados.length === 0 && (
-                            <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
+                            <div style={{ padding: 10, color: "#6b7280" }}>
+                              No se encontraron lotes
+                            </div>
                           )}
                           {lotesFiltrados.map((l) => {
                             const mapId = l.mapId || l.numero || l.id;
-                            const displayText = String(mapId).toLowerCase().startsWith('lote') 
-                              ? mapId 
+                            const displayText = String(mapId)
+                              .toLowerCase()
+                              .startsWith("lote")
+                              ? mapId
                               : `Lote ${mapId}`;
                             return (
                               <button
                                 key={l.id}
                                 type="button"
-                                onClick={() => { setLoteId(String(l.id)); setBusquedaLote(""); }}
-                                style={{ display: "block", width: "100%", textAlign: "left", padding: "10px 12px", background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
-                                onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
-                                onMouseLeave={(e) => e.target.style.background = "#fff"}
+                                onClick={() => {
+                                  setLoteId(String(l.id));
+                                  setBusquedaLote("");
+                                }}
+                                style={{
+                                  display: "block",
+                                  width: "100%",
+                                  textAlign: "left",
+                                  padding: "10px 12px",
+                                  background: "#fff",
+                                  border: "none",
+                                  borderBottom: "1px solid #f3f4f6",
+                                  cursor: "pointer",
+                                }}
+                                onMouseEnter={(e) =>
+                                  (e.target.style.background = "#f9fafb")
+                                }
+                                onMouseLeave={(e) =>
+                                  (e.target.style.background = "#fff")
+                                }
                               >
-                                {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
+                                {displayText}{" "}
+                                <span style={{ color: "#6b7280" }}>
+                                  ({String(l.estado || l.status)})
+                                </span>
                               </button>
                             );
                           })}
@@ -511,7 +647,9 @@ export default function ReservaCrearCard({
                     placeholder="Ej: RES-2025-01"
                   />
                   {numeroError && (
-                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                    <div
+                      style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}
+                    >
                       {numeroError}
                     </div>
                   )}
@@ -532,7 +670,15 @@ export default function ReservaCrearCard({
 
               <div className="field-row">
                 <div className="field-label">MONTO RESERVA/SEÑA</div>
-                <div className="field-value p0" style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+                <div
+                  className="field-value p0"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    position: "relative",
+                  }}
+                >
                   <input
                     className="field-input"
                     type="number"
@@ -549,7 +695,15 @@ export default function ReservaCrearCard({
                     placeholder="0"
                     style={{ flex: 1, paddingRight: "50px" }}
                   />
-                  <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      right: "12px",
+                      color: "#6B7280",
+                      fontSize: "13.5px",
+                      fontWeight: 500,
+                    }}
+                  >
                     USD
                   </span>
                 </div>
@@ -557,7 +711,6 @@ export default function ReservaCrearCard({
             </div>
           </div>
         </div>
-
 
         {error && (
           <div
