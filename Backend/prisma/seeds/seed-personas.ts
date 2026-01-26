@@ -5,7 +5,7 @@
  * Para resetear: SEED_RESET=1 npm run seed:personas
  */
 
-import { PrismaClient, IdentificadorTipo, EstadoPersona } from "../../src/generated/prisma";
+import { PrismaClient, IdentificadorTipo, EstadoOperativo } from "../../src/generated/prisma";
 import dotenv from "dotenv";
 
 // Cargar variables de entorno
@@ -131,7 +131,7 @@ async function main() {
             identificadorValor: valorNormalized,
           },
           data: {
-            estado: EstadoPersona.ELIMINADO,
+            estadoOperativo: EstadoOperativo.ELIMINADO,
           },
         });
       }
@@ -212,7 +212,7 @@ async function main() {
       apellido: personaData.apellido?.trim(),
       razonSocial: personaData.razonSocial?.trim(),
       contacto: personaData.contacto,
-      estado: EstadoPersona.OPERATIVO,
+      estadoOperativo: EstadoOperativo.OPERATIVO,
       updateAt: new Date(),
     };
     
@@ -263,7 +263,7 @@ async function main() {
   console.log("\n=== VERIFICACIÓN FINAL ===\n");
   
   const totalPersonas = await prisma.persona.count({
-    where: { estado: EstadoPersona.OPERATIVO },
+    where: { estadoOperativo: EstadoOperativo.OPERATIVO },
   });
   
   console.log(`Total Personas ACTIVAS: ${totalPersonas}`);
@@ -275,7 +275,7 @@ async function main() {
   // Contar por inmobiliaria
   const personasPorInmobiliaria = await prisma.persona.groupBy({
     by: ['inmobiliariaId'],
-    where: { estado: EstadoPersona.OPERATIVO },
+    where: { estadoOperativo: EstadoOperativo.OPERATIVO },
     _count: true,
   });
   
