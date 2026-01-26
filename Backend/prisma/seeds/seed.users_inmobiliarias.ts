@@ -5,7 +5,7 @@
  * Para resetear y forzar IDs fijos: SEED_RESET=1 npm run seed:core
  */
 
-import { PrismaClient, Role, EstadoInmobiliaria, EstadoPersona, PersonaCategoria, IdentificadorTipo } from "../../src/generated/prisma";
+import { PrismaClient, Role, EstadoOperativo, PersonaCategoria, IdentificadorTipo } from "../../src/generated/prisma";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 
@@ -206,7 +206,7 @@ async function main() {
         razonSocial: inmobData.razonSocial,
         contacto: inmobData.contacto,
         comxventa: inmobData.comxventa,
-        estado: EstadoInmobiliaria.OPERATIVO,
+        estadoOperativo: EstadoOperativo.OPERATIVO,
         // maxPrioridadesActivas queda en default del schema (5)
       },
       create: {
@@ -215,7 +215,7 @@ async function main() {
         razonSocial: inmobData.razonSocial,
         contacto: inmobData.contacto,
         comxventa: inmobData.comxventa,
-        estado: EstadoInmobiliaria.OPERATIVO,
+        estadoOperativo: EstadoOperativo.OPERATIVO,
         // maxPrioridadesActivas queda en default del schema (5)
       },
     });

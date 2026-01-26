@@ -22,6 +22,7 @@ import { usePrepareMapaData } from '../../../utils/mapaDataHelper';
 
 import { reservasTablePreset as tablePreset } from './presets/reservas.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx';
+import { getLoteIdFormatted } from '../TablaLotes/utils/getters';
 import './TablaReservas.css'; 
 
 // ------------------------
@@ -90,6 +91,9 @@ function enrichRow(reserva, { clientesById, inmobiliariasById, lotesById }) {
   if (r.loteId && lotesById?.[r.loteId]) {
     const lote = lotesById[r.loteId];
     r.lote = r.lote || { id: lote.id };
+    // Formatear loteId usando helper existente
+    r.loteFormatted = getLoteIdFormatted(lote);
+    
     const precio = resolveLotePrecio(lote);
     if (precio != null) r.lotePrecio = precio;
   }
@@ -172,12 +176,20 @@ export default function TablaReservas({
       cell: ({ getValue, row }) => {
         const v = getValue?.() ?? row?.original?.estado ?? null;
         return <StatusBadge value={v} />;
-     },
+      },
     };
 
 
     // Busco "Lote" por id (en el preset suele ser 'loteInfo' o similar)
     const loteIdx = cols.findIndex(c => c.id === 'loteInfo' || c.titulo === 'Lote' || c.accessorKey === 'lote');
+    
+    // Si encontramos la columna lote, actualizamos su accessor para usar el formateado
+    if (loteIdx >= 0) {
+        const loteCol = { ...cols[loteIdx] };
+        loteCol.accessor = (r) => r.loteFormatted ?? r?.lote?.mapId ?? r?.lotMapId ?? r?.loteInfo?.mapId ?? r?.loteId ?? '—';
+        cols[loteIdx] = loteCol;
+    }
+
     const insertAt = loteIdx >= 0 ? loteIdx + 1 : 2; // fallback razonable
     cols.splice(insertAt, 0, estadoCol);
 

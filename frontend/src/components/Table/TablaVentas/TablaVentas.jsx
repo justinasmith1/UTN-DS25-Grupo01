@@ -12,6 +12,7 @@ import { usePrepareMapaData } from '../../../utils/mapaDataHelper';
 import { fmtMoney, fmtEstado } from './utils/formatters';
 import { ventasTablePreset as tablePreset } from './presets/ventas.table.jsx';
 import StatusBadge from './cells/StatusBadge.jsx';
+import { getLoteIdFormatted } from '../TablaLotes/utils/getters';
 import './TablaVentas.css';
 
 // Persistencia de columnas por usuario
@@ -108,13 +109,22 @@ export default function TablaVentas({
           return (embedded && String(embedded).trim()) || '—';
         },
         getLoteMapId: (v) => {
-          if (v?.lote?.mapId) return v.lote.mapId;
-          if (v?.lotMapId) return v.lotMapId;
-          const lookupId = v?.loteId ?? v?.lotId ?? null;
-          if (lookupId != null && lotesById[String(lookupId)]) {
-            return lotesById[String(lookupId)].mapId ?? null;
-          }
-          return null;
+            // Intentar obtener el lote completo
+            let lote = v?.lote;
+            if (!lote) {
+                const lookupId = v?.loteId ?? v?.lotId ?? null;
+                if (lookupId != null && lotesById[String(lookupId)]) {
+                    lote = lotesById[String(lookupId)];
+                }
+            }
+            // Si tenemos lote, usamos el formateador oficial
+            if (lote) {
+                return getLoteIdFormatted(lote);
+            }
+            // Fallbacks si no hay objeto lote completo pero hay mapId suelto
+            if (v?.lotMapId) return v.lotMapId;
+             
+            return '—';
         },
       },
     }),

@@ -123,7 +123,7 @@ export default function PromocionCard({
     try {
       const payload = {
         precioPromocional: data.precioPromocional,
-        fin: data.sinFechaFin || !data.fin ? null : new Date(data.fin).toISOString(),
+        fin: data.sinFechaFin || !data.fin ? null : new Date(`${data.fin}T12:00:00.000Z`).toISOString(),
         explicacion: data.explicacion || null,
       };
 

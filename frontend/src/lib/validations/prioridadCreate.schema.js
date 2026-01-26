@@ -10,7 +10,7 @@ const preprocessNumber = (val) => {
 /** Helper para validar fechas: verifica que sea una fecha válida (formato YYYY-MM-DD) */
 const validateDateString = (val) => {
   if (!val || val === "" || val === null || val === undefined) return undefined;
-  const date = new Date(`${val}T00:00:00.000Z`);
+  const date = new Date(`${val}T12:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? undefined : val; // Devolver el string original, no ISO
 };
 
@@ -42,7 +42,7 @@ export const prioridadCreateSchema = z
         z.union([
           z.string({ required_error: "La fecha de inicio es obligatoria", invalid_type_error: "La fecha de inicio es inválida", }).refine((val) => {
             if (!val) return false;
-            const date = new Date(`${val}T00:00:00.000Z`);
+            const date = new Date(`${val}T12:00:00.000Z`);
             return !Number.isNaN(date.getTime());
           }, {
             message: "La fecha de inicio es inválida",
@@ -82,7 +82,7 @@ export const prioridadCreateSchema = z
   .refine(
     (data) => {
       if (!data.fechaInicio || !data.fechaFin) return true;
-      const fechaInicioDate = new Date(`${data.fechaInicio}T00:00:00.000Z`);
+      const fechaInicioDate = new Date(`${data.fechaInicio}T12:00:00.000Z`);
       const fechaFinDate = new Date(`${data.fechaFin}T23:59:59.999Z`);
       return fechaFinDate > fechaInicioDate;
     },

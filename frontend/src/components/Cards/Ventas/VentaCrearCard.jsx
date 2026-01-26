@@ -7,7 +7,7 @@ import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import { createVenta } from "../../../lib/api/ventas.js";
-import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
+import PersonaSearchSelect from "../Lotes/PersonaSearchSelect.jsx";
 
 function toDateInputValue(v) {
   const d = v ? new Date(v) : new Date();
@@ -19,7 +19,7 @@ function toDateInputValue(v) {
 }
 function fromDateInputToISO(s) {
   if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T00:00:00.000Z`);
+  const date = new Date(`${s}T12:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
@@ -47,7 +47,6 @@ export default function VentaCrearCard({
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState(null);
   const [numeroError, setNumeroError] = useState(null);
-  const [openCrearPersona, setOpenCrearPersona] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -96,7 +95,6 @@ export default function VentaCrearCard({
       setFechaVenta(toDateInputValue(new Date()));
       setError(null);
       setNumeroError(null);
-      setOpenCrearPersona(false);
       // Solo resetear loteId si no viene precargado
       if (!loteIdPreSeleccionado) {
         setLoteId("");
@@ -108,23 +106,7 @@ export default function VentaCrearCard({
     }
   }, [open, loteIdPreSeleccionado]);
 
-  // Handler para cuando se crea una nueva persona
-  const handlePersonaCreated = (nuevaPersona) => {
-    // Agregar la nueva persona a la lista
-    setPersonas(prev => [nuevaPersona, ...prev]);
-    // Seleccionar automáticamente la nueva persona
-    setCompradorId(String(nuevaPersona.id));
-    setOpenCrearPersona(false);
-  };
 
-  const personaOpts = useMemo(
-    () => personas.map((p) => ({
-      value: String(p.id ?? p.idPersona ?? ""),
-      label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
-      persona: p
-    })),
-    [personas]
-  );
   const inmoOpts = useMemo(
     () => inmobiliarias.map((i) => ({ value: i.id ?? i.idInmobiliaria ?? "", label: i.nombre ?? i.razonSocial ?? "Inmobiliaria" })),
     [inmobiliarias]
@@ -350,41 +332,13 @@ export default function VentaCrearCard({
                 )}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">COMPRADOR</div>
-                <div className="field-value p0" style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                  <div style={{ flex: 1 }}>
-                    <NiceSelect value={compradorId} options={personaOpts} onChange={setCompradorId} placeholder="Seleccionar comprador" />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setOpenCrearPersona(true);
-                    }}
-                    style={{
-                      padding: "8px 12px",
-                      background: "white",
-                      color: "#111",
-                      border: "1px solid rgba(0,0,0,.3)",
-                      borderRadius: "6px",
-                      cursor: "pointer",
-                      fontSize: "16px",
-                      fontWeight: 600,
-                      whiteSpace: "nowrap",
-                      marginLeft: "8px",
-                      flexShrink: 0,
-                      height: "44px",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center"
-                    }}
-                    title="Crear nuevo comprador"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
+              <PersonaSearchSelect
+                label="COMPRADOR"
+                value={compradorId}
+                onSelect={(val) => setCompradorId(val ? String(val) : "")}
+                personas={personas}
+                placeholder="Buscar por nombre, apellido o DNI"
+              />
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
@@ -452,11 +406,7 @@ export default function VentaCrearCard({
         </EditarBase>
       )}
 
-      <PersonaCrearCard
-        open={openCrearPersona}
-        onCancel={() => setOpenCrearPersona(false)}
-        onCreated={handlePersonaCreated}
-      />
+
     </>
   );
 }
