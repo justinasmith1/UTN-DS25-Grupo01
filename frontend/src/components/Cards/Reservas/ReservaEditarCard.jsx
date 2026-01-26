@@ -681,18 +681,18 @@ export default function ReservaEditarCard({
 
               <div className="field-row">
                 <div className="field-label">SEÑA</div>
-                <div className="field-value p0" style={{ position: "relative" }}>
+                <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
                   <input
-                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                    className={`field-input ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`}
                     type="number"
                     inputMode="decimal"
                     min="0"
                     step="100"
                     value={sena}
-                    onChange={(e) => !estaEliminada && setSena(e.target.value)}
+                    onChange={(e) => !estaEliminada && !isInmobiliaria && setSena(e.target.value)}
                     style={{ paddingRight: "50px" }}
-                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                    readOnly={estaEliminada}
+                    disabled={estaEliminada || isInmobiliaria}
+                    readOnly={estaEliminada || isInmobiliaria}
                   />
                   <span style={{ 
                     position: "absolute", 
