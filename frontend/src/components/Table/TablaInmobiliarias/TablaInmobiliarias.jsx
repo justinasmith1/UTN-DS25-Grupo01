@@ -40,9 +40,13 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
     setOpen(false);
   };
 
-
   const handleVerReservas = () => {
     navigate(`/reservas?inmobiliariaId=${inmobiliariaId}`);
+    setOpen(false);
+  };
+
+  const handleVerPrioridades = () => {
+    navigate(`/prioridades?inmobiliariaId=${inmobiliariaId}`);
     setOpen(false);
   };
 
@@ -76,13 +80,14 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
         >
           <button
             type="button"
-            onClick={handleVerVentas}
+            onClick={handleVerPrioridades}
             style={{
               width: "100%",
               padding: "10px 14px",
               textAlign: "left",
               background: "transparent",
               border: "none",
+              borderTop: "1px solid #e5e7eb",
               cursor: "pointer",
               fontSize: "14px",
               color: "#111827",
@@ -90,8 +95,9 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
             onMouseEnter={(e) => (e.target.style.background = "#f3f4f6")}
             onMouseLeave={(e) => (e.target.style.background = "transparent")}
           >
-            Ver ventas asociadas
+            Ver prioridades asociadas
           </button>
+          
           <button
             type="button"
             onClick={handleVerReservas}
@@ -110,6 +116,25 @@ function VerAsociadasDropdown({ inmobiliariaId, inmobiliariaNombre, navigate }) 
             onMouseLeave={(e) => (e.target.style.background = "transparent")}
           >
             Ver reservas asociadas
+          </button>
+
+          <button
+            type="button"
+            onClick={handleVerVentas}
+            style={{
+              width: "100%",
+              padding: "10px 14px",
+              textAlign: "left",
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "14px",
+              color: "#111827",
+            }}
+            onMouseEnter={(e) => (e.target.style.background = "#f3f4f6")}
+            onMouseLeave={(e) => (e.target.style.background = "transparent")}
+          >
+            Ver ventas asociadas
           </button>
         </div>,
         document.body
@@ -254,7 +279,7 @@ export default function TablaInmobiliarias({
 
       // Unifique la acción de "ver asociadas" en un solo botón con un tipo dropdown, que permite elegir entre ver las ventas o las reservas asociadas
       // a esta inmobiliaria. Cada opción navega al módulo correspondiente aplicando el filtro por inmobiliaria.
-      if (can(user, PERMISSIONS.SALE_VIEW)) {
+      if (can(user, PERMISSIONS.SALE_VIEW) || can(user, PERMISSIONS.RES_VIEW) || can(user, PERMISSIONS.PRIORITY_VIEW)) {
         actions.push(
           <VerAsociadasDropdown
             key="ver-asociadas"
