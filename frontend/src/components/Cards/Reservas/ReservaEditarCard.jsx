@@ -596,52 +596,7 @@ export default function ReservaEditarCard({
 
               <div className="field-row">
                 <div className="field-label">CLIENTE</div>
-                <div className="field-value p0" style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                  {isInmobiliaria ? (
-                    <>
-                      <div style={{ flex: 1 }}>
-                        <NiceSelect
-                          value={String(clienteId || "")}
-                          options={personaOpts}
-                          placeholder="Seleccionar cliente"
-                          showPlaceholderOption={false}
-                          onChange={(val) => !estaEliminada && setClienteId(val || "")}
-                          disabled={estaEliminada || String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setOpenCrearPersona(true);
-                        }}
-                        style={{
-                          padding: "8px 12px",
-                          background: "white",
-                          color: "#111",
-                          border: "1px solid rgba(0,0,0,.3)",
-                          borderRadius: "6px",
-                          cursor: "pointer",
-                          fontSize: "16px",
-                          fontWeight: 600,
-                          whiteSpace: "nowrap",
-                          marginLeft: "8px",
-                          flexShrink: 0,
-                          height: "44px",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center"
-                        }}
-                        title="Crear nuevo cliente"
-                        disabled={String(detalle?.estado ?? "").toUpperCase() === "CANCELADA"}
-                      >
-                        +
-                      </button>
-                    </>
-                  ) : (
-                    <div className="is-readonly">{clienteNombre}</div>
-                  )}
-                </div>
+                <div className="field-value is-readonly">{clienteNombre}</div>
               </div>
 
               <div className="field-row">
