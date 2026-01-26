@@ -10,6 +10,9 @@ import { getAllLotes } from "../../../lib/api/lotes.js";
 import PersonaSearchSelect from "../Lotes/PersonaSearchSelect.jsx";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 
+// Límite de años para el plazo de reserva (Inmobiliaria)
+const MAX_YEARS_INMOBILIARIA = 1;
+
 /* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
   if (!v) return "";
@@ -40,6 +43,14 @@ export default function ReservaCrearCard({
 }) {
   const { user } = useAuth();
   const isInmobiliaria = user?.role === "INMOBILIARIA";
+
+  // Calcular fecha máxima permitida para inmobiliaria (Hoy + MAX_YEARS_INMOBILIARIA)
+  const maxDateInmob = useMemo(() => {
+    if (!isInmobiliaria) return null;
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + MAX_YEARS_INMOBILIARIA);
+    return toDateInputValue(d);
+  }, [isInmobiliaria]);
 
   // Estados de formulario
   const [fechaReserva, setFechaReserva] = useState(
@@ -262,6 +273,13 @@ export default function ReservaCrearCard({
 
     if (!plazoReserva || !plazoReserva.trim()) {
       setError("El plazo de reserva es obligatorio.");
+      setSaving(false);
+      return;
+    }
+
+    // Validar plazo máximo para Inmobiliaria
+    if (isInmobiliaria && maxDateInmob && plazoReserva > maxDateInmob) {
+      setError(`El plazo máximo permitido es de ${MAX_YEARS_INMOBILIARIA} año(s) a partir de hoy.`);
       setSaving(false);
       return;
     }
@@ -664,6 +682,7 @@ export default function ReservaCrearCard({
                     type="date"
                     value={plazoReserva}
                     onChange={(e) => setPlazoReserva(e.target.value)}
+                    max={isInmobiliaria ? maxDateInmob : undefined}
                   />
                 </div>
               </div>
