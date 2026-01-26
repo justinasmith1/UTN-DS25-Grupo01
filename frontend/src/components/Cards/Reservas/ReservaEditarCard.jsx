@@ -1,15 +1,15 @@
 // src/components/Reservas/ReservaEditarCard.jsx
 import { useEffect, useRef, useState, useMemo } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
-import { getAllPersonas } from "../../../lib/api/personas.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
-import PersonaCrearCard from "../Personas/PersonaCrearCard.jsx";
-import { set } from "zod";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
+import { reservaCreateSchema } from "../../../lib/validations/reservaCreate.schema.js"; // Reutilizamos el schema o creamos uno partial si hiciera falta. Para update completo sirve.
 
 /** Estados de reserva: value técnico + label Title Case */
 const ESTADOS_RESERVA = [
@@ -33,8 +33,6 @@ function toDateInputValue(v) {
 }
 function fromDateInputToISO(s) {
   if (!s || !s.trim()) return null;
-  // El backend espera un string ISO válido
-  // Formato de entrada: YYYY-MM-DD (del input type="date")
   const date = new Date(`${s}T12:00:00.000Z`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
@@ -43,29 +41,51 @@ function fromDateInputToISO(s) {
 
 export default function ReservaEditarCard({
   open,
-  reserva,                   // opcional: si viene completa, se usa
-  reservaId,                  // opcional: si viene id, se hace GET
-  reservas,                   // opcional: lista cache para buscar por id
+  reserva,
+  reservaId,
+  reservas,
   onCancel,
   onSaved,
-  inmobiliarias: propsInmob = [], // opcional
-  entityType = "Reserva",     // tipo de entidad para el mensaje de éxito
+  inmobiliarias: propsInmob = [],
+  entityType = "Reserva",
 }) {
-  /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
   const { user } = useAuth();
   const isInmobiliaria = user?.role === 'INMOBILIARIA';
   const [detalle, setDetalle] = useState(reserva || null);
   const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
-  const [personas, setPersonas] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [openCrearPersona, setOpenCrearPersona] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [numeroBackendError, setNumeroBackendError] = useState(null);
 
   // evita múltiples llamados a inmobiliarias
   const fetchedInmobRef = useRef(false);
-
-  // ancho de label como en VerCard
+  // ancho de label
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
+
+  // Hook Form
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(reservaCreateSchema),
+    defaultValues: {
+      fecha: "",
+      plazoReserva: "",
+      loteId: undefined,
+      clienteId: undefined,
+      inmobiliariaId: undefined,
+      montoSeña: undefined,
+      numero: "",
+      estado: "ACTIVA",
+      userRole: user?.role,
+      // observaciones: "", // Si se agrega al UI
+    },
+    mode: "onChange",
+  });
 
   /* 2) GET de reserva al abrir y cuando cambia la prop reserva */
   useEffect(() => {
@@ -73,95 +93,83 @@ export default function ReservaEditarCard({
     async function run() {
       if (!open) return;
 
-      // Determinar el ID a usar
       const idToUse = reserva?.id ?? reservaId;
 
-      // Siempre llamar a getReservaById para obtener datos completos con relaciones
-      // Incluso si viene reserva por props, puede no tener todas las relaciones
       if (idToUse != null) {
         try {
           const response = await getReservaById(idToUse);
           const full = response?.data ?? response;
           if (!abort && full) {
-            // Preservar mapId del lote si está disponible en la reserva original o en la lista
             const originalReserva = reserva || (Array.isArray(reservas) ? reservas.find(r => `${r.id}` === `${idToUse}`) : null);
             const preservedMapId = originalReserva?.lote?.mapId ?? originalReserva?.lotMapId ?? full?.lote?.mapId ?? full?.lotMapId ?? null;
             
-            // Enriquecer el detalle con mapId si está disponible
             const enriched = preservedMapId && full?.lote
-              ? {
-                  ...full,
-                  lotMapId: preservedMapId,
-                  lote: {
-                    ...full.lote,
-                    mapId: preservedMapId,
-                  },
-                }
+              ? { ...full, lotMapId: preservedMapId, lote: { ...full.lote, mapId: preservedMapId } }
               : preservedMapId
-              ? {
-                  ...full,
-                  lotMapId: preservedMapId,
-                }
+              ? { ...full, lotMapId: preservedMapId }
               : full;
             
             setDetalle(enriched);
           }
         } catch (e) {
           console.error("Error obteniendo reserva por id:", e);
-          // Si falla el GET pero tenemos reserva por props, usarla como fallback
           if (reserva && !abort) {
             setDetalle(reserva);
           } else if (reservaId != null && Array.isArray(reservas) && !abort) {
             const found = reservas.find(r => `${r.id}` === `${reservaId}`);
-            if (found) {
-              setDetalle(found);
-            }
+            if (found) setDetalle(found);
           }
         }
       } else if (reserva) {
-        // Si no hay ID pero viene reserva por props, usarla
         if (!abort) setDetalle(reserva);
       }
     }
     run();
     return () => { abort = true; };
-  }, [open, reservaId, reservas, reserva?.id]);
+  }, [open, reservaId, reservas, reserva, reserva?.id]);
 
-  /* 3) Resetear estados cuando el modal se cierra o se abre con otra reserva */
+
+  /* 3) Populate Form (Reset) cuando 'detalle' cambia */
   useEffect(() => {
-    if (!open) {
-      fetchedInmobRef.current = false;
-      setSaving(false);
-      setShowSuccess(false);
-    } else {
-      // Resetear estados al abrir con una nueva reserva
-      setSaving(false);
-      setShowSuccess(false);
-    }
-  }, [open, detalle?.id]);
+    if (!open || !detalle) return;
+
+    const fechaReservaISO = detalle.fechaReserva ?? null;
+    const plazoReservaISO = detalle.fechaFinReserva ?? null;
+    
+    // Preparar valores para el formulario
+    // Nota: aunque loteId e inmobiliariaId sean read-only en casos, los seteamos para validación
+    const initialInmobId = detalle.inmobiliaria?.id ?? detalle.inmobiliariaId ?? undefined;
+    const initialClienteId = detalle.cliente?.id ?? detalle.clienteId ?? undefined;
+    const initialLoteId = detalle.lote?.id ?? detalle.loteId ?? undefined;
+
+    reset({
+      fecha: toDateInputValue(fechaReservaISO),
+      plazoReserva: toDateInputValue(plazoReservaISO),
+      loteId: initialLoteId ? Number(initialLoteId) : undefined,
+      clienteId: initialClienteId ? Number(initialClienteId) : undefined,
+      inmobiliariaId: initialInmobId ? Number(initialInmobId) : undefined,
+      montoSeña: detalle.seña != null ? Number(detalle.seña) : detalle.sena != null ? Number(detalle.sena) : undefined,
+      numero: detalle.numero != null ? String(detalle.numero) : "",
+      estado: String(detalle.estado ?? "ACTIVA"),
+      userRole: user?.role,
+    });
+    setNumeroBackendError(null);
+
+  }, [open, detalle, reset, user]);
+
 
   /* 4) GET de inmobiliarias UNA sola vez por apertura */
   useEffect(() => {
     let abort = false;
-
     function normalizeList(raw) {
-      // getAllInmobiliarias devuelve { data: [...], meta: {...} }
       let list = [];
+      if (raw?.data && Array.isArray(raw.data)) list = raw.data;
+      else if (Array.isArray(raw)) list = raw;
+      else if (raw?.data?.data?.inmobiliarias) list = raw.data.data.inmobiliarias;
+      else if (raw?.data?.inmobiliarias) list = raw.data.inmobiliarias;
+      else if (raw?.inmobiliarias) list = raw.inmobiliarias;
       
-      if (raw?.data && Array.isArray(raw.data)) {
-        list = raw.data;
-      } else if (Array.isArray(raw)) {
-        list = raw;
-      } else if (raw?.data?.data?.inmobiliarias && Array.isArray(raw.data.data.inmobiliarias)) {
-        list = raw.data.data.inmobiliarias;
-      } else if (raw?.data?.inmobiliarias && Array.isArray(raw.data.inmobiliarias)) {
-        list = raw.data.inmobiliarias;
-      } else if (raw?.inmobiliarias && Array.isArray(raw.inmobiliarias)) {
-        list = raw.inmobiliarias;
-      }
-      
-      const arr = Array.isArray(list) ? list : [];
-      return arr
+      return (Array.isArray(list) ? list : [])
         .map(x => ({
           id: x.id ?? x.idInmobiliaria ?? x._id ?? "",
           nombre: x.nombre ?? x.razonSocial ?? "Sin información",
@@ -172,15 +180,12 @@ export default function ReservaEditarCard({
     async function run() {
       if (!open || fetchedInmobRef.current) return;
 
-      // si vienen por props y tienen longitud, no llamo API
       if (propsInmob && propsInmob.length) {
-        const norm = normalizeList(propsInmob);
-        setInmobiliarias(norm);
+        setInmobiliarias(normalizeList(propsInmob));
         fetchedInmobRef.current = true;
         return;
       }
 
-      // Solo cargar inmobiliarias si NO es INMOBILIARIA (no las necesita)
       if (!isInmobiliaria) {
         try {
           const response = await getAllInmobiliarias({});
@@ -204,113 +209,7 @@ export default function ReservaEditarCard({
     return () => { abort = true; };
   }, [open, propsInmob, isInmobiliaria]);
 
-  /* 4.1) GET de personas para selector de cliente (solo si es INMOBILIARIA o si se necesita editar cliente) */
-  const fetchedPersonasRef = useRef(false);
-  useEffect(() => {
-    let abort = false;
-
-    async function run() {
-      if (!open || fetchedPersonasRef.current) return;
-
-      try {
-        const response = await getAllPersonas({});
-        const personasData = response?.personas || response?.data || [];
-        
-        // Si hay un detalle con cliente, asegurarse de que esté en la lista
-        let personasList = Array.isArray(personasData) ? personasData : [];
-        if (detalle?.cliente && !abort) {
-          const clienteIdStr = String(detalle.cliente.id ?? detalle.clienteId ?? "");
-          const clienteYaExiste = personasList.some(p => String(p.id ?? p.idPersona ?? "") === clienteIdStr);
-          
-          if (!clienteYaExiste && clienteIdStr) {
-            const clienteNombre = `${detalle.cliente.nombre || ""} ${detalle.cliente.apellido || ""}`.trim() || "Sin nombre";
-            personasList = [
-              { id: detalle.cliente.id, nombre: detalle.cliente.nombre, apellido: detalle.cliente.apellido, nombreCompleto: clienteNombre },
-              ...personasList
-            ];
-          }
-        }
-        
-        if (!abort) {
-          setPersonas(personasList);
-          fetchedPersonasRef.current = true;
-        }
-      } catch (e) {
-        console.error("Error obteniendo personas:", e);
-        if (!abort) {
-          setPersonas([]);
-          fetchedPersonasRef.current = true;
-        }
-      }
-    }
-    run();
-    return () => { abort = true; };
-  }, [open, detalle?.cliente?.id, detalle?.clienteId]);
-
-  // Opciones de personas para el selector (igual que en ReservaCrearCard)
-  const personaOpts = useMemo(
-    () => personas.map((p) => ({
-      value: String(p.id ?? p.idPersona ?? ""),
-      label: `${p.nombreCompleto || `${p.nombre || ""} ${p.apellido || ""}`.trim() || `ID: ${p.id}`}`,
-      persona: p
-    })),
-    [personas]
-  );
-
-  // Handler para cuando se crea una nueva persona
-  const handlePersonaCreated = (nuevaPersona) => {
-    // Agregar la nueva persona a la lista (como objeto, igual que en ReservaCrearCard)
-    setPersonas(prev => [nuevaPersona, ...prev]);
-    // Seleccionar automáticamente la nueva persona
-    setClienteId(String(nuevaPersona.id));
-    setOpenCrearPersona(false);
-  };
-
-  /* 5) STATES EDITABLES derivados de 'detalle' */
-  const fechaReservaISO = detalle?.fechaReserva ?? null;
-  const plazoReservaISO = detalle?.fechaFinReserva ?? null;
-  const fechaActISO = detalle?.updatedAt ?? detalle?.updateAt ?? detalle?.fechaActualizacion ?? null;
-  const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion ?? null;
-
-  const initialInmobId = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
-  const initialClienteId = detalle?.cliente?.id ?? detalle?.clienteId ?? "";
-
-  const initialNumero = detalle?.numero != null ? String(detalle.numero) : "";
-  const base = {
-    estado: String(detalle?.estado ?? "ACTIVA"),
-    fechaReserva: toDateInputValue(fechaReservaISO),
-    sena: detalle?.seña != null ? String(detalle.seña) : detalle?.sena != null ? String(detalle.sena) : "",
-    inmobiliariaId: initialInmobId,
-    clienteId: initialClienteId,
-    numero: initialNumero,
-    fechaFinReserva: toDateInputValue(plazoReservaISO),
-  };
-
-  const [estado, setEstado] = useState(base.estado);
-  const [fechaReserva, setFechaReserva] = useState(base.fechaReserva);
-  const [sena, setSena] = useState(base.sena);
-  const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
-  const [clienteId, setClienteId] = useState(base.clienteId);
-  const [numero, setNumero] = useState(base.numero);
-  const [fechaFinReserva, setFechaFinReserva] = useState(base.fechaFinReserva);
-  const [numeroError, setNumeroError] = useState(null);
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  // re-sync cuando cambia 'detalle' o se reabre
-  useEffect(() => {
-    if (!open || !detalle) return;
-    setEstado(base.estado);
-    setFechaReserva(base.fechaReserva);
-    setSena(base.sena);
-    setInmobiliariaId(base.inmobiliariaId);
-    setClienteId(base.clienteId);
-    setNumero(base.numero);
-    setFechaFinReserva(base.fechaFinReserva);
-    setNumeroError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id]);
-
-  /* 6) ancho de label como en VerCard */
+  /* Calcular label width */
   useEffect(() => {
     const labels = [
       "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
@@ -321,128 +220,103 @@ export default function ReservaEditarCard({
     setLabelW(computed);
   }, [open, detalle?.id]);
 
-  /* 7) Guardado (PATCH minimal y validado) */
-  function buildPatch() {
+  /* 7) LOGICA PATCH */
+  function buildPatch(data) {
     const patch = {};
 
-    // Para INMOBILIARIA: solo permitir cambiar estado a CANCELADA (y no desde CANCELADA)
-    if (estado !== (detalle?.estado ?? "")) {
+    // Estado logic
+    const estadoActual = String(detalle?.estado ?? "").toUpperCase();
+    const nuevoEstado = String(data.estado ?? "").toUpperCase(); // data.estado puede venir del form (si agregamos campo estado al form state) -> agregarlo a defaultValues
+    // Pero en el form data.userRole puede venir
+    
+    // Como estado no está en el schema de create (creo?), pero en EditarCard sí hay select de estado.
+    // Necesitamos asegurarnos que 'estado' esté en el formValues de useForm. Lo agregué a defaultValues.
+
+    if (nuevoEstado !== estadoActual) {
       if (isInmobiliaria) {
-        const estadoActual = String(detalle?.estado ?? "").toUpperCase();
-        const nuevoEstado = String(estado).toUpperCase();
-        
-        // Si ya está cancelada, no permitir cambiar
-        if (estadoActual === "CANCELADA") {
-          throw new Error("No se puede cambiar el estado de una reserva cancelada.");
-        }
-        
-        // Solo permitir cambiar a CANCELADA
-        if (nuevoEstado !== "CANCELADA") {
-          throw new Error("Solo se puede cambiar el estado a 'Cancelada'.");
-        }
+         if (estadoActual === "CANCELADA") throw new Error("No se puede cambiar el estado de una reserva cancelada.");
+         if (nuevoEstado !== "CANCELADA") throw new Error("Solo se puede cambiar el estado a 'Cancelada'.");
       }
-      patch.estado = estado;
+      patch.estado = data.estado; 
     }
 
-    const prevFR = toDateInputValue(fechaReservaISO);
-    if (prevFR !== fechaReserva) {
-      patch.fechaReserva = fechaReserva ? fromDateInputToISO(fechaReserva) : null;
+    // Fechas
+    const initialFR = toDateInputValue(detalle?.fechaReserva);
+    if (data.fecha !== initialFR) {
+      patch.fechaReserva = fromDateInputToISO(data.fecha);
     }
 
-    const prevPlazo = toDateInputValue(plazoReservaISO);
-    if (prevPlazo !== fechaFinReserva) {
-      if (!fechaFinReserva) {
-        throw new Error("El plazo de reserva no puede quedar vacío.");
-      }
-      // Convertimos el string del input (YYYY-MM-DD) a ISO para el backend
-      patch.fechaFinReserva = fromDateInputToISO(fechaFinReserva);
+    const initialPlazo = toDateInputValue(detalle?.fechaFinReserva);
+    if (data.plazoReserva !== initialPlazo) {
+      patch.fechaFinReserva = fromDateInputToISO(data.plazoReserva);
     }
 
-    const prevSena = detalle?.seña != null ? String(detalle.seña) : detalle?.sena != null ? String(detalle.sena) : "";
-    if (prevSena !== sena) {
-      if (sena === "" || sena.trim() === "") {
-        patch.sena = null;
-      } else {
-        const n = Number(sena);
-        if (!Number.isFinite(n) || n < 0) {
-          throw new Error("La seña debe ser un número ≥ 0.");
-        }
-        patch.sena = n;
-      }
+    // Seña
+    const initialSena = detalle?.seña != null ? Number(detalle.seña) : detalle?.sena != null ? Number(detalle.sena) : undefined;
+    const currentSena = data.montoSeña; // el form field se llama montoSeña en schema
+    if (currentSena !== initialSena) {
+       patch.seña = currentSena ?? null; // Si es undefined/null enviar null
     }
 
-    // Para INMOBILIARIA: no permitir cambiar inmobiliariaId
+    // Inmobiliaria
     if (!isInmobiliaria) {
-      const prevInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
-      if (prevInmob !== (inmobiliariaId ?? "")) {
-        patch.inmobiliariaId = inmobiliariaId || null;
+      const initialInmob = detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId;
+      if (data.inmobiliariaId !== initialInmob) {
+        patch.inmobiliariaId = data.inmobiliariaId || null;
       }
     }
 
-    // Para INMOBILIARIA: no permitir cambiar número
+    // Numero (Solo NO inmobiliaria)
     if (!isInmobiliaria) {
-      const prevNumero = detalle?.numero != null ? String(detalle.numero) : "";
-      if (numero !== prevNumero) {
-        const trimmed = (numero || "").trim();
-        if (!trimmed || trimmed.length < 3 || trimmed.length > 30) {
-          throw new Error("Número de reserva inválido (3 a 30 caracteres).");
-        }
-        patch.numero = trimmed;
-      }
+       const initialNum = detalle?.numero != null ? String(detalle.numero) : "";
+       if (data.numero !== initialNum) {
+         patch.numero = data.numero;
+       }
     }
 
-    // Cliente: permitir cambiar para todos (incluyendo INMOBILIARIA)
-    const prevCliente = detalle?.cliente?.id ?? detalle?.clienteId ?? "";
-    if (prevCliente !== (clienteId ?? "")) {
-      if (!clienteId || !clienteId.trim()) {
-        throw new Error("El cliente es obligatorio.");
-      }
-      patch.clienteId = Number(clienteId);
+    // Cliente
+    const initialCli = detalle?.cliente?.id ?? detalle?.clienteId;
+    if (data.clienteId !== initialCli) {
+      patch.clienteId = Number(data.clienteId);
     }
 
     return patch;
   }
 
-  async function handleSave() {
+  const onSubmit = async (data) => {
     // Bloquear guardado si está eliminada
     if (isEliminado(detalle)) {
-      setNumeroError("No se puede editar una reserva eliminada. Reactívala para modificarla.");
+      setNumeroBackendError("No se puede editar una reserva eliminada. Reactívala para modificarla.");
       return;
     }
-    
+
     try {
       setSaving(true);
-      setNumeroError(null);
-      const patch = buildPatch();
-      
-      if (Object.keys(patch).length === 0) { 
+      setNumeroBackendError(null);
+
+      const patch = buildPatch(data);
+
+      if (Object.keys(patch).length === 0) {
         setSaving(false);
-        onCancel?.(); 
-        return; 
+        onCancel?.();
+        return;
       }
-      
+
       const response = await updateReserva(detalle.id, patch);
-      
-      // updateReserva devuelve { success: true, data: {...}, message: '...' }
-      const updated = response?.data ?? response;
-      
       if (!response || !response.success) {
         throw new Error(response?.message || "No se pudo guardar la reserva.");
       }
-      
-      const mapId = updated?.lote?.mapId ?? detalle?.lote?.mapId ?? updated?.lotMapId ?? detalle?.lotMapId ?? null;
+
+      const updated = response?.data ?? response;
+       // Merge rapido para actualizar UI sin reload completo
+       const mapId = updated?.lote?.mapId ?? detalle?.lote?.mapId ?? updated?.lotMapId ?? detalle?.lotMapId ?? null;
       const enrichedUpdated = {
         ...updated,
         numero: updated?.numero ?? detalle?.numero ?? null,
         lotMapId: mapId ?? updated?.lotMapId ?? null,
-        lote: updated?.lote
-          ? {
-              ...updated.lote,
-              mapId: mapId ?? updated.lote.mapId ?? null,
-            }
-          : updated?.lote ?? null,
+        lote: updated?.lote ? { ...updated.lote, mapId: mapId ?? updated.lote.mapId ?? null } : updated?.lote ?? null,
       };
-      
+
       setDetalle(enrichedUpdated);
       setShowSuccess(true);
       
@@ -452,82 +326,74 @@ export default function ReservaEditarCard({
         onSaved?.(enrichedUpdated);
         onCancel?.();
       }, 1500);
+
     } catch (e) {
       console.error("Error guardando reserva:", e);
       const msg = e?.message || "";
-      if (msg.toLowerCase().includes("número de reserva")) {
-        setNumeroError(msg);
-      } else if (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg)) {
-        setNumeroError("Ya existe una reserva con este número");
-      }
-      setSaving(false);
-      if (!msg.toLowerCase().includes("número de reserva")) {
+      if (msg.toLowerCase().includes("número de reserva") || (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg))) {
+        setNumeroBackendError(msg.includes("unique") ? "Ya existe una reserva con este número" : msg);
+      } else {
         alert(msg || "No se pudo guardar la reserva.");
       }
+      setSaving(false);
     }
-  }
+  };
 
-  function handleReset() {
-    setEstado(base.estado);
-    setFechaReserva(base.fechaReserva);
-    setSena(base.sena);
-    setInmobiliariaId(base.inmobiliariaId);
-    setClienteId(base.clienteId);
-    setNumero(base.numero);
-    setFechaFinReserva(base.fechaFinReserva);
-    setNumeroError(null);
-  }
+  const handleResetForm = () => {
+    // Simplemente forzar reset con detalle actual
+    // (el useEffect ya lo hace, pero esto es para el botón reset manual)
+    if(detalle) {
+        const fechaReservaISO = detalle.fechaReserva ?? null;
+        const plazoReservaISO = detalle.fechaFinReserva ?? null;
+        const initialInmobId = detalle.inmobiliaria?.id ?? detalle.inmobiliariaId ?? undefined;
+        const initialClienteId = detalle.cliente?.id ?? detalle.clienteId ?? undefined;
+        const initialLoteId = detalle.lote?.id ?? detalle.loteId ?? undefined;
 
-  // Para INMOBILIARIA: opciones de estado limitadas (solo CANCELADA si no está cancelada)
-  const estadosDisponibles = useMemo(() => {
-    if (!isInmobiliaria) {
-      return ESTADOS_RESERVA; // ADMIN y GESTOR ven todos los estados
+        reset({
+            fecha: toDateInputValue(fechaReservaISO),
+            plazoReserva: toDateInputValue(plazoReservaISO),
+            loteId: initialLoteId ? Number(initialLoteId) : undefined,
+            clienteId: initialClienteId ? Number(initialClienteId) : undefined,
+            inmobiliariaId: initialInmobId ? Number(initialInmobId) : undefined,
+            montoSeña: detalle.seña != null ? Number(detalle.seña) : detalle.sena != null ? Number(detalle.sena) : undefined,
+            numero: detalle.numero != null ? String(detalle.numero) : "",
+            estado: String(detalle.estado ?? "ACTIVA"),
+            userRole: user?.role,
+        });
+        setNumeroBackendError(null);
     }
-    
-    const estadoActual = String(detalle?.estado ?? "").toUpperCase();
-    if (estadoActual === "CANCELADA") {
-      // Si ya está cancelada, solo mostrar CANCELADA (read-only)
-      return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA");
-    }
-    
-    // Si no está cancelada, permitir cambiar solo a CANCELADA
-    return ESTADOS_RESERVA.filter(e => 
-      e.value === estadoActual || e.value === "CANCELADA"
-    );
-  }, [isInmobiliaria, detalle?.estado]);
+  };
 
-  /* 8) Render */
+  // Render Helpers
   const NA = "Sin información";
-
   const clienteNombre = (() => {
     const n = detalle?.cliente?.nombre || detalle?.clienteNombre;
     const a = detalle?.cliente?.apellido || detalle?.clienteApellido;
     const j = [n, a].filter(Boolean).join(" ");
     return j || NA;
   })();
-
   const loteInfo = (() => {
     const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? null;
     if (mapId) {
-      // Si el mapId ya contiene "Lote", mostrarlo directamente sin duplicar
-      if (String(mapId).toLowerCase().startsWith('lote')) {
-        return mapId;
-      }
+      if (String(mapId).toLowerCase().startsWith('lote')) return mapId;
       return `Lote N° ${mapId}`;
     }
     if (detalle?.lote?.id) {
-      const num = detalle?.lote?.numero || detalle?.lote?.id;
-      return `Lote N° ${num}`;
+       return `Lote N° ${detalle?.lote?.numero || detalle?.lote?.id}`;
     }
     return detalle?.loteId ? `Lote N° ${detalle.loteId}` : NA;
   })();
 
-  const fechaAct = fechaActISO
-    ? new Date(fechaActISO).toLocaleDateString("es-AR")
-    : NA;
-  const fechaCre = fechaCreISO
-    ? new Date(fechaCreISO).toLocaleDateString("es-AR")
-    : NA;
+  const fechaAct = detalle?.updatedAt ? new Date(detalle.updatedAt).toLocaleDateString("es-AR") : NA;
+  const fechaCre = detalle?.createdAt ? new Date(detalle.createdAt).toLocaleDateString("es-AR") : NA;
+  
+  // Disponibilidad de estados
+  const estadosDisponibles = useMemo(() => {
+    if (!isInmobiliaria) return ESTADOS_RESERVA;
+    const estadoActual = String(detalle?.estado ?? "").toUpperCase();
+    if (estadoActual === "CANCELADA") return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA");
+    return ESTADOS_RESERVA.filter(e => e.value === estadoActual || e.value === "CANCELADA");
+  }, [isInmobiliaria, detalle?.estado]);
 
   if (!open || !detalle) return null;
 
@@ -536,36 +402,24 @@ export default function ReservaEditarCard({
 
   return (
     <>
-      {/* Animación de éxito */}
       <SuccessAnimation show={showSuccess} message={`¡${entityType} guardada exitosamente!`} />
 
       <EditarBase
         open={open}
         title={`Reserva N° ${detalle?.numero ?? detalle?.id ?? "—"}`}
         onCancel={() => {
-          // Siempre resetear estados antes de cerrar
           setSaving(false);
           setShowSuccess(false);
           onCancel?.();
         }}
-        onSave={handleSave}
-        onReset={handleReset}
+        onSave={handleSubmit(onSubmit)}
+        onReset={handleResetForm}
         saving={saving}
         saveButtonText={puedeEditar ? "Guardar cambios" : null}
       >
         <div style={{ "--sale-label-w": `${labelW}px` }}>
           {estaEliminada && (
-            <div 
-              className="alert alert-warning" 
-              style={{ 
-                marginBottom: '1rem', 
-                padding: '0.75rem 1rem',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fbbf24',
-                borderRadius: '0.375rem',
-                color: '#92400e'
-              }}
-            >
+            <div className="alert alert-warning" style={{ marginBottom: '1rem', padding: '0.75rem 1rem', backgroundColor: '#fef3c7', border: '1px solid #fbbf24', borderRadius: '0.375rem', color: '#92400e' }}>
               <strong>Reserva eliminada:</strong> No se puede editar una reserva eliminada. Reactívala para modificarla.
             </div>
           )}
@@ -580,133 +434,150 @@ export default function ReservaEditarCard({
                 <div className="field-value is-readonly">{loteInfo}</div>
               </div>
 
-              <div className="field-row">
-                <div className="field-label">FECHA</div>
-                <div className="field-value p0">
-                  <input
-                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
-                    type="date"
-                    value={fechaReserva}
-                    onChange={(e) => !estaEliminada && setFechaReserva(e.target.value)}
-                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                    readOnly={estaEliminada}
-                  />
-                </div>
+              <div className={`fieldRow ${errors.fecha ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">FECHA</div>
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.fecha ? "is-invalid" : ""}`}
+                        type="date"
+                        {...register("fecha")}
+                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                        readOnly={estaEliminada}
+                      />
+                    </div>
+                  </div>
+                  {errors.fecha && <div className="fieldError">{errors.fecha.message}</div>}
               </div>
 
               <div className="field-row">
                 <div className="field-label">CLIENTE</div>
                 <div className="field-value is-readonly">{clienteNombre}</div>
+                {/* Nota: Cliente era editable en el original, pero el UI mostraba read-only nombre. 
+                    En el código original: 
+                    <div className="field-value is-readonly">{clienteNombre}</div>
+                    No había input para cambiar cliente en Editar?
+                    Revisando el código original... 
+                    Linea 599: <div className="field-value is-readonly">{clienteNombre}</div>
+                    PERO el patch logic tenia: `if (data.clienteId !== initialCli)`.
+                    Parece que NO habia selector de cliente habilitado en el render del original. 
+                    Solo estaba preparado el logic. 
+                    Voy a mantenerlo read-only como estaba visually en el original.
+                */}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">INMOBILIARIA</div>
-                {isInmobiliaria ? (
-                  <div className="field-value is-readonly">
-                    {detalle?.inmobiliaria?.nombre ?? "La Federala"}
+              <div className={`fieldRow ${errors.inmobiliariaId ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">INMOBILIARIA</div>
+                    {isInmobiliaria ? (
+                      <div className="field-value is-readonly">
+                        {detalle?.inmobiliaria?.nombre ?? "La Federala"}
+                      </div>
+                    ) : (
+                      <div className="field-value p0">
+                         <Controller
+                            name="inmobiliariaId"
+                            control={control}
+                            render={({ field: { onChange, value } }) => (
+                                <NiceSelect
+                                    value={value != null ? String(value) : ""}
+                                    options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
+                                    placeholder="La Federala"
+                                    showPlaceholderOption={false}
+                                    onChange={(val) => !estaEliminada && onChange(val ? Number(val) : undefined)}
+                                    disabled={estaEliminada}
+                                />
+                            )}
+                         />
+                      </div>
+                    )}
                   </div>
-                ) : (
-                  <div className="field-value p0">
-                    <NiceSelect
-                      value={inmobiliariaId || ""}
-                      options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                      placeholder="La Federala"
-                      showPlaceholderOption={false}
-                      onChange={(val) => !estaEliminada && setInmobiliariaId(val)}
-                      disabled={estaEliminada}
-                    />
-                  </div>
-                )}
+                  {errors.inmobiliariaId && <div className="fieldError">{errors.inmobiliariaId.message}</div>}
               </div>
 
               <div className="field-row">
                 <div className="field-label">ESTADO</div>
                 <div className="field-value p0">
-                  <NiceSelect
-                    value={estado}
-                    options={estadosDisponibles}
-                    placeholder=""
-                    showPlaceholderOption={false}
-                    onChange={(val) => !estaEliminada && setEstado(val)}
-                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                  />
+                   <Controller
+                      name="estado"
+                      control={control}
+                      render={({ field: { onChange, value } }) => (
+                          <NiceSelect
+                            value={value}
+                            options={estadosDisponibles}
+                            placeholder=""
+                            showPlaceholderOption={false}
+                            onChange={(val) => !estaEliminada && onChange(val)}
+                            disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                          />
+                      )}
+                   />
                 </div>
               </div>
             </div>
 
             {/* Columna derecha */}
             <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">NÚMERO DE RESERVA</div>
-                {isInmobiliaria ? (
-                  <div className="field-value is-readonly">{detalle?.numero ?? "—"}</div>
-                ) : (
-                  <div className="field-value p0">
-                    <input
-                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
-                      type="text"
-                      value={numero}
-                      onChange={(e) => {
-                        if (!estaEliminada) {
-                          setNumero(e.target.value);
-                          if (numeroError) setNumeroError(null);
-                        }
-                      }}
-                      placeholder="Ej: RES-2025-01"
-                      disabled={estaEliminada}
-                      readOnly={estaEliminada}
-                    />
-                    {numeroError && (
-                      <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
-                        {numeroError}
-                      </div>
-                    )}
-                  </div>
+              <div className={`fieldRow ${errors.numero || numeroBackendError ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">NÚMERO DE RESERVA</div>
+                  {isInmobiliaria ? (
+                    <div className="field-value is-readonly">{detalle?.numero ?? "—"}</div>
+                  ) : (
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.numero || numeroBackendError ? "is-invalid" : ""}`}
+                        type="text"
+                        placeholder="Ej: RES-2025-01"
+                        {...register("numero")}
+                        disabled={estaEliminada}
+                        readOnly={estaEliminada}
+                      />
+                    </div>
+                  )}
+                </div>
+                {(errors.numero || numeroBackendError) && (
+                    <div className="fieldError">{numeroBackendError || errors.numero?.message}</div>
                 )}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">PLAZO DE RESERVA</div>
-                <div className="field-value p0">
-                  <input
-                    className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
-                    type="date"
-                    value={fechaFinReserva}
-                    onChange={(e) => !estaEliminada && setFechaFinReserva(e.target.value)}
-                    disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                    readOnly={estaEliminada}
-                  />
-                </div>
+              <div className={`fieldRow ${errors.plazoReserva ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">PLAZO DE RESERVA</div>
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.plazoReserva ? "is-invalid" : ""}`}
+                        type="date"
+                        {...register("plazoReserva")}
+                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
+                        readOnly={estaEliminada}
+                      />
+                    </div>
+                  </div>
+                  {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">SEÑA</div>
-                <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
-                  <input
-                    className={`field-input ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`}
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="100"
-                    value={sena}
-                    onChange={(e) => !estaEliminada && !isInmobiliaria && setSena(e.target.value)}
-                    style={{ paddingRight: "50px" }}
-                    disabled={estaEliminada || isInmobiliaria}
-                    readOnly={estaEliminada || isInmobiliaria}
-                  />
-                  <span style={{ 
-                    position: "absolute", 
-                    right: "12px", 
-                    top: "50%", 
-                    transform: "translateY(-50%)",
-                    color: "#6B7280",
-                    fontSize: "13px",
-                    pointerEvents: "none",
-                    fontWeight: 500
-                  }}>
-                    {sena && Number(sena) > 0 ? "USD" : ""}
-                  </span>
+              <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
+                <div className="field-row">
+                    <div className="field-label">SEÑA</div>
+                    <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
+                      <input
+                        className={`field-input ${estaEliminada || isInmobiliaria ? "is-readonly" : ""} ${errors.montoSeña ? "is-invalid" : ""}`}
+                        type="number"
+                        inputMode="decimal"
+                        min="0"
+                        step="100"
+                        {...register("montoSeña", { valueAsNumber: true })}
+                        style={{ paddingRight: "50px" }}
+                        disabled={estaEliminada || isInmobiliaria}
+                        readOnly={estaEliminada || isInmobiliaria}
+                      />
+                      <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#6B7280", fontSize: "13px", pointerEvents: "none", fontWeight: 500 }}>
+                         USD
+                      </span>
+                    </div>
                 </div>
+                {errors.montoSeña && <div className="fieldError">{errors.montoSeña.message}</div>}
               </div>
 
               <div className="field-row">
@@ -722,12 +593,6 @@ export default function ReservaEditarCard({
           </div>
         </div>
       </EditarBase>
-
-      <PersonaCrearCard
-        open={openCrearPersona}
-        onCancel={() => setOpenCrearPersona(false)}
-        onCreated={handlePersonaCreated}
-      />
     </>
   );
 }

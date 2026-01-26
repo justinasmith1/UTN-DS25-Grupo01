@@ -18,6 +18,7 @@
     "@hugeicons/react": "^1.1.4",
     "bootstrap": "^5.3.7",
     "bootstrap-icons": "^1.13.1",
+    "date-fns": "^4.1.0",
     "gsap": "^3.13.0",
     "lucide-react": "^0.544.0",
     "nouislider": "^15.8.1",
