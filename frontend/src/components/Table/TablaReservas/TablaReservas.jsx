@@ -13,7 +13,8 @@ import TablaBase from '../TablaBase';
 
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText, RefreshCcw, Map } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, RefreshCcw, Map, BadgeDollarSign } from 'lucide-react';
+import OfertasReservaCard from '../../Cards/Reservas/OfertasReservaCard.jsx';
 import { canEditByEstadoOperativo, isEliminado, canDeleteReserva, getReservaDeleteTooltip, canSelectForMap } from '../../../utils/estadoOperativo';
 import { useMapaSeleccion } from '../../../hooks/useMapaSeleccion';
 import { useMapaVistaControl } from '../../../hooks/useMapaVistaControl';
@@ -121,12 +122,15 @@ export default function TablaReservas({
 
   roleOverride,
 }) {
-  // 1) Normalizamos fuente
   const source = useMemo(() => {
     if (Array.isArray(reservas) && reservas.length) return reservas;
     if (Array.isArray(data) && data.length) return data;
     return Array.isArray(reservas) ? reservas : Array.isArray(data) ? data : [];
   }, [reservas, data]);
+
+  const [ofertasModal, setOfertasModal] = React.useState({ open: false, reserva: null });
+  const handleVerOfertas = (row) => setOfertasModal({ open: true, reserva: row });
+  const handleCloseOfertas = () => setOfertasModal({ open: false, reserva: null });
 
   // 2) Índices
   const idxClientes = useMemo(() => {
@@ -307,6 +311,11 @@ export default function TablaReservas({
     return (
     <div className="tl-actions">
       {can('visualizarReserva') && (
+        <button className="tl-icon tl-icon--money" aria-label="Ver Ofertas" data-tooltip="Ver Ofertas" onClick={() => handleVerOfertas(row)}>
+           <BadgeDollarSign size={18} strokeWidth={2} />
+        </button>
+      )}
+      {can('visualizarReserva') && (
         <button className="tl-icon tl-icon--view" aria-label="Ver Reserva" data-tooltip="Ver Reserva" onClick={() => onVer?.(row)}>
           <Eye size={18} strokeWidth={2} />
         </button>
@@ -403,6 +412,13 @@ export default function TablaReservas({
           disabledSelectionTooltip={mapaControl.disabledTooltip}
         />
       </div>
+
+      <OfertasReservaCard 
+         open={ofertasModal.open}
+         reserva={ofertasModal.reserva}
+         onClose={handleCloseOfertas}
+         onSuccess={handleCloseOfertas}
+      />
     </>
   );
 }

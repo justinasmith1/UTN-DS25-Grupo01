@@ -8,7 +8,9 @@ import {
   eliminarReserva,
   reactivarReserva,
   getReservaByImmobiliariaId,
-  getReservaByEstado
+  getReservaByEstado,
+  getOfertasByReservaId,
+  createOfertaReserva
 } from '../services/reserva.service';
 import { EstadoReserva } from '../types/interfacesCCLF';
 
@@ -74,6 +76,7 @@ export async function createReservaController(req: Request, res: Response, next:
     const data = await createReserva(req.body, user);
     res.status(201).json({ success: true, message: 'Reserva creada exitosamente', data });
   } catch (error) {
+    console.error("Error creating reserva:", error);
     next(error);
   }
 }
@@ -124,6 +127,32 @@ export async function reactivarReservaController(req: Request, res: Response, ne
     const user = req.user;
     const data = await reactivarReserva(id, user);
     res.json({ success: true, message: 'Reserva reactivada exitosamente', data });
+  } catch (error) {
+    next(error);
+  }
+}
+// ==============================
+// Obtener historial ofertas
+// ==============================
+export async function getOfertasController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const data = await getOfertasByReservaId(id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// ==============================
+// Crear oferta
+// ==============================
+export async function createOfertaController(req: Request, res: Response, next: NextFunction) {
+  try {
+    const id = Number(req.params.id);
+    const user = req.user;
+    const data = await createOfertaReserva(id, req.body, user);
+    res.status(201).json({ success: true, message: 'Oferta registrada', data });
   } catch (error) {
     next(error);
   }

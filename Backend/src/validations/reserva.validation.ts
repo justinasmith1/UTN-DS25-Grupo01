@@ -11,7 +11,8 @@ import { z } from 'zod';
 
 const idInt = z.coerce.number().int('El id debe ser entero').positive('El id debe ser positivo');
 
-const dinero = z.coerce.number().min(0, 'El monto no puede ser negativo'); // para que la seña sea mayor a 0
+const dinero = z.coerce.number().min(0, 'El monto no puede ser negativo'); // permite 0
+const dineroPositivo = z.coerce.number().positive('El monto debe ser mayor a 0'); // estricto > 0
 
 // Acepto que venga tipo Date o string y lo normalizo a ISO que es la forma estandarizada .
 const isoDate = z
@@ -32,7 +33,7 @@ export const createReservaSchema = z.object({
   loteId: idInt,                         // FK obligatoria
   clienteId: idInt,                      // FK obligatoria
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
-  sena: dinero.optional(),
+  sena: dinero.optional().nullable(),
   numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim(),
   fechaFinReserva: isoDate, // Fecha de fin de la reserva
 });
@@ -89,4 +90,11 @@ export const queryReservasSchema = z.object({
 }, {
   message: 'El rango de fechas es inválido (desde > hasta)',
   path: ['hasta'],
+});
+
+export const createOfertaSchema = z.object({
+  monto: dineroPositivo,
+  motivo: z.string().optional(),
+  plazoHasta: isoDate.optional().nullable().or(z.literal('')), 
+  action: z.enum(['CONTRAOFERTAR', 'ACEPTAR', 'RECHAZAR']).optional()
 });

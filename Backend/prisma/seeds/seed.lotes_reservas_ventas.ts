@@ -60,7 +60,9 @@ async function main() {
     // Borrar en orden inverso a dependencias
     await prisma.prioridad.deleteMany({});
     await prisma.venta.deleteMany({});
+    await prisma.ofertaReserva.deleteMany({});
     await prisma.reserva.deleteMany({});
+    await prisma.promocion.deleteMany({});
     await prisma.lote.deleteMany({});
     await prisma.fraccion.deleteMany({});
     console.log("✅ Datos borrados.\n");
@@ -450,7 +452,218 @@ async function main() {
       fechaFinReserva: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
     }
   });
-  console.log(`  ✓ Lote 15 (Reservado / Prioridad Finalizada -> Reserva) - mapId: Lote15-3`);
+  // ==========================================
+  // ESCENARIOS DE OFERTAS Y CONTRAOFERTAS
+  // ==========================================
+
+  console.log("\n📝 Creando Escenarios de Ofertas y Contraofertas...");
+
+  // Lote 16: RESERVADO (En Negociación / Contraoferta)
+  const lote16 = await prisma.lote.create({
+    data: {
+      numero: 16, mapId: "Lote16-3", tipo: TipoLote.LOTE_VENTA, subestado: SubestadoLote.NO_CONSTRUIDO,
+      superficie: 430, precio: 22000.00, estado: EstadoLote.RESERVADO, fraccionId: fraccion3.id,
+      propietarioId: clienteJuan.id,
+      ubicacion: { create: { calle: NombreCalle.CALANDRIA, numero: 302 } }
+    }
+  });
+
+  const reservaLote16 = await prisma.reserva.create({
+    data: {
+      numero: `RES-${lote16.id}-OFFER`,
+      fechaReserva: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // Hace 3 días
+      estado: EstadoReserva.CONTRAOFERTA,
+      loteId: lote16.id, 
+      clienteId: clienteRoberto.id, 
+      inmobiliariaId: idAndinolfi,
+      sena: 2000.00,
+      ofertaActual: 21500.00, // Última oferta
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE,
+      fechaFinReserva: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Historial de ofertas para Lote 16
+  // 1. Inmobiliaria oferta inicial (implícita en la reserva pero hagamos un registro explicito si se quiere, o primera oferta distinta)
+  // Supongamos que la reserva se creó por 22000 (precio lista) pero luego se ofertó menos.
+  
+  // Oferta 1: Inmobiliaria ofrece 20.000
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote16.id,
+      monto: 20000.00,
+      motivo: "Cliente ofrece pagar de contado si se baja el precio.",
+      ownerType: OwnerPrioridad.INMOBILIARIA,
+      efectorId: idAndinolfi,
+      nombreEfector: "Andinolfi Inmobiliaria",
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Oferta 2: CCLF Contraofera 21.500
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote16.id,
+      monto: 21500.00,
+      motivo: "Podemos bajar hasta 21.500, no menos.",
+      ownerType: OwnerPrioridad.CCLF,
+      // efectorId null para admin
+      nombreEfector: "La Federala",
+      createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000)
+    }
+  });
+  console.log(`  ✓ Lote 16 (Reserva en Contraoferta) - mapId: Lote16-3`);
+
+
+  // Lote 17: VENDIDO (Surgió de una Reserva ACEPTADA tras oferta)
+  const lote17 = await prisma.lote.create({
+    data: {
+      numero: 17, mapId: "Lote17-3", tipo: TipoLote.LOTE_VENTA, subestado: SubestadoLote.NO_CONSTRUIDO,
+      superficie: 440, precio: 23000.00, estado: EstadoLote.VENDIDO, fraccionId: fraccion3.id,
+      propietarioId: clienteMaria.id, // Ya es de Maria
+      ubicacion: { create: { calle: NombreCalle.CALANDRIA, numero: 303 } }
+    }
+  });
+
+  const reservaLote17 = await prisma.reserva.create({
+    data: {
+      numero: `RES-${lote17.id}-ACEPT`,
+      fechaReserva: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
+      estado: EstadoReserva.ACEPTADA,
+      loteId: lote17.id,
+      clienteId: clienteMaria.id,
+      inmobiliariaId: idSpinosa,
+      sena: 2300.00,
+      ofertaActual: 22500.00, // Precio acordado
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE,
+      fechaFinReserva: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // Ya pasó, se vendió
+    }
+  });
+
+  // Oferta 1: Cliente ofrece 22.000
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote17.id,
+      monto: 22000.00,
+      motivo: "Oferta inicial baja.",
+      ownerType: OwnerPrioridad.INMOBILIARIA,
+      efectorId: idSpinosa,
+      nombreEfector: "Nicolas Spinosa Operaciones Inmobiliarias",
+      createdAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Oferta 2: CCLF Contraoferta 22.500
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote17.id,
+      monto: 22500.00,
+      motivo: "Partimos la diferencia.",
+      ownerType: OwnerPrioridad.CCLF,
+      nombreEfector: "La Federala",
+      createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Oferta 3: Inmobiliaria ACEPTA (Simulamos oferta final aceptada por el mismo monto o acción de aceptación)
+  // En nuestro sistema, ACEPTAR cambia el estado. Podemos registrar una "oferta" con el mismo monto para que quede constancia o simplemente el estado.
+  // El modelo actual no guarda la acción en OfertaReserva explicitamente como un enum, sino el estado de la reserva.
+  // Pero si creamos una oferta con el mismo monto y fecha posterior, sirve de historial.
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote17.id,
+      monto: 22500.00,
+      motivo: "Aceptamos la contraoferta de 22.500.",
+      ownerType: OwnerPrioridad.INMOBILIARIA,
+      efectorId: idSpinosa,
+      nombreEfector: "Nicolas Spinosa Operaciones Inmobiliarias",
+      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Venta asociada
+  const ventaLote17 = await prisma.venta.create({
+    data: {
+      numero: `VEN-${lote17.id}-OK`, loteId: lote17.id, fechaVenta: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      monto: 22500.00, // Precio negociado
+      estado: EstadoVenta.CON_BOLETO, estadoCobro: EstadoCobro.EN_CURSO, tipoPago: "TRANSFERENCIA",
+      compradorId: clienteMaria.id, inmobiliariaId: idSpinosa
+    }
+  });
+  
+  await prisma.reserva.update({
+      where: { id: reservaLote17.id },
+      data: { ventaId: ventaLote17.id }
+  });
+  console.log(`  ✓ Lote 17 (Reserva Aceptada -> Venta) - mapId: Lote17-3`);
+
+
+  // Lote 18: DISPONIBLE (Reserva RECHAZADA)
+  const lote18 = await prisma.lote.create({
+    data: {
+      numero: 18, mapId: "Lote18-3", tipo: TipoLote.LOTE_VENTA, subestado: SubestadoLote.NO_CONSTRUIDO,
+      superficie: 450, precio: 24000.00, estado: EstadoLote.DISPONIBLE, fraccionId: fraccion3.id,
+      propietarioId: clienteJuan.id,
+      ubicacion: { create: { calle: NombreCalle.CALANDRIA, numero: 304 } }
+    }
+  });
+
+  const reservaLote18 = await prisma.reserva.create({
+    data: {
+      numero: `RES-${lote18.id}-REJ`,
+      fechaReserva: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
+      estado: EstadoReserva.RECHAZADA,
+      loteId: lote18.id,
+      clienteId: clienteRoberto.id,
+      inmobiliariaId: idGianfelice,
+      sena: 1000.00,
+      ofertaActual: 15000.00, // Oferta ridícula
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE,
+      fechaFinReserva: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // Aún vigente en fechas, pero rechazada
+    }
+  });
+
+  // Oferta 1: Inmobiliaria tira muy bajo
+   await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote18.id, monto: 15000.00, motivo: "El cliente solo tiene esto.",
+      nombreEfector: "Gianfelice Andrea", efectorId: idGianfelice, ownerType: OwnerPrioridad.INMOBILIARIA,
+      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+    }
+  });
+
+  // Oferta 2: CCLF Rechaza
+  // No creamos una contraoferta, simplemente el estado queda en RECHAZADA.
+  // Pero podemos loguear el rechazo si queremos consistencia en el historial (aunque el modelo OfertaReserva guarda 'monto', no 'acción' estricta sin monto).
+  // Si rechazamos, no hay nuevo monto. 
+  // Podríamos dejarlo así: ultima oferta fue 15.000 y el estado es RECHAZADA. 
+  // O agregar una entrada final simulando el rechazo explicito.
+  // Vamos a dejarlo con la oferta de 15.000 y estado RECHAZADA, que es lo que pasaría si Admin pulsa "Rechazar".
+  // (El botón rechazar en el front no pide monto, y el backend updatea estado a RECHAZADA. No crea registro en OfertaReserva a menos que modifiquemos eso).
+  // REVISAR LÓGICA: createOfertaReserva en backend SÍ crea registro si mandamos action='RECHAZAR', con el mismo monto?.
+  // Revisemos el service:
+  /*
+    if (data.action === 'RECHAZAR') {
+        updateData.estado = EstadoReserva.RECHAZADA;
+        // ...
+    }
+    // y luego crea oferta:
+    const oferta = await tx.ofertaReserva.create({ data: { ...monto: data.monto ... } })
+  */
+  // Entonces sí se guarda un registro. Agreguemoslo.
+  await prisma.ofertaReserva.create({
+      data: {
+          reservaId: reservaLote18.id,
+          monto: 15000.00, // Mismo monto
+          motivo: "Oferta demasiado baja. Rechazada.",
+          ownerType: OwnerPrioridad.CCLF,
+          nombreEfector: "La Federala",
+          createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000)
+      }
+  });
+
+  console.log(`  ✓ Lote 18 (Reserva Rechazada) - mapId: Lote18-3`);
+
 
 
   console.log("\n✅ Seed completado exitosamente.\n");

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as reservaController from '../controllers/reserva.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema, patchReservaParamsSchema } from '../validations/reserva.validation';
+import { createReservaSchema, updateReservaSchema, getReservaParamsSchema, deleteReservaParamsSchema, queryReservasSchema, patchReservaParamsSchema, createOfertaSchema } from '../validations/reserva.validation';
 
 const router = Router();
 
@@ -83,5 +83,24 @@ router.patch(
     validateParams(patchReservaParamsSchema),
     reservaController.reactivarReservaController
 );
+
+// GET /api/Reservas/:id/ofertas
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+router.get(
+    '/:id/ofertas',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(getReservaParamsSchema),
+    reservaController.getOfertasController);
+
+// POST /api/Reservas/:id/ofertas
+// Permitido para ADMINISTRADOR, GESTOR e INMOBILIARIA
+router.post(
+    '/:id/ofertas',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'INMOBILIARIA'),
+    validateParams(getReservaParamsSchema),
+    validate(createOfertaSchema), 
+    reservaController.createOfertaController);
 
 export const reservaRoutes = router;

@@ -32,8 +32,30 @@ function toDateInputValue(v) {
   return `${yyyy}-${mm}-${dd}`;
 }
 function fromDateInputToISO(s) {
-  if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T12:00:00.000Z`);
+  if (!s) return null;
+  
+  if (s instanceof Date) {
+    if (Number.isNaN(s.getTime())) return null;
+    // Extract YYYY-MM-DD safely from ISO part (assuming UTC which is standard for Date inputs)
+    // Or just use the ISO string if we don't strictly need T12.
+    // To match previous logic (T12):
+    try {
+      const iso = s.toISOString(); // "2026-01-25T00:00:00.000Z"
+      return iso.split('T')[0] + "T12:00:00.000Z";
+    } catch {
+      return null;
+    }
+  }
+
+  const str = String(s);
+  if (!str.trim()) return null;
+  // If exact YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) {
+      const date = new Date(`${str}T12:00:00.000Z`);
+      return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+  // Fallback for other strings
+  const date = new Date(str);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 

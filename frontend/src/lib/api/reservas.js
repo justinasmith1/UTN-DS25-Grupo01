@@ -1,7 +1,7 @@
 // src/lib/api/reservas.js
 // API adapter para reservas
  
-import { http, httpJson, normalizeApiListResponse } from "../http/http";
+import { http, httpJson } from "../http/http";
 
 // ===== NORMALIZADORES =====
 const fromApi = (row = {}) => {
@@ -312,6 +312,10 @@ export const updateReserva = async (id, payload) => {
   if (payload.numero !== undefined && payload.numero !== null) {
     body.numero = String(payload.numero).trim();
   }
+  // Cliente (FIX: Agregado handling de clienteId)
+  if (payload.clienteId !== undefined) {
+    body.clienteId = Number(payload.clienteId);
+  }
   
   // Verificar que al menos hay un campo para actualizar
   if (Object.keys(body).length === 0) {
@@ -531,6 +535,41 @@ export const list = async (params = {}) => {
       pageSize: params.pageSize || 25
     }
   };
+};
+
+// ===== OFERTAS (Negociación) =====
+
+export const getOfertas = async (reservaId) => {
+  try {
+    const response = await httpJson(`/reservas/${reservaId}/ofertas`, { method: 'GET' });
+    // response: { success: true, data: [...] }
+    const raw = response.data || response;
+    // Normalize logic if needed (dates etc)
+    const normalized = Array.isArray(raw) ? raw.map(o => ({
+        ...o,
+        createdAt: o.createdAt ? new Date(o.createdAt).toISOString() : null,
+        plazoHasta: o.plazoHasta ? new Date(o.plazoHasta).toISOString() : null,
+    })) : [];
+
+    return { success: true, data: normalized };
+  } catch (error) {
+     console.error('❌ Error getting offers:', error);
+     throw error;
+  }
+};
+
+export const createOferta = async (reservaId, data) => {
+    // data: { monto, motivo, plazoHasta, action }
+    try {
+        const response = await httpJson(`/reservas/${reservaId}/ofertas`, {
+            method: 'POST',
+            body: data
+        });
+        return { success: true, data: response.data, message: response.message };
+    } catch (error) {
+        console.error('❌ Error creating offer:', error);
+        throw error;
+    }
 };
 
 export { fromApi, toApi };

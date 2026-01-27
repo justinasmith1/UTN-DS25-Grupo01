@@ -101,6 +101,7 @@ export const reservaSchema = z
     
     // Campos auxiliares para validación condicional (no se envían al backend necesariamente)
     userRole: z.string().optional(),
+    estado: z.string().optional(),
   })
   .superRefine((data, ctx) => {
     // Validar que plazo > fecha
