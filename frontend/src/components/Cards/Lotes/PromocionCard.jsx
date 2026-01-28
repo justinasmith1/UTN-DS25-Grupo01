@@ -404,7 +404,7 @@ export default function PromocionCard({
           {/* Fila 3: Explicación (full width) */}
           <div className={`fieldRow promocion-field-full promocion-explicacion-row ${errors.explicacion ? "hasError" : ""}`}>
             <div className="field-row promocion-explicacion-row-inner">
-              <div className="field-label">EXPLICACIÓN</div>
+              <div className="field-label">Motivo</div>
               <div className="field-value p0">
                 <textarea
                   {...register("explicacion")}

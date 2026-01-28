@@ -143,6 +143,7 @@ export default function PrioridadEditarCard({
   const [numeroError, setNumeroError] = useState(null);
   const [fechaInicio, setFechaInicio] = useState(base.fechaInicio);
   const [fechaFin, setFechaFin] = useState(base.fechaFin);
+  const [fechaFinError, setFechaFinError] = useState(null);
   const [estado, setEstado] = useState(base.estado);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
 
@@ -153,6 +154,7 @@ export default function PrioridadEditarCard({
     setNumeroError(null);
     setFechaInicio(base.fechaInicio);
     setFechaFin(base.fechaFin);
+    setFechaFinError(null);
     setEstado(base.estado);
     setInmobiliariaId(base.inmobiliariaId);
   }, [open, detalle?.id]);
@@ -220,6 +222,7 @@ export default function PrioridadEditarCard({
     setSaving(true);
     setShowSuccess(false);
     setNumeroError(null);
+    setFechaFinError(null);
 
     try {
       const estadoActual = String(detalle?.estado ?? "").toUpperCase();
@@ -257,13 +260,13 @@ export default function PrioridadEditarCard({
         const now = new Date();
 
         if (fechaFinDate <= fechaInicioDate) {
-          setNumeroError("La fecha de vencimiento debe ser posterior a la fecha de inicio");
+          setFechaFinError("La fecha de vencimiento debe ser posterior a la fecha de inicio");
           setSaving(false);
           return;
         }
 
         if (fechaFinDate <= now) {
-          setNumeroError("La fecha de vencimiento debe ser posterior a la fecha actual");
+          setFechaFinError("La fecha de vencimiento debe ser posterior a la fecha actual");
           setSaving(false);
           return;
         }
@@ -313,7 +316,7 @@ export default function PrioridadEditarCard({
           }
           // Manejar errores de validación de fecha
           if (e?.response?.status === 400 && (e?.message?.toLowerCase().includes('fecha') || e?.message?.toLowerCase().includes('vencimiento'))) {
-            setNumeroError(e.message || "La fecha de vencimiento no es válida");
+            setFechaFinError(e.message || "La fecha de vencimiento no es válida");
             setSaving(false);
             return;
           }
@@ -358,6 +361,7 @@ export default function PrioridadEditarCard({
     setNumeroError(null);
     setFechaInicio(base.fechaInicio);
     setFechaFin(base.fechaFin);
+    setFechaFinError(null);
     setEstado(base.estado);
     setInmobiliariaId(base.inmobiliariaId);
   };
@@ -499,21 +503,31 @@ export default function PrioridadEditarCard({
                 )}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">VENCIMIENTO</div>
-                {isInmobiliaria ? (
-                  <div className="field-value is-readonly">{fechaFin || NA}</div>
-                ) : (
-                  <div className="field-value p0">
-                    <input
-                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
-                      type="date"
-                      value={fechaFin}
-                      onChange={(e) => !estaEliminada && setFechaFin(e.target.value)}
-                      disabled={estaEliminada}
-                      readOnly={estaEliminada}
-                    />
-                  </div>
+              <div className={`fieldRow ${fechaFinError ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">VENCIMIENTO</div>
+                  {isInmobiliaria ? (
+                    <div className="field-value is-readonly">{fechaFin || NA}</div>
+                  ) : (
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${fechaFinError ? "is-invalid" : ""}`}
+                        type="date"
+                        value={fechaFin}
+                        onChange={(e) => {
+                          if (!estaEliminada) {
+                             setFechaFin(e.target.value);
+                             if (fechaFinError) setFechaFinError(null);
+                          }
+                        }}
+                        disabled={estaEliminada}
+                        readOnly={estaEliminada}
+                      />
+                    </div>
+                  )}
+                </div>
+                {fechaFinError && (
+                  <div className="fieldError">{fechaFinError}</div>
                 )}
               </div>
             </div>
