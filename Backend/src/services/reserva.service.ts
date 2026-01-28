@@ -1,7 +1,7 @@
 // src/services/reserva.service.ts
 import prisma from '../config/prisma'; 
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import { EstadoLote, EstadoReserva, EstadoPrioridad, OwnerPrioridad } from '../generated/prisma';
+import { EstadoLote, EstadoReserva, EstadoPrioridad, OwnerPrioridad, EstadoOperativo } from '../generated/prisma';
 import { updateLoteState } from './lote.service';
 import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
 import { assertLoteOperableFor, assertReservaUnicaVigente, computeRestoreStateFromReserva } from '../domain/loteState/loteState.rules';
@@ -220,7 +220,7 @@ export async function createReserva(
       err.status = 404;
       throw err;
     }
-    if (clienteExists.estadoOperativo !== EstadoOperativo.OPERATIVO) {
+    if (clienteExists.estadoOperativo !== 'OPERATIVO') {
       const err: any = new Error('No se puede crear una reserva con un cliente inactivo');
       err.status = 400;
       throw err;
@@ -237,6 +237,15 @@ export async function createReserva(
 
     // Guardar el estado original del lote antes de crear la reserva (para restaurarlo al finalizar)
     const estadoOriginalLote = lote.estado;
+
+    console.log("DEBUG: createReserva creating prisma record", { 
+        data: {
+            fechaReserva: body.fechaReserva,
+            loteId: body.loteId,
+            sena: body.sena,
+            state: EstadoReserva.ACTIVA
+        }
+    });
 
     // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
     const row = await prisma.reserva.create({
@@ -428,7 +437,7 @@ export async function updateReserva(
 }
 
 // ==============================
-// Eliminar reserva
+// Eliminar reserva (hard delete)
 // ==============================
 export async function deleteReserva(id: number): Promise<void> {
   try {
@@ -642,4 +651,113 @@ export async function reactivarReserva(
     }
     throw mapPrismaError(e);
   }
+}
+// ==============================
+// Obtener historial de ofertas de una reserva
+// ==============================
+export async function getOfertasByReservaId(reservaId: number) {
+  return prisma.ofertaReserva.findMany({
+    where: { reservaId },
+    orderBy: { createdAt: 'desc' },
+  });
+}
+
+// ==============================
+// Crear una oferta (contraoferta/aceptación/rechazo)
+// ==============================
+export async function createOfertaReserva(reservaId: number, data: any, user: any) {
+  // data: { monto, motivo, plazoHasta, action: 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR' }
+  const reserva = await prisma.reserva.findUnique({ 
+      where: { id: reservaId },
+      include: {
+          inmobiliaria: {
+              select: { id: true, nombre: true }
+          }
+      } 
+  });
+  if (!reserva) throw new Error("Reserva no encontrada");
+
+  // Determine owner details
+  let nombreEfector = "Desconocido";
+  let efectorId = null;
+  const isInmobiliaria = user.role === 'INMOBILIARIA';
+  // Use existing enum OwnerPrioridad to distinguish actions
+  const ownerType = isInmobiliaria ? OwnerPrioridad.INMOBILIARIA : OwnerPrioridad.CCLF;
+
+  if (isInmobiliaria) {
+      // Per user request: Inherit from the reservation because that is the agency negotiating.
+      if (reserva.inmobiliaria) {
+          nombreEfector = reserva.inmobiliaria.nombre;
+          efectorId = reserva.inmobiliaria.id;
+      } else {
+          // Fallback if for some reason it's missing (though it should exist for INMO reservations)
+           // Or maybe the user is an external agent? But the logic implies the res belongs to an inmo.
+           // If user has inmoId, use that as fallback
+          if (user.inmobiliariaId) {
+             efectorId = user.inmobiliariaId;
+             const inmo = await prisma.inmobiliaria.findUnique({where: {id: efectorId}, select: {nombre: true}});
+             nombreEfector = inmo?.nombre || "Inmobiliaria";
+          } else {
+             nombreEfector = "Inmobiliaria";
+          }
+      }
+  } else {
+      // Para admin/gestor
+      nombreEfector =  "La Federala"; 
+  }
+
+  // VALIDATION: Ensure Plazo is > Reserva.fechaReserva
+  if (data.plazoHasta) {
+      const plazoDate = new Date(data.plazoHasta);
+      if (plazoDate <= reserva.fechaReserva) {
+          throw { statusCode: 400, message: "La validez de la oferta debe ser posterior a la fecha de la reserva." };
+      }
+  }
+
+  // Transaction
+  return prisma.$transaction(async (tx) => {
+    // 1. Crear registro de oferta
+    // Nota: Si es rechazo, igual creamos el registro para historial explicando el motivo
+    const oferta = await tx.ofertaReserva.create({
+      data: {
+        reservaId,
+        monto: data.monto, // Puede ser el mismo monto anterior si solo rechaza o acepta, o nuevo si contraoferta
+        motivo: data.motivo,
+        plazoHasta: data.plazoHasta ? new Date(data.plazoHasta) : null,
+        nombreEfector,
+        efectorId,
+        ownerType,
+      }
+    });
+
+    // 2. Actualizar reserva
+    const updateData: any = {
+      ofertaActual: data.monto,
+    };
+
+    if (data.action === 'ACEPTAR') {
+        updateData.estado = EstadoReserva.ACEPTADA;
+    } else if (data.action === 'RECHAZAR') {
+        updateData.estado = EstadoReserva.RECHAZADA;
+    } else {
+        // Default -> CONTRAOFERTA (se asume que si no es aceptar/rechazar es nueva oferta)
+        updateData.estado = EstadoReserva.CONTRAOFERTA;
+    }
+
+    // Lógica de extensión de plazo (solo si es Admin/CCLF y hay un plazo mayor)
+    if (ownerType === OwnerPrioridad.CCLF && data.plazoHasta) {
+        const nuevoPlazo = new Date(data.plazoHasta);
+        // Si el nuevo plazo es mayor al vencimiento actual, extender
+        if (nuevoPlazo > reserva.fechaFinReserva) {
+            updateData.fechaFinReserva = nuevoPlazo;
+        }
+    }
+
+    const reservaUpdated = await tx.reserva.update({
+        where: { id: reservaId },
+        data: updateData
+    });
+
+    return { oferta, reserva: reservaUpdated };
+  });
 }

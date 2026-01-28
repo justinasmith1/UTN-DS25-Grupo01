@@ -39,7 +39,31 @@ export default function Prioridades() {
     setSearchText(newSearchText ?? '');
   }, []);
 
-  const [params, setParams] = useState(() => ({}));
+  const [params, setParams] = useState(() => {
+    const p = {};
+    const inmobId = searchParams.get('inmobiliariaId');
+    if (inmobId) {
+      p.owner = [inmobId];
+    }
+    return p;
+  });
+
+  // Sincronizar parámetro inmobiliariaId de la URL con el filtro
+  useEffect(() => {
+    const inmobId = searchParams.get('inmobiliariaId');
+    if (inmobId) {
+      setParams(prev => ({
+        ...prev,
+        owner: [inmobId]
+      }));
+      // Limpiar URL
+      setSearchParams(prev => {
+        const next = new URLSearchParams(prev);
+        next.delete('inmobiliariaId');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const [allPrioridades, setAllPrioridades] = useState([]);
   const [loading, setLoading] = useState(true);

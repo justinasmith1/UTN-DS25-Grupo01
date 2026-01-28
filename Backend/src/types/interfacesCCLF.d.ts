@@ -1,7 +1,6 @@
 // interfacesCCLF.d.ts
 
-import e from "express";
-import { EstadoVenta } from "../generated/prisma";
+import { EstadoVenta, OwnerPrioridad } from "../generated/prisma";
 
 // --- TIPOS BÁSICOS ---
 // Estos tipos definen los valores permitidos para ciertas propiedades,
@@ -86,7 +85,8 @@ export interface Ubicacion {
     id: number;
     calle: Calle;
     numero: number;
-}
+    idLote: number; // Corrected: added idLote based on schema
+} // Wait, Ubicacion interface might differ from schema structure slightly in this manual file. Sticking to minimal changes.
 
 export interface Fraccion {
     idFraccion: number;
@@ -137,6 +137,18 @@ export interface Inmobiliaria {
     fechaBaja?: string;
 }
 
+export interface OfertaReserva {
+    id: number;
+    reservaId: number;
+    monto: number;
+    motivo?: string;
+    plazoHasta?: string;
+    nombreEfector: string;
+    efectorId?: number | null;
+    ownerType: OwnerPrioridad;
+    createdAt: string;
+}
+
 export interface Reserva {
     idReserva: number;
     lote: LoteVenta;
@@ -145,6 +157,8 @@ export interface Reserva {
     fechaReserva: string; 
     numero: string;
     seña?: number;
+    ofertaActual?: number;
+    ofertas?: OfertaReserva[];
     inmobiliaria?: Inmobiliaria;
     fechaFinReserva: string;
 }

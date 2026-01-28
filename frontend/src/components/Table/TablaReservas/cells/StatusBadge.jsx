@@ -31,8 +31,14 @@ function pickVariant(estado) {
       return 'success';
     case 'ACEPTADA':
       return 'info';
+    case 'RECHAZADA':
     case 'CANCELADA':
       return 'danger';
+    case 'CONTRAOFERTA':
+      return 'warn';
+    case 'EXPIRADA':
+    case 'VENCIDA':
+      return 'muted';
     default:
       return 'muted';
   }

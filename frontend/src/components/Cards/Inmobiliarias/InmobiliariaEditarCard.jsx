@@ -1,33 +1,13 @@
 // src/components/Inmobiliarias/InmobiliariaEditarCard.jsx
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { updateInmobiliaria, getInmobiliariaById } from "../../../lib/api/inmobiliarias.js";
 import { isEliminado } from "../../../utils/estadoOperativo";
 import { useAuth } from "../../../app/providers/AuthProvider";
-
-/* -------------------------- Helper dinero -------------------------- */
-function fmtMoney(val) {
-  const NA = "Sin información";
-  const isBlank = (v) =>
-    v === null ||
-    v === undefined ||
-    (typeof v === "string" && v.trim().length === 0);
-  
-  if (isBlank(val)) return NA;
-  const n =
-    typeof val === "number"
-      ? val
-      : Number(String(val).replace(/[^\d.-]/g, ""));
-  if (!isFinite(n)) return NA;
-  return n.toLocaleString("es-AR", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  });
-}
-
-/* ========================================================================== */
+import { inmobiliariaCreateSchema } from "../../../lib/validations/inmobiliariaCreate.schema.js";
 
 export default function InmobiliariaEditarCard({
   open,
@@ -38,13 +18,33 @@ export default function InmobiliariaEditarCard({
   onSaved,
   entityType = "Inmobiliaria", // tipo de entidad para el mensaje de éxito
 }) {
-  /* 1) HOOKS SIEMPRE ARRIBA (sin returns condicionales) */
   const [detalle, setDetalle] = useState(inmobiliaria || null);
   const [saving, setSaving] = useState(false);
-
+  const [showSuccess, setShowSuccess] = useState(false);
+  
   // ancho de label como en VerCard
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
+
+  // Obtener rol del usuario
+  const { user } = useAuth();
+  const isAdminOrGestor = user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR';
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(inmobiliariaCreateSchema),
+    defaultValues: {
+      nombre: "",
+      razonSocial: "",
+      contacto: "",
+      comxventa: "",
+      maxPrioridadesActivas: "",
+    },
+  });
 
   /* 2) GET de inmobiliaria al abrir y cuando cambia la prop inmobiliaria */
   useEffect(() => {
@@ -78,52 +78,28 @@ export default function InmobiliariaEditarCard({
     }
     run();
     return () => { abort = true; };
-  }, [open, inmobiliariaId, inmobiliarias, inmobiliaria?.id, inmobiliaria?.nombre]); // Agregar inmobiliaria?.id y inmobiliaria?.nombre para detectar cambios
+  }, [open, inmobiliariaId, inmobiliarias, inmobiliaria]);
 
-  /* 3) Resetear estados cuando el modal se cierra o se abre con otra inmobiliaria */
+  /* 3) Resetear estados y form cuando el modal se cierra o se abre con otra inmobiliaria */
   useEffect(() => {
     if (!open) {
       setSaving(false);
       setShowSuccess(false);
-    } else {
-      // Resetear estados al abrir con una nueva inmobiliaria
-      setSaving(false);
-      setShowSuccess(false);
-    }
-  }, [open, detalle?.id]); // Resetear también cuando cambia la inmobiliaria (detalle.id)
+    } 
+  }, [open]);
 
-  /* 4) STATES EDITABLES derivados de 'detalle' */
-  // ... (código de fechas existente) ...
-
-  const base = {
-    nombre: detalle?.nombre ?? "",
-    razonSocial: detalle?.razonSocial ?? "",
-    contacto: detalle?.contacto ?? "",
-    comxventa: detalle?.comxventa != null ? String(detalle.comxventa) : "",
-    maxPrioridadesActivas: detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "",
-  };
-
-  const [nombre, setNombre] = useState(base.nombre);
-  const [razonSocial, setRazonSocial] = useState(base.razonSocial);
-  const [contacto, setContacto] = useState(base.contacto);
-  const [comxventa, setComxventa] = useState(base.comxventa);
-  const [maxPrioridadesActivas, setMaxPrioridadesActivas] = useState(base.maxPrioridadesActivas);
-  const [showSuccess, setShowSuccess] = useState(false);
-
-  // Obtener rol del usuario
-  const { user } = useAuth();
-  const isAdminOrGestor = user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR';
-
-  // re-sync cuando cambia 'detalle' o se reabre
+  // Sync form with detalle
   useEffect(() => {
-    if (!open || !detalle) return;
-    setNombre(detalle?.nombre ?? "");
-    setRazonSocial(detalle?.razonSocial ?? "");
-    setContacto(detalle?.contacto ?? "");
-    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
-    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id, detalle?.maxPrioridadesActivas]);
+    if (open && detalle) {
+      reset({
+        nombre: detalle.nombre ?? "",
+        razonSocial: detalle.razonSocial ?? "",
+        contacto: detalle.contacto ?? "",
+        comxventa: detalle.comxventa != null ? String(detalle.comxventa) : "",
+        maxPrioridadesActivas: detalle.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "",
+      });
+    }
+  }, [open, detalle, reset]);
 
   /* 5) ancho de label como en VerCard */
   useEffect(() => {
@@ -137,47 +113,52 @@ export default function InmobiliariaEditarCard({
   }, [open, detalle?.id]);
 
   /* 6) Guardado (PATCH minimal y validado) */
-  function buildPatch() {
+  function buildPatch(data) {
     const patch = {};
 
-    if (razonSocial !== (detalle?.razonSocial ?? "")) {
-      patch.razonSocial = razonSocial.trim();
+    const initialRazonSocial = detalle?.razonSocial ?? "";
+    if (data.razonSocial !== initialRazonSocial) {
+      patch.razonSocial = data.razonSocial.trim();
     }
 
-    if (contacto !== (detalle?.contacto ?? "")) {
-      patch.contacto = contacto.trim();
+    const initialContacto = detalle?.contacto ?? "";
+    const currentContacto = data.contacto ?? "";
+    if (currentContacto !== initialContacto) {
+      patch.contacto = currentContacto.trim() || null;
     }
 
-    if (comxventa !== (detalle?.comxventa != null ? String(detalle.comxventa) : "")) {
-      const num = Number(comxventa);
-      if (!isNaN(num) && num >= 0) {
-        patch.comxventa = num;
-      }
+    const initialComxventa = detalle?.comxventa != null ? String(detalle.comxventa) : "";
+    const currentComxventa = data.comxventa;
+    if (currentComxventa !== initialComxventa) {
+       // El schema ya validó que es numero o undefined/null
+       // Pero data.comxventa viene del input como string (si usamos register sin valueAsNumber) o numero
+       // Si el inputType es number, react hook form intenta convertir
+       const num = currentComxventa === "" ? null : Number(currentComxventa);
+       if (num !== null && !isNaN(num)) {
+          patch.comxventa = num;
+       } else if (num === null) {
+          patch.comxventa = null;
+       }
     }
 
     // maxPrioridadesActivas - solo Admin/Gestor puede editar
     if (isAdminOrGestor) {
-      const valorActual = detalle?.maxPrioridadesActivas;
-      const valorActualString = valorActual != null ? String(valorActual) : "";
-      const valorNuevoString = maxPrioridadesActivas || "";
-      
-      if (valorNuevoString !== valorActualString) {
-        if (valorNuevoString === "") {
-          patch.maxPrioridadesActivas = null; // Limpiar límite
-        } else {
-          const num = Number(valorNuevoString);
-          if (!isNaN(num) && num >= 0) {
-            patch.maxPrioridadesActivas = Math.floor(num); // Entero positivo
+      const initialMax = detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "";
+      const currentMax = data.maxPrioridadesActivas;
+      if (currentMax !== initialMax) {
+          const num = currentMax === "" ? null : Number(currentMax);
+          if (num !== null && !isNaN(num)) {
+             patch.maxPrioridadesActivas = Math.floor(num);
+          } else if (num === null) {
+             patch.maxPrioridadesActivas = null;
           }
-        }
       }
     }
 
-    // IMPORTANTE: NO enviar estado/estadoOperativo - solo endpoints de desactivar/reactivar pueden cambiarlo
     return patch;
   }
 
-  async function handleSave() {
+  const onSubmit = async (data) => {
     // Bloquear submit si está eliminado
     if (isEliminado(detalle)) {
       return;
@@ -185,7 +166,7 @@ export default function InmobiliariaEditarCard({
 
     try {
       setSaving(true);
-      const patch = buildPatch();
+      const patch = buildPatch(data);
       
       if (Object.keys(patch).length === 0) { 
         setSaving(false);
@@ -196,13 +177,9 @@ export default function InmobiliariaEditarCard({
       const response = await updateInmobiliaria(detalle.id, patch);
       const updated = response?.data ?? response;
       
-      // Actualizar detalle inmediatamente con los valores guardados para que la próxima vez que se abra tenga los valores correctos
       setDetalle(updated);
-      
-      // Mostrar animación de éxito
       setShowSuccess(true);
       
-      // Esperar un momento para mostrar la animación antes de cerrar
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
@@ -214,51 +191,43 @@ export default function InmobiliariaEditarCard({
       setSaving(false);
       alert(e?.message || "No se pudo guardar la inmobiliaria.");
     }
-  }
+  };
 
   function handleReset() {
-    setNombre(detalle?.nombre ?? "");
-    setRazonSocial(detalle?.razonSocial ?? "");
-    setContacto(detalle?.contacto ?? "");
-    setComxventa(detalle?.comxventa != null ? String(detalle.comxventa) : "");
-    setMaxPrioridadesActivas(detalle?.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "");
+     if (detalle) {
+        reset({
+            nombre: detalle.nombre ?? "",
+            razonSocial: detalle.razonSocial ?? "",
+            contacto: detalle.contacto ?? "",
+            comxventa: detalle.comxventa != null ? String(detalle.comxventa) : "",
+            maxPrioridadesActivas: detalle.maxPrioridadesActivas != null ? String(detalle.maxPrioridadesActivas) : "",
+        });
+     }
   }
-
-  /* 7) Render */
-  const NA = "Sin información";
-
-  // --- CORRECCIÓN: Definir las variables antes de usarlas ---
-  const fechaActISO = detalle?.updateAt ?? detalle?.updatedAt ?? detalle?.fechaActualizacion;
-  const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion;
-  // ---------------------------------------------------------
-
-  const fechaAct = fechaActISO
-    ? new Date(fechaActISO).toLocaleDateString("es-AR")
-    : NA;
-    
-  const fechaCre = fechaCreISO
-    ? new Date(fechaCreISO).toLocaleDateString("es-AR")
-    : NA;
 
   if (!open || !detalle) return null;
 
   const eliminado = isEliminado(detalle);
 
+  // Fechas (solo lectura)
+  const fechaActISO = detalle?.updateAt ?? detalle?.updatedAt ?? detalle?.fechaActualizacion;
+  const fechaCreISO = detalle?.createdAt ?? detalle?.fechaCreacion;
+  const fechaAct = fechaActISO ? new Date(fechaActISO).toLocaleDateString("es-AR") : "Sin información";
+  const fechaCre = fechaCreISO ? new Date(fechaCreISO).toLocaleDateString("es-AR") : "Sin información";
+
   return (
     <>
-      {/* Animación de éxito */}
       <SuccessAnimation show={showSuccess} message={`¡${entityType} guardada exitosamente!`} />
 
       <EditarBase
         open={open}
         title={`${detalle?.nombre ?? "—"}`}
         onCancel={() => {
-          // Siempre resetear estados antes de cerrar
           setSaving(false);
           setShowSuccess(false);
           onCancel?.();
         }}
-        onSave={eliminado ? undefined : handleSave}
+        onSave={eliminado ? undefined : handleSubmit(onSubmit)}
         onReset={handleReset}
         saving={saving}
       >
@@ -283,66 +252,72 @@ export default function InmobiliariaEditarCard({
             <div className="venta-col">
               <div className="field-row">
                 <div className="field-label">NOMBRE</div>
-                <div className="field-value is-readonly">{nombre || "Sin información"}</div>
+                <div className="field-value is-readonly">{detalle.nombre || "Sin información"}</div>
               </div>
 
-              <div className="field-row">
-                <div className="field-label">RAZÓN SOCIAL</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={razonSocial}
-                    onChange={(e) => setRazonSocial(e.target.value)}
-                    placeholder="Razón social"
-                    disabled={eliminado}
-                  />
+              <div className={`fieldRow ${errors.razonSocial ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">RAZÓN SOCIAL</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.razonSocial ? "is-invalid" : ""}`}
+                      type="text"
+                      placeholder="Razón social"
+                      disabled={eliminado}
+                      {...register("razonSocial")}
+                    />
+                  </div>
                 </div>
+                 {errors.razonSocial && <div className="fieldError">{errors.razonSocial.message}</div>}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">CONTACTO</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={contacto}
-                    onChange={(e) => setContacto(e.target.value)}
-                    placeholder="Teléfono o email"
-                    disabled={eliminado}
-                  />
+              <div className={`fieldRow ${errors.contacto ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">CONTACTO</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.contacto ? "is-invalid" : ""}`}
+                      type="text"
+                      placeholder="Teléfono o email"
+                      disabled={eliminado}
+                      {...register("contacto")}
+                    />
+                  </div>
                 </div>
+                {errors.contacto && <div className="fieldError">{errors.contacto.message}</div>}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">COMISIÓN X VENTA</div>
-                <div className="field-value p0" style={{ position: "relative" }}>
-                  <input
-                    className="field-input"
-                    type="number"
-                    inputMode="decimal"
-                    min="0"
-                    step="0.01"
-                    value={comxventa}
-                    onChange={(e) => setComxventa(e.target.value)}
-                    placeholder="0.00"
-                    style={{ paddingRight: "50px" }}
-                    disabled={eliminado}
-                  />
-                  {/* Mostrar % como símbolo al final */}
-                  <span style={{ 
-                    position: "absolute", 
-                    right: "12px", 
-                    top: "50%", 
-                    transform: "translateY(-50%)",
-                    color: "#6B7280",
-                    fontSize: "13px",
-                    pointerEvents: "none",
-                    fontWeight: 500
-                  }}>
-                    {comxventa && Number(comxventa) > 0 ? "%" : ""}
-                  </span>
+              <div className={`fieldRow ${errors.comxventa ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">COMISIÓN X VENTA</div>
+                  <div className="field-value p0" style={{ position: "relative" }}>
+                    <input
+                      className={`field-input ${errors.comxventa ? "is-invalid" : ""}`}
+                      type="number"
+                      inputMode="decimal"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      style={{ paddingRight: "50px" }}
+                      disabled={eliminado}
+                      {...register("comxventa")}
+                    />
+                     {/* comxventa value visual helper could be managed, but register handles value */}
+                    <span style={{ 
+                      position: "absolute", 
+                      right: "12px", 
+                      top: "50%", 
+                      transform: "translateY(-50%)",
+                      color: "#6B7280",
+                      fontSize: "13px",
+                      pointerEvents: "none",
+                      fontWeight: 500
+                    }}>
+                      %
+                    </span>
+                  </div>
                 </div>
+                {errors.comxventa && <div className="fieldError">{errors.comxventa.message}</div>}
               </div>
             </div>
 
@@ -378,21 +353,23 @@ export default function InmobiliariaEditarCard({
 
               {/* Campo maxPrioridadesActivas - solo visible para Admin/Gestor */}
               {isAdminOrGestor && (
-                <div className="field-row">
-                  <div className="field-label">LÍMITE PRIORIDADES ACTIVAS</div>
-                  <div className="field-value p0">
-                    <input
-                      className="field-input"
-                      type="number"
-                      inputMode="numeric"
-                      min="0"
-                      step="1"
-                      value={maxPrioridadesActivas}
-                      onChange={(e) => setMaxPrioridadesActivas(e.target.value)}
-                      placeholder="Sin límite"
-                      disabled={eliminado}
-                    />
+                <div className={`fieldRow ${errors.maxPrioridadesActivas ? "hasError" : ""}`}>
+                  <div className="field-row">
+                    <div className="field-label">LÍMITE PRIORIDADES ACTIVAS</div>
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${errors.maxPrioridadesActivas ? "is-invalid" : ""}`}
+                        type="number"
+                        inputMode="numeric"
+                        min="0"
+                        step="1"
+                        placeholder="Sin límite"
+                        disabled={eliminado}
+                        {...register("maxPrioridadesActivas")}
+                      />
+                    </div>
                   </div>
+                  {errors.maxPrioridadesActivas && <div className="fieldError">{errors.maxPrioridadesActivas.message}</div>}
                 </div>
               )}
             </div>

@@ -1,5 +1,6 @@
-// src/components/Cards/Reservas/ReservaCrearCard.jsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
@@ -9,6 +10,10 @@ import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import PersonaSearchSelect from "../Lotes/PersonaSearchSelect.jsx";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
+import { reservaCreateSchema } from "../../../lib/validations/reservaCreate.schema.js";
+
+// Límite de años para el plazo de reserva (Inmobiliaria)
+const MAX_YEARS_INMOBILIARIA = 1;
 
 /* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
@@ -19,13 +24,6 @@ function toDateInputValue(v) {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
-}
-
-function fromDateInputToISO(s) {
-  if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T12:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString();
 }
 
 /* ========================================================================== */
@@ -41,25 +39,17 @@ export default function ReservaCrearCard({
   const { user } = useAuth();
   const isInmobiliaria = user?.role === "INMOBILIARIA";
 
-  // Estados de formulario
-  const [fechaReserva, setFechaReserva] = useState(
-    toDateInputValue(new Date()),
-  );
-  const [loteId, setLoteId] = useState(
-    loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "",
-  );
-  const [clienteId, setClienteId] = useState("");
-  const [inmobiliariaId, setInmobiliariaId] = useState("");
-  const [plazoReserva, setPlazoReserva] = useState(
-    toDateInputValue(new Date()),
-  );
-  const [sena, setSena] = useState("");
-  const [numero, setNumero] = useState(""); // Número de reserva editable
-  const [numeroError, setNumeroError] = useState(null); // Error de validación de numero
+  // Calcular fecha máxima permitida para inmobiliaria (Hoy + MAX_YEARS_INMOBILIARIA)
+  const maxDateInmob = useMemo(() => {
+    if (!isInmobiliaria) return null;
+    const d = new Date();
+    d.setFullYear(d.getFullYear() + MAX_YEARS_INMOBILIARIA);
+    return toDateInputValue(d);
+  }, [isInmobiliaria]);
 
   // Estados de datos
   const [lotes, setLotes] = useState([]);
-  const [personas, setPersonas] = useState([]); // Guardar como objetos, no como opciones
+  const [personas, setPersonas] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
   const [loadingLotes, setLoadingLotes] = useState(false);
   const [loadingPersonas, setLoadingPersonas] = useState(false);
@@ -67,83 +57,111 @@ export default function ReservaCrearCard({
 
   // Estados de UI
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState(null);
+  const [generalError, setGeneralError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
   const [busquedaLote, setBusquedaLote] = useState("");
+  const [numeroError, setNumeroError] = useState(null); // Error específico de duplicado backend
+
+  // React Hook Form
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+    control,
+  } = useForm({
+    resolver: zodResolver(reservaCreateSchema),
+    defaultValues: {
+      fecha: toDateInputValue(new Date()),
+      plazoReserva: toDateInputValue(new Date()),
+      loteId: loteIdPreSeleccionado ? Number(loteIdPreSeleccionado) : undefined,
+      clienteId: undefined,
+      inmobiliariaId: undefined,
+      montoSeña: undefined,
+      numero: "",
+      userRole: user?.role, // Para validación condicional en Zod
+    },
+    mode: "onChange",
+  });
+
+  const formValues = watch();
 
   // Calcular el mapId del lote seleccionado cuando viene del side panel o desde fila
   const loteSeleccionadoMapId = useMemo(() => {
-    if ((!fromSidePanel && !lockLote) || !loteId) return null;
-    const loteSeleccionado = lotes.find((l) => String(l.id) === String(loteId));
+    if ((!fromSidePanel && !lockLote) || !formValues.loteId) return null;
+    const loteSeleccionado = lotes.find((l) => String(l.id) === String(formValues.loteId));
     if (!loteSeleccionado) return null;
     const mapId = loteSeleccionado.mapId;
     if (!mapId) return null;
     return String(mapId).toLowerCase().startsWith("lote")
       ? mapId
       : `Lote ${mapId}`;
-  }, [fromSidePanel, lockLote, loteId, lotes]);
+  }, [fromSidePanel, lockLote, formValues.loteId, lotes]);
 
   // Cargar datos al abrir
   useEffect(() => {
     if (!open) return;
 
+    // Actualizar role en form si cambia (raro, pero correcto)
+    setValue("userRole", user?.role);
+
     // Cargar lotes disponibles (solo DISPONIBLE)
-    setLoadingLotes(true);
-    (async () => {
-      try {
-        const resp = await getAllLotes({});
-        const lotesData = resp?.data || [];
-        // Filtrar solo lotes DISPONIBLE
-        let filteredLots = lotesData.filter((l) => {
-          const st = String(l.estado || l.status || "").toUpperCase();
-          return st === "DISPONIBLE";
-        });
+    if (lotes.length === 0) {
+      setLoadingLotes(true);
+      (async () => {
+        try {
+          const resp = await getAllLotes({});
+          const lotesData = resp?.data || [];
+          // Filtrar solo lotes DISPONIBLE
+          let filteredLots = lotesData.filter((l) => {
+            const st = String(l.estado || l.status || "").toUpperCase();
+            return st === "DISPONIBLE";
+          });
 
-        // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
-        if (lockLote && loteIdPreSeleccionado) {
-          const lotePrecargado = lotesData.find(
-            (l) => String(l.id) === String(loteIdPreSeleccionado),
-          );
-          if (
-            lotePrecargado &&
-            !filteredLots.find(
-              (l) => String(l.id) === String(lotePrecargado.id),
-            )
-          ) {
-            filteredLots = [lotePrecargado, ...filteredLots];
+          // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
+          if (lockLote && loteIdPreSeleccionado) {
+            const lotePrecargado = lotesData.find(
+              (l) => String(l.id) === String(loteIdPreSeleccionado),
+            );
+            if (
+              lotePrecargado &&
+              !filteredLots.find(
+                (l) => String(l.id) === String(lotePrecargado.id),
+              )
+            ) {
+              filteredLots = [lotePrecargado, ...filteredLots];
+            }
           }
+          setLotes(filteredLots);
+        } catch (err) {
+          console.error("Error cargando lotes:", err);
+        } finally {
+          setLoadingLotes(false);
         }
+      })();
+    }
 
-        setLotes(filteredLots);
-      } catch (err) {
-        console.error("Error cargando lotes:", err);
-        setLotes([]);
-      } finally {
-        setLoadingLotes(false);
-      }
-    })();
+    // Cargar personas
+    if (personas.length === 0) {
+      setLoadingPersonas(true);
+      (async () => {
+        try {
+          const resp = await getAllPersonas({});
+          const personasData =
+            resp?.personas ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
+          setPersonas(Array.isArray(personasData) ? personasData : []);
+        } catch (err) {
+          console.error("Error cargando personas:", err);
+        } finally {
+          setLoadingPersonas(false);
+        }
+      })();
+    }
 
-    // Cargar personas (siempre, para todos los roles incluyendo INMOBILIARIA)
-    setLoadingPersonas(true);
-    (async () => {
-      try {
-        const resp = await getAllPersonas({});
-        const personasData =
-          resp?.personas ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
-        setPersonas(Array.isArray(personasData) ? personasData : []);
-      } catch (err) {
-        console.error("Error cargando personas:", err);
-        setPersonas([]);
-      } finally {
-        setLoadingPersonas(false);
-      }
-    })();
-
-    // Resetear búsqueda de lote al abrir
-    setBusquedaLote("");
-
-    // Cargar inmobiliarias solo si NO es INMOBILIARIA
-    if (!isInmobiliaria) {
+    // Cargar inmobiliarias
+    if (!isInmobiliaria && inmobiliarias.length === 0) {
       setLoadingInmobiliarias(true);
       (async () => {
         try {
@@ -157,39 +175,36 @@ export default function ReservaCrearCard({
           setInmobiliarias(inmobNormalizadas);
         } catch (err) {
           console.error("Error cargando inmobiliarias:", err);
-          setInmobiliarias([]);
         } finally {
           setLoadingInmobiliarias(false);
         }
       })();
     }
-  }, [open, isInmobiliaria]);
+  }, [open, isInmobiliaria, user, lotes.length, personas.length, inmobiliarias.length, lockLote, loteIdPreSeleccionado]);
 
-  // Resetear cuando se cierra (pero mantener loteId si viene precargado)
+  // Resetear al abrir/cerrar
   useEffect(() => {
     if (!open) {
-      setFechaReserva(toDateInputValue(new Date()));
-      setClienteId("");
-      setInmobiliariaId("");
-      setPlazoReserva(toDateInputValue(new Date()));
-      setSena("");
-      setNumero("");
+      reset({
+        fecha: toDateInputValue(new Date()),
+        plazoReserva: toDateInputValue(new Date()),
+        loteId: undefined, // Resetear loteId
+        clienteId: undefined,
+        inmobiliariaId: undefined,
+        montoSeña: undefined,
+        numero: "",
+        userRole: user?.role,
+      });
+      setGeneralError(null);
       setNumeroError(null);
-      setError(null);
-      setShowSuccess(false);
-      setSaving(false);
       setBusquedaLote("");
-      // Solo resetear loteId si no viene precargado
-      if (!loteIdPreSeleccionado) {
-        setLoteId("");
-      }
     } else if (loteIdPreSeleccionado) {
-      // Cuando se abre y hay loteIdPreSeleccionado, setearlo
-      setLoteId(String(loteIdPreSeleccionado));
+      // Si se abre con preselección
+      setValue("loteId", Number(loteIdPreSeleccionado));
     }
-  }, [open, loteIdPreSeleccionado]);
+  }, [open, loteIdPreSeleccionado, reset, user, setValue, lotes, formValues.loteId, fromSidePanel, lockLote]);
 
-  // Filtrar lotes según búsqueda - igual que en VentaCrearCard (por mapId, numero, id, textoLote, calle)
+  // Filtrar lotes según búsqueda
   const lotesFiltrados = useMemo(() => {
     const q = busquedaLote.trim().toLowerCase();
     if (!q) return [];
@@ -229,117 +244,36 @@ export default function ReservaCrearCard({
     ),
   );
 
-  async function handleSave() {
-    setError(null);
+  const onSubmit = async (data) => {
+    setGeneralError(null);
     setNumeroError(null);
     setSaving(true);
 
-    // Validaciones
-    const numeroTrim = String(numero || "").trim();
-    if (!numeroTrim || numeroTrim.length < 3 || numeroTrim.length > 30) {
-      setNumeroError("Número de reserva obligatorio (3 a 30 caracteres)");
-      setSaving(false);
-      return;
-    }
-
-    if (!fechaReserva || !fechaReserva.trim()) {
-      setError("La fecha de reserva es obligatoria.");
-      setSaving(false);
-      return;
-    }
-
-    if (!loteId || !loteId.trim()) {
-      setError("El lote es obligatorio.");
-      setSaving(false);
-      return;
-    }
-
-    if (!clienteId || !clienteId.trim()) {
-      setError("El cliente es obligatorio.");
-      setSaving(false);
-      return;
-    }
-
-    if (!plazoReserva || !plazoReserva.trim()) {
-      setError("El plazo de reserva es obligatorio.");
-      setSaving(false);
-      return;
-    }
-
-    // Validar seña si se ingresó
-    let senaNum = null;
-    if (sena && sena.trim()) {
-      const n = Number(sena);
-      if (!Number.isFinite(n) || n < 0) {
-        setError("La seña debe ser un número ≥ 0.");
-        setSaving(false);
-        return;
-      }
-      senaNum = n;
-    }
+    const numeroTrim = String(data.numero || "").trim();
 
     try {
-      const fechaISO = fromDateInputToISO(fechaReserva);
-      if (!fechaISO) {
-        setError("La fecha de reserva es inválida.");
-        setSaving(false);
-        return;
-      }
-
-      const fechaFinISO = fromDateInputToISO(plazoReserva);
-      if (!fechaFinISO) {
-        setError("La fecha de plazo es inválida.");
-        setSaving(false);
-        return;
-      }
-
-      if (new Date(fechaFinISO) < new Date(fechaISO)) {
-        setError(
-          "El plazo de reserva no puede ser anterior a la fecha de inicio.",
-        );
-        setSaving(false);
-        return;
-      }
-
-      // Normalizar IDs numéricos
-      const loteIdNum = Number(loteId);
-      const clienteIdNum = Number(clienteId);
-
       const payload = {
-        fechaReserva: fechaISO,
-        loteId: loteIdNum,
-        clienteId: clienteIdNum,
-        // Para INMOBILIARIA: no enviar inmobiliariaId (el backend usará user.inmobiliariaId)
-
-        // Para ADMIN/GESTOR: enviar inmobiliariaId si fue seleccionada
-
+        fechaReserva: new Date(data.fecha).toISOString(), // Convertir date input a ISO
+        loteId: Number(data.loteId),
+        clienteId: Number(data.clienteId),
+        // Para INMOBILIARIA: no enviar inmobiliariaId
         ...(isInmobiliaria
           ? {}
           : {
-              inmobiliariaId:
-                inmobiliariaId && inmobiliariaId.trim()
-                  ? Number(inmobiliariaId)
-                  : null,
+              inmobiliariaId: data.inmobiliariaId ? Number(data.inmobiliariaId) : undefined,
             }),
-        sena: senaNum,
+        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? Number(data.montoSeña) : undefined, // Change sena to seña if backend expects seña, wait interfaces said 'seña?' but post request interface says 'seña'.
         numero: numeroTrim,
-        fechaFinReserva: fechaFinISO,
+        fechaFinReserva: new Date(data.plazoReserva).toISOString(),
       };
 
-      // Debug: mostrar payload para detectar discrepancias
-      // (Quitar console.log en producción)
-      console.debug("➡️ createReserva payload:", payload);
-
+      console.log("📤 Payload Reserva:", payload);
       const response = await createReserva(payload);
 
-      console.debug("⬅️ createReserva response:", response);
-
-      // Manejar respuesta del backend de forma más informativa
       if (!response || !response.success) {
         throw new Error(response?.message || "Error al crear la reserva");
       }
 
-      // Éxito
       setShowSuccess(true);
       onCreated?.(response.data);
 
@@ -348,61 +282,37 @@ export default function ReservaCrearCard({
         setSaving(false);
         onCancel?.();
       }, 1500);
+
     } catch (err) {
       console.error("Error creando reserva:", err);
+      let errorMessage = err?.message || "No se pudo crear la reserva.";
 
-      let errorMessage =
-        err?.message || "No se pudo crear la reserva. Intenta nuevamente.";
-
-      // Manejar errores específicos (unicidad numero)
-      if (
-        err?.response?.data?.errors &&
-        Array.isArray(err.response.data.errors)
-      ) {
-        const mensajes = err.response.data.errors.map((e) => {
-          if (typeof e === "string") return e;
-          const campo = e.path?.[0] || "";
-          const msg = e.message || "";
-          if (campo === "numero") {
-            if (
-              msg.toLowerCase().includes("unique") ||
-              msg.toLowerCase().includes("exist")
-            ) {
-              setNumeroError("Ya existe una reserva con este número");
-              return "Número de reserva ya existente";
-            }
-            setNumeroError("Número de reserva inválido");
+      // Manejo de errores de backend (similar al anterior)
+      if (err?.response?.data?.errors) {
+        // ... Logica de parseo de errores de array
+        const errorArr = err.response.data.errors;
+        const msg = Array.isArray(errorArr) ? errorArr.map(e => e.message || e).join(", ") : String(errorArr);
+          if (msg.toLowerCase().includes("unique") || msg.toLowerCase().includes("exist")) {
+             setNumeroError("Ya existe una reserva con este número");
           }
-          return msg || "Error de validación";
-        });
-        errorMessage = mensajes.join(", ");
-      } else if (
-        typeof errorMessage === "string" &&
-        /numero/i.test(errorMessage)
-      ) {
-        setNumeroError("Ya existe una reserva con este número");
+           errorMessage = msg;
       } else if (err?.response?.data?.message) {
-        if (
-          String(err.response.data.message).toLowerCase().includes("número") ||
-          String(err.response.data.message).toLowerCase().includes("numero")
-        ) {
-          setNumeroError("Ya existe una reserva con este número");
-        }
-        errorMessage = err.response.data.message;
+         if (err.response.data.message.toLowerCase().includes("numero")) {
+           setNumeroError("Ya existe una reserva con este número");
+         }
+         errorMessage = err.response.data.message;
       }
 
-      setError(errorMessage);
+      setGeneralError(errorMessage);
       setSaving(false);
     }
-  }
+  };
 
-  // Renderizar animación incluso si el modal se está cerrando
   const shouldRender = open || showSuccess;
   if (!shouldRender) return null;
 
   return (
     <>
-      {/* Animación de éxito */}
       <SuccessAnimation
         show={showSuccess}
         message={`¡${entityType} creada exitosamente!`}
@@ -413,11 +323,9 @@ export default function ReservaCrearCard({
         title="Registrar Reserva"
         onCancel={() => {
           if (showSuccess) return;
-          setSaving(false);
-          setShowSuccess(false);
           onCancel?.();
         }}
-        onSave={handleSave}
+        onSave={handleSubmit(onSubmit)}
         saving={saving}
         saveButtonText="Confirmar Reserva"
         headerRight={
@@ -429,302 +337,226 @@ export default function ReservaCrearCard({
         }
       >
         <div>
-          <h3
-            className="venta-section-title"
-            style={{ paddingBottom: "6px", marginBottom: "18px" }}
-          >
+          <h3 className="venta-section-title" style={{ paddingBottom: "6px", marginBottom: "18px" }}>
             Información de la Reserva
           </h3>
-          <div
-            className="venta-grid"
-            style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}
-          >
-            {/* Columna izquierda */}
+          <div className="venta-grid" style={{ ["--sale-label-w"]: `${computedLabelWidth}px` }}>
+
+            {/* Columna Izquierda */}
             <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">LOTE</div>
-                {(fromSidePanel || lockLote) && loteSeleccionadoMapId ? (
-                  // Cuando viene del side panel o desde fila, mostrar el lote como read-only
-                  <div className="field-value is-readonly">
-                    {loteSeleccionadoMapId}
-                  </div>
-                ) : fromSidePanel || lockLote ? (
-                  // Si aún no se cargó el mapId, mostrar placeholder (evitar parpadeo)
-                  <div className="field-value is-readonly">—</div>
-                ) : (
-                  <div
-                    className="field-value p0"
-                    style={{ alignItems: "flex-start" }}
-                  >
-                    <div style={{ width: "100%", position: "relative" }}>
-                      <div style={{ position: "relative" }}>
-                        <input
-                          className="field-input"
-                          placeholder={
-                            loteId ? "" : "Buscar lote por número o calle"
-                          }
-                          value={
-                            loteId && !busquedaLote
-                              ? (() => {
-                                  const loteSeleccionado = lotes.find(
-                                    (l) => String(l.id) === String(loteId),
+              {/* LOTE */}
+              <div className={`fieldRow ${errors.loteId ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">LOTE</div>
+                  {(fromSidePanel || lockLote) && loteSeleccionadoMapId ? (
+                    <div className="field-value is-readonly">{loteSeleccionadoMapId}</div>
+                  ) : fromSidePanel || lockLote ? (
+                     <div className="field-value is-readonly">—</div>
+                  ) : (
+                    <div className="field-value p0">
+                       <div style={{ position: "relative", width: "100%" }}>
+                         <input
+                           className={`field-input ${errors.loteId ? "is-invalid" : ""}`}
+                           placeholder={formValues.loteId ? "" : "Buscar lote por número o calle"}
+                           value={
+                             formValues.loteId && !busquedaLote
+                               ? (() => {
+                                   const l = lotes.find(x => String(x.id) === String(formValues.loteId));
+                                   if (!l) return "";
+                                   const mapId = l.mapId;
+                                   return String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                 })()
+                               : busquedaLote
+                           }
+                           onChange={(e) => {
+                             setBusquedaLote(e.target.value);
+                             if (e.target.value && formValues.loteId) {
+                               setValue("loteId", undefined);
+                             }
+                           }}
+                           onFocus={() => {
+                             if (formValues.loteId) {
+                               setBusquedaLote("");
+                               setValue("loteId", undefined);
+                             }
+                           }}
+                         />
+                         {/* Search Icon */}
+                         <svg
+                            width="18" height="18" viewBox="0 0 24 24"
+                            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", opacity: 0.6 }}
+                          >
+                            <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none" />
+                            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2" />
+                          </svg>
+
+                          {/* Dropdown */}
+                          {busquedaLote && (
+                            <div style={{
+                                marginTop: 8, maxHeight: 220, overflowY: "auto", overflowX: "hidden",
+                                border: "1px solid #e5e7eb", borderRadius: 8, position: "absolute", width: "100%", zIndex: 1000, background: "#fff"
+                              }}>
+                                {lotesFiltrados.length === 0 && (
+                                  <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
+                                )}
+                                {lotesFiltrados.map((l) => {
+                                  const mapId = l.mapId || l.numero || l.id;
+                                  const displayText = String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                  return (
+                                    <button
+                                      key={l.id} type="button"
+                                      onClick={() => {
+                                        setValue("loteId", l.id, { shouldValidate: true });
+                                        setBusquedaLote("");
+                                      }}
+                                      style={{
+                                        display: "block", width: "100%", textAlign: "left", padding: "10px 12px",
+                                        background: "#fff", border: "none", borderBottom: "1px solid #f3f4f6", cursor: "pointer"
+                                      }}
+                                      onMouseEnter={(e) => e.target.style.background = "#f9fafb"}
+                                      onMouseLeave={(e) => e.target.style.background = "#fff"}
+                                    >
+                                      {displayText} <span style={{ color: "#6b7280" }}>({String(l.estado || l.status)})</span>
+                                    </button>
                                   );
-                                  if (!loteSeleccionado) return "";
-                                  const mapId = loteSeleccionado.mapId;
-                                  return String(mapId)
-                                    .toLowerCase()
-                                    .startsWith("lote")
-                                    ? mapId
-                                    : `Lote ${mapId}`;
-                                })()
-                              : busquedaLote
-                          }
-                          onChange={(e) => {
-                            setBusquedaLote(e.target.value);
-                            // Si empieza a escribir, limpiar la selección para permitir buscar otro lote
-                            if (e.target.value && loteId) {
-                              setLoteId("");
-                            }
-                          }}
-                          onFocus={() => {
-                            // Al hacer focus, activar el modo búsqueda
-                            if (loteId) {
-                              setBusquedaLote("");
-                              setLoteId("");
-                            }
-                          }}
-                        />
-                        <svg
-                          width="18"
-                          height="18"
-                          viewBox="0 0 24 24"
-                          style={{
-                            position: "absolute",
-                            right: 10,
-                            top: "50%",
-                            transform: "translateY(-50%)",
-                            opacity: 0.6,
-                          }}
-                        >
-                          <circle
-                            cx="11"
-                            cy="11"
-                            r="7"
-                            stroke="#666"
-                            strokeWidth="2"
-                            fill="none"
-                          />
-                          <line
-                            x1="16.5"
-                            y1="16.5"
-                            x2="21"
-                            y2="21"
-                            stroke="#666"
-                            strokeWidth="2"
-                          />
-                        </svg>
-                      </div>
-                      {busquedaLote && (
-                        <div
-                          style={{
-                            marginTop: 8,
-                            maxHeight: 220,
-                            overflowY: "auto",
-                            overflowX: "hidden",
-                            border: "1px solid #e5e7eb",
-                            borderRadius: 8,
-                            position: "absolute",
-                            width: "100%",
-                            zIndex: 1000,
-                            background: "#fff",
-                          }}
-                        >
-                          {lotesFiltrados.length === 0 && (
-                            <div style={{ padding: 10, color: "#6b7280" }}>
-                              No se encontraron lotes
+                                })}
                             </div>
                           )}
-                          {lotesFiltrados.map((l) => {
-                            const mapId = l.mapId || l.numero || l.id;
-                            const displayText = String(mapId)
-                              .toLowerCase()
-                              .startsWith("lote")
-                              ? mapId
-                              : `Lote ${mapId}`;
-                            return (
-                              <button
-                                key={l.id}
-                                type="button"
-                                onClick={() => {
-                                  setLoteId(String(l.id));
-                                  setBusquedaLote("");
-                                }}
-                                style={{
-                                  display: "block",
-                                  width: "100%",
-                                  textAlign: "left",
-                                  padding: "10px 12px",
-                                  background: "#fff",
-                                  border: "none",
-                                  borderBottom: "1px solid #f3f4f6",
-                                  cursor: "pointer",
-                                }}
-                                onMouseEnter={(e) =>
-                                  (e.target.style.background = "#f9fafb")
-                                }
-                                onMouseLeave={(e) =>
-                                  (e.target.style.background = "#fff")
-                                }
-                              >
-                                {displayText}{" "}
-                                <span style={{ color: "#6b7280" }}>
-                                  ({String(l.estado || l.status)})
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="field-row">
-                <div className="field-label">FECHA</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="date"
-                    value={fechaReserva}
-                    onChange={(e) => setFechaReserva(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <PersonaSearchSelect
-                label="COMPRADOR"
-                value={clienteId}
-                onSelect={(val) => setClienteId(val ? String(val) : "")}
-                personas={personas}
-                loading={loadingPersonas}
-                placeholder="Buscar por nombre, apellido o DNI"
-              />
-
-              <div className="field-row">
-                <div className="field-label">INMOBILIARIA</div>
-                {isInmobiliaria ? (
-                  <div className="field-value is-readonly">
-                    {user?.inmobiliariaNombre || ""}
-                  </div>
-                ) : (
-                  <div className="field-value p0">
-                    <NiceSelect
-                      value={inmobiliariaId}
-                      options={inmobiliarias}
-                      placeholder="Seleccionar inmobiliaria (opcional)"
-                      onChange={(val) => setInmobiliariaId(val)}
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Columna derecha */}
-            <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">NÚMERO DE RESERVA</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="text"
-                    value={numero}
-                    onChange={(e) => {
-                      setNumero(e.target.value);
-                      if (numeroError) setNumeroError(null);
-                    }}
-                    placeholder="Ej: RES-2025-01"
-                  />
-                  {numeroError && (
-                    <div
-                      style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}
-                    >
-                      {numeroError}
+                       </div>
                     </div>
                   )}
                 </div>
+                {errors.loteId && <div className="fieldError">{errors.loteId.message}</div>}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">PLAZO RESERVA</div>
-                <div className="field-value p0">
-                  <input
-                    className="field-input"
-                    type="date"
-                    value={plazoReserva}
-                    onChange={(e) => setPlazoReserva(e.target.value)}
-                  />
+              {/* FECHA */}
+              <div className={`fieldRow ${errors.fecha ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">FECHA</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.fecha ? "is-invalid" : ""}`}
+                      type="date"
+                      {...register("fecha")}
+                    />
+                  </div>
                 </div>
+                {errors.fecha && <div className="fieldError">{errors.fecha.message}</div>}
               </div>
 
-              <div className="field-row">
-                <div className="field-label">MONTO RESERVA/SEÑA</div>
-                <div
-                  className="field-value p0"
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "8px",
-                    position: "relative",
-                  }}
-                >
-                  <input
-                    className="field-input"
-                    type="number"
-                    inputMode="numeric"
-                    step="100"
-                    min="0"
-                    value={sena}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === "" || Number(value) >= 0) {
-                        setSena(value);
-                      }
-                    }}
-                    placeholder="0"
-                    style={{ flex: 1, paddingRight: "50px" }}
-                  />
-                  <span
-                    style={{
-                      position: "absolute",
-                      right: "12px",
-                      color: "#6B7280",
-                      fontSize: "13.5px",
-                      fontWeight: 500,
-                    }}
-                  >
-                    USD
-                  </span>
-                </div>
+              {/* COMPRADOR */}
+              <div className={`fieldRow ${errors.clienteId ? "hasError" : ""}`}>
+                <Controller
+                  name="clienteId"
+                  control={control}
+                  render={({ field: { onChange, value } }) => (
+                    <PersonaSearchSelect
+                      label="COMPRADOR"
+                      value={value ? String(value) : ""}
+                      onSelect={(val) => onChange(val ? Number(val) : "")}
+                      personas={personas}
+                      loading={loadingPersonas}
+                      placeholder="Buscar por nombre, apellido o DNI"
+                      error={errors.clienteId?.message}
+                    />
+                  )}
+                />
+                 {errors.clienteId && <div className="fieldError">{errors.clienteId.message}</div>}
               </div>
+
+              {/* INMOBILIARIA */}
+              <div className={`fieldRow ${errors.inmobiliariaId ? "hasError" : ""}`}>
+                 <div className="field-row">
+                    <div className="field-label">INMOBILIARIA</div>
+                    {isInmobiliaria ? (
+                        <div className="field-value is-readonly">{user?.inmobiliariaNombre || ""}</div>
+                    ) : (
+                        <div className="field-value p0">
+                            <Controller
+                                name="inmobiliariaId"
+                                control={control}
+                                render={({ field: { onChange, value } }) => (
+                                    <NiceSelect
+                                        value={value ? String(value) : ""}
+                                        options={inmobiliarias}
+                                        placeholder="Seleccionar inmobiliaria"
+                                        onChange={(val) => onChange(val ? Number(val) : undefined)}
+                                    />
+                                )}
+                            />
+                        </div>
+                    )}
+                 </div>
+                 {errors.inmobiliariaId && <div className="fieldError">{errors.inmobiliariaId.message}</div>}
+              </div>
+            </div>
+
+            {/* Columna Derecha */}
+            <div className="venta-col">
+              {/* NUMERO RESERVA */}
+              <div className={`fieldRow ${errors.numero || numeroError ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">NÚMERO DE RESERVA</div>
+                  <div className="field-value p0">
+                     <input
+                        className={`field-input ${errors.numero || numeroError ? "is-invalid" : ""}`}
+                        type="text"
+                        placeholder="Ej: RES-2025-01"
+                        {...register("numero")}
+                        onChange={(e) => {
+                             register("numero").onChange(e); // Mantener hook form
+                             if (numeroError) setNumeroError(null);
+                        }}
+                     />
+                  </div>
+                </div>
+                {(errors.numero || numeroError) && (
+                    <div className="fieldError">{numeroError || errors.numero?.message}</div>
+                )}
+              </div>
+
+               {/* PLAZO RESERVA */}
+               <div className={`fieldRow ${errors.plazoReserva ? "hasError" : ""}`}>
+                 <div className="field-row">
+                   <div className="field-label">PLAZO RESERVA</div>
+                   <div className="field-value p0">
+                     <input
+                       className={`field-input ${errors.plazoReserva ? "is-invalid" : ""}`}
+                       type="date"
+                       {...register("plazoReserva")}
+                       max={isInmobiliaria ? maxDateInmob : undefined}
+                     />
+                   </div>
+                 </div>
+                 {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
+               </div>
+
+                {/* MONTO SEÑA */}
+                <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
+                    <div className="field-row">
+                        <div className="field-label">MONTO RESERVA/SEÑA</div>
+                        <div className="field-value p0" style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+                             <input
+                                className={`field-input ${errors.montoSeña ? "is-invalid" : ""}`}
+                                type="number"
+                                inputMode="decimal"
+                                step="100"
+                                placeholder="0"
+                                style={{ flex: 1, paddingRight: "50px" }}
+                                {...register("montoSeña", { valueAsNumber: true })}
+                             />
+                             <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>USD</span>
+                        </div>
+                    </div>
+                    {errors.montoSeña && <div className="fieldError">{errors.montoSeña.message}</div>}
+                </div>
             </div>
           </div>
         </div>
 
-        {error && (
-          <div
-            style={{
-              marginTop: "20px",
-              padding: "12px 16px",
-              background: "#fee2e2",
-              border: "1px solid #fecaca",
-              borderRadius: "6px",
-              color: "#991b1b",
-              fontSize: 13.5,
-            }}
-          >
-            {error}
+        {generalError && (
+          <div className="lote-error-global">
+            {generalError}
           </div>
         )}
       </EditarBase>

@@ -1,6 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/prisma"
+  binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x", "linux-musl", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -201,34 +202,51 @@ model Persona {
 
 // Reserva
 model Reserva {
-  id                Int            @id @default(autoincrement())
-  numero            String         @unique
+  id                Int             @id @default(autoincrement())
+  numero            String          @unique
   fechaReserva      DateTime
-  estado            EstadoReserva  @default(ACTIVA)
+  estado            EstadoReserva   @default(ACTIVA)
   estadoPrevio      EstadoReserva?
   estadoOperativo   EstadoOperativo @default(OPERATIVO)
   fechaBaja         DateTime?
   loteId            Int
   clienteId         Int
   inmobiliariaId    Int?
-  sena              Decimal?       @db.Decimal(12, 2)
-  fechaFinReserva   DateTime       @default(now())
-  loteEstadoAlCrear EstadoLote     @default(DISPONIBLE) // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
-  ventaId           Int?           @unique // ID de la venta que consumió esta reserva (nullable). Si no es null, la reserva está cerrada por venta
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  sena              Decimal?        @db.Decimal(12, 2)
+  fechaFinReserva   DateTime        @default(now())
+  loteEstadoAlCrear EstadoLote      @default(DISPONIBLE) // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
+  ventaId           Int?            @unique // ID de la venta que consumió esta reserva (nullable). Si no es null, la reserva está cerrada por venta
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
 
   // relaciones
-  lote         Lote          @relation(fields: [loteId], references: [id])
-  cliente      Persona       @relation(fields: [clienteId], references: [id])
-  inmobiliaria Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id])
-  ventaConsumo Venta?        @relation("VentaConsumeReserva", fields: [ventaId], references: [id], onDelete: SetNull)
+  lote         Lote            @relation(fields: [loteId], references: [id])
+  cliente      Persona         @relation(fields: [clienteId], references: [id])
+  inmobiliaria Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id])
+  ventaConsumo Venta?          @relation("VentaConsumeReserva", fields: [ventaId], references: [id], onDelete: SetNull)
+  ofertas      OfertaReserva[]
+  ofertaActual Decimal?        @db.Decimal(12, 2)
 
   // Esto evita duplicados logicos de la misma reserva pero habria que ver si hace falta o no
   @@unique([clienteId, loteId, fechaReserva], name: "uq_reserva_cliente_lote_fecha")
   @@index([loteId], name: "idx_reserva_lote")
   @@index([clienteId], name: "idx_reserva_cliente")
   @@index([estadoOperativo], name: "idx_reserva_estado_operativo")
+}
+
+model OfertaReserva {
+  id            Int            @id @default(autoincrement())
+  reservaId     Int
+  reserva       Reserva        @relation(fields: [reservaId], references: [id])
+  monto         Decimal        @db.Decimal(12, 2)
+  motivo        String?        @db.Text
+  plazoHasta    DateTime?
+  nombreEfector String
+  efectorId     Int?
+  ownerType     OwnerPrioridad
+  createdAt     DateTime       @default(now())
+
+  @@index([reservaId])
 }
 
 // LOTE
@@ -294,40 +312,40 @@ model Fraccion {
 
 // VENTAS
 model Venta {
-  id             Int           @id @default(autoincrement())
-  numero         String        @unique
-  loteId         Int
-  lote           Lote          @relation(fields: [loteId], references: [id], onDelete: Restrict)
-  fechaVenta     DateTime
-  monto          Decimal       @db.Decimal(12, 2)
-  estado         EstadoVenta   @default(INICIADA)
-  estadoPrevio   EstadoVenta?
+  id              Int             @id @default(autoincrement())
+  numero          String          @unique
+  loteId          Int
+  lote            Lote            @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  fechaVenta      DateTime
+  monto           Decimal         @db.Decimal(12, 2)
+  estado          EstadoVenta     @default(INICIADA)
+  estadoPrevio    EstadoVenta?
   estadoOperativo EstadoOperativo @default(OPERATIVO)
-  fechaBaja      DateTime?
-  estadoCobro    EstadoCobro   @default(PENDIENTE)
-  plazoEscritura DateTime?
-  tipoPago       String
-  compradorId    Int
-  comprador      Persona       @relation(fields: [compradorId], references: [id], onDelete: Restrict)
-  inmobiliariaId Int?
-  inmobiliaria   Inmobiliaria? @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
-  reservaConsumo Reserva?      @relation("VentaConsumeReserva")
-  createdAt      DateTime      @default(now())
-  updateAt       DateTime?
-  
+  fechaBaja       DateTime?
+  estadoCobro     EstadoCobro     @default(PENDIENTE)
+  plazoEscritura  DateTime?
+  tipoPago        String
+  compradorId     Int
+  comprador       Persona         @relation(fields: [compradorId], references: [id], onDelete: Restrict)
+  inmobiliariaId  Int?
+  inmobiliaria    Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
+  reservaConsumo  Reserva?        @relation("VentaConsumeReserva")
+  createdAt       DateTime        @default(now())
+  updateAt        DateTime?
+
   @@index([estadoOperativo], name: "idx_venta_estado_operativo")
 }
 
 // Inmobiliaria
 model Inmobiliaria {
-  id                    Int                @id @default(autoincrement())
+  id                    Int             @id @default(autoincrement())
   nombre                String
   razonSocial           String
-  comxventa             Decimal?           @db.Decimal(5, 2)
+  comxventa             Decimal?        @db.Decimal(5, 2)
   contacto              String?
-  estadoOperativo       EstadoOperativo    @default(OPERATIVO)
+  estadoOperativo       EstadoOperativo @default(OPERATIVO)
   fechaBaja             DateTime?
-  maxPrioridadesActivas Int                @default(5)
+  maxPrioridadesActivas Int             @default(5)
 
   // Fechas de auditoria
   createdAt DateTime  @default(now())
@@ -416,11 +434,11 @@ model Alquiler {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // Constraint parcial: solo un ACTIVO por lote (a nivel de aplicación, no de DB)
+  // En PostgreSQL, usaríamos un índice parcial único, pero Prisma no lo soporta directamente
+  // Se maneja a nivel de aplicación
 
   @@index([loteId], name: "idx_alquiler_lote")
   @@index([inquilinoId], name: "idx_alquiler_inquilino")
   @@index([estado], name: "idx_alquiler_estado")
-  // Constraint parcial: solo un ACTIVO por lote (a nivel de aplicación, no de DB)
-  // En PostgreSQL, usaríamos un índice parcial único, pero Prisma no lo soporta directamente
-  // Se maneja a nivel de aplicación
 }

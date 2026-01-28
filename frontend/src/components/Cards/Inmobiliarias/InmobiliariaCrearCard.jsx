@@ -1,54 +1,61 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import { createInmobiliaria } from "../../../lib/api/inmobiliarias.js";
+import { inmobiliariaCreateSchema } from "../../../lib/validations/inmobiliariaCreate.schema.js";
 
 export default function InmobiliariaCrearCard({ open, onCancel, onCreated }) {
-  const [nombre, setNombre] = useState("");
-  const [razonSocial, setRazonSocial] = useState("");
-  const [contacto, setContacto] = useState("");
-  const [comxventa, setComxventa] = useState("");
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [error, setError] = useState(null);
+  const [generalError, setGeneralError] = useState(null);
 
-  async function handleSave() {
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(inmobiliariaCreateSchema),
+    defaultValues: {
+      nombre: "",
+      razonSocial: "",
+      contacto: "",
+      comxventa: "",
+    },
+  });
+
+  const onSubmit = async (data) => {
     setSaving(true);
-    setError(null);
+    setGeneralError(null);
     try {
-      // 1. VALIDACIÓN: Coincidir con Zod (Nombre y Razón Social requeridos)
-      if (!nombre.trim()) throw new Error("El nombre es obligatorio");
-      if (!razonSocial.trim()) throw new Error("La razón social es obligatoria");
-
       const body = {
-        nombre: nombre.trim(),
-        // 2. DATOS: Enviamos el string limpio. 
-        // Ya no enviamos "|| null" en razonSocial porque es obligatoria.
-        razonSocial: razonSocial.trim(), 
-        contacto: contacto.trim() || null, // Este sí es opcional en Zod
-        comxventa: comxventa === "" ? null : Number(comxventa),
-        // userId: null // Opcional: Si tuvieras un select de usuarios, iría aquí.
+        nombre: data.nombre.trim(),
+        razonSocial: data.razonSocial.trim(),
+        contacto: data.contacto?.trim() || null,
+        comxventa: data.comxventa !== "" && data.comxventa !== undefined ? Number(data.comxventa) : null,
       };
 
       const resp = await createInmobiliaria(body);
       const created = resp?.data ?? resp ?? null;
       
       setShowSuccess(true);
-      onCreated?.(created); // Callback para actualizar la tabla padre
+      onCreated?.(created);
       
       setTimeout(() => {
         setShowSuccess(false);
         setSaving(false);
+        reset(); // Limpiar formulario
         onCancel?.();
       }, 1500);
       
     } catch (e) {
-      // Manejo de error mejorado para capturar mensajes del backend
       const msg = e.response?.data?.message || e.message || "No se pudo crear la inmobiliaria";
-      setError(msg);
+      setGeneralError(msg);
       setSaving(false);
     }
-  }
+  };
 
   if (!open && !showSuccess) return null;
 
@@ -59,43 +66,78 @@ export default function InmobiliariaCrearCard({ open, onCancel, onCreated }) {
         <EditarBase
           open={open}
           title="Agregar Inmobiliaria"
-          onCancel={onCancel}
-          onSave={handleSave}
+          onCancel={() => {
+            reset();
+            onCancel?.();
+          }}
+          onSave={handleSubmit(onSubmit)}
           saving={saving}
           saveButtonText="Confirmar Inmobiliaria"
         >
           <div className="venta-grid" style={{ ["--sale-label-w"]: "200px" }}>
             <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">NOMBRE</div>
-                <div className="field-value p0">
-                  <input className="field-input" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre" />
+              <div className={`fieldRow ${errors.nombre ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">NOMBRE</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.nombre ? "is-invalid" : ""}`}
+                      placeholder="Nombre"
+                      {...register("nombre")}
+                    />
+                  </div>
                 </div>
+                {errors.nombre && <div className="fieldError">{errors.nombre.message}</div>}
               </div>
-              <div className="field-row">
-                <div className="field-label">RAZÓN SOCIAL</div>
-                <div className="field-value p0">
-                  <input className="field-input" value={razonSocial} onChange={(e) => setRazonSocial(e.target.value)} placeholder="Razón Social" />
+              <div className={`fieldRow ${errors.razonSocial ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">RAZÓN SOCIAL</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.razonSocial ? "is-invalid" : ""}`}
+                      placeholder="Razón Social"
+                      {...register("razonSocial")}
+                    />
+                  </div>
                 </div>
+                {errors.razonSocial && <div className="fieldError">{errors.razonSocial.message}</div>}
               </div>
             </div>
             <div className="venta-col">
-              <div className="field-row">
-                <div className="field-label">CONTACTO</div>
-                <div className="field-value p0">
-                  <input className="field-input" value={contacto} onChange={(e) => setContacto(e.target.value)} placeholder="Contacto" />
+              <div className={`fieldRow ${errors.contacto ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">CONTACTO</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.contacto ? "is-invalid" : ""}`}
+                      placeholder="Contacto"
+                      {...register("contacto")}
+                    />
+                  </div>
                 </div>
+                {errors.contacto && <div className="fieldError">{errors.contacto.message}</div>}
               </div>
-              <div className="field-row">
-                <div className="field-label">COMISIÓN X VENTA (%)</div>
-                <div className="field-value p0">
-                  <input className="field-input" type="number" min="0" max="100" step="0.5" value={comxventa} onChange={(e) => setComxventa(e.target.value)} placeholder="0 - 100" />
+              <div className={`fieldRow ${errors.comxventa ? "hasError" : ""}`}>
+                <div className="field-row">
+                  <div className="field-label">COMISIÓN X VENTA (%)</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${errors.comxventa ? "is-invalid" : ""}`}
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      placeholder="0 - 100"
+                      {...register("comxventa")}
+                    />
+                  </div>
                 </div>
+                {errors.comxventa && <div className="fieldError">{errors.comxventa.message}</div>}
               </div>
             </div>
           </div>
-          {error && (
-            <div style={{ marginTop: 12, padding: 10, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>{error}</div>
+          {generalError && (
+            <div style={{ marginTop: 12, padding: 10, background: "#fee2e2", color: "#991b1b", borderRadius: 8 }}>{generalError}</div>
           )}
         </EditarBase>
       )}
