@@ -17,6 +17,7 @@ export default function EliminarBase({
   loadingLabel = "Eliminando…",
   onConfirm,
   onCancel,
+  variant = "danger", // danger | primary | warning
 }) {
   if (!open) return null;
 
@@ -25,17 +26,23 @@ export default function EliminarBase({
     e.stopPropagation();
   };
 
+  const isDanger = variant === "danger";
+  const cardClass = isDanger ? "c-card c-danger" : "c-card";
+  const headerClass = isDanger ? "c-header c-header-danger" : "c-header";
+  // Si no es danger, asumimos primary por defecto para el botón, o podemos mapear
+  const btnClass = isDanger ? "btn btn-danger" : "btn btn-primary";
+
   return (
     <div className="c-backdrop" role="presentation" onClick={!loading ? onCancel : undefined}>
       <section
-        className="c-card c-danger"
+        className={cardClass}
         role="dialog"
         aria-modal="true"
         aria-labelledby="del-title"
         onClick={handleBackdropClick}
       >
         {/* Header rojo claro + botón cerrar del verCard */}
-        <header className="c-header c-header-danger">
+        <header className={headerClass}>
           <h2 id="del-title" className="c-title">{title}</h2>
 
           <button
@@ -100,7 +107,7 @@ export default function EliminarBase({
 
           <button
             type="button"
-            className="btn btn-danger"
+            className={btnClass}
             onClick={onConfirm}
             disabled={loading}
           >
