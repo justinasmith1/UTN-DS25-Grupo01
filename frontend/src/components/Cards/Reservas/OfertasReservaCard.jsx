@@ -134,6 +134,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                 confirmLabel={pendingAction?.action === 'ACEPTAR' ? "Aceptar Oferta" : "Rechazar Oferta"}
                 onConfirm={handleConfirmAction}
                 onCancel={() => setPendingAction(null)}
+                variant={pendingAction?.action === 'ACEPTAR' ? 'primary' : 'danger'}
                 loading={false} // submitOferta is async but we don't block the modal logic currently, we close it immediately. Could improve.
             />
 
