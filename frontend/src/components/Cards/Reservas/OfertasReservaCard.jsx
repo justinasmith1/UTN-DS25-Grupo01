@@ -4,6 +4,8 @@ import { useAuth } from "../../../app/providers/AuthProvider";
 import { getOfertas, createOferta } from "../../../lib/api/reservas";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 
+import EliminarBase from "../Base/EliminarBase.jsx";
+
 export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }) {
     const { user } = useAuth();
     const [ofertas, setOfertas] = useState([]);
@@ -11,6 +13,9 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
     const [showForm, setShowForm] = useState(false);
     const [actionType, setActionType] = useState(null); // 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR'
     const [successMsg, setSuccessMsg] = useState(null);
+    
+    // State for confirmation dialog
+    const [pendingAction, setPendingAction] = useState(null); 
 
     // Form setup
     const { register, handleSubmit, reset, formState: { errors } } = useForm();
@@ -25,17 +30,13 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
         }
         setShowForm(false);
         setSuccessMsg(null);
+        setPendingAction(null);
     }, [open, reserva]);
 
     const handleActionClick = (action, ofertaPrev) => {
         if (action === 'ACEPTAR' || action === 'RECHAZAR') {
-             if (window.confirm(`¿Estás seguro de ${action === 'ACEPTAR' ? 'aceptar' : 'rechazar'} esta oferta?`)) {
-                 submitOferta({ 
-                     monto: ofertaPrev.monto, 
-                     action: action,
-                     motivo: action === 'RECHAZAR' ? 'Rechazado desde panel' : undefined 
-                 });
-             }
+             // Open custom confirmation dialog instead of window.confirm
+             setPendingAction({ action, oferta: ofertaPrev });
         } else {
             // Contraoferta
             setActionType('CONTRAOFERTAR');
@@ -49,13 +50,29 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
         }
     };
 
+    const handleConfirmAction = () => {
+        if (!pendingAction) return;
+        const { action, oferta } = pendingAction;
+        
+        submitOferta({ 
+            monto: oferta.monto, 
+            action: action,
+            motivo: action === 'RECHAZAR' ? 'Rechazado desde panel' : undefined 
+        });
+        setPendingAction(null);
+    };
+
     const submitOferta = async (data) => {
         if (!reserva) return;
         try {
-            await createOferta(reserva.id, {
-                ...data,
-                action: data.action || actionType
-            });
+            // Fix Date Offset: UTC 12:00
+            let payload = { ...data, action: data.action || actionType };
+            if (payload.plazoHasta) {
+                // Ensure T12:00:00.000Z
+                payload.plazoHasta = new Date(`${payload.plazoHasta}T12:00:00.000Z`).toISOString();
+            }
+
+            await createOferta(reserva.id, payload);
             // Refresh
             const res = await getOfertas(reserva.id);
             setOfertas(res.data);
@@ -76,16 +93,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
 
     if (!open) return null;
 
-    if (successMsg) {
-        return (
-             <div className="cclf-overlay">
-                 <div className="cclf-card" style={{ maxWidth: 400, textAlign: 'center', padding: 40 }}>
-                     <SuccessAnimation />
-                     <h3>{successMsg}</h3>
-                 </div>
-             </div>
-        );
-    }
+    // Standard SuccessAnimation is overlaid, we don't return early.
 
     // Determine if current user can interact with the TOP offer
     // Logic: If user is ADMIN, can reply to Inmobiliaria. If user is INMO, can reply to La Federala (CCLF).
@@ -113,16 +121,32 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
     };
 
     return (
-        <div className="cclf-overlay" onClick={onClose}>
-            <div className="cclf-card" onClick={e => e.stopPropagation()} style={{ width: '1000px', maxWidth: '95vw' }}>
-                <div className="cclf-card__header">
-                    <h2 className="cclf-card__title">Historial de Ofertas - Reserva N° {reserva?.numero}</h2>
-                    <button type="button" className="cclf-btn-close" onClick={onClose}>
-                        <span className="cclf-btn-close__x">×</span>
-                    </button>
-                </div>
+        <>
+            <SuccessAnimation show={!!successMsg} message={successMsg} />
+            
+            {/* Confirmation Dialog */}
+            <EliminarBase
+                open={!!pendingAction}
+                title={pendingAction?.action === 'ACEPTAR' ? 'Aceptar Oferta' : 'Rechazar Oferta'}
+                message={pendingAction?.action === 'ACEPTAR' 
+                    ? `¿Estás seguro de que deseas ACEPTAR esta oferta por ${Number(pendingAction?.oferta?.monto).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}?`
+                    : "¿Estás seguro de que deseas RECHAZAR esta oferta?"}
+                confirmLabel={pendingAction?.action === 'ACEPTAR' ? "Aceptar Oferta" : "Rechazar Oferta"}
+                onConfirm={handleConfirmAction}
+                onCancel={() => setPendingAction(null)}
+                loading={false} // submitOferta is async but we don't block the modal logic currently, we close it immediately. Could improve.
+            />
+
+            <div className="cclf-overlay" onClick={onClose}>
+                <div className="cclf-card" onClick={e => e.stopPropagation()} style={{ width: '1000px', maxWidth: '95vw' }}>
+                    <div className="cclf-card__header">
+                        <h2 className="cclf-card__title">Historial de Ofertas - Reserva N° {reserva?.numero}</h2>
+                        <button type="button" className="cclf-btn-close" onClick={onClose}>
+                            <span className="cclf-btn-close__x">×</span>
+                        </button>
+                    </div>
                 
-                <div className="cclf-card__body">
+                    <div className="cclf-card__body">
                     <div style={{ maxHeight: '400px', overflowY: 'auto', overflowX: 'hidden' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
                             <colgroup>
@@ -284,5 +308,6 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                 </div>
             </div>
         </div>
+        </>
     );
 }
