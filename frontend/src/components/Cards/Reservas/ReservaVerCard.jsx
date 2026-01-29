@@ -75,20 +75,34 @@ export default function ReservaVerCard({
     return NA;
   })();
 
-  // Lote: mostrar mapId o información del lote
+  // Lote: mostrar mapId formateado (ej: Lote 3-18)
   const loteInfo = (() => {
-    const mapId = res?.lote?.mapId ?? res?.lotMapId ?? null;
-    if (mapId) {
-      if (String(mapId).toLowerCase().startsWith('lote')) {
-        return mapId;
-      }
-      return `Lote N° ${mapId}`;
+    // Intentar obtener parcel y fraction
+    if (res?.lote) {
+       const fraccion = res.lote.fraccion?.numero;
+       const numero = res.lote.numero;
+       if (fraccion != null && numero != null) {
+          return `Lote ${fraccion}-${numero}`;
+       }
     }
-    if (res?.lote?.id) {
-      const num = res?.lote?.numero || res?.lote?.id;
-      return `Lote N° ${num}`;
+    
+    // Fallback: parsear mapId
+    const mapId = res?.lote?.mapId ?? res?.lotMapId ?? res?.loteId;
+    if (!mapId) return NA;
+
+    const str = String(mapId).trim();
+    // Si es "Lote18-3" o "Lote 18-3" -> "Lote 3-18"
+    const match = str.match(/^Lote\s*(\d+)-(\d+)$/i);
+    if (match) {
+      const [, parte1, parte2] = match;
+      return `Lote ${parte2}-${parte1}`;
     }
-    return res?.loteId ? `Lote N° ${res.loteId}` : NA;
+    
+    // Si no coincide, y empieza con Lote, devuelve tal cual.
+    if (str.toLowerCase().startsWith('lote')) return str;
+    
+    // Si es solo numero, agregar Lote
+    return `Lote N° ${str}`;
   })();
 
   // --- FECHAS ---
@@ -102,7 +116,7 @@ export default function ReservaVerCard({
     ["LOTE", loteInfo],
     ["FECHA", fechaReserva],
     ["CLIENTE", clienteNombre],
-    ["INMOBILIARIA", safe(res?.inmobiliaria?.nombre) || "La Federala"],
+    ["INMOBILIARIA", res?.inmobiliaria?.nombre || res?.inmobiliariaNombre || "La Federala"],
     ["ESTADO", titleCaseEstado(res?.estado)],
   ];
 

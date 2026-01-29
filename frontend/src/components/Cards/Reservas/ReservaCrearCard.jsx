@@ -26,6 +26,31 @@ function toDateInputValue(v) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function fromDateInputToISO(s) {
+  if (!s) return null;
+  if (s instanceof Date) {
+      if (Number.isNaN(s.getTime())) return null;
+      // Si ya es date, extraer YYYY-MM-DD para forzar las 12:00
+      const yyyy = s.getFullYear();
+      const mm = String(s.getMonth() + 1).padStart(2, "0");
+      const dd = String(s.getDate()).padStart(2, "0");
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      return new Date(`${dateStr}T12:00:00.000Z`).toISOString();
+  }
+  if (typeof s !== 'string' || !s.trim()) return null;
+  
+  // Intenta forzar 12:00 UTC
+  // Si viene como "YYYY-MM-DD"
+  if (s.match(/^\d{4}-\d{2}-\d{2}$/)) {
+       const d = new Date(`${s}T12:00:00.000Z`);
+       if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  
+  // Fallback: parseo simple
+  const d2 = new Date(s);
+  return Number.isNaN(d2.getTime()) ? null : d2.toISOString();
+}
+
 /* ========================================================================== */
 export default function ReservaCrearCard({
   open,
@@ -69,6 +94,7 @@ export default function ReservaCrearCard({
     setValue,
     watch,
     reset,
+    setError,
     formState: { errors },
     control,
   } = useForm({
@@ -252,8 +278,23 @@ export default function ReservaCrearCard({
     const numeroTrim = String(data.numero || "").trim();
 
     try {
+      // Formatear fechas a ISO con hora fija (12:00 UTC) vía helper seguro
+      const fechaReservaISO = fromDateInputToISO(data.fecha);
+      if (!fechaReservaISO) {
+          setError("fecha", { type: "manual", message: "Fecha inválida (verifique formato)" });
+          setSaving(false);
+          return;
+      }
+
+      const fechaFinReservaISO = fromDateInputToISO(data.plazoReserva);
+      if (!fechaFinReservaISO) {
+          setError("plazoReserva", { type: "manual", message: "Fecha inválida (verifique formato)" });
+          setSaving(false);
+          return;
+      }
+
       const payload = {
-        fechaReserva: new Date(data.fecha).toISOString(), // Convertir date input a ISO
+        fechaReserva: fechaReservaISO, 
         loteId: Number(data.loteId),
         clienteId: Number(data.clienteId),
         // Para INMOBILIARIA: no enviar inmobiliariaId
@@ -262,9 +303,9 @@ export default function ReservaCrearCard({
           : {
               inmobiliariaId: data.inmobiliariaId ? Number(data.inmobiliariaId) : undefined,
             }),
-        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? Number(data.montoSeña) : undefined, // Change sena to seña if backend expects seña, wait interfaces said 'seña?' but post request interface says 'seña'.
+        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? Number(data.montoSeña) : undefined, 
         numero: numeroTrim,
-        fechaFinReserva: new Date(data.plazoReserva).toISOString(),
+        fechaFinReserva: fechaFinReservaISO,
       };
 
       console.log("📤 Payload Reserva:", payload);

@@ -395,15 +395,30 @@ export default function ReservaEditarCard({
     return j || NA;
   })();
   const loteInfo = (() => {
-    const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? null;
-    if (mapId) {
-      if (String(mapId).toLowerCase().startsWith('lote')) return mapId;
-      return `Lote N° ${mapId}`;
+    // 1. Unify mapId
+    const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? detalle?.loteId;
+
+    // 2. Try fraction/parcel from detailed object
+    if (detalle?.lote) {
+      const fraccion = detalle.lote.fraccion?.numero;
+      const numero = detalle.lote.numero;
+      if (fraccion != null && numero != null) {
+        return `Lote ${fraccion}-${numero}`;
+      }
     }
-    if (detalle?.lote?.id) {
-       return `Lote N° ${detalle?.lote?.numero || detalle?.lote?.id}`;
+
+    if (!mapId) return NA;
+
+    const str = String(mapId).trim();
+    // 3. Regex swap Lote X-Y -> Lote Y-X
+    const match = str.match(/^Lote\s*(\d+)-(\d+)$/i);
+    if (match) {
+        const [, parte1, parte2] = match;
+        return `Lote ${parte2}-${parte1}`;
     }
-    return detalle?.loteId ? `Lote N° ${detalle.loteId}` : NA;
+
+    if (str.toLowerCase().startsWith('lote')) return str;
+    return `Lote N° ${str}`;
   })();
 
   const fechaAct = detalle?.updatedAt ? new Date(detalle.updatedAt).toLocaleDateString("es-AR") : NA;
