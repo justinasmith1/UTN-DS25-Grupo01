@@ -9,6 +9,7 @@ import EliminarBase from "../Base/EliminarBase.jsx";
 export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }) {
     const { user } = useAuth();
     const [ofertas, setOfertas] = useState([]);
+    const [submitting, setSubmitting] = useState(false);
     const [loading, setLoading] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [actionType, setActionType] = useState(null); // 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR'
@@ -63,8 +64,9 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
     };
 
     const submitOferta = async (data) => {
-        if (!reserva) return;
+        if (!reserva || submitting) return;
         try {
+            setSubmitting(true);
             // Fix Date Offset: UTC 12:00
             let payload = { ...data, action: data.action || actionType };
             if (payload.plazoHasta) {
@@ -77,6 +79,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
             const res = await getOfertas(reserva.id);
             setOfertas(res.data);
             setShowForm(false);
+            setPendingAction(null);
             setSuccessMsg("Operación realizada con éxito");
             setTimeout(() => {
                 setSuccessMsg(null);
@@ -84,6 +87,8 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
             }, 1500);
         } catch (error) {
             alert(error.message || "Error al registrar oferta");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -135,7 +140,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                 onConfirm={handleConfirmAction}
                 onCancel={() => setPendingAction(null)}
                 variant={pendingAction?.action === 'ACEPTAR' ? 'primary' : 'danger'}
-                loading={false} // submitOferta is async but we don't block the modal logic currently, we close it immediately. Could improve.
+                loading={submitting} // submitOferta is async but we don't block the modal logic currently, we close it immediately. Could improve.
             />
 
             <div className="cclf-overlay" onClick={onClose}>
@@ -276,9 +281,10 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                 <div style={{ gridColumn: 'span 2', display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 10 }}>
                                     <button 
                                         type="button" 
-                                        className="btn btn-secondary" 
+                                        className="btn btn-outline" 
                                         onClick={() => setShowForm(false)}
                                         style={{ borderRadius: '8px', padding: '8px 16px' }}
+                                        disabled={submitting}
                                     >
                                         Cancelar
                                     </button>
@@ -286,8 +292,9 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                         type="submit" 
                                         className="btn btn-primary"
                                         style={{ borderRadius: '8px', padding: '8px 16px', backgroundColor: '#0D3730', borderColor: '#0D3730' }}
+                                        disabled={submitting}
                                     >
-                                        Enviar Contraoferta
+                                        {submitting ? 'Enviando...' : 'Enviar Contraoferta'}
                                     </button>
                                 </div>
                             </form>
@@ -301,8 +308,9 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                 className="btn btn-primary" 
                                 onClick={() => handleActionClick('CONTRAOFERTAR', { monto: reserva.seña || 0 })}
                                 style={{ borderRadius: '8px', padding: '10px 20px', backgroundColor: '#0D3730', borderColor: '#0D3730', fontWeight: 500 }}
+                                disabled={submitting}
                              >
-                                 Iniciar Negociación
+                                 {submitting ? 'Iniciando...' : 'Iniciar Negociación'}
                              </button>
                          </div>
                     )}
