@@ -125,11 +125,19 @@ export default function ReservaEditarCard({
             const originalReserva = reserva || (Array.isArray(reservas) ? reservas.find(r => `${r.id}` === `${idToUse}`) : null);
             const preservedMapId = originalReserva?.lote?.mapId ?? originalReserva?.lotMapId ?? full?.lote?.mapId ?? full?.lotMapId ?? null;
             
-            const enriched = preservedMapId && full?.lote
-              ? { ...full, lotMapId: preservedMapId, lote: { ...full.lote, mapId: preservedMapId } }
-              : preservedMapId
-              ? { ...full, lotMapId: preservedMapId }
-              : full;
+            // Preservar ofertaInicial si viene null en el full (por cache/error) pero estaba en el original
+            const preservedOferta = full?.ofertaInicial != null ? full.ofertaInicial : originalReserva?.ofertaInicial;
+
+            let enriched = { ...full };
+            if (preservedMapId) {
+                enriched.lotMapId = preservedMapId;
+                if (enriched.lote) {
+                    enriched.lote = { ...enriched.lote, mapId: preservedMapId };
+                }
+            }
+            if (preservedOferta != null) {
+                enriched.ofertaInicial = preservedOferta;
+            }
             
             setDetalle(enriched);
           }
@@ -171,6 +179,7 @@ export default function ReservaEditarCard({
       clienteId: initialClienteId ? Number(initialClienteId) : undefined,
       inmobiliariaId: initialInmobId ? Number(initialInmobId) : undefined,
       montoSeña: detalle.seña != null ? Number(detalle.seña) : detalle.sena != null ? Number(detalle.sena) : undefined,
+      ofertaInicial: detalle.ofertaInicial != null ? Number(detalle.ofertaInicial) : undefined,
       numero: detalle.numero != null ? String(detalle.numero) : "",
       estado: String(detalle.estado ?? "ACTIVA"),
       userRole: user?.role,
@@ -234,7 +243,7 @@ export default function ReservaEditarCard({
   /* Calcular label width */
   useEffect(() => {
     const labels = [
-      "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
+      "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA", "OFERTA INICIAL",
       "FECHA RESERVA", "FECHA DE ACTUALIZACIÓN", "PLAZO DE RESERVA"
     ];
     const longest = Math.max(...labels.map(s => s.length));
@@ -389,6 +398,9 @@ export default function ReservaEditarCard({
   // Render Helpers
   const NA = "Sin información";
   const clienteNombre = (() => {
+    const rs = detalle?.cliente?.razonSocial || detalle?.razonSocial || null;
+    if (rs) return rs;
+
     const n = detalle?.cliente?.nombre || detalle?.clienteNombre;
     const a = detalle?.cliente?.apellido || detalle?.clienteApellido;
     const j = [n, a].filter(Boolean).join(" ");
@@ -594,7 +606,17 @@ export default function ReservaEditarCard({
                   {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
               </div>
 
-              <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
+                {/* OFERTA INICIAL (Read Only) */}
+                <div className="field-row">
+                    <div className="field-label">OFERTA INICIAL</div>
+                    <div className="field-value is-readonly">
+                       {detalle?.ofertaInicial != null 
+                         ? Number(detalle.ofertaInicial).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) 
+                         : "Sin información"}
+                    </div>
+                </div>
+
+                <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                 <div className="field-row">
                     <div className="field-label">SEÑA</div>
                     <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>

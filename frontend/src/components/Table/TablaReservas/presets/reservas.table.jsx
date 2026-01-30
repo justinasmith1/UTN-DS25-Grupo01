@@ -2,6 +2,9 @@
 import { fmtFecha } from '../utils/formatters';
 
 const getClienteNombre = (row) => {
+  if (row?.cliente?.razonSocial) {
+    return row.cliente.razonSocial;
+  }
   if (row?.cliente?.nombre || row?.cliente?.apellido) {
     const n = row.cliente.nombre ?? '';
     const a = row.cliente.apellido ?? '';

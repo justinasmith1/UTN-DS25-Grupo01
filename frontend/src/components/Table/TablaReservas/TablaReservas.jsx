@@ -41,6 +41,9 @@ function buildIndex(arr, key = 'id') {
 
 function resolveClienteNombre(cli) {
   if (!cli) return null;
+  
+  if (cli.razonSocial) return String(cli.razonSocial); // Prioridad Razón Social
+
   const full = cli.fullName || cli.nombreCompleto || cli.displayName;
   if (full) return String(full);
   const nombre = cli.nombre || cli.firstName || cli.nombres;
@@ -112,7 +115,7 @@ export default function TablaReservas({
   lookups,
 
   // callbacks
-  onVer, onEditar, onEliminar, onVerDocumentos, onAgregarReserva, onReactivar,
+  onVer, onEditar, onEliminar, onAgregarReserva, onReactivar,
 
   // selección
   selectedIds = [], onSelectedChange,
@@ -120,7 +123,7 @@ export default function TablaReservas({
   // filtro de vista (para deshabilitar selección en vista Eliminadas)
   estadoOperativoFilter,
 
-  roleOverride,
+
 }) {
   const source = useMemo(() => {
     if (Array.isArray(reservas) && reservas.length) return reservas;
@@ -251,7 +254,7 @@ export default function TablaReservas({
       
       return { loteId, mapId };
     },
-    getMetadata: (reserva, loteData) => {
+    getMetadata: (reserva) => {
       // Metadata específica de reservas para mostrar en el mapa
       return {
         type: 'reserva',

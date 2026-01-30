@@ -66,7 +66,11 @@ export default function ReservaVerCard({
   const safe = (v) => (isBlank(v) ? NA : v);
 
   // Cliente: nombre + apellido
+  // Cliente: nombre + apellido
   const clienteNombre = (() => {
+    const rs = res?.cliente?.razonSocial || res?.razonSocial || null;
+    if (rs) return rs; // Prioridad Razón Social
+
     const n = res?.cliente?.nombre || res?.clienteNombre || null;
     const a = res?.cliente?.apellido || res?.clienteApellido || null;
     const joined = [n, a].filter(Boolean).join(" ");
@@ -124,6 +128,7 @@ export default function ReservaVerCard({
     ["NÚMERO DE RESERVA", safe(res?.numero)],
     // Agregamos el plazo aquí
     ["PLAZO DE RESERVA", plazoReserva], 
+    ["OFERTA INICIAL", res?.ofertaInicial != null ? fmtMoney(res.ofertaInicial) : NA],
     ["SEÑA", res?.seña != null ? fmtMoney(res.seña) : NA],
     // Se quitaron las filas de fechas de actualización/creación
   ];
@@ -132,7 +137,8 @@ export default function ReservaVerCard({
   const containerRef = useRef(null);
   const [labelW, setLabelW] = useState(180);
   useEffect(() => {
-    const labels = [...leftPairs, ...rightPairs].map(([k]) => k);
+    // Definimos las claves manualmente para calcular el ancho máximo
+    const labels = ["LOTE", "FECHA", "CLIENTE", "INMOBILIARIA", "ESTADO", "NÚMERO DE RESERVA", "PLAZO DE RESERVA", "OFERTA INICIAL", "SEÑA"];
     const longest = Math.max(...labels.map((s) => s.length));
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
     setLabelW(computed);

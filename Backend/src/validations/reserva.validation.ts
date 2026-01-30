@@ -35,6 +35,7 @@ export const createReservaSchema = z.object({
   inmobiliariaId: idInt.optional().nullable(), // FK opcional (nullable por si lo vendio el club de campo y ninguna inm en el medio")
   sena: dinero.optional().nullable(),
   numero: z.string().min(3, 'El número de reserva es obligatorio').max(30, 'El número de reserva es demasiado largo').trim(),
+  ofertaInicial: dineroPositivo, // Oferta inicial obligatoria
   fechaFinReserva: isoDate, // Fecha de fin de la reserva
 });
 

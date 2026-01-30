@@ -48,6 +48,7 @@ const fromApi = (row = {}) => {
     clienteApellido: row.cliente?.apellido ?? row.clienteApellido ?? "",
     clienteCompleto:
       row.cliente?.nombreCompleto ||
+      row.cliente?.razonSocial ||
       `${row.cliente?.nombre || ""} ${row.cliente?.apellido || ""}`.trim() ||
       `${row.clienteNombre || ""} ${row.clienteApellido || ""}`.trim() ||
       `Cliente ID: ${row.clienteId || "N/A"}`,
@@ -90,6 +91,7 @@ const toApi = (data = {}) => ({
   numero: data.numero, // Número de reserva editable por el usuario. Usamos reserva.numero como identificador de negocio y mostramos el input arriba a la derecha. El placeholder sugiere el formato RES-AAAA-NN, pero no lo forzamos.
   // estado no se envía en create, se asigna automáticamente como ACTIVA en el backend
   fechaFinReserva: data.fechaFinReserva,
+  ofertaInicial: data.ofertaInicial,
 });
 
 // ===== FUNCIONES DE API =====

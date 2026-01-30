@@ -105,6 +105,7 @@ export default function ReservaCrearCard({
       loteId: loteIdPreSeleccionado ? Number(loteIdPreSeleccionado) : undefined,
       clienteId: undefined,
       inmobiliariaId: undefined,
+      ofertaInicial: undefined,
       montoSeña: undefined,
       numero: "",
       userRole: user?.role, // Para validación condicional en Zod
@@ -217,6 +218,7 @@ export default function ReservaCrearCard({
         loteId: undefined, // Resetear loteId
         clienteId: undefined,
         inmobiliariaId: undefined,
+        ofertaInicial: undefined,
         montoSeña: undefined,
         numero: "",
         userRole: user?.role,
@@ -260,6 +262,7 @@ export default function ReservaCrearCard({
     "COMPRADOR",
     "INMOBILIARIA",
     "PLAZO RESERVA",
+    "OFERTA INICIAL",
     "MONTO RESERVA/SEÑA",
   ];
   const computedLabelWidth = Math.min(
@@ -293,7 +296,13 @@ export default function ReservaCrearCard({
           return;
       }
 
-      const payload = {
+        const safeNumber = (val) => {
+           if (!val) return 0;
+           const n = Number(val);
+           return Number.isNaN(n) ? 0 : n;
+        };
+        
+        const payload = {
         fechaReserva: fechaReservaISO, 
         loteId: Number(data.loteId),
         clienteId: Number(data.clienteId),
@@ -303,7 +312,8 @@ export default function ReservaCrearCard({
           : {
               inmobiliariaId: data.inmobiliariaId ? Number(data.inmobiliariaId) : undefined,
             }),
-        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? Number(data.montoSeña) : undefined, 
+        ofertaInicial: safeNumber(data.ofertaInicial),
+        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? safeNumber(data.montoSeña) : undefined, 
         numero: numeroTrim,
         fechaFinReserva: fechaFinReservaISO,
       };
@@ -572,6 +582,26 @@ export default function ReservaCrearCard({
                  {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
                </div>
 
+                {/* OFERTA INICIAL */}
+                <div className={`fieldRow ${errors.ofertaInicial ? "hasError" : ""}`}>
+                    <div className="field-row">
+                        <div className="field-label">OFERTA INICIAL</div>
+                        <div className="field-value p0" style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+                             <input
+                                className={`field-input ${errors.ofertaInicial ? "is-invalid" : ""}`}
+                                type="number"
+                                inputMode="decimal"
+                                step="100"
+                                placeholder="0"
+                                style={{ flex: 1, paddingRight: "50px" }}
+                                {...register("ofertaInicial")}
+                             />
+                             <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>USD</span>
+                        </div>
+                    </div>
+                    {errors.ofertaInicial && <div className="fieldError">{errors.ofertaInicial.message}</div>}
+                </div>
+
                 {/* MONTO SEÑA */}
                 <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                     <div className="field-row">
@@ -584,7 +614,7 @@ export default function ReservaCrearCard({
                                 step="100"
                                 placeholder="0"
                                 style={{ flex: 1, paddingRight: "50px" }}
-                                {...register("montoSeña", { valueAsNumber: true })}
+                                {...register("montoSeña")}
                              />
                              <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>USD</span>
                         </div>
