@@ -57,7 +57,7 @@ export async function finalizePrioridadActivaOnVenta(loteId: number): Promise<vo
 }
 
 /**
- * Cancela la prioridad activa del lote cuando se crea una reserva (reserva consume prioridad)
+ * Finaliza la prioridad activa del lote cuando se crea una reserva (reserva consume prioridad)
  */
 export async function cancelPrioridadActivaOnReserva(loteId: number): Promise<void> {
   const prioridadActiva = await prisma.prioridad.findFirst({
@@ -67,7 +67,8 @@ export async function cancelPrioridadActivaOnReserva(loteId: number): Promise<vo
   if (prioridadActiva) {
     await prisma.prioridad.update({
       where: { id: prioridadActiva.id },
-      data: { estado: EstadoPrioridad.CANCELADA },
+      data: { estado: EstadoPrioridad.FINALIZADA },
     });
   }
 }
+
