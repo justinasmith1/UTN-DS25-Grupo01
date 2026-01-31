@@ -141,10 +141,10 @@ export default function ReservaCrearCard({
         try {
           const resp = await getAllLotes({});
           const lotesData = resp?.data || [];
-          // Filtrar solo lotes DISPONIBLE
+          // Filtrar lotes DISPONIBLE, EN_PROMOCION, CON_PRIORIDAD
           let filteredLots = lotesData.filter((l) => {
             const st = String(l.estado || l.status || "").toUpperCase();
-            return st === "DISPONIBLE";
+            return ["DISPONIBLE", "EN_PROMOCION", "CON_PRIORIDAD"].includes(st);
           });
 
           // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
@@ -254,6 +254,10 @@ export default function ReservaCrearCard({
     });
   }, [busquedaLote, lotes]);
 
+  // --- EFFECT REMOVED (Validation moved to onSubmit) ---
+
+  // Calcular ancho de labels
+
   // Calcular ancho de labels
   const LABELS = [
     "N° RESERVA",
@@ -273,10 +277,69 @@ export default function ReservaCrearCard({
     ),
   );
 
+  // --- PRIORITY VALIDATION FUNCTION ---
+  const validatePriority = (data) => {
+    const selectedLote = lotes.find(l => String(l.id) === String(data.loteId));
+    if (!selectedLote) return true; // No lot selected, let required validation handle it
+    
+    const estado = String(selectedLote.estado || selectedLote.status || '').toUpperCase();
+    if (estado !== 'CON_PRIORIDAD') return true; // Not a priority lot
+    
+    const prioridad = selectedLote.prioridades?.[0];
+    if (!prioridad) return true; // No priority data (should not happen but graceful fallback)
+    
+    // Handle INMOBILIARIA priority type
+    if (String(prioridad.ownerType) === 'INMOBILIARIA') {
+      let myInmoId = null;
+      
+      if (isInmobiliaria) {
+        // For INMOBILIARIA users, use their fixed inmobiliariaId
+        myInmoId = user?.inmobiliariaId;
+      } else {
+        // For Admin/Gestor, use the selected inmobiliariaId from form
+        myInmoId = data.inmobiliariaId ? Number(data.inmobiliariaId) : null;
+      }
+      
+      const priorityInmoId = prioridad.inmobiliariaId ? Number(prioridad.inmobiliariaId) : null;
+      
+      // If IDs don't match, show error
+      if (priorityInmoId && myInmoId !== priorityInmoId) {
+        const fieldName = isInmobiliaria ? 'loteId' : 'inmobiliariaId';
+        const inmobiliariaName = prioridad.inmobiliaria?.nombre || 'otra inmobiliaria';
+        setError(fieldName, {
+          type: 'manual',
+          message: `Este lote tiene prioridad exclusiva para ${inmobiliariaName}.`
+        });
+        return false;
+      }
+    } 
+    // Handle CCLF priority type
+    else if (String(prioridad.ownerType) === 'CCLF') {
+      if (isInmobiliaria) {
+        setError('loteId', {
+          type: 'manual',
+          message: 'Este lote tiene prioridad reservada a Administración Central.'
+        });
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const onSubmit = async (data) => {
     setGeneralError(null);
     setNumeroError(null);
+    
+    // Validate priority before processing
+    if (!validatePriority(data)) {
+      return; // Stop submission if validation fails
+    }
+
     setSaving(true);
+    
+    // --- VALIDACION DE PRIORIDAD (OnSubmit) Revertida a solitud del usuario
+    // Confiamos en el backend
 
     const numeroTrim = String(data.numero || "").trim();
 
@@ -414,8 +477,12 @@ export default function ReservaCrearCard({
                                ? (() => {
                                    const l = lotes.find(x => String(x.id) === String(formValues.loteId));
                                    if (!l) return "";
-                                   const mapId = l.mapId;
-                                   return String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                   // Formatter logic consistent with other views
+                                   const raw = String(l.mapId || l.numero || l.id).trim();
+                                   const match = raw.match(/^Lote\s*(\d+)-(\d+)$/i);
+                                   if (match) return `Lote ${match[2]}-${match[1]}`;
+                                   if (raw.toLowerCase().startsWith('lote')) return raw;
+                                   return `Lote ${raw}`;
                                  })()
                                : busquedaLote
                            }
@@ -451,8 +518,12 @@ export default function ReservaCrearCard({
                                   <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
                                 )}
                                 {lotesFiltrados.map((l) => {
-                                  const mapId = l.mapId || l.numero || l.id;
-                                  const displayText = String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                  const raw = String(l.mapId || l.numero || l.id).trim();
+                                  let displayText = raw;
+                                  const match = raw.match(/^Lote\s*(\d+)-(\d+)$/i);
+                                  if (match) displayText = `Lote ${match[2]}-${match[1]}`;
+                                  else if (!raw.toLowerCase().startsWith('lote')) displayText = `Lote ${raw}`;
+
                                   return (
                                     <button
                                       key={l.id} type="button"

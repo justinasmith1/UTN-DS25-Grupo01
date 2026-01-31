@@ -119,7 +119,7 @@ export const prioridadesTablePreset = {
       numero: '130px',
       lote: '120px',
       estado: '140px',
-      owner: '180px',
+      owner: '200px',
       fechaInicio: '140px',
       fechaFin: '140px',
       createdAt: '120px',

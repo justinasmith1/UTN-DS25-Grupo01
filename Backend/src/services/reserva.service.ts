@@ -194,22 +194,28 @@ export async function createReserva(
           throw err;
         }
       } else if (prioridadActiva.ownerType === OwnerPrioridad.INMOBILIARIA) {
-        // Solo la inmobiliaria dueña de la prioridad puede reservar
+        // Validar que la inmobiliaria de la reserva coincida con la dueña de la prioridad
+        let targetInmoId: number | null = null;
         if (user?.role === 'INMOBILIARIA') {
-          if (!user.inmobiliariaId) {
-            const err: any = new Error('El usuario INMOBILIARIA no tiene una inmobiliaria asociada');
-            err.status = 400;
-            throw err;
-          }
-          if (prioridadActiva.inmobiliariaId !== user.inmobiliariaId) {
-            const err: any = new Error('No puedes reservar este lote: la prioridad pertenece a otra inmobiliaria');
-            err.status = 403;
-            throw err;
-          }
-        } else if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
-          const err: any = new Error('Solo la inmobiliaria dueña de la prioridad puede reservar este lote');
-          err.status = 403;
-          throw err;
+           if (!user.inmobiliariaId) {
+             const err: any = new Error('El usuario INMOBILIARIA no tiene una inmobiliaria asociada');
+             err.status = 400;
+             throw err;
+           }
+           targetInmoId = user.inmobiliariaId;
+        } else if (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') {
+           // Si es admin, validamos contra la inmobiliaria que viene en el body
+           targetInmoId = body.inmobiliariaId || null;
+        } else {
+             const err: any = new Error('Solo la inmobiliaria dueña de la prioridad o Administradores pueden reservar este lote');
+             err.status = 403;
+             throw err;
+        }
+
+        if (!targetInmoId || Number(prioridadActiva.inmobiliariaId) !== Number(targetInmoId)) {
+             const err: any = new Error('Esta reserva solo puede ser creada para la inmobiliaria que posee la prioridad.');
+             err.status = 403;
+             throw err;
         }
       }
     }
