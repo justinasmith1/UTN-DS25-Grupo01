@@ -359,10 +359,17 @@ export async function updateReserva(
       throw err;
     }
 
-    // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA
+    // BLOQUEO TOTAL: No se puede cambiar el estado de una reserva EXPIRADA
+    if (body.estado !== undefined && reservaActual.estado === EstadoReserva.EXPIRADA) {
+      const err: any = new Error('No se puede cambiar el estado de una reserva expirada');
+      err.status = 400;
+      throw err;
+    }
+
+    // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA, ACEPTADA o CONTRAOFERTA
     if (body.estado !== undefined && body.estado === EstadoReserva.EXPIRADA) {
-      if (reservaActual.estado !== EstadoReserva.ACTIVA) {
-        const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA');
+      if (reservaActual.estado !== EstadoReserva.ACTIVA && reservaActual.estado !== EstadoReserva.ACEPTADA && reservaActual.estado !== EstadoReserva.CONTRAOFERTA) {
+        const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA, ACEPTADA o en CONTRAOFERTA');
         err.status = 400;
         throw err;
       }
@@ -373,6 +380,45 @@ export async function updateReserva(
       if (reservaActual.estado !== EstadoReserva.ACTIVA && reservaActual.estado !== EstadoReserva.ACEPTADA) {
         const err: any = new Error('Solo se puede rechazar una reserva que está ACTIVA o ACEPTADA');
         err.status = 400;
+        throw err;
+      }
+    }
+
+    // Validar reactivación: desde CANCELADA o RECHAZADA solo se puede volver a ACTIVA
+    if (body.estado !== undefined && (reservaActual.estado === EstadoReserva.CANCELADA || reservaActual.estado === EstadoReserva.RECHAZADA)) {
+      // Solo permitir cambio a ACTIVA
+      if (body.estado !== EstadoReserva.ACTIVA) {
+        const err: any = new Error('Desde CANCELADA o RECHAZADA solo se puede volver a ACTIVA');
+        err.status = 400;
+        throw err;
+      }
+
+      // Validar que no exista otra reserva vigente en el lote
+      const otraReservaVigente = await prisma.reserva.findFirst({
+        where: {
+          loteId: reservaActual.loteId,
+          id: { not: id }, // Excluir la reserva actual
+          estado: { in: [EstadoReserva.ACTIVA, EstadoReserva.ACEPTADA] },
+        },
+      });
+
+      if (otraReservaVigente) {
+        const err: any = new Error('No se puede reactivar la reserva porque el lote ya tiene otra reserva vigente');
+        err.status = 409;
+        throw err;
+      }
+
+      // Validar que no exista prioridad activa en el lote
+      const prioridadActiva = await prisma.prioridad.findFirst({
+        where: {
+          loteId: reservaActual.loteId,
+          estado: EstadoPrioridad.ACTIVA,
+        },
+      });
+
+      if (prioridadActiva) {
+        const err: any = new Error('No se puede reactivar la reserva porque el lote tiene una prioridad activa');
+        err.status = 409;
         throw err;
       }
     }
@@ -565,7 +611,7 @@ export async function eliminarReserva(
 
     // Validar que el estado permita eliminación lógica
     // Solo se puede eliminar si está en: CANCELADA, EXPIRADA, RECHAZADA
-    const estadosPermitidos = [EstadoReserva.CANCELADA, EstadoReserva.EXPIRADA, EstadoReserva.RECHAZADA];
+    const estadosPermitidos: EstadoReserva[] = [EstadoReserva.CANCELADA, EstadoReserva.EXPIRADA, EstadoReserva.RECHAZADA];
     if (!estadosPermitidos.includes(reserva.estado)) {
       const err: any = new Error(`No se puede eliminar una reserva en estado ${reserva.estado}. Solo se pueden eliminar reservas en estado CANCELADA, EXPIRADA o RECHAZADA.`);
       err.statusCode = 409;
