@@ -457,15 +457,19 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.fecha ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">FECHA</div>
-                    <div className="field-value p0">
-                      <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.fecha ? "is-invalid" : ""}`}
-                        type="date"
-                        {...register("fecha")}
-                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                        readOnly={estaEliminada}
-                      />
-                    </div>
+                    {isInmobiliaria || estaEliminada ? (
+                      <div className="field-value is-readonly">
+                        {detalle?.fechaReserva ? new Date(detalle.fechaReserva).toLocaleDateString('es-AR') : "—"}
+                      </div>
+                    ) : (
+                      <div className="field-value p0">
+                        <input
+                          className={`field-input ${errors.fecha ? "is-invalid" : ""}`}
+                          type="date"
+                          {...register("fecha")}
+                        />
+                      </div>
+                    )}
                   </div>
                   {errors.fecha && <div className="fieldError">{errors.fecha.message}</div>}
               </div>
@@ -545,15 +549,19 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.plazoReserva ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">PLAZO DE RESERVA</div>
-                    <div className="field-value p0">
-                      <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.plazoReserva ? "is-invalid" : ""}`}
-                        type="date"
-                        {...register("plazoReserva")}
-                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                        readOnly={estaEliminada}
-                      />
-                    </div>
+                    {isInmobiliaria || estaEliminada ? (
+                      <div className="field-value is-readonly">
+                        {detalle?.fechaFinReserva ? new Date(detalle.fechaFinReserva).toLocaleDateString('es-AR') : "—"}
+                      </div>
+                    ) : (
+                      <div className="field-value p0">
+                        <input
+                          className={`field-input ${errors.plazoReserva ? "is-invalid" : ""}`}
+                          type="date"
+                          {...register("plazoReserva")}
+                        />
+                      </div>
+                    )}
                   </div>
                   {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
               </div>

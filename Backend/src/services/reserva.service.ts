@@ -486,6 +486,20 @@ export async function updateReserva(
       throw err;
     }
 
+    // Impedir que INMOBILIARIA cambie fechas de reserva
+    if (user?.role === 'INMOBILIARIA') {
+      if (body.fechaReserva !== undefined) {
+        const err: any = new Error('El rol INMOBILIARIA no puede modificar la fecha de reserva');
+        err.status = 403;
+        throw err;
+      }
+      if (body.fechaFinReserva !== undefined) {
+        const err: any = new Error('El rol INMOBILIARIA no puede modificar el plazo de reserva');
+        err.status = 403;
+        throw err;
+      }
+    }
+
     // Construir dataToUpdate
     const dataToUpdate: any = {};
     if (body.fechaReserva !== undefined) {
