@@ -177,6 +177,14 @@ export async function createReserva(
           loteId: body.loteId,
           estado: EstadoPrioridad.ACTIVA,
         },
+        include: {
+          inmobiliaria: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
       });
 
       if (!prioridadActiva) {
@@ -213,7 +221,8 @@ export async function createReserva(
         }
 
         if (!targetInmoId || Number(prioridadActiva.inmobiliariaId) !== Number(targetInmoId)) {
-             const err: any = new Error('Esta reserva solo puede ser creada para la inmobiliaria que posee la prioridad.');
+             const nombreInmo = prioridadActiva.inmobiliaria?.nombre || 'Inmobiliaria';
+             const err: any = new Error(`Esta reserva solo puede ser creada para la inmobiliaria "${nombreInmo}" que posee la prioridad.`);
              err.status = 403;
              throw err;
         }
