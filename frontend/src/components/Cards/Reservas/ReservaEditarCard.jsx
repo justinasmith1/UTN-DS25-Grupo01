@@ -78,6 +78,7 @@ export default function ReservaEditarCard({
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [numeroBackendError, setNumeroBackendError] = useState(null);
+  const [generalError, setGeneralError] = useState(null);
 
   // evita múltiples llamados a inmobiliarias
   const fetchedInmobRef = useRef(false);
@@ -125,11 +126,19 @@ export default function ReservaEditarCard({
             const originalReserva = reserva || (Array.isArray(reservas) ? reservas.find(r => `${r.id}` === `${idToUse}`) : null);
             const preservedMapId = originalReserva?.lote?.mapId ?? originalReserva?.lotMapId ?? full?.lote?.mapId ?? full?.lotMapId ?? null;
             
-            const enriched = preservedMapId && full?.lote
-              ? { ...full, lotMapId: preservedMapId, lote: { ...full.lote, mapId: preservedMapId } }
-              : preservedMapId
-              ? { ...full, lotMapId: preservedMapId }
-              : full;
+            // Preservar ofertaInicial si viene null en el full (por cache/error) pero estaba en el original
+            const preservedOferta = full?.ofertaInicial != null ? full.ofertaInicial : originalReserva?.ofertaInicial;
+
+            let enriched = { ...full };
+            if (preservedMapId) {
+                enriched.lotMapId = preservedMapId;
+                if (enriched.lote) {
+                    enriched.lote = { ...enriched.lote, mapId: preservedMapId };
+                }
+            }
+            if (preservedOferta != null) {
+                enriched.ofertaInicial = preservedOferta;
+            }
             
             setDetalle(enriched);
           }
@@ -171,6 +180,7 @@ export default function ReservaEditarCard({
       clienteId: initialClienteId ? Number(initialClienteId) : undefined,
       inmobiliariaId: initialInmobId ? Number(initialInmobId) : undefined,
       montoSeña: detalle.seña != null ? Number(detalle.seña) : detalle.sena != null ? Number(detalle.sena) : undefined,
+      ofertaInicial: detalle.ofertaInicial != null ? Number(detalle.ofertaInicial) : undefined,
       numero: detalle.numero != null ? String(detalle.numero) : "",
       estado: String(detalle.estado ?? "ACTIVA"),
       userRole: user?.role,
@@ -234,7 +244,7 @@ export default function ReservaEditarCard({
   /* Calcular label width */
   useEffect(() => {
     const labels = [
-      "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA",
+      "NÚMERO DE RESERVA", "LOTE", "CLIENTE", "INMOBILIARIA", "ESTADO", "SEÑA", "OFERTA INICIAL",
       "FECHA RESERVA", "FECHA DE ACTUALIZACIÓN", "PLAZO DE RESERVA"
     ];
     const longest = Math.max(...labels.map(s => s.length));
@@ -315,6 +325,7 @@ export default function ReservaEditarCard({
     try {
       setSaving(true);
       setNumeroBackendError(null);
+      setGeneralError(null);
 
       const patch = buildPatch(data);
 
@@ -355,7 +366,7 @@ export default function ReservaEditarCard({
       if (msg.toLowerCase().includes("número de reserva") || (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg))) {
         setNumeroBackendError(msg.includes("unique") ? "Ya existe una reserva con este número" : msg);
       } else {
-        alert(msg || "No se pudo guardar la reserva.");
+        setGeneralError(msg || "No se pudo guardar la reserva.");
       }
       setSaving(false);
     }
@@ -389,21 +400,39 @@ export default function ReservaEditarCard({
   // Render Helpers
   const NA = "Sin información";
   const clienteNombre = (() => {
+    const rs = detalle?.cliente?.razonSocial || detalle?.razonSocial || null;
+    if (rs) return rs;
+
     const n = detalle?.cliente?.nombre || detalle?.clienteNombre;
     const a = detalle?.cliente?.apellido || detalle?.clienteApellido;
     const j = [n, a].filter(Boolean).join(" ");
     return j || NA;
   })();
   const loteInfo = (() => {
-    const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? null;
-    if (mapId) {
-      if (String(mapId).toLowerCase().startsWith('lote')) return mapId;
-      return `Lote N° ${mapId}`;
+    // 1. Unify mapId
+    const mapId = detalle?.lote?.mapId ?? detalle?.lotMapId ?? detalle?.loteId;
+
+    // 2. Try fraction/parcel from detailed object
+    if (detalle?.lote) {
+      const fraccion = detalle.lote.fraccion?.numero;
+      const numero = detalle.lote.numero;
+      if (fraccion != null && numero != null) {
+        return `Lote ${fraccion}-${numero}`;
+      }
     }
-    if (detalle?.lote?.id) {
-       return `Lote N° ${detalle?.lote?.numero || detalle?.lote?.id}`;
+
+    if (!mapId) return NA;
+
+    const str = String(mapId).trim();
+    // 3. Regex swap Lote X-Y -> Lote Y-X
+    const match = str.match(/^Lote\s*(\d+)-(\d+)$/i);
+    if (match) {
+        const [, parte1, parte2] = match;
+        return `Lote ${parte2}-${parte1}`;
     }
-    return detalle?.loteId ? `Lote N° ${detalle.loteId}` : NA;
+
+    if (str.toLowerCase().startsWith('lote')) return str;
+    return `Lote N° ${str}`;
   })();
 
   const fechaAct = detalle?.updatedAt ? new Date(detalle.updatedAt).toLocaleDateString("es-AR") : NA;
@@ -411,10 +440,33 @@ export default function ReservaEditarCard({
   
   // Disponibilidad de estados
   const estadosDisponibles = useMemo(() => {
-    if (!isInmobiliaria) return ESTADOS_RESERVA;
     const estadoActual = String(detalle?.estado ?? "").toUpperCase();
-    if (estadoActual === "CANCELADA") return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA");
-    return ESTADOS_RESERVA.filter(e => e.value === estadoActual || e.value === "CANCELADA");
+    
+    // EXPIRADA es inmutable
+    if (estadoActual === "EXPIRADA") {
+      return ESTADOS_RESERVA.filter(e => e.value === "EXPIRADA");
+    }
+    
+    // CANCELADA o RECHAZADA solo pueden volver a ACTIVA
+    if (estadoActual === "CANCELADA") {
+      return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA" || e.value === "ACTIVA");
+    }
+    if (estadoActual === "RECHAZADA") {
+      return ESTADOS_RESERVA.filter(e => e.value === "RECHAZADA" || e.value === "ACTIVA");
+    }
+    
+    // Restricciones para INMOBILIARIA
+    if (isInmobiliaria) {
+      // INMOBILIARIA solo puede cancelar desde ACTIVA
+      if (estadoActual === "ACTIVA") {
+        return ESTADOS_RESERVA.filter(e => e.value === "ACTIVA" || e.value === "CANCELADA");
+      }
+      // Para cualquier otro estado, solo mostrar el actual (read-only)
+      return ESTADOS_RESERVA.filter(e => e.value === estadoActual);
+    }
+    
+    // Admin/Gestor: todos los estados disponibles
+    return ESTADOS_RESERVA;
   }, [isInmobiliaria, detalle?.estado]);
 
   if (!open || !detalle) return null;
@@ -579,7 +631,17 @@ export default function ReservaEditarCard({
                   {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
               </div>
 
-              <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
+                {/* OFERTA INICIAL (Read Only) */}
+                <div className="field-row">
+                    <div className="field-label">OFERTA INICIAL</div>
+                    <div className="field-value is-readonly">
+                       {detalle?.ofertaInicial != null 
+                         ? Number(detalle.ofertaInicial).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) 
+                         : "Sin información"}
+                    </div>
+                </div>
+
+                <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                 <div className="field-row">
                     <div className="field-label">SEÑA</div>
                     <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
@@ -613,6 +675,12 @@ export default function ReservaEditarCard({
               </div>
             </div>
           </div>
+          
+          {generalError && (
+            <div className="alert alert-danger" style={{ marginTop: '1rem', padding: '0.75rem 1rem', backgroundColor: '#fee', border: '1px solid #f88', borderRadius: '0.375rem', color: '#c33' }}>
+              {generalError}
+            </div>
+          )}
         </div>
       </EditarBase>
     </>

@@ -26,6 +26,31 @@ function toDateInputValue(v) {
   return `${yyyy}-${mm}-${dd}`;
 }
 
+function fromDateInputToISO(s) {
+  if (!s) return null;
+  if (s instanceof Date) {
+      if (Number.isNaN(s.getTime())) return null;
+      // Si ya es date, extraer YYYY-MM-DD para forzar las 12:00
+      const yyyy = s.getFullYear();
+      const mm = String(s.getMonth() + 1).padStart(2, "0");
+      const dd = String(s.getDate()).padStart(2, "0");
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      return new Date(`${dateStr}T12:00:00.000Z`).toISOString();
+  }
+  if (typeof s !== 'string' || !s.trim()) return null;
+  
+  // Intenta forzar 12:00 UTC
+  // Si viene como "YYYY-MM-DD"
+  if (s.match(/^\d{4}-\d{2}-\d{2}$/)) {
+       const d = new Date(`${s}T12:00:00.000Z`);
+       if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  
+  // Fallback: parseo simple
+  const d2 = new Date(s);
+  return Number.isNaN(d2.getTime()) ? null : d2.toISOString();
+}
+
 /* ========================================================================== */
 export default function ReservaCrearCard({
   open,
@@ -69,6 +94,7 @@ export default function ReservaCrearCard({
     setValue,
     watch,
     reset,
+    setError,
     formState: { errors },
     control,
   } = useForm({
@@ -79,6 +105,7 @@ export default function ReservaCrearCard({
       loteId: loteIdPreSeleccionado ? Number(loteIdPreSeleccionado) : undefined,
       clienteId: undefined,
       inmobiliariaId: undefined,
+      ofertaInicial: undefined,
       montoSeña: undefined,
       numero: "",
       userRole: user?.role, // Para validación condicional en Zod
@@ -114,10 +141,10 @@ export default function ReservaCrearCard({
         try {
           const resp = await getAllLotes({});
           const lotesData = resp?.data || [];
-          // Filtrar solo lotes DISPONIBLE
+          // Filtrar lotes DISPONIBLE, EN_PROMOCION, CON_PRIORIDAD
           let filteredLots = lotesData.filter((l) => {
             const st = String(l.estado || l.status || "").toUpperCase();
-            return st === "DISPONIBLE";
+            return ["DISPONIBLE", "EN_PROMOCION", "CON_PRIORIDAD"].includes(st);
           });
 
           // Si lockLote es true y hay loteIdPreSeleccionado, asegurar que el lote esté en el array
@@ -191,6 +218,7 @@ export default function ReservaCrearCard({
         loteId: undefined, // Resetear loteId
         clienteId: undefined,
         inmobiliariaId: undefined,
+        ofertaInicial: undefined,
         montoSeña: undefined,
         numero: "",
         userRole: user?.role,
@@ -226,6 +254,10 @@ export default function ReservaCrearCard({
     });
   }, [busquedaLote, lotes]);
 
+  // --- EFFECT REMOVED (Validation moved to onSubmit) ---
+
+  // Calcular ancho de labels
+
   // Calcular ancho de labels
   const LABELS = [
     "N° RESERVA",
@@ -234,6 +266,7 @@ export default function ReservaCrearCard({
     "COMPRADOR",
     "INMOBILIARIA",
     "PLAZO RESERVA",
+    "OFERTA INICIAL",
     "MONTO RESERVA/SEÑA",
   ];
   const computedLabelWidth = Math.min(
@@ -244,16 +277,96 @@ export default function ReservaCrearCard({
     ),
   );
 
+  // --- PRIORITY VALIDATION FUNCTION ---
+  const validatePriority = (data) => {
+    const selectedLote = lotes.find(l => String(l.id) === String(data.loteId));
+    if (!selectedLote) return true; // No lot selected, let required validation handle it
+    
+    const estado = String(selectedLote.estado || selectedLote.status || '').toUpperCase();
+    if (estado !== 'CON_PRIORIDAD') return true; // Not a priority lot
+    
+    const prioridad = selectedLote.prioridades?.[0];
+    if (!prioridad) return true; // No priority data (should not happen but graceful fallback)
+    
+    // Handle INMOBILIARIA priority type
+    if (String(prioridad.ownerType) === 'INMOBILIARIA') {
+      let myInmoId = null;
+      
+      if (isInmobiliaria) {
+        // For INMOBILIARIA users, use their fixed inmobiliariaId
+        myInmoId = user?.inmobiliariaId;
+      } else {
+        // For Admin/Gestor, use the selected inmobiliariaId from form
+        myInmoId = data.inmobiliariaId ? Number(data.inmobiliariaId) : null;
+      }
+      
+      const priorityInmoId = prioridad.inmobiliariaId ? Number(prioridad.inmobiliariaId) : null;
+      
+      // If IDs don't match, show error
+      if (priorityInmoId && myInmoId !== priorityInmoId) {
+        const fieldName = isInmobiliaria ? 'loteId' : 'inmobiliariaId';
+        const inmobiliariaName = prioridad.inmobiliaria?.nombre || 'otra inmobiliaria';
+        setError(fieldName, {
+          type: 'manual',
+          message: `Este lote tiene prioridad exclusiva para ${inmobiliariaName}.`
+        });
+        return false;
+      }
+    } 
+    // Handle CCLF priority type
+    else if (String(prioridad.ownerType) === 'CCLF') {
+      if (isInmobiliaria) {
+        setError('loteId', {
+          type: 'manual',
+          message: 'Este lote tiene prioridad reservada a Administración Central.'
+        });
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
   const onSubmit = async (data) => {
     setGeneralError(null);
     setNumeroError(null);
+    
+    // Validate priority before processing
+    if (!validatePriority(data)) {
+      return; // Stop submission if validation fails
+    }
+
     setSaving(true);
+    
+    // --- VALIDACION DE PRIORIDAD (OnSubmit) Revertida a solitud del usuario
+    // Confiamos en el backend
 
     const numeroTrim = String(data.numero || "").trim();
 
     try {
-      const payload = {
-        fechaReserva: new Date(data.fecha).toISOString(), // Convertir date input a ISO
+      // Formatear fechas a ISO con hora fija (12:00 UTC) vía helper seguro
+      const fechaReservaISO = fromDateInputToISO(data.fecha);
+      if (!fechaReservaISO) {
+          setError("fecha", { type: "manual", message: "Fecha inválida (verifique formato)" });
+          setSaving(false);
+          return;
+      }
+
+      const fechaFinReservaISO = fromDateInputToISO(data.plazoReserva);
+      if (!fechaFinReservaISO) {
+          setError("plazoReserva", { type: "manual", message: "Fecha inválida (verifique formato)" });
+          setSaving(false);
+          return;
+      }
+
+        const safeNumber = (val) => {
+           if (!val) return 0;
+           const n = Number(val);
+           return Number.isNaN(n) ? 0 : n;
+        };
+        
+        const payload = {
+        fechaReserva: fechaReservaISO, 
         loteId: Number(data.loteId),
         clienteId: Number(data.clienteId),
         // Para INMOBILIARIA: no enviar inmobiliariaId
@@ -262,9 +375,10 @@ export default function ReservaCrearCard({
           : {
               inmobiliariaId: data.inmobiliariaId ? Number(data.inmobiliariaId) : undefined,
             }),
-        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? Number(data.montoSeña) : undefined, // Change sena to seña if backend expects seña, wait interfaces said 'seña?' but post request interface says 'seña'.
+        ofertaInicial: safeNumber(data.ofertaInicial),
+        seña: data.montoSeña !== undefined && data.montoSeña !== "" ? safeNumber(data.montoSeña) : undefined, 
         numero: numeroTrim,
-        fechaFinReserva: new Date(data.plazoReserva).toISOString(),
+        fechaFinReserva: fechaFinReservaISO,
       };
 
       console.log("📤 Payload Reserva:", payload);
@@ -363,8 +477,12 @@ export default function ReservaCrearCard({
                                ? (() => {
                                    const l = lotes.find(x => String(x.id) === String(formValues.loteId));
                                    if (!l) return "";
-                                   const mapId = l.mapId;
-                                   return String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                   // Formatter logic consistent with other views
+                                   const raw = String(l.mapId || l.numero || l.id).trim();
+                                   const match = raw.match(/^Lote\s*(\d+)-(\d+)$/i);
+                                   if (match) return `Lote ${match[2]}-${match[1]}`;
+                                   if (raw.toLowerCase().startsWith('lote')) return raw;
+                                   return `Lote ${raw}`;
                                  })()
                                : busquedaLote
                            }
@@ -400,8 +518,12 @@ export default function ReservaCrearCard({
                                   <div style={{ padding: 10, color: "#6b7280" }}>No se encontraron lotes</div>
                                 )}
                                 {lotesFiltrados.map((l) => {
-                                  const mapId = l.mapId || l.numero || l.id;
-                                  const displayText = String(mapId).toLowerCase().startsWith("lote") ? mapId : `Lote ${mapId}`;
+                                  const raw = String(l.mapId || l.numero || l.id).trim();
+                                  let displayText = raw;
+                                  const match = raw.match(/^Lote\s*(\d+)-(\d+)$/i);
+                                  if (match) displayText = `Lote ${match[2]}-${match[1]}`;
+                                  else if (!raw.toLowerCase().startsWith('lote')) displayText = `Lote ${raw}`;
+
                                   return (
                                     <button
                                       key={l.id} type="button"
@@ -531,6 +653,26 @@ export default function ReservaCrearCard({
                  {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
                </div>
 
+                {/* OFERTA INICIAL */}
+                <div className={`fieldRow ${errors.ofertaInicial ? "hasError" : ""}`}>
+                    <div className="field-row">
+                        <div className="field-label">OFERTA INICIAL</div>
+                        <div className="field-value p0" style={{ display: "flex", alignItems: "center", gap: "8px", position: "relative" }}>
+                             <input
+                                className={`field-input ${errors.ofertaInicial ? "is-invalid" : ""}`}
+                                type="number"
+                                inputMode="decimal"
+                                step="100"
+                                placeholder="0"
+                                style={{ flex: 1, paddingRight: "50px" }}
+                                {...register("ofertaInicial")}
+                             />
+                             <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>USD</span>
+                        </div>
+                    </div>
+                    {errors.ofertaInicial && <div className="fieldError">{errors.ofertaInicial.message}</div>}
+                </div>
+
                 {/* MONTO SEÑA */}
                 <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                     <div className="field-row">
@@ -543,7 +685,7 @@ export default function ReservaCrearCard({
                                 step="100"
                                 placeholder="0"
                                 style={{ flex: 1, paddingRight: "50px" }}
-                                {...register("montoSeña", { valueAsNumber: true })}
+                                {...register("montoSeña")}
                              />
                              <span style={{ position: "absolute", right: "12px", color: "#6B7280", fontSize: "13.5px", fontWeight: 500 }}>USD</span>
                         </div>

@@ -2,6 +2,9 @@
 import { fmtFecha } from '../utils/formatters';
 
 const getClienteNombre = (row) => {
+  if (row?.cliente?.razonSocial) {
+    return row.cliente.razonSocial;
+  }
   if (row?.cliente?.nombre || row?.cliente?.apellido) {
     const n = row.cliente.nombre ?? '';
     const a = row.cliente.apellido ?? '';
@@ -119,14 +122,14 @@ export const reservasTablePreset = {
   // anchos por id
   widthFor: (id) => {
     const W = {
-      id: '110px',              // Reducido de 120px
+      id: '130px',              // Reducido de 120px
       loteInfo: '100px',        // Reducido de 120px
       estado: '130px',          // Ancho para la columna Estado (agregada dinámicamente)
       clienteCompleto: '180px',  // Reducido de 220px
       fechaReserva: '120px',    // Reducido de 140px
       fechaFinReserva: '200px',  // Aumentado de 180px para mostrar "Plazo Reserva" completo
       seña: '120px',
-      inmobiliariaNombre: '180px', // Reducido de 200px
+      inmobiliariaNombre: '200px', // Reducido de 200px
       lotePrecio: '130px',
       createdAt: '130px',
     };

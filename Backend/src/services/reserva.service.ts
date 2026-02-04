@@ -62,7 +62,7 @@ export async function getAllReservas(
     orderBy: { fechaReserva: 'desc' },
     include: {
           cliente: {
-            select: { id: true, nombre: true, apellido: true }, // lo que muestra la tabla
+            select: { id: true, nombre: true, apellido: true, razonSocial: true }, // lo que muestra la tabla
           },
           inmobiliaria: {
             select: { id: true, nombre: true }, // nombre visible
@@ -82,7 +82,7 @@ export async function getReservaById(id: number, user?: { role: string; inmobili
     where: { id },
     include: {
       cliente: {
-        select: { id: true, nombre: true, apellido: true },
+        select: { id: true, nombre: true, apellido: true, razonSocial: true },
       },
       inmobiliaria: {
         select: { id: true, nombre: true },
@@ -95,6 +95,8 @@ export async function getReservaById(id: number, user?: { role: string; inmobili
     err.status = 404;
     throw err;
   }
+  
+  console.log("getReservaById row:", JSON.stringify(row));
   
   // Validar permisos: INMOBILIARIA solo puede ver sus propias reservas
   if (user?.role === 'INMOBILIARIA') {
@@ -148,6 +150,7 @@ export async function createReserva(
     sena?: number;                  // Zod ya garantiza >= 0 si viene
     numero: string;                 // Número de reserva (obligatorio y único)
     fechaFinReserva: string;     // Fecha de fin de la reserva
+    ofertaInicial: number;       // Oferta inicial (obligatoria)
   },
   user?: { role: string; inmobiliariaId?: number | null }
 ): Promise<any> {
@@ -191,22 +194,28 @@ export async function createReserva(
           throw err;
         }
       } else if (prioridadActiva.ownerType === OwnerPrioridad.INMOBILIARIA) {
-        // Solo la inmobiliaria dueña de la prioridad puede reservar
+        // Validar que la inmobiliaria de la reserva coincida con la dueña de la prioridad
+        let targetInmoId: number | null = null;
         if (user?.role === 'INMOBILIARIA') {
-          if (!user.inmobiliariaId) {
-            const err: any = new Error('El usuario INMOBILIARIA no tiene una inmobiliaria asociada');
-            err.status = 400;
-            throw err;
-          }
-          if (prioridadActiva.inmobiliariaId !== user.inmobiliariaId) {
-            const err: any = new Error('No puedes reservar este lote: la prioridad pertenece a otra inmobiliaria');
-            err.status = 403;
-            throw err;
-          }
-        } else if (user?.role !== 'ADMINISTRADOR' && user?.role !== 'GESTOR') {
-          const err: any = new Error('Solo la inmobiliaria dueña de la prioridad puede reservar este lote');
-          err.status = 403;
-          throw err;
+           if (!user.inmobiliariaId) {
+             const err: any = new Error('El usuario INMOBILIARIA no tiene una inmobiliaria asociada');
+             err.status = 400;
+             throw err;
+           }
+           targetInmoId = user.inmobiliariaId;
+        } else if (user?.role === 'ADMINISTRADOR' || user?.role === 'GESTOR') {
+           // Si es admin, validamos contra la inmobiliaria que viene en el body
+           targetInmoId = body.inmobiliariaId || null;
+        } else {
+             const err: any = new Error('Solo la inmobiliaria dueña de la prioridad o Administradores pueden reservar este lote');
+             err.status = 403;
+             throw err;
+        }
+
+        if (!targetInmoId || Number(prioridadActiva.inmobiliariaId) !== Number(targetInmoId)) {
+             const err: any = new Error('Esta reserva solo puede ser creada para la inmobiliaria que posee la prioridad.');
+             err.status = 403;
+             throw err;
         }
       }
     }
@@ -243,35 +252,71 @@ export async function createReserva(
             fechaReserva: body.fechaReserva,
             loteId: body.loteId,
             sena: body.sena,
+            ofertaInicial: body.ofertaInicial,
             state: EstadoReserva.ACTIVA
         }
     });
 
-    // Guardamos el estado original del lote para restaurarlo al finalizar la reserva
-    const row = await prisma.reserva.create({
-      data: {
-        fechaReserva: new Date(body.fechaReserva), // ISO -> Date
-        loteId: body.loteId,
-        clienteId: body.clienteId,
-        inmobiliariaId: inmobiliariaIdFinal,
-        // Para Decimal no necesito new Decimal: Prisma acepta number|string
-        ...(body.sena !== undefined ? { sena: body.sena } : {}),
-        estado: EstadoReserva.ACTIVA, // Asigno estado por defecto como ACTIVA
-        numero: body.numero, // Número de reserva
-        fechaFinReserva: new Date(body.fechaFinReserva), // ISO -> Date
-        loteEstadoAlCrear: estadoOriginalLote, // Guardamos el estado original del lote
-      },
+    const result = await prisma.$transaction(async (tx) => {
+        // 1. Crear Reserva
+        // 1. Crear Reserva
+        const reserva = await tx.reserva.create({
+          data: {
+            fechaReserva: new Date(body.fechaReserva),
+            loteId: body.loteId,
+            clienteId: body.clienteId,
+            inmobiliariaId: inmobiliariaIdFinal,
+            ...(body.sena !== undefined ? { sena: body.sena } : {}),
+            ofertaInicial: body.ofertaInicial,
+            ofertaActual: body.ofertaInicial, // Inicialmente igual a la inicial
+            estado: EstadoReserva.ACTIVA, // Siempre nace activa salvo logica especial, pero simplifiquemos
+            numero: body.numero,
+            fechaFinReserva: new Date(body.fechaFinReserva),
+            loteEstadoAlCrear: estadoOriginalLote,
+            estadoOperativo: 'OPERATIVO'
+          },
+          include: {
+            inmobiliaria: { select: { nombre: true, id: true } },
+            cliente: { select: { id: true, nombre: true, apellido: true, razonSocial: true } }
+          }
+        });
+
+        // 2. Crear Oferta Inicial (Primer registro histórico)
+        let nombreEfector = "La Federala";
+        let efectorId = null;
+        let ownerType: OwnerPrioridad = OwnerPrioridad.CCLF; // Default admin
+
+        if (reserva.inmobiliariaId) {
+            nombreEfector = reserva.inmobiliaria?.nombre || "Inmobiliaria";
+            efectorId = reserva.inmobiliariaId;
+            ownerType = OwnerPrioridad.INMOBILIARIA;
+        }
+
+        await tx.ofertaReserva.create({
+            data: {
+                reservaId: reserva.id,
+                monto: body.ofertaInicial,
+                motivo: "Oferta Inicial",
+                plazoHasta: new Date(body.fechaFinReserva), 
+                createdAt: new Date(),
+                nombreEfector,
+                efectorId,
+                ownerType, // Usamos el enum correcto
+            }
+        });
+
+
+        return reserva;
     });
 
-    // Cambiar lote a RESERVADO
+    // 3. Side Effects (Lote Update)
     await updateLoteState(body.loteId, ESTADO_LOTE_OP.RESERVADO);
 
-    // Si el lote estaba CON_PRIORIDAD, cancelar la prioridad activa (reserva consume prioridad)
     if (estadoOriginalLote === EstadoLote.CON_PRIORIDAD) {
       await cancelPrioridadActivaOnReserva(body.loteId);
     }
 
-    return row;
+    return result;
   } catch (e) {
     throw mapPrismaError(e);
   }
@@ -314,10 +359,17 @@ export async function updateReserva(
       throw err;
     }
 
-    // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA
+    // BLOQUEO TOTAL: No se puede cambiar el estado de una reserva EXPIRADA
+    if (body.estado !== undefined && reservaActual.estado === EstadoReserva.EXPIRADA) {
+      const err: any = new Error('No se puede cambiar el estado de una reserva expirada');
+      err.status = 400;
+      throw err;
+    }
+
+    // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA, ACEPTADA o CONTRAOFERTA
     if (body.estado !== undefined && body.estado === EstadoReserva.EXPIRADA) {
-      if (reservaActual.estado !== EstadoReserva.ACTIVA) {
-        const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA');
+      if (reservaActual.estado !== EstadoReserva.ACTIVA && reservaActual.estado !== EstadoReserva.ACEPTADA && reservaActual.estado !== EstadoReserva.CONTRAOFERTA) {
+        const err: any = new Error('Solo se puede marcar como EXPIRADA una reserva que está ACTIVA, ACEPTADA o en CONTRAOFERTA');
         err.status = 400;
         throw err;
       }
@@ -328,6 +380,45 @@ export async function updateReserva(
       if (reservaActual.estado !== EstadoReserva.ACTIVA && reservaActual.estado !== EstadoReserva.ACEPTADA) {
         const err: any = new Error('Solo se puede rechazar una reserva que está ACTIVA o ACEPTADA');
         err.status = 400;
+        throw err;
+      }
+    }
+
+    // Validar reactivación: desde CANCELADA o RECHAZADA solo se puede volver a ACTIVA
+    if (body.estado !== undefined && (reservaActual.estado === EstadoReserva.CANCELADA || reservaActual.estado === EstadoReserva.RECHAZADA)) {
+      // Solo permitir cambio a ACTIVA
+      if (body.estado !== EstadoReserva.ACTIVA) {
+        const err: any = new Error('Desde CANCELADA o RECHAZADA solo se puede volver a ACTIVA');
+        err.status = 400;
+        throw err;
+      }
+
+      // Validar que no exista otra reserva vigente en el lote
+      const otraReservaVigente = await prisma.reserva.findFirst({
+        where: {
+          loteId: reservaActual.loteId,
+          id: { not: id }, // Excluir la reserva actual
+          estado: { in: [EstadoReserva.ACTIVA, EstadoReserva.ACEPTADA] },
+        },
+      });
+
+      if (otraReservaVigente) {
+        const err: any = new Error('No se puede reactivar la reserva porque el lote ya tiene otra reserva vigente');
+        err.status = 409;
+        throw err;
+      }
+
+      // Validar que no exista prioridad activa en el lote
+      const prioridadActiva = await prisma.prioridad.findFirst({
+        where: {
+          loteId: reservaActual.loteId,
+          estado: EstadoPrioridad.ACTIVA,
+        },
+      });
+
+      if (prioridadActiva) {
+        const err: any = new Error('No se puede reactivar la reserva porque el lote tiene una prioridad activa');
+        err.status = 409;
         throw err;
       }
     }
@@ -408,7 +499,7 @@ export async function updateReserva(
       data: dataToUpdate,
       include: {
         cliente: {
-          select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true, razonSocial: true },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },
@@ -477,7 +568,7 @@ export async function eliminarReserva(
       where: { id },
       include: {
         cliente: {
-          select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true, razonSocial: true },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },
@@ -520,7 +611,7 @@ export async function eliminarReserva(
 
     // Validar que el estado permita eliminación lógica
     // Solo se puede eliminar si está en: CANCELADA, EXPIRADA, RECHAZADA
-    const estadosPermitidos = [EstadoReserva.CANCELADA, EstadoReserva.EXPIRADA, EstadoReserva.RECHAZADA];
+    const estadosPermitidos: EstadoReserva[] = [EstadoReserva.CANCELADA, EstadoReserva.EXPIRADA, EstadoReserva.RECHAZADA];
     if (!estadosPermitidos.includes(reserva.estado)) {
       const err: any = new Error(`No se puede eliminar una reserva en estado ${reserva.estado}. Solo se pueden eliminar reservas en estado CANCELADA, EXPIRADA o RECHAZADA.`);
       err.statusCode = 409;
@@ -536,7 +627,7 @@ export async function eliminarReserva(
       },
       include: {
         cliente: {
-          select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true, razonSocial: true },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },
@@ -576,7 +667,7 @@ export async function reactivarReserva(
       where: { id },
       include: {
         cliente: {
-          select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true, razonSocial: true },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },
@@ -625,7 +716,7 @@ export async function reactivarReserva(
       },
       include: {
         cliente: {
-          select: { id: true, nombre: true, apellido: true },
+          select: { id: true, nombre: true, apellido: true, razonSocial: true },
         },
         inmobiliaria: {
           select: { id: true, nombre: true },

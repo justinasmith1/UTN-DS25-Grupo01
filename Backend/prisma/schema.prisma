@@ -220,12 +220,13 @@ model Reserva {
   updatedAt         DateTime        @updatedAt
 
   // relaciones
-  lote         Lote            @relation(fields: [loteId], references: [id])
-  cliente      Persona         @relation(fields: [clienteId], references: [id])
-  inmobiliaria Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id])
-  ventaConsumo Venta?          @relation("VentaConsumeReserva", fields: [ventaId], references: [id], onDelete: SetNull)
-  ofertas      OfertaReserva[]
-  ofertaActual Decimal?        @db.Decimal(12, 2)
+  lote          Lote            @relation(fields: [loteId], references: [id])
+  cliente       Persona         @relation(fields: [clienteId], references: [id])
+  inmobiliaria  Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id])
+  ventaConsumo  Venta?          @relation("VentaConsumeReserva", fields: [ventaId], references: [id], onDelete: SetNull)
+  ofertas       OfertaReserva[]
+  ofertaActual  Decimal         @db.Decimal(12, 2)
+  ofertaInicial Decimal         @db.Decimal(12, 2)
 
   // Esto evita duplicados logicos de la misma reserva pero habria que ver si hace falta o no
   @@unique([clienteId, loteId, fechaReserva], name: "uq_reserva_cliente_lote_fecha")

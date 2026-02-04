@@ -16,16 +16,16 @@ export async function expireReservas(): Promise<number> {
   
   console.log(`[expireReservas] Iniciando expiración de reservas - ${now.toISOString()}`);
   
-  // Buscar reservas ACTIVA vencidas y NO consumidas por venta
+  // Buscar reservas ACTIVA, ACEPTADA o CONTRAOFERTA vencidas y NO consumidas por venta
   const reservasVencidas = await prisma.reserva.findMany({
     where: {
-      estado: EstadoReserva.ACTIVA,
+      estado: { in: [EstadoReserva.ACTIVA, EstadoReserva.ACEPTADA, EstadoReserva.CONTRAOFERTA] },
       fechaFinReserva: {
         lte: now,
       },
-      ventaId: null, // Asegurar que no esté consumida (aunque ACTIVA no debería tener ventaId, seguridad extra)
+      ventaId: null, // Asegurar que no esté consumida
     },
-    select: { id: true, loteId: true }
+    select: { id: true, loteId: true, estado: true }
   });
 
   console.log(`[expireReservas] Encontradas ${reservasVencidas.length} reservas vencidas`);

@@ -66,7 +66,11 @@ export default function ReservaVerCard({
   const safe = (v) => (isBlank(v) ? NA : v);
 
   // Cliente: nombre + apellido
+  // Cliente: nombre + apellido
   const clienteNombre = (() => {
+    const rs = res?.cliente?.razonSocial || res?.razonSocial || null;
+    if (rs) return rs; // Prioridad Razón Social
+
     const n = res?.cliente?.nombre || res?.clienteNombre || null;
     const a = res?.cliente?.apellido || res?.clienteApellido || null;
     const joined = [n, a].filter(Boolean).join(" ");
@@ -75,20 +79,34 @@ export default function ReservaVerCard({
     return NA;
   })();
 
-  // Lote: mostrar mapId o información del lote
+  // Lote: mostrar mapId formateado (ej: Lote 3-18)
   const loteInfo = (() => {
-    const mapId = res?.lote?.mapId ?? res?.lotMapId ?? null;
-    if (mapId) {
-      if (String(mapId).toLowerCase().startsWith('lote')) {
-        return mapId;
-      }
-      return `Lote N° ${mapId}`;
+    // Intentar obtener parcel y fraction
+    if (res?.lote) {
+       const fraccion = res.lote.fraccion?.numero;
+       const numero = res.lote.numero;
+       if (fraccion != null && numero != null) {
+          return `Lote ${fraccion}-${numero}`;
+       }
     }
-    if (res?.lote?.id) {
-      const num = res?.lote?.numero || res?.lote?.id;
-      return `Lote N° ${num}`;
+    
+    // Fallback: parsear mapId
+    const mapId = res?.lote?.mapId ?? res?.lotMapId ?? res?.loteId;
+    if (!mapId) return NA;
+
+    const str = String(mapId).trim();
+    // Si es "Lote18-3" o "Lote 18-3" -> "Lote 3-18"
+    const match = str.match(/^Lote\s*(\d+)-(\d+)$/i);
+    if (match) {
+      const [, parte1, parte2] = match;
+      return `Lote ${parte2}-${parte1}`;
     }
-    return res?.loteId ? `Lote N° ${res.loteId}` : NA;
+    
+    // Si no coincide, y empieza con Lote, devuelve tal cual.
+    if (str.toLowerCase().startsWith('lote')) return str;
+    
+    // Si es solo numero, agregar Lote
+    return `Lote N° ${str}`;
   })();
 
   // --- FECHAS ---
@@ -102,7 +120,7 @@ export default function ReservaVerCard({
     ["LOTE", loteInfo],
     ["FECHA", fechaReserva],
     ["CLIENTE", clienteNombre],
-    ["INMOBILIARIA", safe(res?.inmobiliaria?.nombre) || "La Federala"],
+    ["INMOBILIARIA", res?.inmobiliaria?.nombre || res?.inmobiliariaNombre || "La Federala"],
     ["ESTADO", titleCaseEstado(res?.estado)],
   ];
 
@@ -110,6 +128,7 @@ export default function ReservaVerCard({
     ["NÚMERO DE RESERVA", safe(res?.numero)],
     // Agregamos el plazo aquí
     ["PLAZO DE RESERVA", plazoReserva], 
+    ["OFERTA INICIAL", res?.ofertaInicial != null ? fmtMoney(res.ofertaInicial) : NA],
     ["SEÑA", res?.seña != null ? fmtMoney(res.seña) : NA],
     // Se quitaron las filas de fechas de actualización/creación
   ];
@@ -118,7 +137,8 @@ export default function ReservaVerCard({
   const containerRef = useRef(null);
   const [labelW, setLabelW] = useState(180);
   useEffect(() => {
-    const labels = [...leftPairs, ...rightPairs].map(([k]) => k);
+    // Definimos las claves manualmente para calcular el ancho máximo
+    const labels = ["LOTE", "FECHA", "CLIENTE", "INMOBILIARIA", "ESTADO", "NÚMERO DE RESERVA", "PLAZO DE RESERVA", "OFERTA INICIAL", "SEÑA"];
     const longest = Math.max(...labels.map((s) => s.length));
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
     setLabelW(computed);

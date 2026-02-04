@@ -41,6 +41,9 @@ function buildIndex(arr, key = 'id') {
 
 function resolveClienteNombre(cli) {
   if (!cli) return null;
+  
+  if (cli.razonSocial) return String(cli.razonSocial); // Prioridad Razón Social
+
   const full = cli.fullName || cli.nombreCompleto || cli.displayName;
   if (full) return String(full);
   const nombre = cli.nombre || cli.firstName || cli.nombres;
@@ -112,7 +115,7 @@ export default function TablaReservas({
   lookups,
 
   // callbacks
-  onVer, onEditar, onEliminar, onVerDocumentos, onAgregarReserva, onReactivar,
+  onVer, onEditar, onEliminar, onAgregarReserva, onReactivar,
 
   // selección
   selectedIds = [], onSelectedChange,
@@ -120,7 +123,7 @@ export default function TablaReservas({
   // filtro de vista (para deshabilitar selección en vista Eliminadas)
   estadoOperativoFilter,
 
-  roleOverride,
+
 }) {
   const source = useMemo(() => {
     if (Array.isArray(reservas) && reservas.length) return reservas;
@@ -205,12 +208,12 @@ export default function TablaReservas({
     // resuelve los ids efectivos en tu preset
     const idId = 'id';
     const loteId = columnsWithEstado.find(c => c.id === 'loteInfo' || c.titulo === 'Lote')?.id ?? 'loteInfo';
-    const clienteId = columnsWithEstado.find(c => c.id === 'clienteCompleto' || c.titulo === 'Cliente')?.id ?? 'clienteCompleto';
     const fechaId = columnsWithEstado.find(c => c.id === 'fechaReserva' || c.titulo === 'Fecha Reserva')?.id ?? 'fechaReserva';
     const inmoId = columnsWithEstado.find(c => c.id === 'inmobiliariaNombre' || c.titulo === 'Inmobiliaria')?.id ?? 'inmobiliariaNombre';
     const plazoId = columnsWithEstado.find(c => c.id === 'fechaFinReserva' || c.titulo === 'Plazo Reserva')?.id ?? 'fechaFinReserva';
+    const lotePrecioId = columnsWithEstado.find(c => c.id === 'lotePrecio' || c.titulo === 'Precio Lote')?.id ?? 'lotePrecio';
 
-    return [idId, loteId, 'estado', clienteId, fechaId, inmoId, plazoId]; // 7 exactas, Seña queda deseleccionada
+    return [idId, loteId, 'estado',inmoId, fechaId, plazoId, lotePrecioId]; // 7 exactas, Cliente queda deseleccionada
   }, [columnsWithEstado]);
 
   // 7) Alineación global para esta tabla (no tocamos preset/TablaBase)
@@ -251,7 +254,7 @@ export default function TablaReservas({
       
       return { loteId, mapId };
     },
-    getMetadata: (reserva, loteData) => {
+    getMetadata: (reserva) => {
       // Metadata específica de reservas para mostrar en el mapa
       return {
         type: 'reserva',
@@ -311,11 +314,6 @@ export default function TablaReservas({
     return (
     <div className="tl-actions">
       {can('visualizarReserva') && (
-        <button className="tl-icon tl-icon--money" aria-label="Ver Ofertas" data-tooltip="Ver Ofertas" onClick={() => handleVerOfertas(row)}>
-           <BadgeDollarSign size={18} strokeWidth={2} />
-        </button>
-      )}
-      {can('visualizarReserva') && (
         <button className="tl-icon tl-icon--view" aria-label="Ver Reserva" data-tooltip="Ver Reserva" onClick={() => onVer?.(row)}>
           <Eye size={18} strokeWidth={2} />
         </button>
@@ -323,6 +321,11 @@ export default function TablaReservas({
       {can('editarReserva') && puedeEditar && (
         <button className="tl-icon tl-icon--edit" aria-label="Editar Reserva" data-tooltip="Editar Reserva" onClick={() => onEditar?.(row)}>
           <Edit size={18} strokeWidth={2} />
+        </button>
+      )}
+      {can('visualizarReserva') && (
+        <button className="tl-icon tl-icon--money" aria-label="Ver Ofertas" data-tooltip="Ver Ofertas" onClick={() => handleVerOfertas(row)}>
+           <BadgeDollarSign size={18} strokeWidth={2} />
         </button>
       )}
       {can('eliminarReserva') && (

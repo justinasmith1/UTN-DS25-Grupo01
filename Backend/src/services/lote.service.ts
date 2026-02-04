@@ -105,7 +105,7 @@ async function crearOMantenerAlquiler(loteId: number, inquilinoId: number): Prom
   // Validar que la persona esté activa
   const persona = await prisma.persona.findUnique({
     where: { id: inquilinoId },
-    select: { estado: true },
+    select: { estadoOperativo: true },
   });
 
   if (!persona) {
@@ -114,7 +114,7 @@ async function crearOMantenerAlquiler(loteId: number, inquilinoId: number): Prom
     throw error;
   }
 
-  if (persona.estado !== 'OPERATIVO') {
+  if (persona.estadoOperativo !== 'OPERATIVO') {
     const error: any = new Error('No se puede asignar un inquilino inactivo');
     error.statusCode = 400;
     throw error;
@@ -247,6 +247,18 @@ export async function getAllLotes(query: any = {}, role?: string) {
             inicio: true,
             fin: true,
             explicacion: true,
+          },
+          take: 1,
+        },
+        prioridad: {
+          where: { estado: 'ACTIVA' },
+          select: {
+            id: true,
+            inmobiliariaId: true,
+            ownerType: true,
+            inmobiliaria: {
+              select: { id: true, nombre: true }
+            }
           },
           take: 1,
         },
@@ -523,7 +535,7 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
       // Validar que la persona inquilino esté activa
       const personaInquilino = await prisma.persona.findUnique({
         where: { id: inquilinoId },
-        select: { estado: true },
+        select: { estadoOperativo: true },
       });
 
       if (!personaInquilino) {
@@ -532,7 +544,7 @@ export async function updatedLote(id: number, data: any, role?: string): Promise
         throw error;
       }
 
-      if (personaInquilino.estado !== 'OPERATIVO') {
+      if (personaInquilino.estadoOperativo !== 'OPERATIVO') {
         const error: any = new Error('No se puede asignar un inquilino inactivo');
         error.statusCode = 400;
         throw error;

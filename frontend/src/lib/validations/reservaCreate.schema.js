@@ -91,6 +91,22 @@ export const reservaSchema = z
         ])
       )
       .optional(),
+      
+    ofertaInicial: z
+      .preprocess(
+        preprocessNumber,
+        z.union([
+          z.number({
+            invalid_type_error: "Debe ser un número válido",
+          })
+          .min(0, "La oferta inicial no puede ser negativa")
+          .positive("La oferta inicial debe ser mayor a 0"),
+          z.undefined(),
+        ])
+      )
+      .refine((val) => val !== undefined, {
+        message: "La oferta inicial es obligatoria",
+      }),
 
     observaciones: z.string().optional(),
 

@@ -133,7 +133,7 @@ async function main() {
   console.log(`  ✓ Lote 2 (Reservado) - mapId: Lote2-3`);
 
   // Crear Reserva para Lote 2
-  await prisma.reserva.create({
+  const reservaLote2 = await prisma.reserva.create({
     data: {
       numero: `RES-${lote2.id}-001`,
       fechaReserva: new Date(),
@@ -142,9 +142,18 @@ async function main() {
       clienteId: clienteMaria.id,
       inmobiliariaId: idAndinolfi,
       sena: 1000.00,
+      ofertaInicial: 1000.00,
+      ofertaActual: 1000.00,
       fechaFinReserva: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // +7 días
       loteEstadoAlCrear: EstadoLote.DISPONIBLE,
     },
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote2.id, monto: 1000.00, motivo: "Oferta Inicial",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idAndinolfi, nombreEfector: "Andinolfi Inmobiliaria",
+      createdAt: new Date(), plazoHasta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
   });
   console.log(`    -> Reserva creada para Lote 2 (Cliente: María)`);
 
@@ -170,18 +179,28 @@ async function main() {
   console.log(`  ✓ Lote 3 (Vendido) - mapId: Lote3-3`);
 
   // Crear Reserva consumida (histórica)
+  const fechaReservaL3 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
   const reservaLote3 = await prisma.reserva.create({
     data: {
       numero: `RES-${lote3.id}-HIST`,
-      fechaReserva: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Hace 30 días
+      fechaReserva: fechaReservaL3,
       estado: EstadoReserva.ACEPTADA,
       loteId: lote3.id,
       clienteId: clienteRoberto.id,
       inmobiliariaId: idGianfelice,
       sena: 2000.00,
+      ofertaInicial: 2000.00,
+      ofertaActual: 2000.00,
       loteEstadoAlCrear: EstadoLote.DISPONIBLE,
       // ventaId se conectará después
     },
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote3.id, monto: 2000.00, motivo: "Oferta Inicial",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idGianfelice, nombreEfector: "Gianfelice Andrea",
+      createdAt: fechaReservaL3
+    }
   });
 
   // Crear Venta para Lote 3
@@ -287,11 +306,20 @@ async function main() {
       ubicacion: { create: { calle: NombreCalle.REINAMORA, numero: 107 } }
     }
   });
-  await prisma.reserva.create({
+  const fechaReservaL7 = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const reservaLote7 = await prisma.reserva.create({
     data: {
-      numero: `RES-${lote7.id}-CANC`, fechaReserva: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000),
+      numero: `RES-${lote7.id}-CANC`, fechaReserva: fechaReservaL7,
       estado: EstadoReserva.CANCELADA, loteId: lote7.id, clienteId: clienteMaria.id, inmobiliariaId: idAndinolfi,
-      sena: 500.00, loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() - 53 * 24 * 60 * 60 * 1000)
+      sena: 500.00, ofertaInicial: 500.00, ofertaActual: 500.00,
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() - 53 * 24 * 60 * 60 * 1000)
+    }
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote7.id, monto: 500.00, motivo: "Oferta Inicial",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idAndinolfi, nombreEfector: "Andinolfi Inmobiliaria",
+      createdAt: fechaReservaL7
     }
   });
   console.log(`  ✓ Lote 7 (Disponible / Reserva Cancelada) - mapId: Lote7-3`);
@@ -305,11 +333,20 @@ async function main() {
       ubicacion: { create: { calle: NombreCalle.REINAMORA, numero: 108 } }
     }
   });
-  await prisma.reserva.create({
+  const fechaReservaL8 = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const reservaLote8 = await prisma.reserva.create({
     data: {
-      numero: `RES-${lote8.id}-EXP`, fechaReserva: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+      numero: `RES-${lote8.id}-EXP`, fechaReserva: fechaReservaL8,
       estado: EstadoReserva.EXPIRADA, loteId: lote8.id, clienteId: clienteRoberto.id, inmobiliariaId: idGianfelice,
-      sena: 500.00, loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000)
+      sena: 500.00, ofertaInicial: 500.00, ofertaActual: 500.00,
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() - 23 * 24 * 60 * 60 * 1000)
+    }
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote8.id, monto: 500.00, motivo: "Oferta Inicial",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idGianfelice, nombreEfector: "Gianfelice Andrea",
+      createdAt: fechaReservaL8
     }
   });
   console.log(`  ✓ Lote 8 (Disponible / Reserva Expirada) - mapId: Lote8-3`);
@@ -323,11 +360,20 @@ async function main() {
       ubicacion: { create: { calle: NombreCalle.REINAMORA, numero: 109 } }
     }
   });
-  await prisma.reserva.create({
+  const fechaReservaL9 = new Date();
+  const reservaLote9 = await prisma.reserva.create({
     data: {
-      numero: `RES-${lote9.id}-CONT`, fechaReserva: new Date(),
+      numero: `RES-${lote9.id}-CONT`, fechaReserva: fechaReservaL9,
       estado: EstadoReserva.CONTRAOFERTA, loteId: lote9.id, clienteId: clienteMaria.id, inmobiliariaId: idAndinolfi,
-      sena: 1200.00, loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+      sena: 1200.00, ofertaInicial: 1200.00, ofertaActual: 1200.00,
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE, fechaFinReserva: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)
+    }
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote9.id, monto: 1200.00, motivo: "Oferta Inicial",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idAndinolfi, nombreEfector: "Andinolfi Inmobiliaria",
+      createdAt: fechaReservaL9
     }
   });
   console.log(`  ✓ Lote 9 (Reservado / Contraoferta) - mapId: Lote9-3`);
@@ -444,12 +490,21 @@ async function main() {
     }
   });
   // Reserva activa resultante
-  await prisma.reserva.create({
+  const fechaReservaL15 = new Date();
+  const reservaLote15 = await prisma.reserva.create({
     data: {
-      numero: `RES-${lote15.id}-PRI`, fechaReserva: new Date(), estado: EstadoReserva.ACTIVA,
+      numero: `RES-${lote15.id}-PRI`, fechaReserva: fechaReservaL15, estado: EstadoReserva.ACTIVA,
       loteId: lote15.id, clienteId: clienteMaria.id, inmobiliariaId: idSpinosa,
-      sena: 2100.00, loteEstadoAlCrear: EstadoLote.DISPONIBLE,
+      sena: 2100.00, ofertaInicial: 2100.00, ofertaActual: 2100.00,
+      loteEstadoAlCrear: EstadoLote.DISPONIBLE,
       fechaFinReserva: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    }
+  });
+  await prisma.ofertaReserva.create({
+    data: {
+      reservaId: reservaLote15.id, monto: 2100.00, motivo: "Oferta Inicial (Desde Prioridad)",
+      ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idSpinosa, nombreEfector: "Nicolas Spinosa Operaciones Inmobiliarias",
+      createdAt: fechaReservaL15
     }
   });
   // ==========================================
@@ -477,6 +532,7 @@ async function main() {
       clienteId: clienteRoberto.id, 
       inmobiliariaId: idAndinolfi,
       sena: 2000.00,
+      ofertaInicial: 20000.00,
       ofertaActual: 21500.00, // Última oferta
       loteEstadoAlCrear: EstadoLote.DISPONIBLE,
       fechaFinReserva: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000)
@@ -484,19 +540,16 @@ async function main() {
   });
 
   // Historial de ofertas para Lote 16
-  // 1. Inmobiliaria oferta inicial (implícita en la reserva pero hagamos un registro explicito si se quiere, o primera oferta distinta)
-  // Supongamos que la reserva se creó por 22000 (precio lista) pero luego se ofertó menos.
-  
-  // Oferta 1: Inmobiliaria ofrece 20.000
+  // Oferta 1 (Inicial): Inmobiliaria ofrece 20.000
   await prisma.ofertaReserva.create({
     data: {
       reservaId: reservaLote16.id,
       monto: 20000.00,
-      motivo: "Cliente ofrece pagar de contado si se baja el precio.",
+      motivo: "Oferta Inicial.",
       ownerType: OwnerPrioridad.INMOBILIARIA,
       efectorId: idAndinolfi,
       nombreEfector: "Andinolfi Inmobiliaria",
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000)
+      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000) // Coincide con fecha reserva
     }
   });
 
@@ -534,22 +587,23 @@ async function main() {
       clienteId: clienteMaria.id,
       inmobiliariaId: idSpinosa,
       sena: 2300.00,
+      ofertaInicial: 22000.00,
       ofertaActual: 22500.00, // Precio acordado
       loteEstadoAlCrear: EstadoLote.DISPONIBLE,
       fechaFinReserva: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000) // Ya pasó, se vendió
     }
   });
 
-  // Oferta 1: Cliente ofrece 22.000
+  // Oferta 1 (Inicial): Cliente ofrece 22.000
   await prisma.ofertaReserva.create({
     data: {
       reservaId: reservaLote17.id,
       monto: 22000.00,
-      motivo: "Oferta inicial baja.",
+      motivo: "Oferta Inicial.",
       ownerType: OwnerPrioridad.INMOBILIARIA,
       efectorId: idSpinosa,
       nombreEfector: "Nicolas Spinosa Operaciones Inmobiliarias",
-      createdAt: new Date(Date.now() - 9 * 24 * 60 * 60 * 1000)
+      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
     }
   });
 
@@ -617,18 +671,19 @@ async function main() {
       clienteId: clienteRoberto.id,
       inmobiliariaId: idGianfelice,
       sena: 1000.00,
+      ofertaInicial: 15000.00,
       ofertaActual: 15000.00, // Oferta ridícula
       loteEstadoAlCrear: EstadoLote.DISPONIBLE,
       fechaFinReserva: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) // Aún vigente en fechas, pero rechazada
     }
   });
 
-  // Oferta 1: Inmobiliaria tira muy bajo
+  // Oferta 1 (Inicial): Inmobiliaria tira muy bajo
    await prisma.ofertaReserva.create({
     data: {
-      reservaId: reservaLote18.id, monto: 15000.00, motivo: "El cliente solo tiene esto.",
+      reservaId: reservaLote18.id, monto: 15000.00, motivo: "Oferta Inicial (Baja)",
       nombreEfector: "Gianfelice Andrea", efectorId: idGianfelice, ownerType: OwnerPrioridad.INMOBILIARIA,
-      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000)
     }
   });
 
