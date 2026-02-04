@@ -479,6 +479,13 @@ export async function updateReserva(
       throw err;
     }
 
+    // Impedir cambiar inmobiliariaId una vez creada la reserva
+    if (body.inmobiliariaId !== undefined && body.inmobiliariaId !== reservaActual.inmobiliariaId) {
+      const err: any = new Error('No se puede cambiar la inmobiliaria de una reserva ya creada');
+      err.status = 400;
+      throw err;
+    }
+
     // Construir dataToUpdate
     const dataToUpdate: any = {};
     if (body.fechaReserva !== undefined) {

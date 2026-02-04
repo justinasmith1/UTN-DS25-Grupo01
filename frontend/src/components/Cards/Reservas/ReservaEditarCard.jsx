@@ -6,7 +6,6 @@ import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
-import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 import { reservaCreateSchema } from "../../../lib/validations/reservaCreate.schema.js"; // Reutilizamos el schema o creamos uno partial si hiciera falta. Para update completo sirve.
@@ -68,20 +67,16 @@ export default function ReservaEditarCard({
   reservas,
   onCancel,
   onSaved,
-  inmobiliarias: propsInmob = [],
   entityType = "Reserva",
 }) {
   const { user } = useAuth();
   const isInmobiliaria = user?.role === 'INMOBILIARIA';
   const [detalle, setDetalle] = useState(reserva || null);
-  const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [numeroBackendError, setNumeroBackendError] = useState(null);
   const [generalError, setGeneralError] = useState(null);
 
-  // evita múltiples llamados a inmobiliarias
-  const fetchedInmobRef = useRef(false);
   // ancho de label
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
@@ -190,56 +185,7 @@ export default function ReservaEditarCard({
   }, [open, detalle, reset, user]);
 
 
-  /* 4) GET de inmobiliarias UNA sola vez por apertura */
-  useEffect(() => {
-    let abort = false;
-    function normalizeList(raw) {
-      let list = [];
-      if (raw?.data && Array.isArray(raw.data)) list = raw.data;
-      else if (Array.isArray(raw)) list = raw;
-      else if (raw?.data?.data?.inmobiliarias) list = raw.data.data.inmobiliarias;
-      else if (raw?.data?.inmobiliarias) list = raw.data.inmobiliarias;
-      else if (raw?.inmobiliarias) list = raw.inmobiliarias;
-      
-      return (Array.isArray(list) ? list : [])
-        .map(x => ({
-          id: x.id ?? x.idInmobiliaria ?? x._id ?? "",
-          nombre: x.nombre ?? x.razonSocial ?? "Sin información",
-        }))
-        .filter(i => i.id);
-    }
 
-    async function run() {
-      if (!open || fetchedInmobRef.current) return;
-
-      if (propsInmob && propsInmob.length) {
-        setInmobiliarias(normalizeList(propsInmob));
-        fetchedInmobRef.current = true;
-        return;
-      }
-
-      if (!isInmobiliaria) {
-        try {
-          const response = await getAllInmobiliarias({});
-          const norm = normalizeList(response);
-          if (!abort) {
-            setInmobiliarias(norm);
-            fetchedInmobRef.current = true;
-          }
-        } catch (e) {
-          console.error("Error obteniendo inmobiliarias:", e);
-          if (!abort) {
-            setInmobiliarias([]);
-            fetchedInmobRef.current = true;
-          }
-        }
-      } else {
-        fetchedInmobRef.current = true;
-      }
-    }
-    run();
-    return () => { abort = true; };
-  }, [open, propsInmob, isInmobiliaria]);
 
   /* Calcular label width */
   useEffect(() => {
@@ -543,28 +489,9 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.inmobiliariaId ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">INMOBILIARIA</div>
-                    {isInmobiliaria ? (
-                      <div className="field-value is-readonly">
-                        {detalle?.inmobiliaria?.nombre ?? "La Federala"}
-                      </div>
-                    ) : (
-                      <div className="field-value p0">
-                         <Controller
-                            name="inmobiliariaId"
-                            control={control}
-                            render={({ field: { onChange, value } }) => (
-                                <NiceSelect
-                                    value={value != null ? String(value) : ""}
-                                    options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                                    placeholder="La Federala"
-                                    showPlaceholderOption={false}
-                                    onChange={(val) => !estaEliminada && onChange(val ? Number(val) : undefined)}
-                                    disabled={estaEliminada}
-                                />
-                            )}
-                         />
-                      </div>
-                    )}
+                    <div className="field-value is-readonly">
+                      {detalle?.inmobiliaria?.nombre ?? "Sin información"}
+                    </div>
                   </div>
                   {errors.inmobiliariaId && <div className="fieldError">{errors.inmobiliariaId.message}</div>}
               </div>
