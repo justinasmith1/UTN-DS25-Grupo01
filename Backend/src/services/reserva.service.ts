@@ -367,11 +367,53 @@ export async function updateReserva(
       throw err;
     }
 
-    // BLOQUEO TOTAL: No se puede cambiar el estado de una reserva EXPIRADA
-    if (body.estado !== undefined && reservaActual.estado === EstadoReserva.EXPIRADA) {
-      const err: any = new Error('No se puede cambiar el estado de una reserva expirada');
-      err.status = 400;
-      throw err;
+    // VALIDACIÓN DE TRANSICIONES DE ESTADO
+    if (body.estado !== undefined && body.estado !== reservaActual.estado) {
+      const estadoActual = reservaActual.estado as string;
+      const nuevoEstado = body.estado as string;
+      
+      // Definir transiciones permitidas por estado
+      const transicionesPermitidas: Record<string, string[]> = {
+        'CANCELADA': ['ACTIVA'],
+        'ACEPTADA': ['RECHAZADA', 'CANCELADA'],
+        'ACTIVA': ['CANCELADA'],
+        'RECHAZADA': ['ACTIVA'],
+        'CONTRAOFERTA': [], // No se puede cambiar manualmente
+        'EXPIRADA': ['ACTIVA']
+      };
+      
+      const permitidas = transicionesPermitidas[estadoActual] || [];
+      
+      if (!permitidas.includes(nuevoEstado)) {
+        const err: any = new Error(
+          `No se puede cambiar el estado de ${estadoActual} a ${nuevoEstado}. Transiciones permitidas: ${permitidas.join(', ') || 'ninguna (solo via negociaciones)'}`
+        );
+        err.status = 400;
+        throw err;
+      }
+      
+      // Si está reactivando a ACTIVA, validar estado del lote
+      if (nuevoEstado === 'ACTIVA' && ['CANCELADA', 'RECHAZADA', 'EXPIRADA'].includes(estadoActual)) {
+        const lote = await prisma.lote.findUnique({
+          where: { id: reservaActual.loteId },
+          select: { estado: true }
+        });
+        
+        if (!lote) {
+          const err: any = new Error('No se encontró el lote asociado a la reserva');
+          err.status = 404;
+          throw err;
+        }
+        
+        const estadosPermitidos = [EstadoLote.DISPONIBLE, EstadoLote.EN_PROMOCION];
+        if (!estadosPermitidos.includes(lote.estado as any)) {
+          const err: any = new Error(
+            `No se puede reactivar la reserva. El lote debe estar en estado DISPONIBLE o EN PROMOCIÓN (actualmente: ${lote.estado})`
+          );
+          err.status = 400;
+          throw err;
+        }
+      }
     }
 
     // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA, ACEPTADA o CONTRAOFERTA

@@ -198,6 +198,7 @@ export default function ReservaEditarCard({
     setLabelW(computed);
   }, [open, detalle?.id]);
 
+
   /* 7) LOGICA PATCH */
   function buildPatch(data) {
     const patch = {};
@@ -280,6 +281,7 @@ export default function ReservaEditarCard({
         onCancel?.();
         return;
       }
+
 
       const response = await updateReserva(detalle.id, patch);
       if (!response || !response.success) {
@@ -384,35 +386,48 @@ export default function ReservaEditarCard({
   const fechaAct = detalle?.updatedAt ? new Date(detalle.updatedAt).toLocaleDateString("es-AR") : NA;
   const fechaCre = detalle?.createdAt ? new Date(detalle.createdAt).toLocaleDateString("es-AR") : NA;
   
-  // Disponibilidad de estados
+  // Disponibilidad de estados según transiciones permitidas
   const estadosDisponibles = useMemo(() => {
     const estadoActual = String(detalle?.estado ?? "").toUpperCase();
     
-    // EXPIRADA es inmutable
-    if (estadoActual === "EXPIRADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "EXPIRADA");
+    // Función helper para filtrar estados
+    const filterByValues = (allowedValues) => {
+      return ESTADOS_RESERVA.filter(e => allowedValues.includes(e.value));
+    };
+
+    // Reglas de transición por estado actual
+    switch (estadoActual) {
+      case "CANCELADA":
+        // Solo puede volver a ACTIVA
+        return filterByValues(["CANCELADA", "ACTIVA"]);
+      
+      case "ACEPTADA":
+        // Solo puede ir a RECHAZADA o CANCELADA
+        return filterByValues(["ACEPTADA", "RECHAZADA", "CANCELADA"]);
+      
+      case "ACTIVA":
+        // Solo puede ir a CANCELADA (otros estados via negociaciones)
+        if (isInmobiliaria) {
+          return filterByValues(["ACTIVA", "CANCELADA"]);
+        }
+        return filterByValues(["ACTIVA", "CANCELADA"]);
+      
+      case "RECHAZADA":
+        // Solo puede volver a ACTIVA
+        return filterByValues(["RECHAZADA", "ACTIVA"]);
+      
+      case "CONTRAOFERTA":
+        // No se puede cambiar manualmente (solo via negociaciones)
+        return filterByValues(["CONTRAOFERTA"]);
+      
+      case "EXPIRADA":
+        // Solo puede volver a ACTIVA  
+        return filterByValues(["EXPIRADA", "ACTIVA"]);
+      
+      default:
+        // Por defecto, solo mostrar el estado actual
+        return ESTADOS_RESERVA.filter(e => e.value === estadoActual);
     }
-    
-    // CANCELADA o RECHAZADA solo pueden volver a ACTIVA
-    if (estadoActual === "CANCELADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA" || e.value === "ACTIVA");
-    }
-    if (estadoActual === "RECHAZADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "RECHAZADA" || e.value === "ACTIVA");
-    }
-    
-    // Restricciones para INMOBILIARIA
-    if (isInmobiliaria) {
-      // INMOBILIARIA solo puede cancelar desde ACTIVA
-      if (estadoActual === "ACTIVA") {
-        return ESTADOS_RESERVA.filter(e => e.value === "ACTIVA" || e.value === "CANCELADA");
-      }
-      // Para cualquier otro estado, solo mostrar el actual (read-only)
-      return ESTADOS_RESERVA.filter(e => e.value === estadoActual);
-    }
-    
-    // Admin/Gestor: todos los estados disponibles
-    return ESTADOS_RESERVA;
   }, [isInmobiliaria, detalle?.estado]);
 
   if (!open || !detalle) return null;
@@ -494,7 +509,7 @@ export default function ReservaEditarCard({
                   <div className="field-row">
                     <div className="field-label">INMOBILIARIA</div>
                     <div className="field-value is-readonly">
-                      {detalle?.inmobiliaria?.nombre ?? "Sin información"}
+                      {detalle?.inmobiliaria?.nombre || detalle?.inmobiliariaNombre || "La Federala"}
                     </div>
                   </div>
                   {errors.inmobiliariaId && <div className="fieldError">{errors.inmobiliariaId.message}</div>}
