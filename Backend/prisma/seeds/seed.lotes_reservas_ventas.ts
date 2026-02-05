@@ -152,7 +152,7 @@ async function main() {
     data: {
       reservaId: reservaLote2.id, monto: 1000.00, motivo: "Oferta Inicial",
       ownerType: OwnerPrioridad.INMOBILIARIA, efectorId: idAndinolfi, nombreEfector: "Andinolfi Inmobiliaria",
-      createdAt: new Date(), plazoHasta: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+      createdAt: new Date()
     }
   });
   console.log(`    -> Reserva creada para Lote 2 (Cliente: María)`);

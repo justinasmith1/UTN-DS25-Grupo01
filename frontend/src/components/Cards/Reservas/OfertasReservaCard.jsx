@@ -45,8 +45,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
             // Pre-fill monto with previous amount or empty
             reset({
                 monto: ofertaPrev.monto,
-                motivo: '',
-                plazoHasta: ''
+                motivo: ''
             });
         }
     };
@@ -69,10 +68,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
             setSubmitting(true);
             // Fix Date Offset: UTC 12:00
             let payload = { ...data, action: data.action || actionType };
-            if (payload.plazoHasta) {
-                // Ensure T12:00:00.000Z
-                payload.plazoHasta = new Date(`${payload.plazoHasta}T12:00:00.000Z`).toISOString();
-            }
+
 
             await createOferta(reserva.id, payload);
             // Refresh
@@ -159,9 +155,9 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                 <col style={{ width: '12%' }} />
                                 <col style={{ width: '18%' }} />
                                 <col style={{ width: '15%' }} />
-                                <col style={{ width: '28%' }} /> 
+                                <col style={{ width: '32%' }} /> 
                                 <col style={{ width: '11%' }} />
-                                <col style={{ width: '16%' }} />
+                                <col style={{ width: '3%' }} />
                             </colgroup>
                             <thead>
                                 <tr style={{ borderBottom: '2px solid #eee', color: '#666', textAlign: 'center' }}>
@@ -169,7 +165,6 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                     <th style={{ padding: 10 }}>Oferente</th>
                                     <th style={{ padding: 10 }}>Monto</th>
                                     <th style={{ padding: 10 }}>Motivo</th>
-                                    <th style={{ padding: 10 }}>Validez</th>
                                     <th style={{ padding: 10 }}>Acciones</th>
                                 </tr>
                             </thead>
@@ -186,7 +181,6 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                               {Number(o.monto).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 })}
                                             </td>
                                             <td style={{ padding: 10, textAlign: 'center', whiteSpace: 'normal', wordWrap: 'break-word' }}>{o.motivo || '-'}</td>
-                                            <td style={{ padding: 10, textAlign: 'center' }}>{o.plazoHasta ? new Date(o.plazoHasta).toLocaleDateString() : '-'}</td>
                                             <td style={{ padding: 10, textAlign: 'center' }}>
                                                 {showActions && !showForm && (
                                                     <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
@@ -249,26 +243,7 @@ export default function OfertasReservaCard({ open, onClose, reserva, onSuccess }
                                         {errors.monto && <div className="invalid-feedback">{errors.monto.message}</div>}
                                     </div>
                                 </div>
-                                <div>
-                                    <label className="form-label" style={{ fontWeight: 500, fontSize: '0.9rem' }}>Validez Hasta (Plazo)</label>
-                                    <input 
-                                        type="date" 
-                                        className={`form-control ${errors.plazoHasta ? 'is-invalid' : ''}`}
-                                        {...register('plazoHasta', {
-                                            validate: value => {
-                                                if (!value) return true; // Optional logic if intended, though validity usually matters. 
-                                                // Assuming backend allows optional, but if entered, strictly > fechaReserva
-                                                if (reserva && new Date(value) <= new Date(reserva.fechaReserva)) {
-                                                    return "Debe ser posterior a la fecha de reserva";
-                                                }
-                                                return true;
-                                            }
-                                        })}
-                                        style={{ borderRadius: '8px' }}
-                                    />
-                                    {errors.plazoHasta && <div className="invalid-feedback">{errors.plazoHasta.message}</div>}
-                                    {iAmInmo && <small style={{ color: '#666', fontSize: '0.8rem', marginTop: 4, display: 'block' }}>Solo Admin puede extender la reserva oficial.</small>}
-                                </div>
+
                                 <div style={{ gridColumn: 'span 2' }}>
                                     <label className="form-label" style={{ fontWeight: 500, fontSize: '0.9rem' }}>Motivo / Comentario</label>
                                     <textarea 

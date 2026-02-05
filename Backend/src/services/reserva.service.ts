@@ -306,7 +306,6 @@ export async function createReserva(
                 reservaId: reserva.id,
                 monto: body.ofertaInicial,
                 motivo: "Oferta Inicial",
-                plazoHasta: new Date(body.fechaFinReserva), 
                 createdAt: new Date(),
                 nombreEfector,
                 efectorId,
@@ -787,7 +786,7 @@ export async function getOfertasByReservaId(reservaId: number) {
 // Crear una oferta (contraoferta/aceptación/rechazo)
 // ==============================
 export async function createOfertaReserva(reservaId: number, data: any, user: any) {
-  // data: { monto, motivo, plazoHasta, action: 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR' }
+  // data: { monto, motivo, action: 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR' }
   const reserva = await prisma.reserva.findUnique({ 
       where: { id: reservaId },
       include: {
@@ -827,13 +826,7 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
       nombreEfector =  "La Federala"; 
   }
 
-  // VALIDATION: Ensure Plazo is > Reserva.fechaReserva
-  if (data.plazoHasta) {
-      const plazoDate = new Date(data.plazoHasta);
-      if (plazoDate <= reserva.fechaReserva) {
-          throw { statusCode: 400, message: "La validez de la oferta debe ser posterior a la fecha de la reserva." };
-      }
-  }
+
 
   // Transaction
   return prisma.$transaction(async (tx) => {
@@ -844,7 +837,6 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
         reservaId,
         monto: data.monto, // Puede ser el mismo monto anterior si solo rechaza o acepta, o nuevo si contraoferta
         motivo: data.motivo,
-        plazoHasta: data.plazoHasta ? new Date(data.plazoHasta) : null,
         nombreEfector,
         efectorId,
         ownerType,
@@ -865,14 +857,7 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
         updateData.estado = EstadoReserva.CONTRAOFERTA;
     }
 
-    // Lógica de extensión de plazo (solo si es Admin/CCLF y hay un plazo mayor)
-    if (ownerType === OwnerPrioridad.CCLF && data.plazoHasta) {
-        const nuevoPlazo = new Date(data.plazoHasta);
-        // Si el nuevo plazo es mayor al vencimiento actual, extender
-        if (nuevoPlazo > reserva.fechaFinReserva) {
-            updateData.fechaFinReserva = nuevoPlazo;
-        }
-    }
+
 
     const reservaUpdated = await tx.reserva.update({
         where: { id: reservaId },
