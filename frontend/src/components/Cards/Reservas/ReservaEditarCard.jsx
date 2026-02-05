@@ -87,6 +87,7 @@ export default function ReservaEditarCard({
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(reservaCreateSchema),
@@ -296,6 +297,7 @@ export default function ReservaEditarCard({
         numero: updated?.numero ?? detalle?.numero ?? null,
         lotMapId: mapId ?? updated?.lotMapId ?? null,
         lote: updated?.lote ? { ...updated.lote, mapId: mapId ?? updated.lote.mapId ?? null } : updated?.lote ?? null,
+        ofertaInicial: updated?.ofertaInicial ?? detalle?.ofertaInicial ?? null,
       };
 
       setDetalle(enrichedUpdated);
@@ -434,6 +436,13 @@ export default function ReservaEditarCard({
 
   const estaEliminada = isEliminado(detalle);
   const puedeEditar = canEditByEstadoOperativo(detalle);
+  const isExpirada = String(detalle?.estado ?? "").toUpperCase() === "EXPIRADA";
+  
+  // Observar el estado seleccionado en el formulario
+  const estadoSeleccionado = watch("estado");
+  
+  // Detectar si estamos en proceso de reactivación
+  const estadoEnReactivacion = isExpirada && estadoSeleccionado === "ACTIVA";
 
   return (
     <>
@@ -472,7 +481,7 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.fecha ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">FECHA</div>
-                    {isInmobiliaria || estaEliminada ? (
+                    {isInmobiliaria || estaEliminada || isExpirada ? (
                       <div className="field-value is-readonly">
                         {detalle?.fechaReserva ? new Date(detalle.fechaReserva).toLocaleDateString('es-AR') : "—"}
                       </div>
@@ -541,17 +550,15 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.numero || numeroBackendError ? "hasError" : ""}`}>
                 <div className="field-row">
                   <div className="field-label">NÚMERO DE RESERVA</div>
-                  {isInmobiliaria ? (
+                  {isInmobiliaria || estaEliminada || isExpirada ? (
                     <div className="field-value is-readonly">{detalle?.numero ?? "—"}</div>
                   ) : (
                     <div className="field-value p0">
                       <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.numero || numeroBackendError ? "is-invalid" : ""}`}
+                        className={`field-input ${errors.numero || numeroBackendError ? "is-invalid" : ""}`}
                         type="text"
                         placeholder="Ej: RES-2025-01"
                         {...register("numero")}
-                        disabled={estaEliminada}
-                        readOnly={estaEliminada}
                       />
                     </div>
                   )}
@@ -564,7 +571,7 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.plazoReserva ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">PLAZO DE RESERVA</div>
-                    {isInmobiliaria || estaEliminada ? (
+                    {(isInmobiliaria || estaEliminada || (isExpirada && !estadoEnReactivacion)) ? (
                       <div className="field-value is-readonly">
                         {detalle?.fechaFinReserva ? new Date(detalle.fechaFinReserva).toLocaleDateString('es-AR') : "—"}
                       </div>
@@ -573,6 +580,7 @@ export default function ReservaEditarCard({
                         <input
                           className={`field-input ${errors.plazoReserva ? "is-invalid" : ""}`}
                           type="date"
+                          min={detalle?.fechaFinReserva ? toDateInputValue(detalle.fechaFinReserva) : undefined}
                           {...register("plazoReserva")}
                         />
                       </div>
@@ -585,26 +593,30 @@ export default function ReservaEditarCard({
                 <div className="field-row">
                     <div className="field-label">OFERTA INICIAL</div>
                     <div className="field-value is-readonly">
-                       {detalle?.ofertaInicial != null 
-                         ? Number(detalle.ofertaInicial).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) 
-                         : "Sin información"}
+                       {(() => {
+                         const valor = detalle?.ofertaInicial;
+                         if (valor == null || valor === '' || valor === undefined) return "Sin información";
+                         const num = typeof valor === 'number' ? valor : Number(String(valor).replace(/[^0-9.-]/g, ''));
+                         if (isNaN(num)) return "Sin información";
+                         return num.toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+                       })()}
                     </div>
                 </div>
 
                 <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                 <div className="field-row">
                     <div className="field-label">SEÑA</div>
-                    <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
+                    <div className={`field-value p0 ${estaEliminada || isInmobiliaria || isExpirada ? "is-readonly" : ""}`} style={{ position: "relative" }}>
                       <input
-                        className={`field-input ${estaEliminada || isInmobiliaria ? "is-readonly" : ""} ${errors.montoSeña ? "is-invalid" : ""}`}
+                        className={`field-input ${estaEliminada || isInmobiliaria || isExpirada ? "is-readonly" : ""} ${errors.montoSeña ? "is-invalid" : ""}`}
                         type="number"
                         inputMode="decimal"
                         min="0"
                         step="100"
                         {...register("montoSeña", { valueAsNumber: true })}
                         style={{ paddingRight: "50px" }}
-                        disabled={estaEliminada || isInmobiliaria}
-                        readOnly={estaEliminada || isInmobiliaria}
+                        disabled={estaEliminada || isInmobiliaria || isExpirada}
+                        readOnly={estaEliminada || isInmobiliaria || isExpirada}
                       />
                       <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#6B7280", fontSize: "13px", pointerEvents: "none", fontWeight: 500 }}>
                          USD
