@@ -550,7 +550,6 @@ export const getOfertas = async (reservaId) => {
     const normalized = Array.isArray(raw) ? raw.map(o => ({
         ...o,
         createdAt: o.createdAt ? new Date(o.createdAt).toISOString() : null,
-        plazoHasta: o.plazoHasta ? new Date(o.plazoHasta).toISOString() : null,
     })) : [];
 
     return { success: true, data: normalized };
@@ -561,7 +560,7 @@ export const getOfertas = async (reservaId) => {
 };
 
 export const createOferta = async (reservaId, data) => {
-    // data: { monto, motivo, plazoHasta, action }
+    // data: { monto, motivo, action }
     try {
         const response = await httpJson(`/reservas/${reservaId}/ofertas`, {
             method: 'POST',

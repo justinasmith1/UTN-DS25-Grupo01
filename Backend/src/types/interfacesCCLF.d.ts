@@ -142,7 +142,6 @@ export interface OfertaReserva {
     reservaId: number;
     monto: number;
     motivo?: string;
-    plazoHasta?: string;
     nombreEfector: string;
     efectorId?: number | null;
     ownerType: OwnerPrioridad;

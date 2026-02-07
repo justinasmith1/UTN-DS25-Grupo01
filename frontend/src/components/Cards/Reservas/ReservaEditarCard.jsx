@@ -6,7 +6,6 @@ import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { updateReserva, getReservaById } from "../../../lib/api/reservas.js";
-import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { useAuth } from "../../../app/providers/AuthProvider.jsx";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 import { reservaCreateSchema } from "../../../lib/validations/reservaCreate.schema.js"; // Reutilizamos el schema o creamos uno partial si hiciera falta. Para update completo sirve.
@@ -68,20 +67,16 @@ export default function ReservaEditarCard({
   reservas,
   onCancel,
   onSaved,
-  inmobiliarias: propsInmob = [],
   entityType = "Reserva",
 }) {
   const { user } = useAuth();
   const isInmobiliaria = user?.role === 'INMOBILIARIA';
   const [detalle, setDetalle] = useState(reserva || null);
-  const [inmobiliarias, setInmobiliarias] = useState(propsInmob || []);
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [numeroBackendError, setNumeroBackendError] = useState(null);
   const [generalError, setGeneralError] = useState(null);
 
-  // evita múltiples llamados a inmobiliarias
-  const fetchedInmobRef = useRef(false);
   // ancho de label
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
@@ -92,6 +87,7 @@ export default function ReservaEditarCard({
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(reservaCreateSchema),
@@ -190,56 +186,7 @@ export default function ReservaEditarCard({
   }, [open, detalle, reset, user]);
 
 
-  /* 4) GET de inmobiliarias UNA sola vez por apertura */
-  useEffect(() => {
-    let abort = false;
-    function normalizeList(raw) {
-      let list = [];
-      if (raw?.data && Array.isArray(raw.data)) list = raw.data;
-      else if (Array.isArray(raw)) list = raw;
-      else if (raw?.data?.data?.inmobiliarias) list = raw.data.data.inmobiliarias;
-      else if (raw?.data?.inmobiliarias) list = raw.data.inmobiliarias;
-      else if (raw?.inmobiliarias) list = raw.inmobiliarias;
-      
-      return (Array.isArray(list) ? list : [])
-        .map(x => ({
-          id: x.id ?? x.idInmobiliaria ?? x._id ?? "",
-          nombre: x.nombre ?? x.razonSocial ?? "Sin información",
-        }))
-        .filter(i => i.id);
-    }
 
-    async function run() {
-      if (!open || fetchedInmobRef.current) return;
-
-      if (propsInmob && propsInmob.length) {
-        setInmobiliarias(normalizeList(propsInmob));
-        fetchedInmobRef.current = true;
-        return;
-      }
-
-      if (!isInmobiliaria) {
-        try {
-          const response = await getAllInmobiliarias({});
-          const norm = normalizeList(response);
-          if (!abort) {
-            setInmobiliarias(norm);
-            fetchedInmobRef.current = true;
-          }
-        } catch (e) {
-          console.error("Error obteniendo inmobiliarias:", e);
-          if (!abort) {
-            setInmobiliarias([]);
-            fetchedInmobRef.current = true;
-          }
-        }
-      } else {
-        fetchedInmobRef.current = true;
-      }
-    }
-    run();
-    return () => { abort = true; };
-  }, [open, propsInmob, isInmobiliaria]);
 
   /* Calcular label width */
   useEffect(() => {
@@ -251,6 +198,7 @@ export default function ReservaEditarCard({
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
     setLabelW(computed);
   }, [open, detalle?.id]);
+
 
   /* 7) LOGICA PATCH */
   function buildPatch(data) {
@@ -335,6 +283,7 @@ export default function ReservaEditarCard({
         return;
       }
 
+
       const response = await updateReserva(detalle.id, patch);
       if (!response || !response.success) {
         throw new Error(response?.message || "No se pudo guardar la reserva.");
@@ -348,6 +297,7 @@ export default function ReservaEditarCard({
         numero: updated?.numero ?? detalle?.numero ?? null,
         lotMapId: mapId ?? updated?.lotMapId ?? null,
         lote: updated?.lote ? { ...updated.lote, mapId: mapId ?? updated.lote.mapId ?? null } : updated?.lote ?? null,
+        ofertaInicial: updated?.ofertaInicial ?? detalle?.ofertaInicial ?? null,
       };
 
       setDetalle(enrichedUpdated);
@@ -438,41 +388,61 @@ export default function ReservaEditarCard({
   const fechaAct = detalle?.updatedAt ? new Date(detalle.updatedAt).toLocaleDateString("es-AR") : NA;
   const fechaCre = detalle?.createdAt ? new Date(detalle.createdAt).toLocaleDateString("es-AR") : NA;
   
-  // Disponibilidad de estados
+  // Disponibilidad de estados según transiciones permitidas
   const estadosDisponibles = useMemo(() => {
     const estadoActual = String(detalle?.estado ?? "").toUpperCase();
     
-    // EXPIRADA es inmutable
-    if (estadoActual === "EXPIRADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "EXPIRADA");
+    // Función helper para filtrar estados
+    const filterByValues = (allowedValues) => {
+      return ESTADOS_RESERVA.filter(e => allowedValues.includes(e.value));
+    };
+
+    // Reglas de transición por estado actual
+    switch (estadoActual) {
+      case "CANCELADA":
+        // Solo puede volver a ACTIVA
+        return filterByValues(["CANCELADA", "ACTIVA"]);
+      
+      case "ACEPTADA":
+        // Solo puede ir a RECHAZADA o CANCELADA
+        return filterByValues(["ACEPTADA", "RECHAZADA", "CANCELADA"]);
+      
+      case "ACTIVA":
+        // Solo puede ir a CANCELADA (otros estados via negociaciones)
+        if (isInmobiliaria) {
+          return filterByValues(["ACTIVA", "CANCELADA"]);
+        }
+        return filterByValues(["ACTIVA", "CANCELADA"]);
+      
+      case "RECHAZADA":
+        // Solo puede volver a ACTIVA
+        return filterByValues(["RECHAZADA", "ACTIVA"]);
+      
+      case "CONTRAOFERTA":
+        // No se puede cambiar manualmente (solo via negociaciones)
+        return filterByValues(["CONTRAOFERTA"]);
+      
+      case "EXPIRADA":
+        // Solo puede volver a ACTIVA  
+        return filterByValues(["EXPIRADA", "ACTIVA"]);
+      
+      default:
+        // Por defecto, solo mostrar el estado actual
+        return ESTADOS_RESERVA.filter(e => e.value === estadoActual);
     }
-    
-    // CANCELADA o RECHAZADA solo pueden volver a ACTIVA
-    if (estadoActual === "CANCELADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "CANCELADA" || e.value === "ACTIVA");
-    }
-    if (estadoActual === "RECHAZADA") {
-      return ESTADOS_RESERVA.filter(e => e.value === "RECHAZADA" || e.value === "ACTIVA");
-    }
-    
-    // Restricciones para INMOBILIARIA
-    if (isInmobiliaria) {
-      // INMOBILIARIA solo puede cancelar desde ACTIVA
-      if (estadoActual === "ACTIVA") {
-        return ESTADOS_RESERVA.filter(e => e.value === "ACTIVA" || e.value === "CANCELADA");
-      }
-      // Para cualquier otro estado, solo mostrar el actual (read-only)
-      return ESTADOS_RESERVA.filter(e => e.value === estadoActual);
-    }
-    
-    // Admin/Gestor: todos los estados disponibles
-    return ESTADOS_RESERVA;
   }, [isInmobiliaria, detalle?.estado]);
 
   if (!open || !detalle) return null;
 
   const estaEliminada = isEliminado(detalle);
   const puedeEditar = canEditByEstadoOperativo(detalle);
+  const isExpirada = String(detalle?.estado ?? "").toUpperCase() === "EXPIRADA";
+  
+  // Observar el estado seleccionado en el formulario
+  const estadoSeleccionado = watch("estado");
+  
+  // Detectar si estamos en proceso de reactivación
+  const estadoEnReactivacion = isExpirada && estadoSeleccionado === "ACTIVA";
 
   return (
     <>
@@ -511,15 +481,19 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.fecha ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">FECHA</div>
-                    <div className="field-value p0">
-                      <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.fecha ? "is-invalid" : ""}`}
-                        type="date"
-                        {...register("fecha")}
-                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                        readOnly={estaEliminada}
-                      />
-                    </div>
+                    {isInmobiliaria || estaEliminada || isExpirada ? (
+                      <div className="field-value is-readonly">
+                        {detalle?.fechaReserva ? new Date(detalle.fechaReserva).toLocaleDateString('es-AR') : "—"}
+                      </div>
+                    ) : (
+                      <div className="field-value p0">
+                        <input
+                          className={`field-input ${errors.fecha ? "is-invalid" : ""}`}
+                          type="date"
+                          {...register("fecha")}
+                        />
+                      </div>
+                    )}
                   </div>
                   {errors.fecha && <div className="fieldError">{errors.fecha.message}</div>}
               </div>
@@ -543,28 +517,9 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.inmobiliariaId ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">INMOBILIARIA</div>
-                    {isInmobiliaria ? (
-                      <div className="field-value is-readonly">
-                        {detalle?.inmobiliaria?.nombre ?? "La Federala"}
-                      </div>
-                    ) : (
-                      <div className="field-value p0">
-                         <Controller
-                            name="inmobiliariaId"
-                            control={control}
-                            render={({ field: { onChange, value } }) => (
-                                <NiceSelect
-                                    value={value != null ? String(value) : ""}
-                                    options={inmobiliarias.map(i => ({ value: i.id, label: i.nombre }))}
-                                    placeholder="La Federala"
-                                    showPlaceholderOption={false}
-                                    onChange={(val) => !estaEliminada && onChange(val ? Number(val) : undefined)}
-                                    disabled={estaEliminada}
-                                />
-                            )}
-                         />
-                      </div>
-                    )}
+                    <div className="field-value is-readonly">
+                      {detalle?.inmobiliaria?.nombre || detalle?.inmobiliariaNombre || "La Federala"}
+                    </div>
                   </div>
                   {errors.inmobiliariaId && <div className="fieldError">{errors.inmobiliariaId.message}</div>}
               </div>
@@ -595,17 +550,15 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.numero || numeroBackendError ? "hasError" : ""}`}>
                 <div className="field-row">
                   <div className="field-label">NÚMERO DE RESERVA</div>
-                  {isInmobiliaria ? (
+                  {isInmobiliaria || estaEliminada || isExpirada ? (
                     <div className="field-value is-readonly">{detalle?.numero ?? "—"}</div>
                   ) : (
                     <div className="field-value p0">
                       <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.numero || numeroBackendError ? "is-invalid" : ""}`}
+                        className={`field-input ${errors.numero || numeroBackendError ? "is-invalid" : ""}`}
                         type="text"
                         placeholder="Ej: RES-2025-01"
                         {...register("numero")}
-                        disabled={estaEliminada}
-                        readOnly={estaEliminada}
                       />
                     </div>
                   )}
@@ -618,15 +571,20 @@ export default function ReservaEditarCard({
               <div className={`fieldRow ${errors.plazoReserva ? "hasError" : ""}`}>
                   <div className="field-row">
                     <div className="field-label">PLAZO DE RESERVA</div>
-                    <div className="field-value p0">
-                      <input
-                        className={`field-input ${estaEliminada ? "is-readonly" : ""} ${errors.plazoReserva ? "is-invalid" : ""}`}
-                        type="date"
-                        {...register("plazoReserva")}
-                        disabled={estaEliminada || (isInmobiliaria && String(detalle?.estado ?? "").toUpperCase() === "CANCELADA")}
-                        readOnly={estaEliminada}
-                      />
-                    </div>
+                    {(isInmobiliaria || estaEliminada || (isExpirada && !estadoEnReactivacion)) ? (
+                      <div className="field-value is-readonly">
+                        {detalle?.fechaFinReserva ? new Date(detalle.fechaFinReserva).toLocaleDateString('es-AR') : "—"}
+                      </div>
+                    ) : (
+                      <div className="field-value p0">
+                        <input
+                          className={`field-input ${errors.plazoReserva ? "is-invalid" : ""}`}
+                          type="date"
+                          min={detalle?.fechaFinReserva ? toDateInputValue(detalle.fechaFinReserva) : undefined}
+                          {...register("plazoReserva")}
+                        />
+                      </div>
+                    )}
                   </div>
                   {errors.plazoReserva && <div className="fieldError">{errors.plazoReserva.message}</div>}
               </div>
@@ -635,26 +593,30 @@ export default function ReservaEditarCard({
                 <div className="field-row">
                     <div className="field-label">OFERTA INICIAL</div>
                     <div className="field-value is-readonly">
-                       {detalle?.ofertaInicial != null 
-                         ? Number(detalle.ofertaInicial).toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 }) 
-                         : "Sin información"}
+                       {(() => {
+                         const valor = detalle?.ofertaInicial;
+                         if (valor == null || valor === '' || valor === undefined) return "Sin información";
+                         const num = typeof valor === 'number' ? valor : Number(String(valor).replace(/[^0-9.-]/g, ''));
+                         if (isNaN(num)) return "Sin información";
+                         return num.toLocaleString("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+                       })()}
                     </div>
                 </div>
 
                 <div className={`fieldRow ${errors.montoSeña ? "hasError" : ""}`}>
                 <div className="field-row">
                     <div className="field-label">SEÑA</div>
-                    <div className={`field-value p0 ${estaEliminada || isInmobiliaria ? "is-readonly" : ""}`} style={{ position: "relative" }}>
+                    <div className={`field-value p0 ${estaEliminada || isInmobiliaria || isExpirada ? "is-readonly" : ""}`} style={{ position: "relative" }}>
                       <input
-                        className={`field-input ${estaEliminada || isInmobiliaria ? "is-readonly" : ""} ${errors.montoSeña ? "is-invalid" : ""}`}
+                        className={`field-input ${estaEliminada || isInmobiliaria || isExpirada ? "is-readonly" : ""} ${errors.montoSeña ? "is-invalid" : ""}`}
                         type="number"
                         inputMode="decimal"
                         min="0"
                         step="100"
                         {...register("montoSeña", { valueAsNumber: true })}
                         style={{ paddingRight: "50px" }}
-                        disabled={estaEliminada || isInmobiliaria}
-                        readOnly={estaEliminada || isInmobiliaria}
+                        disabled={estaEliminada || isInmobiliaria || isExpirada}
+                        readOnly={estaEliminada || isInmobiliaria || isExpirada}
                       />
                       <span style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", color: "#6B7280", fontSize: "13px", pointerEvents: "none", fontWeight: 500 }}>
                          USD

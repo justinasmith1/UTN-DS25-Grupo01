@@ -177,6 +177,14 @@ export async function createReserva(
           loteId: body.loteId,
           estado: EstadoPrioridad.ACTIVA,
         },
+        include: {
+          inmobiliaria: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+        },
       });
 
       if (!prioridadActiva) {
@@ -213,7 +221,8 @@ export async function createReserva(
         }
 
         if (!targetInmoId || Number(prioridadActiva.inmobiliariaId) !== Number(targetInmoId)) {
-             const err: any = new Error('Esta reserva solo puede ser creada para la inmobiliaria que posee la prioridad.');
+             const nombreInmo = prioridadActiva.inmobiliaria?.nombre || 'Inmobiliaria';
+             const err: any = new Error(`Esta reserva solo puede ser creada para la inmobiliaria "${nombreInmo}" que posee la prioridad.`);
              err.status = 403;
              throw err;
         }
@@ -297,7 +306,6 @@ export async function createReserva(
                 reservaId: reserva.id,
                 monto: body.ofertaInicial,
                 motivo: "Oferta Inicial",
-                plazoHasta: new Date(body.fechaFinReserva), 
                 createdAt: new Date(),
                 nombreEfector,
                 efectorId,
@@ -359,11 +367,53 @@ export async function updateReserva(
       throw err;
     }
 
-    // BLOQUEO TOTAL: No se puede cambiar el estado de una reserva EXPIRADA
-    if (body.estado !== undefined && reservaActual.estado === EstadoReserva.EXPIRADA) {
-      const err: any = new Error('No se puede cambiar el estado de una reserva expirada');
-      err.status = 400;
-      throw err;
+    // VALIDACIÓN DE TRANSICIONES DE ESTADO
+    if (body.estado !== undefined && body.estado !== reservaActual.estado) {
+      const estadoActual = reservaActual.estado as string;
+      const nuevoEstado = body.estado as string;
+      
+      // Definir transiciones permitidas por estado
+      const transicionesPermitidas: Record<string, string[]> = {
+        'CANCELADA': ['ACTIVA'],
+        'ACEPTADA': ['RECHAZADA', 'CANCELADA'],
+        'ACTIVA': ['CANCELADA'],
+        'RECHAZADA': ['ACTIVA'],
+        'CONTRAOFERTA': [], // No se puede cambiar manualmente
+        'EXPIRADA': ['ACTIVA']
+      };
+      
+      const permitidas = transicionesPermitidas[estadoActual] || [];
+      
+      if (!permitidas.includes(nuevoEstado)) {
+        const err: any = new Error(
+          `No se puede cambiar el estado de ${estadoActual} a ${nuevoEstado}. Transiciones permitidas: ${permitidas.join(', ') || 'ninguna (solo via negociaciones)'}`
+        );
+        err.status = 400;
+        throw err;
+      }
+      
+      // Si está reactivando a ACTIVA, validar estado del lote
+      if (nuevoEstado === 'ACTIVA' && ['CANCELADA', 'RECHAZADA', 'EXPIRADA'].includes(estadoActual)) {
+        const lote = await prisma.lote.findUnique({
+          where: { id: reservaActual.loteId },
+          select: { estado: true }
+        });
+        
+        if (!lote) {
+          const err: any = new Error('No se encontró el lote asociado a la reserva');
+          err.status = 404;
+          throw err;
+        }
+        
+        const estadosPermitidos = [EstadoLote.DISPONIBLE, EstadoLote.EN_PROMOCION];
+        if (!estadosPermitidos.includes(lote.estado as any)) {
+          const err: any = new Error(
+            `No se puede reactivar la reserva. El lote debe estar en estado DISPONIBLE o EN PROMOCIÓN (actualmente: ${lote.estado})`
+          );
+          err.status = 400;
+          throw err;
+        }
+      }
     }
 
     // Validar expiración: solo puede aplicarse si la reserva estaba ACTIVA, ACEPTADA o CONTRAOFERTA
@@ -468,6 +518,27 @@ export async function updateReserva(
       const err: any = new Error('No se puede cambiar el loteId de una reserva');
       err.status = 400;
       throw err;
+    }
+
+    // Impedir cambiar inmobiliariaId una vez creada la reserva
+    if (body.inmobiliariaId !== undefined && body.inmobiliariaId !== reservaActual.inmobiliariaId) {
+      const err: any = new Error('No se puede cambiar la inmobiliaria de una reserva ya creada');
+      err.status = 400;
+      throw err;
+    }
+
+    // Impedir que INMOBILIARIA cambie fechas de reserva
+    if (user?.role === 'INMOBILIARIA') {
+      if (body.fechaReserva !== undefined) {
+        const err: any = new Error('El rol INMOBILIARIA no puede modificar la fecha de reserva');
+        err.status = 403;
+        throw err;
+      }
+      if (body.fechaFinReserva !== undefined) {
+        const err: any = new Error('El rol INMOBILIARIA no puede modificar el plazo de reserva');
+        err.status = 403;
+        throw err;
+      }
     }
 
     // Construir dataToUpdate
@@ -757,7 +828,7 @@ export async function getOfertasByReservaId(reservaId: number) {
 // Crear una oferta (contraoferta/aceptación/rechazo)
 // ==============================
 export async function createOfertaReserva(reservaId: number, data: any, user: any) {
-  // data: { monto, motivo, plazoHasta, action: 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR' }
+  // data: { monto, motivo, action: 'CONTRAOFERTAR' | 'ACEPTAR' | 'RECHAZAR' }
   const reserva = await prisma.reserva.findUnique({ 
       where: { id: reservaId },
       include: {
@@ -797,13 +868,7 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
       nombreEfector =  "La Federala"; 
   }
 
-  // VALIDATION: Ensure Plazo is > Reserva.fechaReserva
-  if (data.plazoHasta) {
-      const plazoDate = new Date(data.plazoHasta);
-      if (plazoDate <= reserva.fechaReserva) {
-          throw { statusCode: 400, message: "La validez de la oferta debe ser posterior a la fecha de la reserva." };
-      }
-  }
+
 
   // Transaction
   return prisma.$transaction(async (tx) => {
@@ -814,7 +879,6 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
         reservaId,
         monto: data.monto, // Puede ser el mismo monto anterior si solo rechaza o acepta, o nuevo si contraoferta
         motivo: data.motivo,
-        plazoHasta: data.plazoHasta ? new Date(data.plazoHasta) : null,
         nombreEfector,
         efectorId,
         ownerType,
@@ -835,14 +899,7 @@ export async function createOfertaReserva(reservaId: number, data: any, user: an
         updateData.estado = EstadoReserva.CONTRAOFERTA;
     }
 
-    // Lógica de extensión de plazo (solo si es Admin/CCLF y hay un plazo mayor)
-    if (ownerType === OwnerPrioridad.CCLF && data.plazoHasta) {
-        const nuevoPlazo = new Date(data.plazoHasta);
-        // Si el nuevo plazo es mayor al vencimiento actual, extender
-        if (nuevoPlazo > reserva.fechaFinReserva) {
-            updateData.fechaFinReserva = nuevoPlazo;
-        }
-    }
+
 
     const reservaUpdated = await tx.reserva.update({
         where: { id: reservaId },

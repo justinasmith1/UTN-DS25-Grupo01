@@ -96,6 +96,5 @@ export const queryReservasSchema = z.object({
 export const createOfertaSchema = z.object({
   monto: dineroPositivo,
   motivo: z.string().optional(),
-  plazoHasta: isoDate.optional().nullable().or(z.literal('')), 
   action: z.enum(['CONTRAOFERTAR', 'ACEPTAR', 'RECHAZAR']).optional()
 });
