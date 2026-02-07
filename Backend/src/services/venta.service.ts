@@ -5,6 +5,11 @@ import { updateLoteState } from './lote.service';
 import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
 import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
 import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
+import { 
+    assertTransicionEstadoValida, 
+    assertCamposObligatoriosPorEstado 
+} from '../domain/ventaState/ventaState.rules';
+import { isVentaFinalizada } from '../domain/ventaState/ventaState.types';
 
 
 export async function getAllVentas(
@@ -124,14 +129,25 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         throw error;
     }
 
+    // Validar campos obligatorios según estado inicial (si viene estado diferente a INICIADA)
+    const estadoInicial = data.estado || 'INICIADA';
+    assertCamposObligatoriosPorEstado(estadoInicial as any, {
+        fechaEscrituraReal: data.fechaEscrituraReal ? new Date(data.fechaEscrituraReal) : null,
+        fechaCancelacion: data.fechaCancelacion ? new Date(data.fechaCancelacion) : null,
+        motivoCancelacion: data.motivoCancelacion,
+    } as any);
+
     const newVenta = await prisma.venta.create({
         data: {
             loteId: data.loteId,
             fechaVenta: new Date(data.fechaVenta),
             monto: data.monto,
-            estado: data.estado || 'INICIADA',
+            estado: estadoInicial,
             estadoCobro: data.estadoCobro || 'PENDIENTE', // Si viene en request, usarlo; si no, PENDIENTE
             plazoEscritura: data.plazoEscritura ? new Date(data.plazoEscritura) : null,
+            fechaEscrituraReal: data.fechaEscrituraReal ? new Date(data.fechaEscrituraReal) : null,
+            fechaCancelacion: data.fechaCancelacion ? new Date(data.fechaCancelacion) : null,
+            motivoCancelacion: data.motivoCancelacion || null,
             tipoPago: data.tipoPago,
             compradorId: data.compradorId,
             inmobiliariaId: data.inmobiliariaId || null,
@@ -162,7 +178,7 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
     // Obtener venta actual para validaciones y side effects
     const ventaActual = await prisma.venta.findUnique({
         where: { id },
-        select: { estado: true, loteId: true }
+        select: { estado: true, estadoCobro: true, loteId: true }
     });
 
     if (!ventaActual) {
@@ -171,12 +187,21 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
         throw error;
     }
 
-    // Validar cancelación: no se puede cancelar una venta ESCRITURADO
-    if (updateData.estado === 'CANCELADA' && ventaActual.estado === 'ESCRITURADO') {
-        const error = new Error('No se puede cancelar una venta que ya está escriturada');
-        (error as any).statusCode = 400;
-        throw error;
+    // Validar transición de estado si se está cambiando
+    if (updateData.estado && updateData.estado !== ventaActual.estado) {
+        assertTransicionEstadoValida(ventaActual.estado, updateData.estado as any);
     }
+
+    // Preparar datos para validar campos obligatorios según nuevo estado
+    const estadoFinal = updateData.estado || ventaActual.estado;
+    const dataValidacion = {
+        fechaEscrituraReal: updateData.fechaEscrituraReal ? new Date(updateData.fechaEscrituraReal) : null,
+        fechaCancelacion: updateData.fechaCancelacion ? new Date(updateData.fechaCancelacion) : null,
+        motivoCancelacion: updateData.motivoCancelacion,
+    };
+
+    // Validar campos obligatorios según el estado final
+    assertCamposObligatoriosPorEstado(estadoFinal as any, dataValidacion as any);
 
     if (updateData.loteId) {
         const loteExists = await prisma.lote.findUnique({
@@ -212,9 +237,24 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
     }
 
     try{
+        // Preparar datos de actualización con conversión de fechas
+        const prismaUpdateData: any = { ...updateData };
+        if (updateData.fechaVenta) {
+            prismaUpdateData.fechaVenta = new Date(updateData.fechaVenta);
+        }
+        if (updateData.plazoEscritura) {
+            prismaUpdateData.plazoEscritura = new Date(updateData.plazoEscritura);
+        }
+        if (updateData.fechaEscrituraReal) {
+            prismaUpdateData.fechaEscrituraReal = new Date(updateData.fechaEscrituraReal);
+        }
+        if (updateData.fechaCancelacion) {
+            prismaUpdateData.fechaCancelacion = new Date(updateData.fechaCancelacion);
+        }
+
         const updatedVenta = await prisma.venta.update({
             where: { id }, 
-            data: updateData,
+            data: prismaUpdateData,
             include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
         });
 
@@ -281,18 +321,32 @@ export async function eliminarVenta(
         throw error;
     }
 
-    // Regla de negocio: solo se puede eliminar si estado === CANCELADA
-    const estadoStr = String(venta.estado).toUpperCase();
-    if (estadoStr !== 'CANCELADA') {
-        const error = new Error(`No se puede eliminar una venta en estado ${venta.estado}. Solo se pueden eliminar ventas canceladas.`) as any;
-        error.statusCode = 409;
-        throw error;
+    // Validar regla de negocio: solo se puede eliminar si CANCELADA o FINALIZADA
+    const ventaData = {
+        estado: venta.estado,
+        estadoCobro: venta.estadoCobro,
+        fechaEscrituraReal: venta.fechaEscrituraReal,
+        fechaCancelacion: venta.fechaCancelacion,
+        motivoCancelacion: venta.motivoCancelacion,
+    };
+
+    // Esta función lanza error si no se puede eliminar
+    try {
+        const { assertVentaEliminable } = await import('../domain/ventaState/ventaState.rules');
+        assertVentaEliminable(ventaData);
+    } catch (err: any) {
+        // Re-lanzar con statusCode si no lo tiene
+        if (!err.statusCode && !err.status) {
+            err.statusCode = 409;
+        }
+        throw err;
     }
 
     return await prisma.venta.update({
         where: { id },
         data: {
             estadoOperativo: 'ELIMINADO',
+            fechaBaja: new Date(),
         },
         include: { comprador: true, lote: { include: { propietario: true, fraccion: { select: { numero: true } } } }, inmobiliaria: true },
     });

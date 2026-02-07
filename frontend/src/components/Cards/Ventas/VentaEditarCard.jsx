@@ -1,19 +1,17 @@
 // src/components/Ventas/VentaEditarCard.jsx
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import EditarBase from "../Base/EditarBase.jsx";
 import SuccessAnimation from "../Base/SuccessAnimation.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
+import { Info } from "lucide-react";
 import { updateVenta, getVentaById } from "../../../lib/api/ventas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
-
-/** Estados: value técnico + label Title Case */
-const ESTADOS = [
-  { value: "INICIADA", label: "Iniciada" },
-  { value: "CON_BOLETO", label: "Con Boleto" },
-  { value: "FINALIZADA", label: "Finalizada" },
-  { value: "CANCELADA", label: "Cancelada" },
-];
+import { 
+  getEstadosDisponibles, 
+  esEstadoTerminal, 
+  getMensajeEstadoTerminal 
+} from "../../../utils/ventaState";
 
 /* -------------------------- Helpers fechas -------------------------- */
 function toDateInputValue(v) {
@@ -33,26 +31,26 @@ function fromDateInputToISO(s) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-/* -------------------------- Helper dinero (como VerVentaCard) -------------------------- */
-function fmtMoney(val) {
-  const NA = "Sin información";
-  const isBlank = (v) =>
-    v === null ||
-    v === undefined ||
-    (typeof v === "string" && v.trim().length === 0);
+/* -------------------------- Constantes -------------------------- */
 
-  if (isBlank(val)) return NA;
-  const n =
-    typeof val === "number"
-      ? val
-      : Number(String(val).replace(/[^\d.-]/g, ""));
-  if (!isFinite(n)) return NA;
-  return n.toLocaleString("es-AR", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  });
-}
+// Objeto de errores inicial (reutilizable)
+const INITIAL_ERRORS = {
+  numero: null,
+  estado: null,
+  fechaEscrituraReal: null,
+  fechaCancelacion: null,
+  motivoCancelacion: null,
+  general: null,
+};
+
+// Mapa de keywords para detección inteligente de errores del backend
+const ERROR_KEYWORDS = [
+  { pattern: /fechaEscrituraReal/i, field: 'fechaEscrituraReal' },
+  { pattern: /fechaCancelaci[oó]n/i, field: 'fechaCancelacion' },
+  { pattern: /motivoCancelaci[oó]n/i, field: 'motivoCancelacion' },
+  { pattern: /estado/i, field: 'estado' },
+  { pattern: /n[uú]mero/i, field: 'numero' },
+];
 
 /* ========================================================================== */
 
@@ -199,7 +197,8 @@ export default function VentaEditarCard({
     detalle?.inmobiliaria?.id ?? detalle?.inmobiliariaId ?? "";
   const initialNumero = detalle?.numero != null ? String(detalle.numero) : "";
 
-  const base = {
+  // Objeto base memoizado (evita recreación en cada render)
+  const base = useMemo(() => ({
     estado: String(detalle?.estado ?? "INICIADA"),
     monto: detalle?.monto != null ? String(detalle.monto) : "",
     tipoPago: detalle?.tipoPago ?? "",
@@ -207,7 +206,7 @@ export default function VentaEditarCard({
     plazoEscritura: toDateInputValue(detalle?.plazoEscritura),
     inmobiliariaId: initialInmobId,
     numero: initialNumero,
-  };
+  }), [detalle?.estado, detalle?.monto, detalle?.tipoPago, fechaVentaISO, detalle?.plazoEscritura, initialInmobId, initialNumero]);
 
   const [estado, setEstado] = useState(base.estado);
   const [monto, setMonto] = useState(base.monto);
@@ -216,8 +215,21 @@ export default function VentaEditarCard({
   const [plazoEscritura, setPlazoEscritura] = useState(base.plazoEscritura);
   const [inmobiliariaId, setInmobiliariaId] = useState(base.inmobiliariaId);
   const [numero, setNumero] = useState(base.numero);
-  const [numeroError, setNumeroError] = useState(null);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Nuevos campos condicionales (Etapa 1)
+  const [fechaEscrituraReal, setFechaEscrituraReal] = useState(
+    toDateInputValue(detalle?.fechaEscrituraReal)
+  );
+  const [fechaCancelacion, setFechaCancelacion] = useState(
+    toDateInputValue(detalle?.fechaCancelacion)
+  );
+  const [motivoCancelacion, setMotivoCancelacion] = useState(
+    detalle?.motivoCancelacion ?? ""
+  );
+
+  // Sistema de errores estructurado (reemplaza alerts)
+  const [errors, setErrors] = useState(INITIAL_ERRORS);
 
   // re-sync cuando cambia 'detalle' o se reabre
   useEffect(() => {
@@ -229,7 +241,10 @@ export default function VentaEditarCard({
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
     setNumero(base.numero);
-    setNumeroError(null);
+    setFechaEscrituraReal(toDateInputValue(detalle?.fechaEscrituraReal));
+    setFechaCancelacion(toDateInputValue(detalle?.fechaCancelacion));
+    setMotivoCancelacion(detalle?.motivoCancelacion ?? "");
+    setErrors({ ...INITIAL_ERRORS });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, detalle?.id, detalle?.monto]);
 
@@ -289,19 +304,128 @@ export default function VentaEditarCard({
       patch.inmobiliariaId = inmobiliariaId || null;
     }
 
+    // Campos condicionales nuevos (Etapa 1)
+    const prevFER = toDateInputValue(detalle?.fechaEscrituraReal);
+    if (prevFER !== fechaEscrituraReal) {
+      patch.fechaEscrituraReal = fechaEscrituraReal && fechaEscrituraReal.trim() !== ""
+        ? fromDateInputToISO(fechaEscrituraReal)
+        : null;
+    }
+
+    const prevFC = toDateInputValue(detalle?.fechaCancelacion);
+    if (prevFC !== fechaCancelacion) {
+      patch.fechaCancelacion = fechaCancelacion && fechaCancelacion.trim() !== ""
+        ? fromDateInputToISO(fechaCancelacion)
+        : null;
+    }
+
+    const prevMC = detalle?.motivoCancelacion ?? "";
+    if (prevMC !== motivoCancelacion) {
+      patch.motivoCancelacion = motivoCancelacion && motivoCancelacion.trim() !== ""
+        ? motivoCancelacion.trim()
+        : null;
+    }
+
     return patch;
+  }
+
+  // Helper para limpiar todos los errores
+  function clearAllErrors() {
+    setErrors({ ...INITIAL_ERRORS });
+  }
+
+  // Helper para mapear errores del backend a campos
+  function handleBackendError(error) {
+    const newErrors = { ...errors };
+    
+    // Extraer mensaje del error
+    const errorMsg = error?.message || error?.response?.data?.message || "Error al guardar la venta";
+    
+    // Caso 1: Error de transición de estado
+    if (/transici[oó]n.*inválida|transición.*estado/i.test(errorMsg)) {
+      newErrors.estado = errorMsg;
+      setErrors(newErrors);
+      return;
+    }
+    
+    // Caso 2: Errores estructurados de Zod (array de errores)
+    if (error?.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+      error.response.data.errors.forEach((err) => {
+        const campo = err.path?.[0] || '';
+        const mensaje = err.message || '';
+        
+        // Mapear por campo
+        if (campo === 'numero' || /n[uú]mero/i.test(mensaje)) {
+          newErrors.numero = mensaje || "Número de venta inválido";
+        } else if (campo === 'estado' || /estado/i.test(mensaje)) {
+          newErrors.estado = mensaje;
+        } else if (campo === 'fechaEscrituraReal' || /fecha.*escritura.*real/i.test(mensaje)) {
+          newErrors.fechaEscrituraReal = mensaje;
+        } else if (campo === 'fechaCancelacion' || /fecha.*cancelaci[oó]n/i.test(mensaje)) {
+          newErrors.fechaCancelacion = mensaje;
+        } else if (campo === 'motivoCancelacion' || /motivo.*cancelaci[oó]n/i.test(mensaje)) {
+          newErrors.motivoCancelacion = mensaje;
+        } else {
+          // Error genérico
+          if (!newErrors.general) newErrors.general = mensaje;
+        }
+      });
+      setErrors(newErrors);
+      return;
+    }
+    
+    // Caso 3: Error de unicidad de número (común)
+    if (/n[uú]mero.*existe|unique.*numero/i.test(errorMsg)) {
+      newErrors.numero = "Ya existe una venta con este número";
+      setErrors(newErrors);
+      return;
+    }
+    
+    // Caso 4: Menciona un campo específico en el mensaje (detección por keywords)
+    const matchedKeyword = ERROR_KEYWORDS.find(k => k.pattern.test(errorMsg));
+    if (matchedKeyword) {
+      newErrors[matchedKeyword.field] = errorMsg;
+    } else {
+      newErrors.general = errorMsg;
+    }
+    
+    setErrors(newErrors);
   }
 
   async function handleSave() {
     // Bloquear guardado si está eliminada
     if (isEliminado(detalle)) {
-      setNumeroError("No se puede editar una venta eliminada. Reactívala para modificarla.");
+      setErrors({ ...errors, general: "No se puede editar una venta eliminada. Reactívala para modificarla." });
       return;
     }
     
     try {
       setSaving(true);
-      setNumeroError(null);
+      clearAllErrors();
+
+      const newErrors = {};
+
+      // Validaciones condicionales (Etapa 1)
+      if (estado === "ESCRITURADO" && (!fechaEscrituraReal || !fechaEscrituraReal.trim())) {
+        newErrors.fechaEscrituraReal = "El campo Fecha Escritura Real es obligatorio para el estado ESCRITURADO";
+      }
+
+      if (estado === "CANCELADA") {
+        if (!fechaCancelacion || !fechaCancelacion.trim()) {
+          newErrors.fechaCancelacion = "El campo Fecha Cancelación es obligatorio para el estado CANCELADA";
+        }
+        if (!motivoCancelacion || !motivoCancelacion.trim()) {
+          newErrors.motivoCancelacion = "El campo Motivo Cancelación es obligatorio para el estado CANCELADA";
+        }
+      }
+
+      // Si hay errores de validación frontend, mostrarlos y detener
+      if (Object.keys(newErrors).length > 0) {
+        setErrors({ ...errors, ...newErrors });
+        setSaving(false);
+        return;
+      }
+
       const patch = buildPatch();
 
       if (Object.keys(patch).length === 0) {
@@ -327,16 +451,8 @@ export default function VentaEditarCard({
       }, 1500);
     } catch (e) {
       console.error("Error guardando venta:", e);
-      const msg = e?.message || "";
-      if (msg.toLowerCase().includes("número de venta")) {
-        setNumeroError(msg);
-      } else if (/numero/i.test(msg) && /(unique|único|existe|existente)/i.test(msg)) {
-        setNumeroError("Ya existe una venta con este número");
-      }
+      handleBackendError(e);
       setSaving(false);
-      if (!msg.toLowerCase().includes("número de venta")) {
-        alert(msg || "No se pudo guardar la venta.");
-      }
     }
   }
 
@@ -348,11 +464,19 @@ export default function VentaEditarCard({
     setPlazoEscritura(base.plazoEscritura);
     setInmobiliariaId(base.inmobiliariaId);
     setNumero(base.numero);
-    setNumeroError(null);
+    setFechaEscrituraReal(toDateInputValue(detalle?.fechaEscrituraReal));
+    setFechaCancelacion(toDateInputValue(detalle?.fechaCancelacion));
+    setMotivoCancelacion(detalle?.motivoCancelacion ?? "");
+    clearAllErrors();
   }
 
   /* 8) Render */
   const NA = "Sin información";
+
+  // Opciones de estados dinámicas según transiciones permitidas
+  const estadosDisponibles = getEstadosDisponibles(detalle?.estado || 'INICIADA');
+  const esTerminal = esEstadoTerminal(detalle?.estado);
+  const mensajeTerminal = getMensajeEstadoTerminal(detalle?.estado);
 
   const compradorNombre = (() => {
     const n = detalle?.comprador?.nombre, a = detalle?.comprador?.apellido;
@@ -401,7 +525,7 @@ export default function VentaEditarCard({
           // Siempre resetear estados antes de cerrar
           setSaving(false);
           setShowSuccess(false);
-          setNumeroError(null);
+          clearAllErrors();
           onCancel?.();
         }}
         onSave={handleSave}
@@ -469,17 +593,127 @@ export default function VentaEditarCard({
 
               <div className="field-row">
                 <div className="field-label">ESTADO DE VENTA</div>
-                <div className="field-value p0">
+                <div className="field-value p0" style={{ position: 'relative' }}>
                   <NiceSelect
                     value={estado}
-                    options={ESTADOS}
+                    options={estadosDisponibles}
                     placeholder="Seleccionar estado"
-                    onChange={(val) => !estaEliminada && setEstado(val)}
+                    onChange={(val) => {
+                      if (!estaEliminada && !esTerminal) {
+                        setEstado(val);
+                        // Limpiar error de estado al cambiar
+                        if (errors.estado) {
+                          setErrors({ ...errors, estado: null });
+                        }
+                      }
+                    }}
                     showPlaceholderOption={false}
-                    disabled={estaEliminada}
+                    disabled={estaEliminada || esTerminal}
                   />
+                  {/* Tooltip para estados terminales */}
+                  {esTerminal && mensajeTerminal && (
+                    <span
+                      className="propietario-info-icon-inline estado-tooltip-icon"
+                      data-tooltip={mensajeTerminal}
+                    >
+                      <Info size={14} />
+                    </span>
+                  )}
+                  {/* Error inline */}
+                  {errors.estado && (
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                      {errors.estado}
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Campo condicional: Fecha Escritura Real (solo si ESCRITURADO) */}
+              {estado === "ESCRITURADO" && (
+                <div className="field-row">
+                  <div className="field-label">FECHA ESCRITURA REAL</div>
+                  <div className="field-value p0">
+                    <input
+                      className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                      type="date"
+                      value={fechaEscrituraReal}
+                      onChange={(e) => {
+                        if (!estaEliminada) {
+                          setFechaEscrituraReal(e.target.value);
+                          if (errors.fechaEscrituraReal) {
+                            setErrors({ ...errors, fechaEscrituraReal: null });
+                          }
+                        }
+                      }}
+                      disabled={estaEliminada}
+                      readOnly={estaEliminada}
+                    />
+                    {errors.fechaEscrituraReal && (
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                        {errors.fechaEscrituraReal}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Campos condicionales: Fecha y Motivo de Cancelación (solo si CANCELADA) */}
+              {estado === "CANCELADA" && (
+                <>
+                  <div className="field-row">
+                    <div className="field-label">FECHA CANCELACIÓN</div>
+                    <div className="field-value p0">
+                      <input
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                        type="date"
+                        value={fechaCancelacion}
+                        onChange={(e) => {
+                          if (!estaEliminada) {
+                            setFechaCancelacion(e.target.value);
+                            if (errors.fechaCancelacion) {
+                              setErrors({ ...errors, fechaCancelacion: null });
+                            }
+                          }
+                        }}
+                        disabled={estaEliminada}
+                        readOnly={estaEliminada}
+                      />
+                      {errors.fechaCancelacion && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                          {errors.fechaCancelacion}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="field-row">
+                    <div className="field-label">MOTIVO CANCELACIÓN</div>
+                    <div className="field-value p0">
+                      <textarea
+                        className={`field-input ${estaEliminada ? "is-readonly" : ""}`}
+                        value={motivoCancelacion}
+                        onChange={(e) => {
+                          if (!estaEliminada) {
+                            setMotivoCancelacion(e.target.value);
+                            if (errors.motivoCancelacion) {
+                              setErrors({ ...errors, motivoCancelacion: null });
+                            }
+                          }
+                        }}
+                        placeholder="Motivo de la cancelación"
+                        rows={3}
+                        disabled={estaEliminada}
+                        readOnly={estaEliminada}
+                        style={{ resize: "vertical", minHeight: "60px" }}
+                      />
+                      {errors.motivoCancelacion && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
+                          {errors.motivoCancelacion}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
@@ -516,20 +750,38 @@ export default function VentaEditarCard({
                       onChange={(e) => {
                         if (!estaEliminada) {
                           setNumero(e.target.value);
-                          if (numeroError) setNumeroError(null);
+                          if (errors.numero) {
+                            setErrors({ ...errors, numero: null });
+                          }
                         }
                       }}
                       placeholder="Ej: CCLF-2025-01"
                       disabled={estaEliminada}
                       readOnly={estaEliminada}
                     />
-                  {numeroError && (
+                  {errors.numero && (
                     <div style={{ marginTop: 4, fontSize: 12, color: "#b91c1c" }}>
-                      {numeroError}
+                      {errors.numero}
                     </div>
                   )}
                 </div>
               </div>
+
+              {/* Error general (si no se pudo mapear a campo específico) */}
+              {errors.general && (
+                <div style={{ 
+                  marginTop: 8, 
+                  marginBottom: 8, 
+                  padding: '8px 12px',
+                  backgroundColor: '#fee2e2',
+                  border: '1px solid #fca5a5',
+                  borderRadius: '0.375rem',
+                  color: '#991b1b',
+                  fontSize: '13px'
+                }}>
+                  {errors.general}
+                </div>
+              )}
 
               <div className="field-row">
                 <div className="field-label">FECHA VENTA</div>

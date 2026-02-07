@@ -117,8 +117,8 @@ export function getReservaDeleteTooltip(reserva) {
 
 /**
  * Verifica si una venta puede eliminarse lógicamente según su estado comercial
- * Solo se pueden eliminar ventas en estado: CANCELADA
- * @param {Object} venta - Venta con campo estado
+ * Solo se pueden eliminar ventas en estado: CANCELADA o FINALIZADA derivada (ESCRITURADO + PAGO_COMPLETO)
+ * @param {Object} venta - Venta con campo estado y estadoCobro
  * @returns {boolean} - true si puede eliminarse lógicamente
  */
 export function canDeleteVenta(venta) {
@@ -131,22 +131,49 @@ export function canDeleteVenta(venta) {
   if (!estado) return false;
   
   const estadoStr = String(estado).toUpperCase().trim();
-  const estadosPermitidos = ['CANCELADA'];
   
-  return estadosPermitidos.includes(estadoStr);
+  // Caso 1: CANCELADA
+  if (estadoStr === 'CANCELADA') return true;
+  
+  // Caso 2: FINALIZADA derivada (ESCRITURADO + PAGO_COMPLETO)
+  if (estadoStr === 'ESCRITURADO') {
+    const estadoCobro = venta.estadoCobro;
+    if (!estadoCobro) return false;
+    const estadoCobroStr = String(estadoCobro).toUpperCase().trim();
+    return estadoCobroStr === 'PAGO_COMPLETO';
+  }
+  
+  return false;
 }
 
 /**
  * Obtiene el mensaje de tooltip para cuando no se puede eliminar una venta
- * @param {Object} venta - Venta con campo estado
+ * @param {Object} venta - Venta con campo estado y estadoCobro
  * @returns {string} - Mensaje explicativo
  */
 export function getVentaDeleteTooltip(venta) {
   if (!venta) return 'No se puede eliminar esta venta';
   
-  const estado = venta.estado;
+  if (!isOperativo(venta)) {
+    return 'Esta venta ya está eliminada';
+  }
+  
+  const estado = venta?.estado;
   if (!estado) return 'No se puede eliminar esta venta';
   
   const estadoStr = String(estado).toUpperCase().trim();
-  return `No se puede eliminar una venta en estado ${estadoStr}`;
+  
+  // Si ya puede eliminarse, no mostrar tooltip
+  if (canDeleteVenta(venta)) return '';
+  
+  // Mensajes específicos según el estado
+  if (estadoStr === 'ESCRITURADO') {
+    const estadoCobro = venta?.estadoCobro;
+    const estadoCobroStr = estadoCobro ? String(estadoCobro).toUpperCase().trim() : '';
+    if (estadoCobroStr !== 'PAGO_COMPLETO') {
+      return 'Solo podés eliminar ventas CANCELADAS o FINALIZADAS (ESCRITURADO + PAGO_COMPLETO)';
+    }
+  }
+  
+  return 'Solo podés eliminar ventas CANCELADAS o FINALIZADAS (ESCRITURADO + PAGO_COMPLETO)';
 }

@@ -70,17 +70,14 @@ enum EstadoReserva {
 }
 
 enum EstadoCobro {
-  OPERATIVO
-  ELIMINADO
   PENDIENTE
   EN_CURSO
-  COMPLETADA
+  PAGO_COMPLETO
 }
 
 enum EstadoVenta {
   INICIADA
   CON_BOLETO
-  ESCRITURA_PROGRAMADA
   ESCRITURADO
   CANCELADA
 }
@@ -312,26 +309,29 @@ model Fraccion {
 
 // VENTAS
 model Venta {
-  id              Int             @id @default(autoincrement())
-  numero          String          @unique
-  loteId          Int
-  lote            Lote            @relation(fields: [loteId], references: [id], onDelete: Restrict)
-  fechaVenta      DateTime
-  monto           Decimal         @db.Decimal(12, 2)
-  estado          EstadoVenta     @default(INICIADA)
-  estadoPrevio    EstadoVenta?
-  estadoOperativo EstadoOperativo @default(OPERATIVO)
-  fechaBaja       DateTime?
-  estadoCobro     EstadoCobro     @default(PENDIENTE)
-  plazoEscritura  DateTime?
-  tipoPago        String
-  compradorId     Int
-  comprador       Persona         @relation(fields: [compradorId], references: [id], onDelete: Restrict)
-  inmobiliariaId  Int?
-  inmobiliaria    Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
-  reservaConsumo  Reserva?        @relation("VentaConsumeReserva")
-  createdAt       DateTime        @default(now())
-  updateAt        DateTime?
+  id                  Int             @id @default(autoincrement())
+  numero              String          @unique
+  loteId              Int
+  lote                Lote            @relation(fields: [loteId], references: [id], onDelete: Restrict)
+  fechaVenta          DateTime
+  monto               Decimal         @db.Decimal(12, 2)
+  estado              EstadoVenta     @default(INICIADA)
+  estadoPrevio        EstadoVenta?
+  estadoOperativo     EstadoOperativo @default(OPERATIVO)
+  fechaBaja           DateTime?
+  estadoCobro         EstadoCobro     @default(PENDIENTE)
+  plazoEscritura      DateTime?
+  fechaEscrituraReal  DateTime?
+  fechaCancelacion    DateTime?
+  motivoCancelacion   String?         @db.Text
+  tipoPago            String
+  compradorId         Int
+  comprador           Persona         @relation(fields: [compradorId], references: [id], onDelete: Restrict)
+  inmobiliariaId      Int?
+  inmobiliaria        Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
+  reservaConsumo      Reserva?        @relation("VentaConsumeReserva")
+  createdAt           DateTime        @default(now())
+  updateAt            DateTime?
 
   @@index([estadoOperativo], name: "idx_venta_estado_operativo")
 }

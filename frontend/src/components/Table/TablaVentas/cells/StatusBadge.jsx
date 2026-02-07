@@ -34,8 +34,6 @@ function pickVariant(estado) {
                       // En tablas "soft delete", suele ser gris.
     case 'ESCRITURADO':
       return 'success';
-    case 'ESCRITURA_PROGRAMADA':
-      return 'info';
     case 'INICIADA':
       return 'info';
     case 'CON_BOLETO':
