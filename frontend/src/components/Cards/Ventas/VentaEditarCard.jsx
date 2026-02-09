@@ -522,6 +522,8 @@ export default function VentaEditarCard({
   // Etapa 2: Validaciones de edición por estado
   const esEditable = esVentaEditable(detalle?.estado);
   const puedeEditarCobro = puedeEditarEstadoCobro(detalle?.estado);
+  
+  // FINALIZADA solo se muestra si está guardada en BD (no en cambios locales pendientes)
   const esFinalizada = isVentaFinalizada(detalle);
 
   const compradorNombre = (() => {
@@ -682,19 +684,20 @@ export default function VentaEditarCard({
                         <Info size={14} />
                       </span>
                     )}
-                    {/* Indicador FINALIZADA (derivada) */}
-                    {esFinalizada && (
-                      <div style={{ 
-                        marginTop: 4, 
-                        fontSize: 12, 
-                        color: '#059669',
-                        fontWeight: 600
-                      }}>
-                        ✓ FINALIZADA (Escriturado + Pago Completo)
-                      </div>
-                    )}
                   </div>
                 </div>
+                {/* Indicador FINALIZADA (derivada) - FUERA del field-row para que aparezca debajo */}
+                {esFinalizada && estadoCobro === detalle?.estadoCobro && (
+                  <div style={{ 
+                    marginTop: 6, 
+                    marginLeft: 'calc(var(--sale-label-w, 180px) + 12px)',
+                    fontSize: 12, 
+                    color: '#059669',
+                    fontWeight: 600
+                  }}>
+                    ✓ FINALIZADA (Escriturado + Pago Completo)
+                  </div>
+                )}
                 {/* Error inline */}
                 {errors.estado && <div className="fieldError">{errors.estado}</div>}
               </div>

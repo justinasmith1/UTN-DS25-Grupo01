@@ -20,7 +20,13 @@ export const ventasFilterPreset = {
       unit: "días",
     },
     monto: { minLimit: 0, maxLimit: 1000000, step: 1000, unit: "USD" },
-    plazoEscritura: { minLimit: 0, maxLimit: 365, step: 1, unit: "días" },
+    // Etapa 3: Rango de fecha para plazoEscritura (fecha escritura programada)
+    plazoEscritura: {
+      minLimit: new Date("2020-01-01").getTime(),
+      maxLimit: new Date("2030-12-31").getTime(),
+      step: 86400000, // 1 día en ms
+      unit: "días",
+    },
   },
   // Defaults en plural + compatibilidad legacy
   defaults: {
@@ -31,6 +37,6 @@ export const ventasFilterPreset = {
     inmobiliaria: [], // legacy
     fechaVenta: { min: null, max: null },
     monto: { min: null, max: null },
-    plazoEscritura: { min: null, max: null },
+    plazoEscritura: { min: null, max: null }, // Etapa 3: Fecha escritura programada (rango)
   },
 };

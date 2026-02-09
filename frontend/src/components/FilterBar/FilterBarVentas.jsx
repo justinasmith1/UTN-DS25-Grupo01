@@ -29,6 +29,7 @@ export default function FilterBarVentas({
       { id: "tipoPago",       type: "multiSelect", label: "Tipo de Pago",   defaultValue: [] },
       { id: "inmobiliarias",  type: "multiSelect", label: "Inmobiliaria",   defaultValue: [] },
       { id: "fechaVenta",     type: "dateRange",   label: "Fecha de Venta", defaultValue: { min: null, max: null } },
+      { id: "plazoEscritura", type: "dateRange",   label: "Fecha Escritura Programada", defaultValue: { min: null, max: null } }, // Etapa 3
       { id: "monto",          type: "range",       label: "Monto",          defaultValue: { min: null, max: null } },
     ],
     []
@@ -83,6 +84,7 @@ export default function FilterBarVentas({
   const ranges = useMemo(
     () => ({
       fechaVenta: ventasFilterPreset?.ranges?.fechaVenta,
+      plazoEscritura: ventasFilterPreset?.ranges?.plazoEscritura, // Etapa 3
       monto: ventasFilterPreset?.ranges?.monto,
     }),
     []
@@ -96,6 +98,7 @@ export default function FilterBarVentas({
       tipoPago: [],
       inmobiliarias: [],
       fechaVenta: { min: null, max: null },
+      plazoEscritura: { min: null, max: null }, // Etapa 3
       monto: { min: null, max: null },
     }),
     []
@@ -118,7 +121,8 @@ export default function FilterBarVentas({
         return val;
       },
       tipoPago: nice,
-      inmobiliarias: nice,
+      // inmobiliarias: NO usar 'nice' porque toma el value (ID) en lugar del label (nombre)
+      // Dejar que FilterBarBase use el label directamente de las opciones
     }),
     []
   );
