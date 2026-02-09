@@ -23,6 +23,33 @@ export const ESTADO_VENTA_LABELS = {
 };
 
 /**
+ * Estados de cobro válidos (Etapa 2)
+ */
+export const ESTADO_COBRO = {
+  PENDIENTE: 'PENDIENTE',
+  EN_CURSO: 'EN_CURSO',
+  PAGO_COMPLETO: 'PAGO_COMPLETO',
+};
+
+/**
+ * Labels legibles para estados de cobro
+ */
+export const ESTADO_COBRO_LABELS = {
+  [ESTADO_COBRO.PENDIENTE]: 'Pendiente',
+  [ESTADO_COBRO.EN_CURSO]: 'En Curso',
+  [ESTADO_COBRO.PAGO_COMPLETO]: 'Pago Completo',
+};
+
+/**
+ * Opciones para selector de estado de cobro
+ */
+export const OPCIONES_ESTADO_COBRO = [
+  { value: ESTADO_COBRO.PENDIENTE, label: ESTADO_COBRO_LABELS[ESTADO_COBRO.PENDIENTE] },
+  { value: ESTADO_COBRO.EN_CURSO, label: ESTADO_COBRO_LABELS[ESTADO_COBRO.EN_CURSO] },
+  { value: ESTADO_COBRO.PAGO_COMPLETO, label: ESTADO_COBRO_LABELS[ESTADO_COBRO.PAGO_COMPLETO] },
+];
+
+/**
  * Transiciones permitidas desde cada estado (Etapa 1)
  * Refleja la máquina de estados del backend
  */
@@ -122,4 +149,47 @@ export function getMensajeEstadoTerminal(estado) {
   }
   
   return 'Este estado no permite cambios.';
+}
+
+/**
+ * Verifica si una venta está finalizada (derivada)
+ * FINALIZADA = ESCRITURADO + PAGO_COMPLETO
+ * @param {Object} venta - Objeto venta con estado y estadoCobro
+ * @returns {boolean}
+ */
+export function isVentaFinalizada(venta) {
+  if (!venta) return false;
+  
+  const estado = String(venta.estado || '').toUpperCase().trim();
+  const estadoCobro = String(venta.estadoCobro || '').toUpperCase().trim();
+  
+  return estado === ESTADO_VENTA.ESCRITURADO && estadoCobro === ESTADO_COBRO.PAGO_COMPLETO;
+}
+
+/**
+ * Verifica si el estadoCobro es editable según el estado de la venta
+ * @param {string} estado - Estado actual de la venta
+ * @returns {boolean}
+ */
+export function puedeEditarEstadoCobro(estado) {
+  if (!estado) return false;
+  
+  const estadoUpper = String(estado).toUpperCase().trim();
+  
+  // No se puede editar estadoCobro si la venta está CANCELADA
+  return estadoUpper !== ESTADO_VENTA.CANCELADA;
+}
+
+/**
+ * Verifica si una venta es editable según su estado legal
+ * @param {string} estado - Estado actual de la venta
+ * @returns {boolean}
+ */
+export function esVentaEditable(estado) {
+  if (!estado) return true; // default: editable
+  
+  const estadoUpper = String(estado).toUpperCase().trim();
+  
+  // CANCELADA es solo lectura
+  return estadoUpper !== ESTADO_VENTA.CANCELADA;
 }

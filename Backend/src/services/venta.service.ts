@@ -7,7 +7,8 @@ import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
 import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
 import { 
     assertTransicionEstadoValida, 
-    assertCamposObligatoriosPorEstado 
+    assertCamposObligatoriosPorEstado,
+    assertVentaEliminable
 } from '../domain/ventaState/ventaState.rules';
 import { isVentaFinalizada } from '../domain/ventaState/ventaState.types';
 
@@ -176,9 +177,17 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
 
 export async function updateVenta(id: number, updateData: PutVentaRequest): Promise<Venta> {
     // Obtener venta actual para validaciones y side effects
+    // IMPORTANTE: Incluir campos necesarios para validación de merge (DB + payload)
     const ventaActual = await prisma.venta.findUnique({
         where: { id },
-        select: { estado: true, estadoCobro: true, loteId: true }
+        select: { 
+            estado: true, 
+            estadoCobro: true, 
+            loteId: true,
+            fechaEscrituraReal: true,
+            fechaCancelacion: true,
+            motivoCancelacion: true
+        }
     });
 
     if (!ventaActual) {
@@ -192,15 +201,29 @@ export async function updateVenta(id: number, updateData: PutVentaRequest): Prom
         assertTransicionEstadoValida(ventaActual.estado, updateData.estado as any);
     }
 
-    // Preparar datos para validar campos obligatorios según nuevo estado
+    // Preparar datos para validar campos obligatorios según estado final (merge DB + payload)
     const estadoFinal = updateData.estado || ventaActual.estado;
+    
+    // Merge: priorizar payload, usar DB como fallback
+    const fechaEscrituraRealFinal = updateData.fechaEscrituraReal 
+        ? new Date(updateData.fechaEscrituraReal) 
+        : ventaActual.fechaEscrituraReal;
+    
+    const fechaCancelacionFinal = updateData.fechaCancelacion 
+        ? new Date(updateData.fechaCancelacion) 
+        : ventaActual.fechaCancelacion;
+    
+    const motivoCancelacionFinal = updateData.motivoCancelacion !== undefined
+        ? updateData.motivoCancelacion
+        : ventaActual.motivoCancelacion;
+    
     const dataValidacion = {
-        fechaEscrituraReal: updateData.fechaEscrituraReal ? new Date(updateData.fechaEscrituraReal) : null,
-        fechaCancelacion: updateData.fechaCancelacion ? new Date(updateData.fechaCancelacion) : null,
-        motivoCancelacion: updateData.motivoCancelacion,
+        fechaEscrituraReal: fechaEscrituraRealFinal,
+        fechaCancelacion: fechaCancelacionFinal,
+        motivoCancelacion: motivoCancelacionFinal,
     };
 
-    // Validar campos obligatorios según el estado final
+    // Validar campos obligatorios según el estado final (con datos mergeados)
     assertCamposObligatoriosPorEstado(estadoFinal as any, dataValidacion as any);
 
     if (updateData.loteId) {
@@ -332,7 +355,6 @@ export async function eliminarVenta(
 
     // Esta función lanza error si no se puede eliminar
     try {
-        const { assertVentaEliminable } = await import('../domain/ventaState/ventaState.rules');
         assertVentaEliminable(ventaData);
     } catch (err: any) {
         // Re-lanzar con statusCode si no lo tiene

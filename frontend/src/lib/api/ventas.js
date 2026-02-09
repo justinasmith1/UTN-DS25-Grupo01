@@ -227,6 +227,7 @@ async function apiUpdate(id, payload) {
   if (payload.fechaVenta != null) body.fechaVenta = payload.fechaVenta;
   if (payload.monto != null) body.monto = payload.monto;
   if (payload.estado != null) body.estado = payload.estado;
+  if (payload.estadoCobro != null) body.estadoCobro = payload.estadoCobro; // Etapa 2
   if (payload.plazoEscritura != null) body.plazoEscritura = payload.plazoEscritura;
   if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
   if (payload.numero != null) body.numero = payload.numero;
