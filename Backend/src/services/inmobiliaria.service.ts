@@ -41,7 +41,7 @@ async function calcularMetricasInmobiliarias(): Promise<Map<number, Inmobiliaria
       by: ['inmobiliariaId'],
       where: {
         estadoOperativo: 'OPERATIVO',
-        estado: { in: [EstadoVenta.INICIADA, EstadoVenta.CON_BOLETO, EstadoVenta.ESCRITURA_PROGRAMADA, EstadoVenta.ESCRITURADO] }
+        estado: { in: [EstadoVenta.INICIADA, EstadoVenta.CON_BOLETO, EstadoVenta.ESCRITURADO] }
       },
       _count: { id: true }
     }),
@@ -170,7 +170,7 @@ async function calcularMetricasInmobiliarias(): Promise<Map<number, Inmobiliaria
 async function calcularMetricasInmobiliaria(inmobiliariaId: number): Promise<InmobiliariaMetrics> {
   const [ventasTotales, ventasActivas, reservasTotales, reservasActivas, prioridadesTotales, prioridadesActivas] = await Promise.all([
     prisma.venta.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO' } }),
-    prisma.venta.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO', estado: { in: [EstadoVenta.INICIADA, EstadoVenta.CON_BOLETO, EstadoVenta.ESCRITURA_PROGRAMADA, EstadoVenta.ESCRITURADO] } } }),
+    prisma.venta.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO', estado: { in: [EstadoVenta.INICIADA, EstadoVenta.CON_BOLETO, EstadoVenta.ESCRITURADO] } } }),
     prisma.reserva.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO' } }),
     prisma.reserva.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO', estado: EstadoReserva.ACTIVA } }),
     prisma.prioridad.count({ where: { inmobiliariaId, estadoOperativo: 'OPERATIVO', ownerType: OwnerPrioridad.INMOBILIARIA } }),

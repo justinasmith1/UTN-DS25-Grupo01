@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getVentaById } from "../../../lib/api/ventas";
 import { canEditByEstadoOperativo } from "../../../utils/estadoOperativo";
+import { isVentaFinalizada, ESTADO_COBRO_LABELS } from "../../../utils/ventaState";
 
 /**
  * VentaVerCard
@@ -180,11 +181,20 @@ export default function VentaVerCard({
   const fechaActualizacion = fmtDate(sale?.updatedAt ?? sale?.updateAt ?? sale?.fechaActualizacion);
   const fechaCreacion = fmtDate(sale?.createdAt ?? sale?.fechaCreacion);
 
+  // Estado de cobro formateado
+  const estadoCobroLabel = sale?.estadoCobro 
+    ? (ESTADO_COBRO_LABELS[sale.estadoCobro] || titleCaseEstado(sale.estadoCobro))
+    : NA;
+
+  // Verificar si es FINALIZADA (derivada)
+  const esFinalizada = isVentaFinalizada(sale);
+
   // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha
   const leftPairs = [
     ["LOTE N°", safe(sale?.lote?.mapId ?? sale?.lotMapId ?? sale?.loteId)],
     ["MONTO", fmtMoney(sale?.monto)],
     ["ESTADO DE VENTA", titleCaseEstado(sale?.estado)],
+    ["ESTADO DE COBRO", estadoCobroLabel],
     ["INMOBILIARIA", safe(sale?.inmobiliaria?.nombre)],
     ["COMPRADOR", compradorNombre],
     ["PROPIETARIO", propietarioNombre],
@@ -198,6 +208,20 @@ export default function VentaVerCard({
     ["FECHA DE ACTUALIZACIÓN", fechaActualizacion],
     ["FECHA DE CREACIÓN", fechaCreacion],
   ];
+
+  // Campos condicionales según estado
+  const camposCondicionales = [];
+  if (sale?.estado === 'ESCRITURADO' && sale?.fechaEscrituraReal) {
+    camposCondicionales.push(["FECHA ESCRITURA REAL", fmtDate(sale.fechaEscrituraReal)]);
+  }
+  if (sale?.estado === 'CANCELADA') {
+    if (sale?.fechaCancelacion) {
+      camposCondicionales.push(["FECHA CANCELACIÓN", fmtDate(sale.fechaCancelacion)]);
+    }
+    if (sale?.motivoCancelacion) {
+      camposCondicionales.push(["MOTIVO CANCELACIÓN", safe(sale.motivoCancelacion)]);
+    }
+  }
 
   // Un solo ancho de label, calculado por el más largo
   const containerRef = useRef(null);
@@ -247,6 +271,23 @@ export default function VentaVerCard({
         <div className="cclf-card__body">
           <h3 className="venta-section-title">Información de la venta</h3>
 
+          {/* Badge FINALIZADA (si aplica) */}
+          {esFinalizada && (
+            <div style={{ 
+              marginBottom: 16,
+              padding: '8px 14px',
+              backgroundColor: '#d1fae5',
+              border: '1px solid #10b981',
+              borderRadius: '0.375rem',
+              color: '#065f46',
+              fontSize: '13px',
+              fontWeight: 600,
+              display: 'inline-block'
+            }}>
+              ✓ FINALIZADA (Escriturado + Pago Completo)
+            </div>
+          )}
+
           <div className="venta-grid" style={{ ["--sale-label-w"]: `${labelW}px` }}>
             <div className="venta-col">
               {leftPairs.map(([label, value]) => (
@@ -270,6 +311,22 @@ export default function VentaVerCard({
               ))}
             </div>
           </div>
+
+          {/* Campos condicionales (debajo de la grilla principal) */}
+          {camposCondicionales.length > 0 && (
+            <div className="venta-grid" style={{ ["--sale-label-w"]: `${labelW}px`, marginTop: 16 }}>
+              <div className="venta-col">
+                {camposCondicionales.map(([label, value]) => (
+                  <div className="field-row" key={label}>
+                    <div className="field-label">{label}</div>
+                    <div className="field-value" style={valueStyle(value)}>
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!!sale?.reserva && (
             <div className="reserva-box" style={{ marginTop: 18 }}>

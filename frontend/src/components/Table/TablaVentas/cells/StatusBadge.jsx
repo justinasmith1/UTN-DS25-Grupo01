@@ -17,6 +17,7 @@ const variants = {
   info:    { backgroundColor: '#E6F0FA', color: '#0F3E9E', border: '1px solid #BBD1F6', paddingTop: '2.5px', paddingBottom: '2.5px' },
   warn:    { backgroundColor: '#FFF4E5', color: '#7A4B00', border: '1px solid #FFD8A8', paddingTop: '2.5px', paddingBottom: '2.5px' },
   danger:  { backgroundColor: '#FDECEC', color: '#8A0F0F', border: '1px solid #F5B5B5', paddingTop: '2.5px', paddingBottom: '2.5px' },
+  purple:  { backgroundColor: '#F3E8FF', color: '#6B21A8', border: '1px solid #D8B4FE', paddingTop: '2.5px', paddingBottom: '2.5px' },
   muted:   { backgroundColor: '#F1F3F5', color: '#495057', border: '1px solid #DEE2E6', paddingTop: '2.5px', paddingBottom: '2.5px' },
 };
 
@@ -33,9 +34,9 @@ function pickVariant(estado) {
       return 'muted'; // 'muted' para que se vea gris/desactivado, o 'danger' si queremos resaltar que está borrado.
                       // En tablas "soft delete", suele ser gris.
     case 'ESCRITURADO':
-      return 'success';
-    case 'ESCRITURA_PROGRAMADA':
-      return 'info';
+      return 'purple'; // Violeta para ESCRITURADO (sin pago completo)
+    case 'FINALIZADA':
+      return 'success'; // Verde para FINALIZADA (ESCRITURADO + PAGO_COMPLETO)
     case 'INICIADA':
       return 'info';
     case 'CON_BOLETO':

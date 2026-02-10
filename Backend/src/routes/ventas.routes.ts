@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as ventaController from '../controllers/venta.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema, reactivarVentaSchema } from '../validations/venta.validation';
+import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema } from '../validations/venta.validation';
 
 const router = Router();
 

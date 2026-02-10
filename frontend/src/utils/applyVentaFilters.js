@@ -34,6 +34,8 @@ export function applyVentaFilters(rows = [], f = {}) {
     // rangos
     fechaVentaMin = null,
     fechaVentaMax = null,
+    plazoEscrituraMin = null, // Etapa 3
+    plazoEscrituraMax = null, // Etapa 3
     montoMin = null,
     montoMax = null,
 
@@ -69,6 +71,10 @@ export function applyVentaFilters(rows = [], f = {}) {
   const tMin = toTime(fechaVentaMin);
   const tMax = toTime(fechaVentaMax);
 
+  // Rango de plazo escritura (milisegundos) - Etapa 3
+  const tPlazoMin = toTime(plazoEscrituraMin);
+  const tPlazoMax = toTime(plazoEscrituraMax);
+
   // Rango de montos (números)
   const nMin = toNumber(montoMin);
   const nMax = toNumber(montoMax);
@@ -86,6 +92,7 @@ export function applyVentaFilters(rows = [], f = {}) {
     // Monto y Fecha
     const montoNum = toNumber(v.monto);
     const fechaMs = toTime(v.fechaVenta);
+    const plazoEscrituraMs = toTime(v.plazoEscritura); // Etapa 3
 
     // ----- 0) Visibilidad (estadoOperativo) - se filtra en backend, pero por si acaso aplicamos también en frontend
     if (visibilidadFilter) {
@@ -121,11 +128,16 @@ export function applyVentaFilters(rows = [], f = {}) {
       if (!matchById && !matchByName) return false;
     }
 
-    // ----- 4) Rango de fechas -----
+    // ----- 4) Rango de fechas (fechaVenta) -----
     if (tMin != null && (fechaMs == null || fechaMs < tMin)) return false;
     if (tMax != null && (fechaMs == null || fechaMs > tMax)) return false;
 
-    // ----- 5) Rango de montos -----
+    // ----- 5) Rango de fecha escritura programada (plazoEscritura) - Etapa 3 -----
+    // Si plazoEscritura es null y hay filtro activo, no matchea
+    if (tPlazoMin != null && (plazoEscrituraMs == null || plazoEscrituraMs < tPlazoMin)) return false;
+    if (tPlazoMax != null && (plazoEscrituraMs == null || plazoEscrituraMs > tPlazoMax)) return false;
+
+    // ----- 6) Rango de montos -----
     if (nMin != null && (montoNum == null || montoNum < nMin)) return false;
     if (nMax != null && (montoNum == null || montoNum > nMax)) return false;
 

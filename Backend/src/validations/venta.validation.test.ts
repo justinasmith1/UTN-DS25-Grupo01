@@ -148,18 +148,30 @@ describe('createVentaSchema', () => {
 
     test('debe validar todos los estados válidos', () => {
         // ARRANGE
-        const estados = ['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO'];
+        const estados = ['INICIADA', 'CON_BOLETO', 'ESCRITURADO', 'CANCELADA'];
 
         // ACT & ASSERT
         estados.forEach(estado => {
-            const validVenta = {
+            // Agregar campos obligatorios según el estado
+            const validVenta: any = {
                 loteId: 1,
                 fechaVenta: '2025-12-01T18:00:00.000Z',
                 monto: 100000,
                 estado,
                 tipoPago: 'CONTADO',
                 compradorId: 10,
+                numero: 'VENTA-001',
             };
+            
+            // Agregar campos obligatorios según estado
+            if (estado === 'ESCRITURADO') {
+                validVenta.fechaEscrituraReal = '2025-12-15T18:00:00.000Z';
+            }
+            if (estado === 'CANCELADA') {
+                validVenta.fechaCancelacion = '2025-12-15T18:00:00.000Z';
+                validVenta.motivoCancelacion = 'Cliente desistió';
+            }
+            
             expect(() => createVentaSchema.parse(validVenta)).not.toThrow();
         });
     });
@@ -324,7 +336,7 @@ describe('queryVentaSchema', () => {
 
     test('debe validar todos los estados válidos en la query', () => {
         // ARRANGE
-        const estados = ['INICIADA', 'CON_BOLETO', 'ESCRITURA_PROGRAMADA', 'ESCRITURADO'];
+        const estados = ['INICIADA', 'CON_BOLETO', 'ESCRITURADO', 'CANCELADA'];
 
         // ACT & ASSERT
         estados.forEach(estado => {

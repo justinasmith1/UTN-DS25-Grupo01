@@ -210,8 +210,9 @@ async function main() {
       loteId: lote3.id,
       fechaVenta: new Date(),
       monto: 20000.00,
-      estado: EstadoVenta.ESCRITURADO, // Corregido: Enum válido
-      estadoCobro: EstadoCobro.COMPLETADA, // Corregido: Enum válido
+      estado: EstadoVenta.ESCRITURADO,
+      estadoCobro: EstadoCobro.PAGO_COMPLETO,
+      fechaEscrituraReal: new Date(), // Obligatorio para ESCRITURADO
       tipoPago: "CONTADO",
       compradorId: clienteRoberto.id,
       inmobiliariaId: idGianfelice,
@@ -427,7 +428,9 @@ async function main() {
   await prisma.venta.create({
     data: {
       numero: `VEN-${lote12.id}-CANC`, loteId: lote12.id, fechaVenta: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000),
-      monto: 19500.00, estado: EstadoVenta.CANCELADA, estadoCobro: EstadoCobro.ELIMINADO, tipoPago: "CUOTAS",
+      monto: 19500.00, estado: EstadoVenta.CANCELADA, estadoCobro: EstadoCobro.PENDIENTE, tipoPago: "CUOTAS",
+      fechaCancelacion: new Date(Date.now() - 85 * 24 * 60 * 60 * 1000), // Obligatorio para CANCELADA
+      motivoCancelacion: "Cliente desistió de la compra", // Obligatorio para CANCELADA
       compradorId: clienteRoberto.id, inmobiliariaId: idGianfelice, fechaBaja: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
     }
   });

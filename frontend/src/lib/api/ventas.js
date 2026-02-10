@@ -50,9 +50,14 @@ const fromApi = (row = {}) => {
     monto: row.monto != null ? (typeof row.monto === "number" ? row.monto : Number(row.monto)) : (row.amount != null ? Number(row.amount) : null),
     fechaVenta: row.fechaVenta ?? row.date ?? row.fecha ?? null,
     estado: row.estado ?? row.status ?? null,
+    estadoCobro: row.estadoCobro ?? null,
     tipoPago: row.tipoPago ?? row.paymentType ?? null,
     plazoEscritura: row.plazoEscritura ?? row.plazo_escritura ?? null,
     fechaBaja: row.fechaBaja ?? row.fecha_baja ?? null,
+    // Campos nuevos (Etapa 1)
+    fechaEscrituraReal: row.fechaEscrituraReal ?? null,
+    fechaCancelacion: row.fechaCancelacion ?? null,
+    motivoCancelacion: row.motivoCancelacion ?? null,
     // Mantener compatibilidad con nombres en inglés para código existente
     date: row.fechaVenta ?? row.date ?? row.fecha ?? null,
     status: row.estado ?? row.status ?? null,
@@ -222,12 +227,18 @@ async function apiUpdate(id, payload) {
   if (payload.fechaVenta != null) body.fechaVenta = payload.fechaVenta;
   if (payload.monto != null) body.monto = payload.monto;
   if (payload.estado != null) body.estado = payload.estado;
+  if (payload.estadoCobro != null) body.estadoCobro = payload.estadoCobro; // Etapa 2
   if (payload.plazoEscritura != null) body.plazoEscritura = payload.plazoEscritura;
   if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
   if (payload.numero != null) body.numero = payload.numero;
   if (payload.compradorId != null) body.compradorId = payload.compradorId;
   if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
   if (payload.reservaId != null) body.reservaId = payload.reservaId;
+  
+  // Campos nuevos (Etapa 1)
+  if (payload.fechaEscrituraReal != null) body.fechaEscrituraReal = payload.fechaEscrituraReal;
+  if (payload.fechaCancelacion != null) body.fechaCancelacion = payload.fechaCancelacion;
+  if (payload.motivoCancelacion != null) body.motivoCancelacion = payload.motivoCancelacion;
   
   const res = await fetchWithFallback(`${PRIMARY}/${id}`, { method: "PUT", body });
   const data = await res.json().catch(() => ({}));

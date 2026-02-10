@@ -101,8 +101,11 @@ export interface Venta {
     fechaVenta: string;
     monto: number;
     estado: EstadoVenta;
-    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'PAGO_COMPLETO';
     plazoEscritura?: DateTime;
+    fechaEscrituraReal?: DateTime;
+    fechaCancelacion?: DateTime;
+    motivoCancelacion?: string;
     tipoPago: string;
     compradorId: number;
     inmobiliariaId?: number;
@@ -247,8 +250,11 @@ export interface PostVentaRequest {
     fechaVenta: DateTime;
     monto: number;
     estado?: EstadoVenta;
-    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'PAGO_COMPLETO';
     plazoEscritura?: DateTime;
+    fechaEscrituraReal?: DateTime;
+    fechaCancelacion?: DateTime;
+    motivoCancelacion?: string;
     tipoPago: string;
     compradorId: number;  
     inmobiliariaId?: number;
@@ -279,8 +285,11 @@ export interface PutVentaRequest {
     compradorId?: number; // Es mejor enviar solo el ID
     fechaVenta?: DateTime
     estado?: EstadoVenta;
-    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'COMPLETADA';
+    estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'PAGO_COMPLETO';
     plazoEscritura?: DateTime;
+    fechaEscrituraReal?: DateTime;
+    fechaCancelacion?: DateTime;
+    motivoCancelacion?: string;
     tipoPago?: string;
     inmobiliariaId?: number;
     updateAt: DateTime;
