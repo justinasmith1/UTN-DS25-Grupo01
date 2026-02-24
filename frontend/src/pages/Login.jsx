@@ -93,7 +93,7 @@ export default function Login() {
             </Form>
 
             <div className="text-center lf-footer mt-2">
-              <a href="#forgot" className="lf-link">¿Olvidaste la contraseña?</a>
+              <span className="lf-footer">¿Olvidaste tu contraseña? Contactá al administrador</span>
             </div>
           </Card.Body>
         </Card>

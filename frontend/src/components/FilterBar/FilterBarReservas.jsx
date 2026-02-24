@@ -34,13 +34,14 @@ export default function FilterBarReservas({
   const fields = useMemo(
     () => {
       const allFields = [
-      { id: "q",              type: "search",     label: "Búsqueda",             placeholder: "N° reserva, cliente, lote...", defaultValue: "" },
-      { id: "estado",         type: "multiSelect",label: "Estado",             defaultValue: [] },
-      { id: "visibilidad",    type: "singleSelect",label: "Visibilidad",       defaultValue: "OPERATIVO" },
-      { id: "inmobiliarias",  type: "multiSelect",label: "Inmobiliaria",       defaultValue: [] },
-      { id: "fechaReserva",   type: "dateRange",  label: "Fecha de Reserva",   defaultValue: { min: null, max: null } },
-      { id: "fechaFinReserva",  type: "dateRange",  label: "Plazo Reserva",  defaultValue: { min: null, max: null } },
-      { id: "seña",           type: "range",      label: "Seña",               defaultValue: { min: null, max: null } },
+        { id: "q", type: "search", label: "Búsqueda", placeholder: "N° reserva, cliente, lote...", defaultValue: "" },
+        { id: "estado", type: "multiSelect", label: "Estado", defaultValue: [] },
+        { id: "visibilidad", type: "singleSelect", label: "Visibilidad", defaultValue: "OPERATIVO" },
+        { id: "inmobiliarias", type: "multiSelect", label: "Inmobiliaria", defaultValue: [] },
+        { id: "fechaReserva", type: "dateRange", label: "Fecha de Reserva", defaultValue: { min: null, max: null } },
+        { id: "fechaFinReserva", type: "dateRange", label: "Plazo Reserva (Histórico)", defaultValue: { min: null, max: null } },
+        { id: "diasRestantes", type: "number", label: "Días Restantes (≤)", placeholder: "Ej: 7", defaultValue: null },
+        { id: "seña", type: "range", label: "Seña", defaultValue: { min: null, max: null } },
       ];
       // Filtrar el campo de inmobiliaria si el usuario es INMOBILIARIA
       if (userRole === 'INMOBILIARIA') {
@@ -89,9 +90,9 @@ export default function FilterBarReservas({
   // ===== Rangos / Defaults =====
   const ranges = useMemo(
     () => ({
-      fechaReserva:  reservasFilterPreset?.ranges?.fechaReserva,
+      fechaReserva: reservasFilterPreset?.ranges?.fechaReserva,
       fechaFinReserva: reservasFilterPreset?.ranges?.fechaFinReserva,
-      seña:          reservasFilterPreset?.ranges?.seña,
+      seña: reservasFilterPreset?.ranges?.seña,
     }),
     []
   );
@@ -99,12 +100,13 @@ export default function FilterBarReservas({
   const defaults = useMemo(
     () => {
       const baseDefaults = {
-      q: "",
-      estado: [],
-      visibilidad: "OPERATIVO", // Default: mostrar solo operativas
-      fechaReserva:  { min: null, max: null },
-      fechaFinReserva: { min: null, max: null },
-      seña:          { min: null, max: null },
+        q: "",
+        estado: [],
+        visibilidad: "OPERATIVO", // Default: mostrar solo operativas
+        fechaReserva: { min: null, max: null },
+        fechaFinReserva: { min: null, max: null },
+        diasRestantes: null,
+        seña: { min: null, max: null },
       };
       // Para INMOBILIARIA: no incluir inmobiliarias en defaults
       if (userRole !== 'INMOBILIARIA') {
@@ -116,7 +118,7 @@ export default function FilterBarReservas({
   );
 
   const optionFormatter = useMemo(() => {
-    const base = { 
+    const base = {
       estado: nice,
       visibilidad: (val) => {
         if (val === "OPERATIVO") return "Operativas";
@@ -166,9 +168,10 @@ export default function FilterBarReservas({
       estado,                       // ["ACTIVA", ...] - estado de negocio
       estadoOperativo: visibilidad, // Mapear visibilidad a estadoOperativo para backend
       inmobiliarias: inmoIds,       // IMPORTANTE: por ID
-      fechaReserva:  { min: frMin, max: frMax },
+      fechaReserva: { min: frMin, max: frMax },
       fechaFinReserva: { min: ffrMin, max: ffrMax },
-      seña:          { min: sMin,  max: sMax  },
+      diasRestantes: p?.diasRestantes ?? null,
+      seña: { min: sMin, max: sMax },
 
       // ===== LEGACY / BACKEND (alias) =====
       estados: estado,
@@ -219,13 +222,13 @@ export default function FilterBarReservas({
   const handleParamsChange = (paramsFromFB) => {
     // Excluir 'q' del procesamiento (se maneja con onSearchChange)
     const { q, ...paramsSinQ } = paramsFromFB || {};
-    
+
     // Si paramsFromFB solo tiene algunos campos (actualización parcial), 
     // no convertir con toPageShape porque agrega todos los campos con defaults
     const isPartialUpdate = paramsSinQ && (
       Object.keys(paramsSinQ).length < 3 && !paramsSinQ.inmobiliarias
     );
-    
+
     if (isPartialUpdate) {
       onChange?.(paramsSinQ);
     } else {
