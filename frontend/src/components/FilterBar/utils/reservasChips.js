@@ -63,6 +63,11 @@ export function reservasChipsFrom(applied, catalogs) {
     chips.push({ k: "fechaFinReserva", v: { min, max }, label: `Plazo Reserva: ${minStr} - ${maxStr}` });
   }
 
+  // Días restantes
+  if (applied.diasRestantes !== null && applied.diasRestantes !== undefined && applied.diasRestantes !== '') {
+    chips.push({ k: "diasRestantes", v: applied.diasRestantes, label: `Días Restantes: ≤ ${applied.diasRestantes}` });
+  }
+
   // Seña (USD)
   if (applied.seña && (applied.seña.min !== null || applied.seña.max !== null)) {
     const { min, max } = applied.seña;

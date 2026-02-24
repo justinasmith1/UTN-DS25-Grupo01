@@ -165,5 +165,30 @@ export const applyReservaFilters = (reservas, params = {}) => {
     }
   }
 
+  // 7) Días restantes (solo para reservas ACTIVAS)
+  // Calcula días desde hoy hasta fechaFinReserva
+  if (params.diasRestantes != null && params.diasRestantes !== '') {
+    const maxDias = Number(params.diasRestantes);
+    if (Number.isFinite(maxDias) && maxDias >= 0) {
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      const hoyMs = hoy.getTime();
+
+      filtered = filtered.filter((r) => {
+        const estado = upper(r?.estado);
+        if (estado !== 'ACTIVA') return false;
+
+        const fechaFin = toMs(r?.fechaFinReserva);
+        if (fechaFin == null) return false;
+
+        const diffMs = fechaFin - hoyMs;
+        const diasRestantes = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+        // Incluir si días restantes <= maxDias (también las ya vencidas, son las más urgentes)
+        return diasRestantes <= maxDias;
+      });
+    }
+  }
+
   return filtered;
 };

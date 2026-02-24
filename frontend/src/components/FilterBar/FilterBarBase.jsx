@@ -15,32 +15,32 @@ const DEBOUNCE_MS = 250;
 export default function FilterBarBase({
   // Configuración de campos dinámicos
   fields = [], // [{ id, type, label, options?, rangeConfig?, defaultValue }]
-  
+
   // Configuración de catálogos
   catalogs = {}, // { [fieldId]: [options] }
-  
+
   // Configuración de rangos
   ranges = {}, // { [fieldId]: { minLimit, maxLimit, step, unit } }
-  
+
   // Valores por defecto
   defaults = {}, // { [fieldId]: defaultValue }
-  
+
   // Callbacks
   onParamsChange,
   onSearchChange, // Callback opcional para búsqueda (si no se pasa, usa onParamsChange)
-  
+
   // Configuración de vistas
   viewsConfig = null, // { isInmo, variant, sanitizeForRole }
-  
+
   // Formateador personalizado de chips
   chipsFormatter,
-  
+
   // Formateador de opciones en el modal
   optionFormatter = {},
-  
+
   // Estilo
   variant = "dashboard",
-  
+
   // Valor inicial (para sincronizar desde props externas)
   initialValue,
 }) {
@@ -52,6 +52,7 @@ export default function FilterBarBase({
       case 'range': return { min: null, max: null };
       case 'singleSelect': return null;
       case 'dateRange': return { min: null, max: null };
+      case 'number': return null;
       default: return '';
     }
   };
@@ -59,20 +60,20 @@ export default function FilterBarBase({
   // Estado de UI
   const [open, setOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
-  
+
   // Estado de filtros dinámicos basado en fields
   const [filterState, setFilterState] = useState(() => {
     const state = {};
     fields.forEach(field => {
       // Si hay initialValue, usarlo; si no, usar defaults
       const initialVal = initialValue?.[field.id];
-      state[field.id] = initialVal !== undefined 
-        ? initialVal 
+      state[field.id] = initialVal !== undefined
+        ? initialVal
         : (defaults[field.id] ?? field.defaultValue ?? getDefaultValueForType(field.type));
     });
     return state;
   });
-  
+
   // Estado de filtros aplicados (chips) - inicializar desde initialValue si está disponible
   const [appliedFilters, setAppliedFilters] = useState(() => {
     if (initialValue && typeof initialValue === 'object') {
@@ -115,12 +116,12 @@ export default function FilterBarBase({
   // Si hay onSearchChange, usarlo en lugar de onParamsChange para búsqueda
   const searchField = fields.find(f => f.type === 'search');
   const searchValue = searchField ? filterState[searchField.id] : '';
-  
+
   // Debounce de búsqueda: solo actualizar appliedFilters cuando NO hay onSearchChange
   // o al final del debounce si hay onSearchChange (para evitar rebotes)
   useEffect(() => {
     if (!searchField) return;
-    
+
     const timeoutId = setTimeout(() => {
       if (onSearchChange) {
         // Con onSearchChange: solo llamar al callback, NO actualizar appliedFilters durante escritura
@@ -132,15 +133,15 @@ export default function FilterBarBase({
         onParamsChange?.({ [searchField.id]: searchValue });
       }
     }, DEBOUNCE_MS);
-    
+
     return () => clearTimeout(timeoutId);
   }, [searchValue, searchField, onSearchChange, onParamsChange]);
-  
+
   // Actualizar appliedFilters para el chip de búsqueda solo cuando hay onSearchChange
   // y el valor se estabiliza (después del debounce), pero sin causar re-render del input
   useEffect(() => {
     if (!searchField || !onSearchChange) return;
-    
+
     // Usar un timeout adicional para actualizar appliedFilters sin afectar el input
     const timeoutId = setTimeout(() => {
       setAppliedFilters((prev) => {
@@ -149,18 +150,18 @@ export default function FilterBarBase({
         return { ...prev, [searchField.id]: searchValue };
       });
     }, DEBOUNCE_MS + 50); // Ligeramente después del debounce para no interferir
-    
+
     return () => clearTimeout(timeoutId);
   }, [searchValue, searchField, onSearchChange]);
 
   const toggle = (fieldId, value) => {
     const currentValue = filterState[fieldId];
     const field = fields.find(f => f.id === fieldId);
-    
+
     if (field?.type === 'multiSelect') {
       // Asegurar que currentValue sea un array
       const currentArray = Array.isArray(currentValue) ? currentValue : [];
-      const newValue = currentArray.includes(value) 
+      const newValue = currentArray.includes(value)
         ? currentArray.filter(v => v !== value)
         : [...currentArray, value];
       setFilterState(prev => ({ ...prev, [fieldId]: newValue }));
@@ -178,14 +179,14 @@ export default function FilterBarBase({
   const resetField = (fieldId) => {
     const field = fields.find(f => f.id === fieldId);
     const defaultValue = defaults[fieldId] ?? field?.defaultValue ?? getDefaultValueForType(field?.type);
-    
+
     // Actualizar tanto filterState como appliedFilters
     const newFilterState = { ...filterState, [fieldId]: defaultValue };
     const newAppliedFilters = { ...appliedFilters, [fieldId]: defaultValue };
-    
+
     setFilterState(newFilterState);
     setAppliedFilters(newAppliedFilters);
-    
+
     // Notificar al componente padre del cambio
     onParamsChange?.(newAppliedFilters);
   };
@@ -193,12 +194,12 @@ export default function FilterBarBase({
   // Aplicar / Limpiar
   const applyFilters = () => {
     let sanitizedState = { ...filterState };
-    
+
     // Aplicar sanitización si está configurada
     if (viewsConfig?.sanitizeForRole) {
       sanitizedState = viewsConfig.sanitizeForRole(sanitizedState);
     }
-    
+
     setAppliedFilters({ ...sanitizedState });
     onParamsChange?.(sanitizedState);
     setOpen(false);
@@ -209,7 +210,7 @@ export default function FilterBarBase({
     if (!field) return;
 
     const newAppliedFilters = { ...appliedFilters };
-    
+
     if (field.type === 'multiSelect' && Array.isArray(newAppliedFilters[key])) {
       // Para multiSelect, remover el valor específico
       // Comparar considerando que puede venir como número o string
@@ -230,9 +231,9 @@ export default function FilterBarBase({
     } else if (field.type === 'range' || field.type === 'dateRange') {
       // Para range/dateRange, resetear a null
       newAppliedFilters[key] = { min: null, max: null };
-    } else if (field.type === 'search') {
-      // Para search, limpiar
-      newAppliedFilters[key] = '';
+    } else if (field.type === 'search' || field.type === 'number') {
+      // Para search y number, limpiar
+      newAppliedFilters[key] = field.type === 'number' ? null : '';
     } else {
       // Para otros tipos, resetear al valor por defecto
       newAppliedFilters[key] = defaults[key] ?? field.defaultValue ?? getDefaultValueForType(field.type);
@@ -257,15 +258,15 @@ export default function FilterBarBase({
   const chips = useMemo(() => {
     // Si hay un formateador personalizado, usarlo
     if (chipsFormatter) return chipsFormatter(appliedFilters, catalogs);
-    
+
     // Fallback a la lógica por defecto
     const result = fields
       .map(field => {
         const value = appliedFilters[field.id];
         let isEmpty = false;
-        // Para singleSelect, considerar vacío solo si es null o undefined (no si es string vacío o valor válido)
-        if (field.type === 'singleSelect') {
-          isEmpty = value === null || value === undefined;
+        // Para singleSelect y number, considerar vacío solo si es null o undefined
+        if (field.type === 'singleSelect' || field.type === 'number') {
+          isEmpty = value === null || value === undefined || value === '';
         } else if (!value) {
           isEmpty = true;
         } else if (Array.isArray(value) && value.length === 0) {
@@ -297,6 +298,8 @@ export default function FilterBarBase({
           }
         } else if (field.type === 'search' && value) {
           label = `${field.label}: "${value}"`;
+        } else if (field.type === 'number' && value !== null && value !== undefined && value !== '') {
+          label = `${field.label}: ${value}`;
         }
         return label ? { id: field.id, label, value } : null;
       })
@@ -334,66 +337,92 @@ export default function FilterBarBase({
           <div className="fb-body-top" ref={topRef}>
             {/* ⬇️ Aquí va SOLO lo que NO es búsqueda ni rangos (numéricos o de fecha) */}
             {fields
-              .filter(field => field.type !== 'search' && field.type !== 'range' && field.type !== 'dateRange')
+              .filter(field => field.type !== 'search' && field.type !== 'range' && field.type !== 'dateRange' && field.type !== 'number')
               .map(field => (
-              <section key={field.id} className="fb-section">
-                <div className="fb-sec-head">
-                  <h4>{field.label}</h4>
-                  {filterState[field.id] && 
-                   (Array.isArray(filterState[field.id]) ? filterState[field.id].length > 0 : 
-                    (typeof filterState[field.id] === 'object' ? (filterState[field.id].min || filterState[field.id].max) : 
-                     filterState[field.id])) && 
-                   <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
-                  }
-                </div>
-                
-                {/* Los campos de búsqueda no se renderizan en el modal */}
-                
-                {(field.type === 'multiSelect' || field.type === 'singleSelect') && (
-                  <div className={field.useGrid ? "fb-options fb-grid" : "fb-options"}>
-                    {(catalogs[field.id] || field.options || []).map((option) => {
-                      // Extraer value y label del objeto option
-                      const optionValue = option.value || option;
-                      const optionLabel = option.label || option;
-                      
-                      // Usar el formateador si está disponible, pasando el valor (no el objeto completo)
-                      const formattedOption = optionFormatter[field.id] 
-                        ? optionFormatter[field.id](optionValue) 
-                        : optionLabel;
-                      
-                      return (
-                        <button
-                          key={optionValue}
-                          className={`fb-pill ${field.type === 'multiSelect' 
-                            ? filterState[field.id]?.includes(optionValue) ? "is-checked" : ""
-                            : filterState[field.id] === optionValue ? "is-checked" : ""
-                          }`}
-                          aria-pressed={field.type === 'multiSelect' 
-                            ? filterState[field.id]?.includes(optionValue) 
-                            : filterState[field.id] === optionValue
-                          }
-                          onClick={() => toggle(field.id, optionValue)}
-                        >
-                          {formattedOption}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
-            ))}
-          </div>
-
-          <div className="fb-body-rest">
-            {fields.filter(field => field.type === 'range' || field.type === 'dateRange').map(field => (
                 <section key={field.id} className="fb-section">
                   <div className="fb-sec-head">
                     <h4>{field.label}</h4>
-                    {filterState[field.id] && 
-                     (filterState[field.id].min !== null || filterState[field.id].max !== null) && 
-                     <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
+                    {filterState[field.id] &&
+                      (Array.isArray(filterState[field.id]) ? filterState[field.id].length > 0 :
+                        (typeof filterState[field.id] === 'object' ? (filterState[field.id].min || filterState[field.id].max) :
+                          filterState[field.id])) &&
+                      <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
                     }
                   </div>
+
+                  {/* Los campos de búsqueda no se renderizan en el modal */}
+
+                  {(field.type === 'multiSelect' || field.type === 'singleSelect') && (
+                    <div className={field.useGrid ? "fb-options fb-grid" : "fb-options"}>
+                      {(catalogs[field.id] || field.options || []).map((option) => {
+                        // Extraer value y label del objeto option
+                        const optionValue = option.value || option;
+                        const optionLabel = option.label || option;
+
+                        // Usar el formateador si está disponible, pasando el valor (no el objeto completo)
+                        const formattedOption = optionFormatter[field.id]
+                          ? optionFormatter[field.id](optionValue)
+                          : optionLabel;
+
+                        return (
+                          <button
+                            key={optionValue}
+                            className={`fb-pill ${field.type === 'multiSelect'
+                              ? filterState[field.id]?.includes(optionValue) ? "is-checked" : ""
+                              : filterState[field.id] === optionValue ? "is-checked" : ""
+                              }`}
+                            aria-pressed={field.type === 'multiSelect'
+                              ? filterState[field.id]?.includes(optionValue)
+                              : filterState[field.id] === optionValue
+                            }
+                            onClick={() => toggle(field.id, optionValue)}
+                          >
+                            {formattedOption}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              ))}
+          </div>
+
+          <div className="fb-body-rest">
+            {fields.filter(field => field.type === 'number').map(field => (
+              <section key={field.id} className="fb-section">
+                <div className="fb-sec-head">
+                  <h4>{field.label}</h4>
+                  {filterState[field.id] !== null && filterState[field.id] !== undefined && filterState[field.id] !== '' &&
+                    <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
+                  }
+                </div>
+                <div className="fb-number-block">
+                  <input
+                    type="number"
+                    placeholder={field.placeholder || 'Ingrese un valor'}
+                    value={filterState[field.id] ?? ''}
+                    onChange={(e) => {
+                      const val = e.target.value === '' ? null : Number(e.target.value);
+                      setFilterState(prev => ({ ...prev, [field.id]: val }));
+                    }}
+                    min={field.min ?? 0}
+                    max={field.max}
+                    step={field.step ?? 1}
+                    className="fb-number-input"
+                  />
+                </div>
+              </section>
+            ))}
+
+            {fields.filter(field => field.type === 'range' || field.type === 'dateRange').map(field => (
+              <section key={field.id} className="fb-section">
+                <div className="fb-sec-head">
+                  <h4>{field.label}</h4>
+                  {filterState[field.id] &&
+                    (filterState[field.id].min !== null || filterState[field.id].max !== null) &&
+                    <button className="fb-reset" onClick={() => resetField(field.id)}>Restablecer</button>
+                  }
+                </div>
                 <div className="fb-range-block">
                   {field.type === 'dateRange' ? (
                     <DateRangeControl
@@ -419,14 +448,14 @@ export default function FilterBarBase({
             ))}
           </div>
         </div>
-          <div className="fb-sheet-footer is-green">
-            <div className="fb-btn-group">
-              <button className="fb-btn fb-btn--danger" onClick={clear}>Borrar todo</button>
-              <button className="fb-btn fb-btn--primary" onClick={applyFilters}>Aplicar filtros</button>
-            </div>
+        <div className="fb-sheet-footer is-green">
+          <div className="fb-btn-group">
+            <button className="fb-btn fb-btn--danger" onClick={clear}>Borrar todo</button>
+            <button className="fb-btn fb-btn--primary" onClick={applyFilters}>Aplicar filtros</button>
           </div>
         </div>
-      </div>,
+      </div>
+    </div>,
     document.body
   );
 
