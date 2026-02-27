@@ -8,6 +8,8 @@ import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import { createVenta } from "../../../lib/api/ventas.js";
 import CompradoresMultiSelect from "./CompradoresMultiSelect.jsx";
+import { toDateInputValue, fromDateInputToISO } from "../../../utils/ventaDateUtils";
+import { mapVentaBackendError } from "../../../utils/ventaErrorMapper";
 
 const INITIAL_ERRORS = {
   numero: null,
@@ -17,20 +19,6 @@ const INITIAL_ERRORS = {
   compradores: null,
   general: null,
 };
-
-function toDateInputValue(v) {
-  const d = v ? new Date(v) : new Date();
-  if (Number.isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function fromDateInputToISO(s) {
-  if (!s || !s.trim()) return null;
-  const date = new Date(`${s}T12:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
 
 export default function VentaCrearCard({
   open,
@@ -144,39 +132,15 @@ export default function VentaCrearCard({
   }
 
   function handleBackendError(e) {
-    const newErrors = { ...INITIAL_ERRORS };
-    const errorMsg = e?.message || e?.response?.data?.message || "No se pudo registrar la venta";
+    const { fieldErrors, generalMessage } = mapVentaBackendError(e, {
+      defaultMessage: "No se pudo registrar la venta",
+    });
 
-    if (e?.response?.data?.errors && Array.isArray(e.response.data.errors)) {
-      e.response.data.errors.forEach((err) => {
-        const campo = err.path?.[0] || "";
-        const mensaje = err.message || "";
-        if (campo === "numero" || /n[uú]mero/i.test(mensaje)) {
-          newErrors.numero = /unique|exist/i.test(mensaje) ? "Ya existe una venta con este número" : (mensaje || "Número de venta inválido");
-        } else if (campo === "loteId") {
-          newErrors.loteId = mensaje || "Lote inválido";
-        } else if (campo === "monto") {
-          newErrors.monto = mensaje || "Monto inválido";
-        } else if (campo === "tipoPago") {
-          newErrors.tipoPago = mensaje || "Tipo de pago inválido";
-        } else if (campo === "compradores" || /comprador/i.test(mensaje)) {
-          newErrors.compradores = mensaje || "Error en compradores";
-        } else {
-          if (!newErrors.general) newErrors.general = mensaje || "Error de validación";
-        }
-      });
-      setErrors(newErrors);
-      return;
-    }
-
-    if (/n[uú]mero.*existe|unique.*numero/i.test(errorMsg)) {
-      newErrors.numero = "Ya existe una venta con este número";
-      setErrors(newErrors);
-      return;
-    }
-
-    newErrors.general = errorMsg;
-    setErrors(newErrors);
+    setErrors(prev => ({
+      ...prev,
+      ...fieldErrors,
+      general: generalMessage ?? prev.general,
+    }));
   }
 
   async function handleSave() {
@@ -380,7 +344,7 @@ export default function VentaCrearCard({
               <div className={`fieldRow ${errors.monto ? "hasError" : ""}`}>
                 <div className="field-row">
                   <div className="field-label">MONTO</div>
-                  <div className="field-value p0" style={{ position: "relative" }}>
+                  <div className="field-value p0 venta-monto-wrapper">
                     <input
                       className={`field-input ${errors.monto ? "is-invalid" : ""}`}
                       type="number"
@@ -390,7 +354,7 @@ export default function VentaCrearCard({
                       onChange={(e) => { setMonto(e.target.value); if (errors.monto) clearFieldError("monto"); }}
                       style={{ paddingRight: 50 }}
                     />
-                    <span style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#6B7280" }}>USD</span>
+                    <span className="venta-monto-currency">USD</span>
                   </div>
                 </div>
                 {errors.monto && <div className="fieldError">{errors.monto}</div>}

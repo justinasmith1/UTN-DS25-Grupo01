@@ -865,6 +865,59 @@ select.field {
   font-style: italic;
 }
 
+/* Contenedor y etiqueta USD para campos de monto */
+.venta-monto-wrapper {
+  position: relative;
+}
+
+.venta-monto-currency {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6B7280;
+  font-size: 13px;
+  pointer-events: none;
+  font-weight: 500;
+}
+
+/* Banners de alerta informativa (venta eliminada, cancelada, etc.) */
+.venta-alert {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.375rem;
+  font-size: 14px;
+}
+
+.venta-alert--warning {
+  background-color: #fef3c7;
+  border: 1px solid #fbbf24;
+  color: #92400e;
+}
+
+.venta-alert--info {
+  background-color: #f0f9ff;
+  border: 1px solid #0ea5e9;
+  color: #0c4a6e;
+}
+
+/* Indicador de estado FINALIZADA debajo del select de estado */
+.ventaFinalizada {
+  margin-top: 6px;
+  margin-left: calc(var(--sale-label-w, 180px) + 12px);
+  font-size: 12px;
+  color: #059669;
+  font-weight: 600;
+}
+
+/* Nota informativa bajo estado de cobro cuando no es editable */
+.ventaEstadoCobroNote {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+  font-style: italic;
+}
+
 .boolean-value {
   justify-content: flex-start;
   gap: 10px;

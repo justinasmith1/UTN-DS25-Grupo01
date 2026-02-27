@@ -18,24 +18,8 @@ import {
   esVentaEditable,
   isVentaFinalizada
 } from "../../../utils/ventaState";
-
-/* -------------------------- Helpers fechas -------------------------- */
-function toDateInputValue(v) {
-  if (!v) return "";
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return "";
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function fromDateInputToISO(s) {
-  if (!s || !s.trim()) return null;
-  // El backend espera un string ISO válido
-  // Formato de entrada: YYYY-MM-DD (del input type="date")
-  const date = new Date(`${s}T12:00:00.000Z`);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
-}
+import { toDateInputValue, fromDateInputToISO } from "../../../utils/ventaDateUtils";
+import { mapVentaBackendError } from "../../../utils/ventaErrorMapper";
 
 /* -------------------------- Constantes -------------------------- */
 
@@ -50,17 +34,6 @@ const INITIAL_ERRORS = {
   compradores: null,
   general: null,
 };
-
-// Mapa de keywords para detección inteligente de errores del backend
-const ERROR_KEYWORDS = [
-  { pattern: /fechaVenta|fecha.*venta/i, field: 'fechaVenta' },
-  { pattern: /fechaEscrituraReal/i, field: 'fechaEscrituraReal' },
-  { pattern: /fechaCancelaci[oó]n/i, field: 'fechaCancelacion' },
-  { pattern: /motivoCancelaci[oó]n/i, field: 'motivoCancelacion' },
-  { pattern: /estado/i, field: 'estado' },
-  { pattern: /n[uú]mero/i, field: 'numero' },
-  { pattern: /comprador|compradores/i, field: 'compradores' },
-];
 
 /* ========================================================================== */
 
@@ -87,7 +60,6 @@ export default function VentaEditarCard({
 
   // ancho de label como en VerCard
   const [labelW, setLabelW] = useState(180);
-  const containerRef = useRef(null);
 
   /* 2) GET de venta al abrir — siempre busca datos frescos para garantizar compradores[] completos.
    * El endpoint de listado NO incluye la relación compradores[], así que si usamos el prop del
@@ -412,62 +384,15 @@ export default function VentaEditarCard({
 
   // Helper para mapear errores del backend a campos
   function handleBackendError(error) {
-    const newErrors = { ...errors };
-    
-    // Extraer mensaje del error
-    const errorMsg = error?.message || error?.response?.data?.message || "Error al guardar la venta";
-    
-    // Caso 1: Error de transición de estado
-    if (/transici[oó]n.*inválida|transición.*estado/i.test(errorMsg)) {
-      newErrors.estado = errorMsg;
-      setErrors(newErrors);
-      return;
-    }
-    
-    // Caso 2: Errores estructurados de Zod (array de errores)
-    if (error?.response?.data?.errors && Array.isArray(error.response.data.errors)) {
-      error.response.data.errors.forEach((err) => {
-        const campo = err.path?.[0] || '';
-        const mensaje = err.message || '';
-        
-        // Mapear por campo
-        if (campo === 'numero' || /n[uú]mero/i.test(mensaje)) {
-          newErrors.numero = mensaje || "Número de venta inválido";
-        } else if (campo === 'estado' || /estado/i.test(mensaje)) {
-          newErrors.estado = mensaje;
-        } else if (campo === 'fechaVenta' || /fecha.*venta/i.test(mensaje)) {
-          newErrors.fechaVenta = mensaje;
-        } else if (campo === 'fechaEscrituraReal' || /fecha.*escritura.*real/i.test(mensaje)) {
-          newErrors.fechaEscrituraReal = mensaje;
-        } else if (campo === 'fechaCancelacion' || /fecha.*cancelaci[oó]n/i.test(mensaje)) {
-          newErrors.fechaCancelacion = mensaje;
-        } else if (campo === 'motivoCancelacion' || /motivo.*cancelaci[oó]n/i.test(mensaje)) {
-          newErrors.motivoCancelacion = mensaje;
-        } else {
-          // Error genérico
-          if (!newErrors.general) newErrors.general = mensaje;
-        }
-      });
-      setErrors(newErrors);
-      return;
-    }
-    
-    // Caso 3: Error de unicidad de número (común)
-    if (/n[uú]mero.*existe|unique.*numero/i.test(errorMsg)) {
-      newErrors.numero = "Ya existe una venta con este número";
-      setErrors(newErrors);
-      return;
-    }
-    
-    // Caso 4: Menciona un campo específico en el mensaje (detección por keywords)
-    const matchedKeyword = ERROR_KEYWORDS.find(k => k.pattern.test(errorMsg));
-    if (matchedKeyword) {
-      newErrors[matchedKeyword.field] = errorMsg;
-    } else {
-      newErrors.general = errorMsg;
-    }
-    
-    setErrors(newErrors);
+    const { fieldErrors, generalMessage } = mapVentaBackendError(error, {
+      defaultMessage: "Error al guardar la venta",
+    });
+
+    setErrors(prev => ({
+      ...prev,
+      ...fieldErrors,
+      general: generalMessage ?? prev.general,
+    }));
   }
 
   async function handleSave() {
@@ -674,7 +599,7 @@ export default function VentaEditarCard({
           
           <h3 className="venta-section-title">Información de la venta</h3>
 
-          <div className="venta-grid" ref={containerRef}>
+          <div className="venta-grid">
             {/* Columna izquierda */}
             <div className="venta-col">
               <div className="field-row">
@@ -684,7 +609,7 @@ export default function VentaEditarCard({
 
               <div className="field-row">
                 <div className="field-label">MONTO</div>
-                <div className="field-value p0" style={{ position: "relative" }}>
+                <div className="field-value p0 venta-monto-wrapper">
                   <input
                     className={`field-input ${(estaEliminada || !esEditable) ? "is-readonly" : ""}`}
                     type="number"
@@ -697,16 +622,7 @@ export default function VentaEditarCard({
                     readOnly={estaEliminada || !esEditable}
                   />
                   {/* Mostrar USD como símbolo al final */}
-                  <span style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    color: "#6B7280",
-                    fontSize: "13px",
-                    pointerEvents: "none",
-                    fontWeight: 500
-                  }}>
+                  <span className="venta-monto-currency">
                     {monto && Number(monto) > 0 ? "USD" : ""}
                   </span>
                 </div>
