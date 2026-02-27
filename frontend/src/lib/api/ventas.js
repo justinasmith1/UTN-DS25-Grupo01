@@ -65,6 +65,9 @@ const fromApi = (row = {}) => {
     paymentType: row.tipoPago ?? row.paymentType ?? null,
     buyerId: row.buyerId ?? row.compradorId ?? null,
     compradorId: row.compradorId ?? row.buyerId ?? null,
+    // Etapa 4: compradores múltiples — relación implícita devuelve Persona[] directamente
+    // vc.persona ?? vc soporta el shape antiguo (explícito) y el nuevo (implícito)
+    compradores: (row.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
     reservaId: row.reservaId ?? row.reserva_id ?? null,
     observaciones: row.observaciones ?? row.notas ?? "",
@@ -139,6 +142,8 @@ async function apiGetById(id) {
     ...base,
     // Preservar relaciones completas del backend
     comprador: raw?.comprador || base?.comprador || null,
+    // Etapa 4: compradores múltiples
+    compradores: base.compradores?.length ? base.compradores : (raw?.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,
@@ -232,6 +237,12 @@ async function apiUpdate(id, payload) {
   if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
   if (payload.numero != null) body.numero = payload.numero;
   if (payload.compradorId != null) body.compradorId = payload.compradorId;
+  // Etapa 4: compradores múltiples
+  if (payload.compradores != null && Array.isArray(payload.compradores)) {
+    body.compradores = payload.compradores.map(c =>
+      typeof c === 'object' && c.personaId != null ? { personaId: c.personaId } : { personaId: c.id ?? c }
+    );
+  }
   if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
   if (payload.reservaId != null) body.reservaId = payload.reservaId;
   
@@ -252,6 +263,8 @@ async function apiUpdate(id, payload) {
   return ok({
     ...base,
     comprador: raw?.comprador || base?.comprador || null,
+    // Etapa 4: compradores múltiples
+    compradores: base.compradores?.length ? base.compradores : (raw?.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,

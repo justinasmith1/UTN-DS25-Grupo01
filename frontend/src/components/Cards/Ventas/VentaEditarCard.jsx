@@ -6,6 +6,8 @@ import NiceSelect from "../../Base/NiceSelect.jsx";
 import { Info } from "lucide-react";
 import { updateVenta, getVentaById } from "../../../lib/api/ventas.js";
 import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
+import { getAllPersonas } from "../../../lib/api/personas.js";
+import CompradoresMultiSelect from "./CompradoresMultiSelect.jsx";
 import { canEditByEstadoOperativo, isEliminado } from "../../../utils/estadoOperativo";
 import { 
   getEstadosDisponibles, 
@@ -45,6 +47,7 @@ const INITIAL_ERRORS = {
   fechaEscrituraReal: null,
   fechaCancelacion: null,
   motivoCancelacion: null,
+  compradores: null,
   general: null,
 };
 
@@ -56,6 +59,7 @@ const ERROR_KEYWORDS = [
   { pattern: /motivoCancelaci[oó]n/i, field: 'motivoCancelacion' },
   { pattern: /estado/i, field: 'estado' },
   { pattern: /n[uú]mero/i, field: 'numero' },
+  { pattern: /comprador|compradores/i, field: 'compradores' },
 ];
 
 /* ========================================================================== */
@@ -78,52 +82,68 @@ export default function VentaEditarCard({
   // evita múltiples llamados a inmobiliarias
   const fetchedInmobRef = useRef(false);
 
+  // garantiza que compradoresEdit se inicialice exactamente UNA vez por detalle.id
+  const compradoresInitializedForId = useRef(null);
+
   // ancho de label como en VerCard
   const [labelW, setLabelW] = useState(180);
   const containerRef = useRef(null);
 
-  /* 2) GET de venta al abrir y cuando cambia la prop venta (igual patrón que VerCard) */
+  /* 2) GET de venta al abrir — siempre busca datos frescos para garantizar compradores[] completos.
+   * El endpoint de listado NO incluye la relación compradores[], así que si usamos el prop del
+   * padre directamente, compradoresEdit se inicializa vacío y el PATCH sobreescribe el array
+   * existente en la BD con sólo los nuevos compradores.
+   * Patrón: render optimista inmediato con prop → fetch fresco en paralelo → reemplazar detalle. */
   useEffect(() => {
     let abort = false;
     async function run() {
       if (!open) return;
 
-      // Si viene venta por props, usarla (esto se ejecuta también cuando venta cambia)
-      if (venta) {
-        setDetalle(venta);
-        return;
-      }
+      const id = venta?.id ?? ventaId;
+      if (!id) return;
 
-      if (ventaId != null && Array.isArray(ventas)) {
-        const found = ventas.find(v => `${v.id}` === `${ventaId}`);
-        if (found) {
-          setDetalle(found);
-          return;
-        }
-      }
+      // Render optimista inmediato: usar prop o caché local mientras llega el fetch
+      const inmediato =
+        venta ??
+        (Array.isArray(ventas) ? ventas.find(v => `${v.id}` === `${id}`) : null);
+      if (inmediato) setDetalle(inmediato);
 
-      if (ventaId != null) {
-        try {
-          const response = await getVentaById(ventaId);
-          const full = response?.data ?? response;
-          if (!abort && full) setDetalle(full);
-        } catch (e) {
-          console.error("Error obteniendo venta por id:", e);
+      // Fetch fresco (siempre): garantiza relaciones completas (compradores, lote, etc.)
+      try {
+        const response = await getVentaById(id);
+        const full = response?.data ?? response;
+        if (!abort && full) {
+          setDetalle(full);
+          // Actualizamos compradoresEdit directamente desde los datos frescos.
+          // No podemos depender del re-sync useEffect porque detalle?.id no cambia
+          // (misma venta) y React no re-dispara el effect.
+          const frescos = full.compradores?.length
+            ? full.compradores
+            : (full.comprador ? [full.comprador] : []);
+          setCompradoresEdit(frescos);
+          compradoresInitializedForId.current = full.id ?? null;
         }
+      } catch (e) {
+        console.error("Error obteniendo venta por id:", e);
+        if (!abort && venta && !inmediato) setDetalle(venta);
       }
     }
     run();
     return () => { abort = true; };
-  }, [open, ventaId, ventas, venta?.id, venta?.monto]); // Agregar venta?.id y venta?.monto para detectar cambios
+    // ventas/venta?.monto fuera del dep-array de forma intencional:
+    // ventas sólo se usa para un render optimista instantáneo (stale OK, el fetch fresco lo corrige).
+    // venta?.monto causaba re-inicializaciones no deseadas al cambiar otros campos.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, venta?.id, ventaId]);
 
   /* 3) Resetear estados cuando el modal se cierra o se abre con otra venta */
   useEffect(() => {
     if (!open) {
       fetchedInmobRef.current = false;
+      compradoresInitializedForId.current = null;
       setSaving(false);
       setShowSuccess(false);
     } else {
-      // Resetear estados al abrir con una nueva venta
       setSaving(false);
       setShowSuccess(false);
     }
@@ -224,6 +244,10 @@ export default function VentaEditarCard({
   const [numero, setNumero] = useState(base.numero);
   const [showSuccess, setShowSuccess] = useState(false);
 
+  // Etapa 4: compradores múltiples
+  const [personas, setPersonas] = useState([]);
+  const [compradoresEdit, setCompradoresEdit] = useState([]);
+
   // Nuevos campos condicionales (Etapa 1)
   const [fechaEscrituraReal, setFechaEscrituraReal] = useState(
     toDateInputValue(detalle?.fechaEscrituraReal)
@@ -253,8 +277,31 @@ export default function VentaEditarCard({
     setFechaCancelacion(toDateInputValue(detalle?.fechaCancelacion));
     setMotivoCancelacion(detalle?.motivoCancelacion ?? "");
     setErrors({ ...INITIAL_ERRORS });
+
+    // Etapa 4: inicializar compradores UNA sola vez por (open, detalle.id).
+    // El ref-guard evita que cambios en otros campos (monto, estado, etc.)
+    // que disparen re-renders reseteen la lista que el usuario ya editó.
+    if (compradoresInitializedForId.current !== detalle?.id) {
+      const compradoresIniciales = detalle?.compradores?.length
+        ? detalle.compradores
+        : (detalle?.comprador ? [detalle.comprador] : []);
+      setCompradoresEdit(compradoresIniciales);
+      compradoresInitializedForId.current = detalle?.id ?? null;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, detalle?.id, detalle?.monto]);
+  }, [open, detalle?.id]);
+
+  // Etapa 4: cargar personas al abrir (solo si el estado permite editar compradores)
+  useEffect(() => {
+    if (!open) return;
+    const estadoActual = detalle?.estado ?? 'INICIADA';
+    const esEditable = estadoActual === 'INICIADA' || estadoActual === 'CON_BOLETO';
+    if (!esEditable) return;
+    getAllPersonas({}).then(res => {
+      const arr = res?.personas ?? res?.data ?? (Array.isArray(res) ? res : []);
+      setPersonas(Array.isArray(arr) ? arr : []);
+    }).catch(e => console.error("Error cargando personas:", e));
+  }, [open, detalle?.id]);
 
   /* 6) ancho de label como en VerCard */
   useEffect(() => {
@@ -338,6 +385,21 @@ export default function VentaEditarCard({
       patch.motivoCancelacion = motivoCancelacion && motivoCancelacion.trim() !== ""
         ? motivoCancelacion.trim()
         : null;
+    }
+
+    // Etapa 4: compradores múltiples (solo si el estado permite editar)
+    const estadoActual = detalle?.estado ?? 'INICIADA';
+    const puedeEditarCompradores = (estadoActual === 'INICIADA' || estadoActual === 'CON_BOLETO') && !isEliminado(detalle);
+    if (puedeEditarCompradores) {
+      const prevCompradorIds = ((detalle?.compradores?.length
+        ? detalle.compradores
+        : (detalle?.comprador ? [detalle.comprador] : []))
+      ).map(c => String(c.id)).sort().join(',');
+      const currentCompradorIds = compradoresEdit.map(c => String(c.id)).sort().join(',');
+      if (prevCompradorIds !== currentCompradorIds) {
+        // Validación: no permitir 0 compradores (se maneja vía errors.compradores, no throw)
+        patch.compradores = compradoresEdit.map(c => ({ personaId: c.id }));
+      }
     }
 
     return patch;
@@ -435,6 +497,13 @@ export default function VentaEditarCard({
         }
       }
 
+      // Validación de compradores (Etapa 4): no permitir 0 compradores cuando es editable
+      const estadoActualValidacion = detalle?.estado ?? 'INICIADA';
+      const puedeEditarCompradoresValidacion = (estadoActualValidacion === 'INICIADA' || estadoActualValidacion === 'CON_BOLETO') && !isEliminado(detalle);
+      if (puedeEditarCompradoresValidacion && compradoresEdit.length === 0) {
+        newErrors.compradores = "Debe seleccionar al menos un comprador.";
+      }
+
       // Validación de consistencia de fechas
       if (fechaVenta && fechaVenta.trim()) {
         const fechaVentaDate = new Date(fechaVenta);
@@ -474,8 +543,14 @@ export default function VentaEditarCard({
       const response = await updateVenta(detalle.id, patch);
       const updated = response?.data ?? response;
 
-      // Actualizar estado local con la respuesta del backend (sincronización)
+      // Sincronizar detalle con la respuesta del backend
       setDetalle(updated);
+      // Sincronizar compradores desde la respuesta (detalle?.id no cambia → re-sync effect no dispara)
+      const savedCompradores = updated?.compradores?.length
+        ? updated.compradores
+        : (updated?.comprador ? [updated.comprador] : compradoresEdit);
+      setCompradoresEdit(savedCompradores);
+      compradoresInitializedForId.current = updated?.id ?? null;
 
       // Actualizar estado del padre inmediatamente
       onSaved?.(updated);
@@ -508,6 +583,13 @@ export default function VentaEditarCard({
     setFechaEscrituraReal(toDateInputValue(detalle?.fechaEscrituraReal));
     setFechaCancelacion(toDateInputValue(detalle?.fechaCancelacion));
     setMotivoCancelacion(detalle?.motivoCancelacion ?? "");
+    // Etapa 4: restaurar compradores al estado del servidor
+    const compradoresIniciales = detalle?.compradores?.length
+      ? detalle.compradores
+      : (detalle?.comprador ? [detalle.comprador] : []);
+    setCompradoresEdit(compradoresIniciales);
+    // Resetear el guard para que una futura reapertura reinicialice correctamente
+    compradoresInitializedForId.current = detalle?.id ?? null;
     clearAllErrors();
   }
 
@@ -526,11 +608,6 @@ export default function VentaEditarCard({
   // FINALIZADA solo se muestra si está guardada en BD (no en cambios locales pendientes)
   const esFinalizada = isVentaFinalizada(detalle);
 
-  const compradorNombre = (() => {
-    const n = detalle?.comprador?.nombre, a = detalle?.comprador?.apellido;
-    const j = [n, a].filter(Boolean).join(" ");
-    return j || NA;
-  })();
 
   const propietarioNombre = (() => {
     // 1) propietario directo
@@ -584,33 +661,13 @@ export default function VentaEditarCard({
         {/* Podés mover el chevron del select nativo con esta var si hiciera falta */}
         <div style={{ "--sale-label-w": `${labelW}px`, "--select-chevron-x": "26px" }}>
           {estaEliminada && (
-            <div 
-              className="alert alert-warning" 
-              style={{ 
-                marginBottom: '1rem', 
-                padding: '0.75rem 1rem',
-                backgroundColor: '#fef3c7',
-                border: '1px solid #fbbf24',
-                borderRadius: '0.375rem',
-                color: '#92400e'
-              }}
-            >
+            <div className="venta-alert venta-alert--warning">
               <strong>Venta eliminada:</strong> No se puede editar una venta eliminada. Reactívala para modificarla.
             </div>
           )}
 
           {!estaEliminada && !esEditable && estado === 'CANCELADA' && (
-            <div 
-              className="alert alert-info" 
-              style={{ 
-                marginBottom: '1rem', 
-                padding: '0.75rem 1rem',
-                backgroundColor: '#f0f9ff',
-                border: '1px solid #0ea5e9',
-                borderRadius: '0.375rem',
-                color: '#0c4a6e'
-              }}
-            >
+            <div className="venta-alert venta-alert--info">
               <strong>Venta cancelada:</strong> Esta venta está en estado cancelado y solo permite lectura.
             </div>
           )}
@@ -688,15 +745,7 @@ export default function VentaEditarCard({
                 </div>
                 {/* Indicador FINALIZADA (derivada) - FUERA del field-row para que aparezca debajo */}
                 {esFinalizada && estadoCobro === detalle?.estadoCobro && (
-                  <div style={{ 
-                    marginTop: 6, 
-                    marginLeft: 'calc(var(--sale-label-w, 180px) + 12px)',
-                    fontSize: 12, 
-                    color: '#059669',
-                    fontWeight: 600
-                  }}>
-                    ✓ FINALIZADA (Escriturado + Pago Completo)
-                  </div>
+                  <div className="ventaFinalizada">✓ FINALIZADA (Escriturado + Pago Completo)</div>
                 )}
                 {/* Error inline */}
                 {errors.estado && <div className="fieldError">{errors.estado}</div>}
@@ -719,12 +768,7 @@ export default function VentaEditarCard({
                     disabled={estaEliminada || !esEditable || !puedeEditarCobro}
                   />
                   {!puedeEditarCobro && estado === 'CANCELADA' && (
-                    <div style={{ 
-                      marginTop: 4, 
-                      fontSize: 12, 
-                      color: '#6b7280',
-                      fontStyle: 'italic'
-                    }}>
+                    <div className="ventaEstadoCobroNote">
                       No se puede modificar el estado de cobro en ventas canceladas
                     </div>
                   )}
@@ -832,11 +876,6 @@ export default function VentaEditarCard({
               </div>
 
               <div className="field-row">
-                <div className="field-label">COMPRADOR</div>
-                <div className="field-value is-readonly">{compradorNombre}</div>
-              </div>
-
-              <div className="field-row">
                 <div className="field-label">PROPIETARIO</div>
                 <div className="field-value is-readonly">{propietarioNombre}</div>
               </div>
@@ -871,18 +910,7 @@ export default function VentaEditarCard({
 
               {/* Error general (si no se pudo mapear a campo específico) */}
               {errors.general && (
-                <div style={{ 
-                  marginTop: 8, 
-                  marginBottom: 8, 
-                  padding: '8px 12px',
-                  backgroundColor: '#fee2e2',
-                  border: '1px solid #fca5a5',
-                  borderRadius: '0.375rem',
-                  color: '#991b1b',
-                  fontSize: '13px'
-                }}>
-                  {errors.general}
-                </div>
+                <div className="lote-error-global">{errors.general}</div>
               )}
 
               <div className={`fieldRow ${errors.fechaVenta ? "hasError" : ""}`}>
@@ -949,6 +977,45 @@ export default function VentaEditarCard({
               </div>
             </div>
           </div>
+
+          {/* Compradores — bloque full-width fuera de la grilla */}
+          {(() => {
+            const estadoActual = detalle?.estado ?? 'INICIADA';
+            const eliminado = isEliminado(detalle);
+            const puedeEditarCompradores = (estadoActual === 'INICIADA' || estadoActual === 'CON_BOLETO') && !eliminado;
+
+            const tooltipReadOnly = !puedeEditarCompradores
+              ? eliminado
+                ? 'La venta está eliminada. Reactívala para modificar los compradores.'
+                : estadoActual === 'ESCRITURADO'
+                  ? 'No se pueden modificar los compradores de una venta escriturada.'
+                  : estadoActual === 'CANCELADA'
+                    ? 'No se pueden modificar los compradores de una venta cancelada.'
+                    : 'Los compradores no son editables en el estado actual de la venta.'
+              : null;
+
+            // Fuente única de verdad: siempre compradoresEdit.
+            // El fallback anterior (detalle.compradores cuando edit==[]) era la causa raíz
+            // del bug de reemplazo visual: al agregar el primer comprador, la fuente
+            // cambiaba y perdía los originales que estaban en detalle pero no en el estado.
+            return (
+              <CompradoresMultiSelect
+                value={compradoresEdit}
+                onAdd={(p) => {
+                  setCompradoresEdit(prev => [...prev, p]);
+                  if (errors.compradores) setErrors(prev => ({ ...prev, compradores: null }));
+                }}
+                onRemove={(id) => {
+                  setCompradoresEdit(prev => prev.filter(c => String(c.id) !== String(id)));
+                  if (errors.compradores) setErrors(prev => ({ ...prev, compradores: null }));
+                }}
+                disabled={!puedeEditarCompradores}
+                error={errors.compradores}
+                personas={personas}
+                tooltipReadOnly={tooltipReadOnly}
+              />
+            );
+          })()}
         </div>
       </EditarBase>
     </>

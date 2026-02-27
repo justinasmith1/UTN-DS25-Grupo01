@@ -190,6 +190,7 @@ model Persona {
 
   Venta   Venta[]
   Reserva Reserva[]
+  ventasComoComprador Venta[] @relation("VentaCompradores")
 
   @@unique([identificadorTipo, identificadorValor])
   @@index([estadoOperativo])
@@ -330,6 +331,7 @@ model Venta {
   inmobiliariaId      Int?
   inmobiliaria        Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
   reservaConsumo      Reserva?        @relation("VentaConsumeReserva")
+  compradores         Persona[]       @relation("VentaCompradores")
   createdAt           DateTime        @default(now())
   updateAt            DateTime?
 

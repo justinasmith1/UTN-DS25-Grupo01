@@ -1053,10 +1053,23 @@ export default function LoteSidePanel({
                                   <span>{item.estado}</span>
                                 </>
                               )}
-                              {item.comprador && (
+                              {/* Etapa 4: soporta compradores[] (múltiples) y comprador (legacy string) */}
+                              {(item.compradores?.length > 0 || item.comprador) && (
                                 <>
-                                  <strong>Comprador:</strong>
-                                  <span>{item.comprador}</span>
+                                  <strong>Comprador{item.compradores?.length > 1 ? 'es' : ''}:</strong>
+                                  <span>
+                                    {item.compradores?.length > 0
+                                      ? (() => {
+                                          const c0 = item.compradores[0];
+                                          const primero = [c0.nombre, c0.apellido].filter(Boolean).join(' ')
+                                            || c0.razonSocial
+                                            || `Persona ${c0.id}`;
+                                          return item.compradores.length > 1
+                                            ? `${primero} (+${item.compradores.length - 1})`
+                                            : primero;
+                                        })()
+                                      : item.comprador}
+                                  </span>
                                 </>
                               )}
                               {item.inmobiliaria && (

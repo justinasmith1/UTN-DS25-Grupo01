@@ -9,6 +9,11 @@ const fechaISO = z.string().refine((date) => !isNaN(Date.parse(date)), {
     message: 'Fecha inválida' 
 });
 
+// Etapa 4: Schema para un comprador individual
+const compradorInputSchema = z.object({
+    personaId: z.coerce.number().int('El ID de la persona debe ser un número entero').positive('El ID de la persona debe ser un número positivo'),
+});
+
 export const createVentaSchema = z.object({
     loteId: z.coerce.number().int('El ID del lote debe ser un número entero').positive('El ID del lote debe ser un número positivo'),
     fechaVenta: fechaISO,
@@ -20,10 +25,20 @@ export const createVentaSchema = z.object({
     fechaCancelacion: fechaISO.optional(),
     motivoCancelacion: z.string().min(1, 'El motivo de cancelación no puede estar vacío').trim().optional(),
     tipoPago: z.string().min(1, 'Se requiere un tipo de pago').trim(),
-    compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo'),
+    // Etapa 4: compradorId es legacy (se mantiene por compatibilidad), compradores[] es el nuevo campo
+    compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo').optional(),
+    compradores: z.array(compradorInputSchema).min(1, 'Debe especificar al menos un comprador').optional(),
     inmobiliariaId: z.coerce.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo').optional(),
     reservaId: z.number().int('El ID de la reserva debe ser un número entero').positive('El ID de la reserva debe ser un número positivo').optional().nullable(),
     numero: z.string().min(3, 'El número de venta es obligatorio').max(30, 'El número de venta es demasiado largo').trim(),
+}).refine((data) => {
+    // Debe venir compradores[] O compradorId (al menos uno)
+    const tieneCompradores = data.compradores && data.compradores.length > 0;
+    const tieneCompradorId = data.compradorId != null;
+    return tieneCompradores || tieneCompradorId;
+}, {
+    message: 'Debe especificar al menos un comprador (campo compradores[] o compradorId)',
+    path: ['compradores'],
 }).refine((data) => {
     // Si estado es ESCRITURADO, fechaEscrituraReal es obligatoria
     if (data.estado === 'ESCRITURADO' && !data.fechaEscrituraReal) {
@@ -64,9 +79,20 @@ export const updateVentaSchema = z.object({
     fechaCancelacion: fechaISO.optional(),
     motivoCancelacion: z.string().min(1, 'El motivo de cancelación no puede estar vacío').trim().optional(),
     tipoPago: z.string().min(1, 'Se requiere un tipo de pago').trim().optional(),
+    // Etapa 4: compradorId legacy opcional, compradores[] reemplaza la lista completa si viene
     compradorId: z.coerce.number().int('El ID del comprador debe ser un número entero').positive('El ID del comprador debe ser un número positivo').optional(),
+    compradores: z.array(compradorInputSchema).min(1, 'Debe especificar al menos un comprador').optional(),
     inmobiliariaId: z.coerce.number().int('El ID de la inmobiliaria debe ser un número entero').positive('El ID de la inmobiliaria debe ser un número positivo').optional(),
     numero: z.string().min(3, 'El número de venta es obligatorio').max(30, 'El número de venta es demasiado largo').trim().optional(),
+}).refine((data) => {
+    // Si se envía compradores[], debe tener al menos 1
+    if (data.compradores !== undefined && data.compradores.length === 0) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'La lista de compradores no puede estar vacía',
+    path: ['compradores'],
 }).refine((data) => {
     // Si estado es ESCRITURADO, fechaEscrituraReal es obligatoria
     if (data.estado === 'ESCRITURADO' && !data.fechaEscrituraReal) {
