@@ -12,6 +12,7 @@ export default function DocumentoDropdown({
   onClose,
   onSelectTipo,
   onAddDocumento,
+  canUpload = false,
 }) {
   const dropdownRef = useRef(null);
 
@@ -83,25 +84,27 @@ export default function DocumentoDropdown({
               </button>
             ))}
 
-            <button
-              type="button"
-              className="tl-btn tl-btn--soft"
-              onClick={() => {
-                onAddDocumento?.();
-                onClose?.();
-              }}
-              style={{
-                marginTop: "4px",
-                alignSelf: "flex-start",
-                width: "100%",
-                textAlign: "center",
-                padding: "12px 16px",
-                fontSize: "15px",
-                fontWeight: 500,
-              }}
-            >
-              + Agregar documento
-            </button>
+            {canUpload && (
+              <button
+                type="button"
+                className="tl-btn tl-btn--soft"
+                onClick={() => {
+                  onAddDocumento?.();
+                  onClose?.();
+                }}
+                style={{
+                  marginTop: "4px",
+                  alignSelf: "flex-start",
+                  width: "100%",
+                  textAlign: "center",
+                  padding: "12px 16px",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                }}
+              >
+                + Agregar documento
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -176,6 +176,10 @@ export default function VentasPage() {
   const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
   const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
 
+  // Permisos de archivos (coinciden con lo que el backend permite por rol)
+  const canUploadFiles = ['ADMINISTRADOR', 'GESTOR', 'TECNICO'].includes(user?.role);
+  const canDeleteFiles = ['ADMINISTRADOR', 'GESTOR'].includes(user?.role);
+
   // Función reutilizable para cargar datos
   const loadVentasData = useCallback(async () => {
     setIsLoading(true);
@@ -670,6 +674,7 @@ export default function VentasPage() {
         onSelectTipo={handleSelectTipoDocumento}
         onAddDocumento={handleAbrirFormularioDoc}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
+        canUpload={canUploadFiles}
       />
 
       {/* Formulario de documento (modal) */}
@@ -691,14 +696,8 @@ export default function VentasPage() {
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
         loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
-        documentoUrl={null}
-        selectedDoc={docCustomSeleccionado}
-        onModificar={(url) => {
-          console.log("Modificar documento:", url);
-        }}
-        onDescargar={(url) => {
-          console.log("Descargar documento:", url);
-        }}
+        canUpload={canUploadFiles}
+        canDelete={canDeleteFiles}
       />
 
       {/* Animación de éxito al eliminar */}

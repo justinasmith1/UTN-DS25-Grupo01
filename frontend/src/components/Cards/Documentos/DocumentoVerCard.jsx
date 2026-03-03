@@ -1,7 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import "../../../styles/tokens.css";
 import "../Base/cards.css";
-import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos";
+import "./documentos.css";
+import {
+  getArchivosByLote,
+  getFileSignedUrl,
+  uploadArchivo,
+  deleteArchivo,
+} from "../../../lib/api/archivos";
 
 const DOC_INFO = {
   BOLETO: { title: "Boleto de Compraventa" },
@@ -15,6 +21,19 @@ const TIPO_MAP = {
   PLANOS: "PLANO",
 };
 
+function formatDate(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function DocumentoVerCard({
   open,
   onClose,
@@ -22,112 +41,177 @@ export default function DocumentoVerCard({
   tipoDocumento,
   loteId,
   loteNumero,
-  selectedDoc,
-  onModificar,
-  onDescargar,
+  canUpload = false,
+  canDelete = false,
 }) {
+  const [archivos, setArchivos] = useState([]);
+  const [selectedId, setSelectedId] = useState(null);
   const [signedUrl, setSignedUrl] = useState("");
-  const [loadingArchivos, setLoadingArchivos] = useState(false);
-  const [documentoActual, setDocumentoActual] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingUrl, setLoadingUrl] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (open && loteId) {
-      setLoadingArchivos(true);
-      setError("");
-      (async () => {
-        try {
-          const archivosDelLote = await getArchivosByLote(loteId);
-
-          let docEncontrado = null;
-          if (selectedDoc && selectedDoc.id) {
-            docEncontrado = archivosDelLote.find(
-              (a) => a.id === selectedDoc.id || a.filename === selectedDoc.nombre
-            );
-          } else if (tipoDocumento) {
-            const tipoBackend = TIPO_MAP[tipoDocumento] || tipoDocumento;
-            docEncontrado = archivosDelLote.find((a) => a.tipo === tipoBackend);
-          }
-
-          if (docEncontrado) {
-            setDocumentoActual(docEncontrado);
-            // Signed URL obligatoria para visualizar
-            const url = await getFileSignedUrl(docEncontrado.id);
-            if (url) {
-              setSignedUrl(url);
-            } else {
-              setError("No se pudo obtener la URL del documento");
-            }
-          } else {
-            setDocumentoActual(null);
-            setSignedUrl("");
-          }
-        } catch (err) {
-          console.error("Error cargando archivos:", err);
-          setDocumentoActual(null);
-          setSignedUrl("");
-          setError("Error al cargar el documento");
-        } finally {
-          setLoadingArchivos(false);
-        }
-      })();
-    }
-  }, [open, tipoDocumento, loteId, selectedDoc]);
-
-  useEffect(() => {
-    if (!open) {
-      setSignedUrl("");
-      setDocumentoActual(null);
-      setError("");
-    }
-  }, [open]);
-
-  if (!open) return null;
-
-  const info = DOC_INFO[tipoDocumento] || {
-    title: selectedDoc?.nombre || "Documento",
-  };
+  const tipoBackend = TIPO_MAP[tipoDocumento] || tipoDocumento;
+  const info = DOC_INFO[tipoDocumento] || { title: "Documento" };
 
   const limpiarMapId = (mapId) => {
     if (!mapId) return mapId;
     const str = String(mapId);
     return str.replace(/^lote\s*/i, "").trim() || str;
   };
-
   const numeroLote = limpiarMapId(loteNumero) || loteId || "XXXX";
 
-  const titulo = selectedDoc?.nombre
-    ? `${selectedDoc.nombre} - Lote N° ${numeroLote}`
-    : tipoDocumento === "BOLETO"
-    ? `Boleto de CompraVenta de Lote N° ${numeroLote}`
-    : tipoDocumento === "ESCRITURA"
-    ? `Escritura de Lote N° ${numeroLote}`
-    : `Planos de Lote N° ${numeroLote}`;
+  const titulo =
+    tipoDocumento === "BOLETO"
+      ? `Boleto de CompraVenta de Lote N\u00B0 ${numeroLote}`
+      : tipoDocumento === "ESCRITURA"
+      ? `Escritura de Lote N\u00B0 ${numeroLote}`
+      : `Planos de Lote N\u00B0 ${numeroLote}`;
 
-  const getFileExtension = (url) => {
-    if (!url) return "jpg";
-    const match = url.match(/\.([a-z]{3,4})(?:[?#]|$)/i);
-    return match ? match[1] : "jpg";
+  const fetchArchivos = useCallback(async () => {
+    if (!loteId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const all = await getArchivosByLote(loteId);
+      const filtered = all
+        .filter((a) => a.tipo === tipoBackend)
+        .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      setArchivos(filtered);
+      return filtered;
+    } catch (err) {
+      console.error("Error cargando archivos:", err);
+      setError("Error al cargar los documentos");
+      setArchivos([]);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  }, [loteId, tipoBackend]);
+
+  const loadSignedUrl = useCallback(async (fileId) => {
+    if (!fileId) {
+      setSignedUrl("");
+      return;
+    }
+    setLoadingUrl(true);
+    setError("");
+    try {
+      const url = await getFileSignedUrl(fileId);
+      if (url) {
+        setSignedUrl(url);
+      } else {
+        setSignedUrl("");
+        setError("No se pudo obtener la URL del documento");
+      }
+    } catch {
+      setSignedUrl("");
+      setError("Error al obtener la URL del documento");
+    } finally {
+      setLoadingUrl(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && loteId) {
+      (async () => {
+        const list = await fetchArchivos();
+        if (list && list.length > 0) {
+          setSelectedId(list[0].id);
+          loadSignedUrl(list[0].id);
+        } else {
+          setSelectedId(null);
+          setSignedUrl("");
+        }
+      })();
+    }
+  }, [open, loteId, tipoDocumento]);
+
+  useEffect(() => {
+    if (!open) {
+      setArchivos([]);
+      setSelectedId(null);
+      setSignedUrl("");
+      setError("");
+      setUploading(false);
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }, [open]);
+
+  const handleSelect = (fileId) => {
+    if (fileId === selectedId) return;
+    setSelectedId(fileId);
+    setSignedUrl("");
+    loadSignedUrl(fileId);
   };
 
-  const isPdf =
-    signedUrl &&
-    (documentoActual?.filename?.toLowerCase().endsWith(".pdf") ||
-      signedUrl.toLowerCase().includes(".pdf"));
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !loteId) return;
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    setUploading(true);
+    setError("");
+    try {
+      const saved = await uploadArchivo(file, loteId, tipoBackend);
+      const list = await fetchArchivos();
+      const newId = saved?.id || list?.[0]?.id;
+      if (newId) {
+        setSelectedId(newId);
+        loadSignedUrl(newId);
+      }
+    } catch (err) {
+      setError(err?.message || "Error al subir el archivo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!selectedId) return;
+    setDeleting(true);
+    setError("");
+    try {
+      await deleteArchivo(selectedId);
+      setConfirmingDelete(false);
+      const list = await fetchArchivos();
+      if (list.length > 0) {
+        setSelectedId(list[0].id);
+        loadSignedUrl(list[0].id);
+      } else {
+        setSelectedId(null);
+        setSignedUrl("");
+      }
+    } catch (err) {
+      setError(err?.message || "Error al eliminar el documento");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const handleDescargar = () => {
     if (!signedUrl) return;
+    const selected = archivos.find((a) => a.id === selectedId);
     const link = document.createElement("a");
     link.href = signedUrl;
     link.target = "_blank";
-    link.download = `${info.title.replace(/\s+/g, "_")}_Lote_${
-      loteNumero || loteId || "N"
-    }.${getFileExtension(documentoActual?.filename || signedUrl)}`;
+    link.download = selected?.filename || "documento";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    onDescargar?.(signedUrl);
   };
+
+  if (!open) return null;
+
+  const selectedFile = archivos.find((a) => a.id === selectedId);
+  const isPdf =
+    selectedFile?.filename?.toLowerCase().endsWith(".pdf") ||
+    signedUrl?.toLowerCase().includes(".pdf");
 
   return (
     <div className="c-backdrop" onClick={onClose}>
@@ -144,235 +228,180 @@ export default function DocumentoVerCard({
             onClick={onClose}
             aria-label="Cerrar"
           >
-            <span className="cclf-btn-close__x">×</span>
+            <span className="cclf-btn-close__x">&times;</span>
           </button>
         </header>
 
-        <div
-          className="c-body"
-          style={{
-            padding: "24px",
-            display: "flex",
-            flexDirection: "column",
-            gap: "24px",
-            overflow: "hidden",
-            minHeight: 0,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              gap: "24px",
-              flex: "1",
-              minHeight: 0,
-              overflow: "hidden",
-            }}
-          >
-            {/* Preview del documento */}
-            <div
-              style={{
-                flex: "2",
-                display: "flex",
-                flexDirection: "column",
-                gap: "16px",
-                overflow: "hidden",
-                minWidth: 0,
-              }}
-            >
-              <div
-                style={{
-                  flex: "1",
-                  backgroundColor: "var(--color-surface, #f9fafb)",
-                  border: "1px solid rgba(0,0,0,.1)",
-                  borderRadius: "8px",
-                  overflow: "auto",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minHeight: "500px",
-                  maxHeight: "calc(90vh - 300px)",
-                }}
-              >
-                {loadingArchivos ? (
-                  <div
-                    style={{
-                      padding: "40px",
-                      textAlign: "center",
-                      color: "#6b7280",
-                    }}
-                  >
-                    Cargando documento...
+        <div className="c-body">
+          <div className="doc-panel">
+            {/* Sidebar: lista de documentos */}
+            <div className="doc-sidebar">
+              <div className="doc-sidebar__header">
+                {info.title} ({archivos.length})
+              </div>
+              <div className="doc-sidebar__list">
+                {loading ? (
+                  <div className="doc-sidebar__empty">Cargando...</div>
+                ) : archivos.length === 0 ? (
+                  <div className="doc-sidebar__empty">
+                    <span className="doc-sidebar__empty-title">
+                      Sin documentos
+                    </span>
+                    <span>
+                      No hay {info.title.toLowerCase()} cargados para este lote
+                    </span>
                   </div>
-                ) : error ? (
-                  <div
-                    style={{
-                      padding: "40px",
-                      textAlign: "center",
-                      color: "#dc2626",
-                    }}
-                  >
-                    <div style={{ fontSize: "16px", fontWeight: 600 }}>
-                      {error}
-                    </div>
-                  </div>
-                ) : documentoActual && signedUrl ? (
-                  isPdf ? (
-                    <embed
-                      src={signedUrl}
-                      type="application/pdf"
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        borderRadius: "8px",
-                      }}
-                    />
-                  ) : (
-                    <img
-                      src={signedUrl}
-                      alt={info.title}
-                      style={{
-                        maxWidth: "100%",
-                        maxHeight: "100%",
-                        objectFit: "contain",
-                      }}
-                    />
-                  )
                 ) : (
-                  <div
-                    style={{
-                      padding: "40px",
-                      textAlign: "center",
-                      color: "#6b7280",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      height: "100%",
-                    }}
-                  >
-                    <div style={{ fontSize: "16px", fontWeight: 600, marginBottom: "8px" }}>
-                      No hay documentos asignados
+                  archivos.map((arch) => (
+                    <div
+                      key={arch.id}
+                      className={`doc-sidebar__item${
+                        arch.id === selectedId
+                          ? " doc-sidebar__item--selected"
+                          : ""
+                      }`}
+                      onClick={() => handleSelect(arch.id)}
+                    >
+                      <div className="doc-sidebar__item-name">
+                        {arch.filename}
+                      </div>
+                      <div className="doc-sidebar__item-meta">
+                        {formatDate(arch.uploadedAt)}
+                        {arch.uploadedBy ? ` \u2014 ${arch.uploadedBy}` : ""}
+                      </div>
                     </div>
-                    <div style={{ fontSize: "14px", color: "#9ca3af" }}>
-                      Este lote no tiene {info.title.toLowerCase()} asignado
-                    </div>
-                  </div>
+                  ))
                 )}
               </div>
             </div>
 
-            {/* Columna derecha: Info + Botones */}
-            <div
-              style={{
-                flex: "1",
-                display: "flex",
-                flexDirection: "column",
-                minWidth: "280px",
-                gap: "20px",
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: "#f3f4f6",
-                  border: "1px solid rgba(0,0,0,.1)",
-                  borderRadius: "8px",
-                  padding: "16px",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "flex-start",
-                    gap: "12px",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: "24px",
-                      height: "24px",
-                      borderRadius: "50%",
-                      backgroundColor: "#6b7280",
-                      color: "white",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "14px",
-                      fontWeight: "bold",
-                      flexShrink: 0,
-                    }}
-                  >
-                    i
+            {/* Preview */}
+            <div className="doc-preview">
+              <div className="doc-preview__frame">
+                {loadingUrl ? (
+                  <div className="doc-preview__loading">
+                    Cargando vista previa...
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>
-                      {info.title}
-                    </h3>
-                    {documentoActual && (
-                      <p
-                        style={{
-                          margin: "4px 0 0",
-                          fontSize: "13px",
-                          color: "#6b7280",
-                        }}
-                      >
-                        {documentoActual.filename}
-                      </p>
-                    )}
+                ) : selectedId && signedUrl ? (
+                  isPdf ? (
+                    <embed
+                      src={signedUrl}
+                      type="application/pdf"
+                      title={selectedFile?.filename}
+                    />
+                  ) : (
+                    <img src={signedUrl} alt={selectedFile?.filename || ""} />
+                  )
+                ) : selectedId && !signedUrl && !loadingUrl ? (
+                  <div className="doc-preview__error">
+                    No se pudo cargar la vista previa
                   </div>
-                </div>
+                ) : (
+                  <div className="doc-preview__placeholder">
+                    <span className="doc-preview__placeholder-title">
+                      {archivos.length === 0
+                        ? "No hay documentos asignados"
+                        : "Seleccion\u00E1 un documento"}
+                    </span>
+                    <span className="doc-preview__placeholder-sub">
+                      {archivos.length === 0
+                        ? `Este lote no tiene ${info.title.toLowerCase()} cargado`
+                        : "Hac\u00E9 click en un archivo de la lista para previsualizarlo"}
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: "12px",
-                  marginTop: "auto",
-                }}
+          {error && <div className="doc-error-inline">{error}</div>}
+
+          {/* Confirmación inline de eliminación */}
+          {confirmingDelete && selectedFile && (
+            <div className="doc-confirm-delete">
+              <span className="doc-confirm-delete__msg">
+                {"¿Eliminar \""}{selectedFile.filename}{"\"?"}
+              </span>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleDeleteConfirm}
+                disabled={deleting}
               >
+                {deleting ? "Eliminando..." : "Confirmar"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={() => setConfirmingDelete(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
+
+          {/* Barra de acciones */}
+          <div className="doc-actions">
+            {canUpload && (
+              <>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  onChange={handleUpload}
+                  hidden
+                />
                 <button
                   type="button"
                   className="btn btn-primary"
-                  onClick={handleDescargar}
-                  disabled={!documentoActual || !signedUrl}
-                  style={{
-                    minWidth: "120px",
-                    background: "#2849AF",
-                    border: "1px solid #000",
-                    color: "#fff",
-                    boxShadow: "0 4px 10px rgba(40,73,175,.22)",
-                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || confirmingDelete}
                 >
-                  Descargar
+                  {uploading ? "Subiendo..." : "Agregar"}
                 </button>
+              </>
+            )}
 
-                <button
-                  type="button"
-                  className="btn"
-                  onClick={() => {
-                    if (onVolverAtras) {
-                      onVolverAtras();
-                    } else {
-                      onClose?.();
-                    }
-                  }}
-                  style={{
-                    backgroundColor: "#065f46",
-                    color: "white",
-                    borderColor: "#065f46",
-                    minWidth: "120px",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = "#054d37";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = "#065f46";
-                  }}
-                >
-                  Volver Atrás
-                </button>
-              </div>
-            </div>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleDescargar}
+              disabled={!selectedId || !signedUrl || confirmingDelete}
+            >
+              Descargar
+            </button>
+
+            {canDelete && (
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => setConfirmingDelete(true)}
+                disabled={!selectedId || confirmingDelete}
+              >
+                Eliminar
+              </button>
+            )}
+
+            <div className="doc-actions__spacer" />
+
+            <button
+              type="button"
+              className="btn btn-outline"
+              onClick={() => {
+                if (confirmingDelete) {
+                  setConfirmingDelete(false);
+                  return;
+                }
+                if (onVolverAtras) {
+                  onVolverAtras();
+                } else {
+                  onClose?.();
+                }
+              }}
+            >
+              {"Volver Atrás"}
+            </button>
           </div>
         </div>
       </div>
