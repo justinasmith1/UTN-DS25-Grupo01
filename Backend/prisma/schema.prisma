@@ -412,15 +412,21 @@ model Promocion {
 // Archivos
 
 model Archivos {
-  id             Int           @id @default(autoincrement())
-  nombreArchivo  String
-  linkArchivo    String
-  tipo           TiposArchivos
-  idLoteAsociado Int
-  lote           Lote          @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
-  createdAt      DateTime      @default(now())
-  uploadedBy     String?
-  user           User?         @relation(fields: [uploadedBy], references: [email])
+  id              Int             @id @default(autoincrement())
+  nombreArchivo   String
+  linkArchivo     String
+  tipo            TiposArchivos
+  idLoteAsociado  Int
+  lote            Lote            @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  uploadedBy      String?
+  user            User?           @relation(fields: [uploadedBy], references: [email])
+  estadoOperativo EstadoOperativo @default(OPERATIVO)
+  fechaBaja       DateTime?
+  deletedBy       String?
+
+  @@index([estadoOperativo])
 }
 
 // Alquiler

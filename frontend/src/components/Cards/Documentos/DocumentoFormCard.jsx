@@ -1,18 +1,13 @@
-// src/components/Cards/Documentos/DocumentoFormCard.jsx
-// Card independiente para cargar un documento (solo frontend, persiste en sessionStorage).
 import { useState, useEffect, useRef } from "react";
 import "../Base/cards.css";
-import { addLocalDoc } from "../../../lib/storage/docsLocal";
+import { uploadArchivo } from "../../../lib/api/archivos";
 
 export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
   const ref = useRef(null);
-  const [formState, setFormState] = useState({
-    nombre: "",
-    link: "",
-    tipo: "OTRO",
-    fileDataUrl: "",
-    fileName: "",
-  });
+  const [tipo, setTipo] = useState("OTRO");
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -26,43 +21,36 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
     }
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) {
+      setTipo("OTRO");
+      setFile(null);
+      setLoading(false);
+      setError("");
+    }
+  }, [open]);
+
   if (!open) return null;
 
-  const handleFileChange = (file) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setFormState((prev) => ({
-        ...prev,
-        fileDataUrl: e.target?.result || "",
-        fileName: file.name,
-      }));
-    };
-    reader.readAsDataURL(file);
+  const handleFileChange = (f) => {
+    if (!f) return;
+    setFile(f);
+    setError("");
   };
 
-  const handleSubmit = () => {
-    if (!loteId) return;
-    if (!formState.nombre.trim()) return;
-    const nuevo = {
-      id: `${Date.now()}`,
-      nombre: formState.nombre.trim(),
-      link: formState.link.trim() || formState.fileDataUrl,
-      tipo: formState.tipo || "OTRO",
-      fileName: formState.fileName || formState.nombre.trim(),
-      createdAt: new Date().toISOString(),
-      isLocal: true,
-    };
-    addLocalDoc(loteId, nuevo);
-    onSaved?.(nuevo);
-    onClose?.();
-    setFormState({
-      nombre: "",
-      link: "",
-      tipo: "OTRO",
-      fileDataUrl: "",
-      fileName: "",
-    });
+  const handleSubmit = async () => {
+    if (!loteId || !file) return;
+    setLoading(true);
+    setError("");
+    try {
+      const saved = await uploadArchivo(file, loteId, tipo);
+      onSaved?.(saved);
+      onClose?.();
+    } catch (err) {
+      setError(err?.message || "Error al subir el archivo");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -75,28 +63,31 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
       >
         <header className="c-header">
           <h2 className="c-title">Agregar documento</h2>
-          <button type="button" className="cclf-btn-close" onClick={onClose} aria-label="Cerrar">
+          <button
+            type="button"
+            className="cclf-btn-close"
+            onClick={onClose}
+            aria-label="Cerrar"
+          >
             <span className="cclf-btn-close__x">×</span>
           </button>
         </header>
 
-        <div className="c-body" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          <div>
-            <label style={{ fontSize: "13px", color: "#374151" }}>Nombre</label>
-            <input
-              type="text"
-              value={formState.nombre}
-              onChange={(e) => setFormState((p) => ({ ...p, nombre: e.target.value }))}
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db" }}
-              placeholder="Ej: Certificado, Informe, etc."
-            />
-          </div>
+        <div
+          className="c-body"
+          style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+        >
           <div>
             <label style={{ fontSize: "13px", color: "#374151" }}>Tipo</label>
             <select
-              value={formState.tipo}
-              onChange={(e) => setFormState((p) => ({ ...p, tipo: e.target.value }))}
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db" }}
+              value={tipo}
+              onChange={(e) => setTipo(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "10px",
+                borderRadius: "8px",
+                border: "1px solid #d1d5db",
+              }}
             >
               <option value="OTRO">Otro</option>
               <option value="BOLETO">Boleto</option>
@@ -104,18 +95,11 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
               <option value="PLANO">Plano</option>
             </select>
           </div>
+
           <div>
-            <label style={{ fontSize: "13px", color: "#374151" }}>Link (opcional)</label>
-            <input
-              type="text"
-              value={formState.link}
-              onChange={(e) => setFormState((p) => ({ ...p, link: e.target.value }))}
-              style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db" }}
-              placeholder="https://..."
-            />
-          </div>
-          <div>
-            <label style={{ fontSize: "13px", color: "#374151" }}>Adjuntar archivo (PDF u otro)</label>
+            <label style={{ fontSize: "13px", color: "#374151" }}>
+              Archivo (PDF o imagen) *
+            </label>
             <div
               style={{
                 border: "1px dashed #9ca3af",
@@ -128,22 +112,24 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => {
                 e.preventDefault();
-                const file = e.dataTransfer.files?.[0];
-                if (file) handleFileChange(file);
+                const f = e.dataTransfer.files?.[0];
+                if (f) handleFileChange(f);
               }}
               onClick={() => {
                 const input = document.createElement("input");
                 input.type = "file";
                 input.accept = ".pdf,image/*";
                 input.onchange = (e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleFileChange(file);
+                  const f = e.target.files?.[0];
+                  if (f) handleFileChange(f);
                 };
                 input.click();
               }}
             >
-              {formState.fileName ? (
-                <div style={{ fontSize: "14px", color: "#111827" }}>{formState.fileName}</div>
+              {file ? (
+                <div style={{ fontSize: "14px", color: "#111827" }}>
+                  {file.name}
+                </div>
               ) : (
                 <div style={{ fontSize: "14px", color: "#6b7280" }}>
                   Arrastra un archivo o haz clic para seleccionar
@@ -151,6 +137,20 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
               )}
             </div>
           </div>
+
+          {error && (
+            <div
+              style={{
+                fontSize: "13px",
+                color: "#dc2626",
+                padding: "8px",
+                backgroundColor: "#fef2f2",
+                borderRadius: "6px",
+              }}
+            >
+              {error}
+            </div>
+          )}
         </div>
 
         <footer className="c-footer" style={{ display: "flex", gap: "8px" }}>
@@ -158,15 +158,16 @@ export default function DocumentoFormCard({ open, onClose, loteId, onSaved }) {
             type="button"
             className="tl-btn tl-btn--soft"
             onClick={handleSubmit}
-            disabled={!formState.nombre.trim()}
+            disabled={!file || loading}
             style={{ flex: 1 }}
           >
-            Guardar
+            {loading ? "Subiendo..." : "Subir"}
           </button>
           <button
             type="button"
             className="tl-btn tl-btn--ghost"
             onClick={onClose}
+            disabled={loading}
             style={{ flex: 1 }}
           >
             Cancelar

@@ -1,12 +1,17 @@
 export type TipoFile =  'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN' | 'OTRO';
+export type EstadoOperativoFile = 'OPERATIVO' | 'ELIMINADO';
+
 export interface FileMetadata {
     id: number;
     filename: string;
     url: string;
     tipo: TipoFile;
     uploadedAt: Date;
+    updatedAt: Date;
     uploadedBy?: string | null;
     idLoteAsociado: number;
+    estadoOperativo: EstadoOperativoFile;
+    deletedBy?: string | null;
 }
 
 export interface NewFileMetadata {

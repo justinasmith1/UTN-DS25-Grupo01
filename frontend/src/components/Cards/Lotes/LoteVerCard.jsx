@@ -317,7 +317,7 @@ export default function LoteVerCard({
     if (!match) return null;
     return {
       ...match,
-      url: match.url || match.linkArchivo || match.signedUrl || null,
+      url: match.url || match.signedUrl || null,
     };
   };
 

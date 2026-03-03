@@ -56,6 +56,21 @@ export async function generateSignedUrl(objectPath: string, expiresIn: number = 
   return data.signedUrl;
 }
 
+function toFileMetadata(row: any): FileMetadata {
+  return {
+    id: row.id,
+    filename: row.nombreArchivo,
+    url: row.linkArchivo,
+    tipo: row.tipo as TipoFile,
+    uploadedAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    uploadedBy: row.uploadedBy,
+    idLoteAsociado: row.idLoteAsociado,
+    estadoOperativo: row.estadoOperativo,
+    deletedBy: row.deletedBy,
+  };
+}
+
 export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileMetadata> {
   const newFile = await prisma.archivos.create({
     data: {
@@ -66,62 +81,48 @@ export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileM
       uploadedBy: metadata.uploadedBy || null,
     },
   });
-  return {
-    id: newFile.id,
-    filename: newFile.nombreArchivo,
-    url: newFile.linkArchivo,
-    tipo: newFile.tipo as TipoFile,
-    uploadedAt: newFile.createdAt,
-    uploadedBy: newFile.uploadedBy,
-    idLoteAsociado: newFile.idLoteAsociado,
-  };
+  return toFileMetadata(newFile);
 }
 
-export async function listByLote(idLoteAsociado: number): Promise<FileMetadata[]> {
+export async function listByLote(idLoteAsociado: number, includeDeleted = false): Promise<FileMetadata[]> {
+  const where: any = { idLoteAsociado };
+  if (!includeDeleted) {
+    where.estadoOperativo = "OPERATIVO";
+  }
   const rows = await prisma.archivos.findMany({
-    where: { idLoteAsociado },
+    where,
     orderBy: { createdAt: "desc" },
   });
-  return rows.map((row) => ({
-    id: row.id,
-    filename: row.nombreArchivo,
-    url: row.linkArchivo,
-    tipo: row.tipo as TipoFile,
-    uploadedAt: row.createdAt,
-    uploadedBy: row.uploadedBy,
-    idLoteAsociado: row.idLoteAsociado,
-  }));
+  return rows.map(toFileMetadata);
 }
 
 export async function getFileById(id: number): Promise<FileMetadata | null> {
   const file = await prisma.archivos.findUnique({ where: { id } });
-  if (!file) return null;
-  return {
-    id: file.id,
-    filename: file.nombreArchivo,
-    url: file.linkArchivo,
-    tipo: file.tipo as TipoFile,
-    uploadedAt: file.createdAt,
-    uploadedBy: file.uploadedBy,
-    idLoteAsociado: file.idLoteAsociado,
-  };
+  if (!file || file.estadoOperativo === "ELIMINADO") return null;
+  return toFileMetadata(file);
 }
 
-export async function deleteFileById(id: number): Promise<void> {
+// Soft delete: marca el registro como ELIMINADO sin tocar el binario en storage
+export async function deleteFileById(id: number, deletedByEmail?: string): Promise<void> {
   const file = await prisma.archivos.findUnique({ where: { id } });
   if (!file) throw new Error("File not found");
 
-  const objectPath = file.linkArchivo.split(`${bucket}/`)[1];
-
-  const { error } = await supabase.storage.from(bucket).remove([objectPath]);
-  if (error) throw new Error(`Error deleting file: ${error.message}`);
-
-  await prisma.archivos.delete({ where: { id } });
+  await prisma.archivos.update({
+    where: { id },
+    data: {
+      estadoOperativo: "ELIMINADO",
+      fechaBaja: new Date(),
+      deletedBy: deletedByEmail || null,
+    },
+  });
 }
 
 export async function updateFileMetadata(id: number, updates: UpdateFileMetadata): Promise<FileMetadata> {
   const existingFile = await prisma.archivos.findUnique({ where: { id } });
   if (!existingFile) throw new Error("File not found");
+  if (existingFile.estadoOperativo === "ELIMINADO") {
+    throw new Error("No se puede modificar un archivo eliminado");
+  }
 
   const updatedFile = await prisma.archivos.update({
     where: { id },
@@ -134,13 +135,12 @@ export async function updateFileMetadata(id: number, updates: UpdateFileMetadata
     },
   });
 
-  return {
-    id: updatedFile.id,
-    filename: updatedFile.nombreArchivo,
-    url: updatedFile.linkArchivo,
-    tipo: updatedFile.tipo as TipoFile,
-    uploadedAt: updatedFile.createdAt,
-    uploadedBy: updatedFile.uploadedBy,
-    idLoteAsociado: updatedFile.idLoteAsociado,
-  };
+  return toFileMetadata(updatedFile);
+}
+
+// Busca un archivo operativo por ID y devuelve el registro crudo (para signed URL)
+export async function getOperativeFileRaw(id: number) {
+  const file = await prisma.archivos.findUnique({ where: { id } });
+  if (!file || file.estadoOperativo === "ELIMINADO") return null;
+  return file;
 }
