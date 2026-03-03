@@ -7,9 +7,11 @@ import { getAllInmobiliarias } from "../../../lib/api/inmobiliarias.js";
 import { getAllPersonas } from "../../../lib/api/personas.js";
 import { getAllLotes } from "../../../lib/api/lotes.js";
 import { createVenta } from "../../../lib/api/ventas.js";
+import { getAllReservas } from "../../../lib/api/reservas.js";
 import CompradoresMultiSelect from "./CompradoresMultiSelect.jsx";
 import { toDateInputValue, fromDateInputToISO } from "../../../utils/ventaDateUtils";
 import { mapVentaBackendError } from "../../../utils/ventaErrorMapper";
+import { isFederalaInmobiliaria } from "../../../utils/inmobiliariaHelpers.js";
 
 const INITIAL_ERRORS = {
   numero: null,
@@ -40,6 +42,7 @@ export default function VentaCrearCard({
   const [personas, setPersonas] = useState([]);
   const [inmobiliarias, setInmobiliarias] = useState([]);
   const [lotes, setLotes] = useState([]);
+  const [reservas, setReservas] = useState([]);
   const [busquedaLote, setBusquedaLote] = useState("");
   const [saving, setSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -49,20 +52,34 @@ export default function VentaCrearCard({
     if (!open) return;
     (async () => {
       try {
-        const [pRes, iRes, lRes] = await Promise.all([
+        const [pRes, iRes, lRes, rRes] = await Promise.all([
           getAllPersonas({}),
           getAllInmobiliarias({}),
           getAllLotes({}),
+          getAllReservas({}),
         ]);
         const pData = pRes?.personas ?? pRes?.data ?? (Array.isArray(pRes) ? pRes : []);
         const iData = iRes?.data ?? (Array.isArray(iRes) ? iRes : []);
         const lData = lRes?.data ?? (Array.isArray(lRes) ? lRes : []);
+        const rData = rRes?.data ?? (Array.isArray(rRes) ? rRes : []);
         setPersonas(Array.isArray(pData) ? pData : []);
         setInmobiliarias(Array.isArray(iData) ? iData : []);
+        setReservas(Array.isArray(rData) ? rData : []);
+        const rDataArr = Array.isArray(rData) ? rData : [];
         let filteredLots = Array.isArray(lData)
           ? lData.filter((l) => {
               const st = String(l.estado || l.status || "").toUpperCase();
-              return st === "DISPONIBLE" || st === "RESERVADO";
+              if (st === "DISPONIBLE") return true;
+              if (st !== "RESERVADO") return false;
+              return rDataArr.some(r => {
+                if (String(r.loteId ?? r.lote?.id) !== String(l.id)) return false;
+                const re = String(r.estado || "").toUpperCase();
+                const op = String(r.estadoOperativo || "OPERATIVO").toUpperCase() === "OPERATIVO";
+                if (!op) return false;
+                if (re === "ACTIVA") return true;
+                if (re === "ACEPTADA") return r.ventaId == null;
+                return false;
+              });
             })
           : [];
 
@@ -90,6 +107,7 @@ export default function VentaCrearCard({
       setPlazoEscritura("");
       setFechaVenta(toDateInputValue(new Date()));
       setErrors({ ...INITIAL_ERRORS });
+      setReservas([]);
       if (!loteIdPreSeleccionado) setLoteId("");
       return;
     }
@@ -122,6 +140,44 @@ export default function VentaCrearCard({
     if (!mapId) return null;
     return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
   }, [lockLote, loteId, lotes]);
+
+  // Etapa 4.5: reserva vigente (ACTIVA/ACEPTADA, operativa, no consumida) del lote seleccionado
+  const reservaDelLote = useMemo(() => {
+    if (!loteId) return null;
+    const lote = lotes.find(l => String(l.id) === String(loteId));
+    const esReservado = String(lote?.estado || lote?.status || "").toUpperCase() === "RESERVADO";
+    if (!esReservado) return null;
+
+    const vigentes = reservas.filter(r => {
+      const rLoteId = r.loteId ?? r.lote?.id;
+      const estado = String(r.estado || "").toUpperCase();
+      const operativo = String(r.estadoOperativo || "OPERATIVO").toUpperCase() === "OPERATIVO";
+      return String(rLoteId) === String(loteId)
+        && (estado === "ACTIVA" || estado === "ACEPTADA")
+        && operativo;
+    });
+    return vigentes[0] ?? null;
+  }, [loteId, lotes, reservas]);
+
+  const inmobiliariaFreezeada = useMemo(() => {
+    if (!reservaDelLote) return false;
+    return !isFederalaInmobiliaria(reservaDelLote.inmobiliariaId);
+  }, [reservaDelLote]);
+
+  const esReservaFederala = useMemo(() => {
+    if (!reservaDelLote) return false;
+    return isFederalaInmobiliaria(reservaDelLote.inmobiliariaId);
+  }, [reservaDelLote]);
+
+  // Cuando cambia la reserva detectada, ajustar inmobiliaria según el caso
+  useEffect(() => {
+    if (!reservaDelLote) return;
+    if (inmobiliariaFreezeada) {
+      setInmobiliariaId(String(reservaDelLote.inmobiliariaId));
+    } else {
+      setInmobiliariaId("");
+    }
+  }, [reservaDelLote, inmobiliariaFreezeada]);
 
   function clearFieldError(field) {
     setErrors(prev => ({ ...prev, [field]: null }));
@@ -296,9 +352,21 @@ export default function VentaCrearCard({
 
               <div className="field-row">
                 <div className="field-label">INMOBILIARIA</div>
-                <div className="field-value p0">
-                  <NiceSelect value={inmobiliariaId} options={inmoOpts} onChange={setInmobiliariaId} placeholder="(Opcional)" />
-                </div>
+                {inmobiliariaFreezeada ? (
+                  <div className="field-value is-readonly" title="Definida por la reserva">
+                    {inmoOpts.find(o => String(o.value) === String(inmobiliariaId))?.label || "Inmobiliaria"}
+                  </div>
+                ) : (
+                  <div className="field-value p0">
+                    <NiceSelect
+                      value={inmobiliariaId}
+                      options={inmoOpts}
+                      onChange={setInmobiliariaId}
+                      placeholder={esReservaFederala ? "La Federala" : "(Opcional)"}
+                      showPlaceholderOption={esReservaFederala}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className={`fieldRow ${errors.tipoPago ? "hasError" : ""}`}>

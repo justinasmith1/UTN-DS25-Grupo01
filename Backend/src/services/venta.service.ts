@@ -1,26 +1,24 @@
 import prisma from '../config/prisma';
-import { Venta, EstadoReserva, EstadoPrioridad } from '../generated/prisma';
+import { Venta, EstadoReserva, EstadoPrioridad, EstadoLote } from '../generated/prisma';
 import { PostVentaRequest, PutVentaRequest, DeleteVentaResponse } from '../types/interfacesCCLF'; 
 import { updateLoteState } from './lote.service';
 import { ESTADO_LOTE_OP } from '../domain/loteState/loteState.types';
 import { assertLoteOperableFor } from '../domain/loteState/loteState.rules';
-import { finalizePrioridadActivaOnVenta } from '../domain/loteState/loteState.effects';
 import { 
     assertTransicionEstadoValida, 
     assertCamposObligatoriosPorEstado,
     assertVentaEliminable
 } from '../domain/ventaState/ventaState.rules';
-import { isVentaFinalizada } from '../domain/ventaState/ventaState.types';
+import { isFederalaInmobiliaria } from '../utils/inmobiliaria.utils';
 
-// Include estándar para ventas (Etapa 4: compradores[] vía relación implícita + comprador legacy)
 const VENTA_INCLUDE = {
-    comprador: true, // Legacy — se mantiene hasta Fase 3
-    compradores: true, // Etapa 4: relación implícita → devuelve Persona[] directamente
+    comprador: true,
+    compradores: true,
     lote: { include: { propietario: true, fraccion: { select: { numero: true } } } },
     inmobiliaria: true,
 } as const;
 
-// Helper: extraer lista de personaIds desde el payload (soporta legacy y nuevo formato)
+/** Unifica legacy compradorId y nuevo compradores[] en una lista de IDs */
 function resolveCompradorIds(data: { compradorId?: number; compradores?: { personaId: number }[] }): number[] {
     if (data.compradores && data.compradores.length > 0) {
         return data.compradores.map(c => c.personaId);
@@ -31,32 +29,23 @@ function resolveCompradorIds(data: { compradorId?: number; compradores?: { perso
     return [];
 }
 
-
 export async function getAllVentas(
   query?: { estadoOperativo?: string },
   user?: { role: string; inmobiliariaId?: number | null }
 ): Promise<Venta[]> {
     const whereClause: any = {};
 
-    // Si el usuario es INMOBILIARIA, filtrar por su inmobiliariaId
     if (user?.role === 'INMOBILIARIA' && user?.inmobiliariaId != null) {
       whereClause.inmobiliariaId = user.inmobiliariaId;
     }
 
-    // Filtro estadoOperativo: default OPERATIVO si no viene
-    if (query?.estadoOperativo) {
-      whereClause.estadoOperativo = query.estadoOperativo;
-    } else {
-      whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
-    }
+    whereClause.estadoOperativo = query?.estadoOperativo || 'OPERATIVO';
 
-    const ventas = await prisma.venta.findMany({
+    return prisma.venta.findMany({
         where: whereClause,
         include: VENTA_INCLUDE,
         orderBy: { id: 'asc' },
     });
-
-    return ventas;
 }
 
 export async function getVentaById(id: number): Promise<Venta> {
@@ -66,13 +55,12 @@ export async function getVentaById(id: number): Promise<Venta> {
     });
 
     if (!venta) {
-        const error = new  Error('Venta no encontrada');
+        const error = new Error('Venta no encontrada');
         (error as any).statusCode = 404;
         throw error;
     }
 
     return venta;
-
 }
 
 export async function getVentasByInmobiliaria(
@@ -80,13 +68,7 @@ export async function getVentasByInmobiliaria(
   query?: { estadoOperativo?: string }
 ): Promise<Venta[]> {
     const whereClause: any = { inmobiliariaId };
-
-    // Filtro estadoOperativo: default OPERATIVO si no viene
-    if (query?.estadoOperativo) {
-      whereClause.estadoOperativo = query.estadoOperativo;
-    } else {
-      whereClause.estadoOperativo = 'OPERATIVO'; // Default: solo operativas
-    }
+    whereClause.estadoOperativo = query?.estadoOperativo || 'OPERATIVO';
 
     const ventas = await prisma.venta.findMany({
         where: whereClause,
@@ -116,10 +98,8 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         (error as any).statusCode = 400;
         throw error;
     }
-    // Validar que el lote esté operativo (bloquea NO_DISPONIBLE)
     assertLoteOperableFor('crear venta', loteExists.estado);
 
-    // Resolver lista de compradores (soporta legacy compradorId y nuevo compradores[])
     const compradorIds = resolveCompradorIds(data);
     if (compradorIds.length === 0) {
         const error = new Error('Debe especificar al menos un comprador');
@@ -127,7 +107,6 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         throw error;
     }
 
-    // Verificar que todas las personas existen
     for (const personaId of compradorIds) {
         const personaExists = await prisma.persona.findUnique({ where: { id: personaId } });
         if (!personaExists) {
@@ -137,31 +116,49 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         }
     }
 
-    // El compradorId principal (legacy): el primero de la lista
     const compradorIdPrincipal = compradorIds[0];
 
-    // Obtener la reserva asociada al lote (si existe y está aceptada)
-    const reserva = await prisma.reserva.findFirst({
-      where: {
-        loteId: data.loteId,
-        estado: EstadoReserva.ACEPTADA,
-      },
+    // Etapa 4.5: buscar reserva vigente del lote (ACEPTADA o ACTIVA, operativa, no consumida)
+    const reservasVigentes = await prisma.reserva.findMany({
+        where: {
+            loteId: data.loteId,
+            estadoOperativo: 'OPERATIVO',
+            estado: { in: [EstadoReserva.ACEPTADA, EstadoReserva.ACTIVA] },
+            ventaId: null,
+        },
     });
 
-    // Si hay una reserva ACEPTADA, validar los datos
+    if (reservasVigentes.length > 1) {
+        const error = new Error(
+            `Conflicto: se encontraron ${reservasVigentes.length} reservas vigentes para el lote ${data.loteId}. Resolver manualmente.`
+        );
+        (error as any).statusCode = 409;
+        throw error;
+    }
+
+    const reserva = reservasVigentes[0] ?? null;
+
     if (reserva) {
-        if (reserva.inmobiliariaId) {
-            if (reserva.inmobiliariaId !== data.inmobiliariaId) {
-                throw new Error("La inmobiliaria de la venta no coincide con la de la reserva.");
+        // Inmobiliaria no-Federala: la venta debe coincidir
+        if (!isFederalaInmobiliaria(reserva.inmobiliariaId)) {
+            if (data.inmobiliariaId !== reserva.inmobiliariaId) {
+                const error = new Error(
+                    `La inmobiliaria de la venta debe coincidir con la de la reserva (inmobiliariaId esperado: ${reserva.inmobiliariaId})`
+                );
+                (error as any).statusCode = 400;
+                throw error;
             }
-        } 
-        // Etapa 4: el clienteId de la reserva debe estar entre los compradores
+        }
+
+        // Trazabilidad: warning si el cliente de la reserva no está entre los compradores
         if (!compradorIds.includes(reserva.clienteId)) {
-            throw new Error("El cliente de la reserva debe estar incluido en la lista de compradores de la venta.");
+            console.warn(
+                `[Venta-Reserva] Cliente de reserva no coincide con compradores.`,
+                { reservaId: reserva.id, clienteId: reserva.clienteId, compradorIds }
+            );
         }
     }
 
-    // Validar campos obligatorios según estado inicial (si viene estado diferente a INICIADA)
     const estadoInicial = data.estado || 'INICIADA';
     assertCamposObligatoriosPorEstado(estadoInicial as any, {
         fechaEscrituraReal: data.fechaEscrituraReal ? new Date(data.fechaEscrituraReal) : null,
@@ -169,43 +166,60 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
         motivoCancelacion: data.motivoCancelacion,
     } as any);
 
-    const newVenta = await prisma.venta.create({
-        data: {
-            loteId: data.loteId,
-            fechaVenta: new Date(data.fechaVenta),
-            monto: data.monto,
-            estado: estadoInicial,
-            estadoCobro: data.estadoCobro || 'PENDIENTE',
-            plazoEscritura: data.plazoEscritura ? new Date(data.plazoEscritura) : null,
-            fechaEscrituraReal: data.fechaEscrituraReal ? new Date(data.fechaEscrituraReal) : null,
-            fechaCancelacion: data.fechaCancelacion ? new Date(data.fechaCancelacion) : null,
-            motivoCancelacion: data.motivoCancelacion || null,
-            tipoPago: data.tipoPago,
-            compradorId: compradorIdPrincipal, // Legacy: primer comprador
-            inmobiliariaId: data.inmobiliariaId || null,
-            numero: data.numero,
-            createdAt: new Date(),
-            // Etapa 4: conectar compradores vía relación implícita
-            compradores: {
-                connect: compradorIds.map(id => ({ id })),
+    // Transacción atómica: venta + lote VENDIDO + prioridad + reserva consumida
+    const newVenta = await prisma.$transaction(async (tx) => {
+        const venta = await tx.venta.create({
+            data: {
+                loteId: data.loteId,
+                fechaVenta: new Date(data.fechaVenta),
+                monto: data.monto,
+                estado: estadoInicial,
+                estadoCobro: data.estadoCobro || 'PENDIENTE',
+                plazoEscritura: data.plazoEscritura ? new Date(data.plazoEscritura) : null,
+                fechaEscrituraReal: data.fechaEscrituraReal ? new Date(data.fechaEscrituraReal) : null,
+                fechaCancelacion: data.fechaCancelacion ? new Date(data.fechaCancelacion) : null,
+                motivoCancelacion: data.motivoCancelacion || null,
+                tipoPago: data.tipoPago,
+                compradorId: compradorIdPrincipal,
+                inmobiliariaId: data.inmobiliariaId || null,
+                numero: data.numero,
+                createdAt: new Date(),
+                compradores: {
+                    connect: compradorIds.map(id => ({ id })),
+                },
             },
-        },
-        include: VENTA_INCLUDE,
-    });
-
-    // Actualizar el estado del lote a "VENDIDO"
-    await updateLoteState(data.loteId, ESTADO_LOTE_OP.VENDIDO);
-    
-    // Si había prioridad activa, se finaliza al concretar la venta
-    await finalizePrioridadActivaOnVenta(data.loteId);
-    
-    // Asignar el ventaId a la reserva si existe una reserva ACEPTADA
-    if (reserva) {
-        await prisma.reserva.update({
-            where: { id: reserva.id },
-            data: { ventaId: newVenta.id },
+            include: VENTA_INCLUDE,
         });
-    }
+
+        await tx.lote.update({
+            where: { id: data.loteId },
+            data: { estado: EstadoLote.VENDIDO },
+        });
+
+        const prioridadActiva = await tx.prioridad.findFirst({
+            where: { loteId: data.loteId, estado: EstadoPrioridad.ACTIVA },
+        });
+        if (prioridadActiva) {
+            await tx.prioridad.update({
+                where: { id: prioridadActiva.id },
+                data: { estado: EstadoPrioridad.FINALIZADA },
+            });
+        }
+
+        if (reserva) {
+            await tx.reserva.update({
+                where: { id: reserva.id },
+                data: {
+                    ventaId: venta.id,
+                    ...(reserva.estado === EstadoReserva.ACTIVA
+                        ? { estado: EstadoReserva.ACEPTADA }
+                        : {}),
+                },
+            });
+        }
+
+        return venta;
+    });
 
     return newVenta;
 }
