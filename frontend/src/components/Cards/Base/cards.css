@@ -260,7 +260,7 @@
   color: #111;
 }
 
-/* 1) FREEZADOS con leve gris (mínimo) */
+/* Campos de solo lectura */
 .value.is-readonly {
   background: #f7f7f7; /* gris muy suave */
   color: #333;
@@ -304,7 +304,7 @@ select.field {
   }
 }
 
-/* Reserva mini-card (tal como lo tenías) */
+/* Reserva mini-card */
 .reserva-box {
   margin-top: 16px;
   padding: 14px;
@@ -330,7 +330,6 @@ select.field {
   display: grid;
   place-items: center;
   z-index: 2600;
-  place-items: center;
   padding: 32px 16px;
 }
 .cclf-card {
@@ -376,8 +375,6 @@ select.field {
 .venta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-}
-.venta-grid {
   gap: 22px 36px;
 }
 .venta-col {
@@ -828,43 +825,6 @@ select.field {
   font-size: 13.5px;
 }
 
-/* Banners de alerta informativa (venta eliminada, cancelada, etc.) */
-.venta-alert {
-  margin-bottom: 1rem;
-  padding: 0.75rem 1rem;
-  border-radius: 0.375rem;
-  font-size: 14px;
-}
-
-.venta-alert--warning {
-  background-color: #fef3c7;
-  border: 1px solid #fbbf24;
-  color: #92400e;
-}
-
-.venta-alert--info {
-  background-color: #f0f9ff;
-  border: 1px solid #0ea5e9;
-  color: #0c4a6e;
-}
-
-/* Indicador de estado FINALIZADA debajo del select de estado */
-.ventaFinalizada {
-  margin-top: 6px;
-  margin-left: calc(var(--sale-label-w, 180px) + 12px);
-  font-size: 12px;
-  color: #059669;
-  font-weight: 600;
-}
-
-/* Nota informativa bajo estado de cobro cuando no es editable */
-.ventaEstadoCobroNote {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #6b7280;
-  font-style: italic;
-}
-
 /* Contenedor y etiqueta USD para campos de monto */
 .venta-monto-wrapper {
   position: relative;
@@ -1226,10 +1186,10 @@ select.field {
   margin-top: 20px;
 }
 
-/* Para que el "valor" editable conserve el rectángulo del VerCard */
 .field-value.p0 {
   padding: 0;
   min-width: 0;
+  overflow: visible;
 }
 
 .field-value.p0 .propietario-search-wrapper {
@@ -1277,55 +1237,6 @@ select.field-input {
 }
 
 /* ==== NiceSelect ==== */
-.field-value.p0 {
-  overflow: visible;
-} /* para que la lista pueda sobresalir */
-
-.ns-trigger {
-  width: 100%;
-  min-height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: #fff;
-  border: none;
-  outline: none;
-  cursor: pointer;
-  font: inherit;
-  color: #111827;
-}
-.ns-trigger:hover {
-  background: #fafafa;
-}
-
-.ns-list {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: calc(100% + 6px);
-  max-height: 260px;
-  overflow: auto;
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.14);
-  border-radius: 10px;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  padding: 6px;
-  z-index: 50;
-}
-.ns-item {
-  border-radius: 8px;
-  padding: 10px 10px;
-  cursor: pointer;
-}
-.ns-item:hover {
-  background: #f3f4f6;
-}
-.ns-item.is-active {
-  background: #e9efff;
-}
-
 .ns-wrap {
   position: relative;
   overflow: visible;
@@ -1338,7 +1249,7 @@ select.field-input {
   min-height: 44px;
   display: flex;
   align-items: center;
-  padding: 8px 12px; /* padding uniforme, el chevron va absolutamente */
+  padding: 8px 12px;
   border-radius: 8px;
   background: #fff;
   border: none;
@@ -1353,20 +1264,20 @@ select.field-input {
   right: 6px;
   top: 53%;
   transform: translateY(-50%);
-  pointer-events: none; /* no interfiere con el click */
+  pointer-events: none;
 }
 .ns-trigger span {
-  overflow: hidden; /* evita que el texto sobresalga */
-  text-overflow: ellipsis; /* ... si es muy largo */
-  white-space: nowrap; /* no se corta en varias líneas */
-  padding-right: 32px; /* espacio para el chevron */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 32px;
 }
 
 .ns-list {
   position: absolute;
   left: 0;
   top: calc(100% + 6px);
-  width: max(100%, 280px); /* ← no se achica */
+  width: max(100%, 280px);
   max-height: 260px;
   overflow: auto;
   background: #fff;
@@ -1377,7 +1288,7 @@ select.field-input {
   z-index: 50;
 }
 .ns-item {
-  white-space: nowrap; /* ← no se corta el texto */
+  white-space: nowrap;
   border-radius: 8px;
   padding: 10px;
   cursor: pointer;
@@ -1633,11 +1544,6 @@ select.field-input {
 .estado-tooltip-icon[data-tooltip]:hover::after {
   opacity: 1;
   transform: translateY(0);
-}
-
-/* Asegurar que el tooltip no se corte por overflow */
-.field-value.p0 {
-  overflow: visible;
 }
 
 .propietario-search-icon {

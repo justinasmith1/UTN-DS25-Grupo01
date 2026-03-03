@@ -31,7 +31,6 @@ export default function VentaCrearCard({
 }) {
   const [fechaVenta, setFechaVenta] = useState(toDateInputValue(new Date()));
   const [loteId, setLoteId] = useState(loteIdPreSeleccionado ? String(loteIdPreSeleccionado) : "");
-  // Etapa 4: compradores múltiples
   const [compradores, setCompradores] = useState([]);
   const [inmobiliariaId, setInmobiliariaId] = useState("");
   const [numero, setNumero] = useState("");
@@ -141,7 +140,7 @@ export default function VentaCrearCard({
     return String(mapId).toLowerCase().startsWith('lote') ? mapId : `Lote ${mapId}`;
   }, [lockLote, loteId, lotes]);
 
-  // Etapa 4.5: reserva vigente (ACTIVA/ACEPTADA, operativa, no consumida) del lote seleccionado
+  // Reserva vigente (ACTIVA/ACEPTADA, operativa, no consumida) del lote seleccionado
   const reservaDelLote = useMemo(() => {
     if (!loteId) return null;
     const lote = lotes.find(l => String(l.id) === String(loteId));
@@ -169,7 +168,6 @@ export default function VentaCrearCard({
     return isFederalaInmobiliaria(reservaDelLote.inmobiliariaId);
   }, [reservaDelLote]);
 
-  // Cuando cambia la reserva detectada, ajustar inmobiliaria según el caso
   useEffect(() => {
     if (!reservaDelLote) return;
     if (inmobiliariaFreezeada) {
@@ -285,7 +283,6 @@ export default function VentaCrearCard({
           saveButtonText="Confirmar Venta"
         >
           <div className="venta-grid" style={{ ["--sale-label-w"]: "180px" }}>
-            {/* Columna izquierda */}
             <div className="venta-col">
               <div className={`fieldRow ${errors.loteId ? "hasError" : ""}`}>
                 <div className="field-row">
@@ -385,7 +382,6 @@ export default function VentaCrearCard({
               </div>
             </div>
 
-            {/* Columna derecha */}
             <div className="venta-col">
               <div className={`fieldRow ${errors.numero ? "hasError" : ""}`}>
                 <div className="field-row">
@@ -437,7 +433,6 @@ export default function VentaCrearCard({
             </div>
           </div>
 
-          {/* Compradores — bloque full-width fuera de la grilla */}
           <CompradoresMultiSelect
             value={compradores}
             onAdd={(p) => {
