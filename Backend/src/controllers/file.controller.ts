@@ -54,23 +54,29 @@ export class fileController {
         }
 
         const { originalname, buffer } = file;
-        const { objectPath } = await FileService.uploadFileToSupabase(buffer, {
-            idLoteAsociado,
-            tipo,
-            filename: originalname,
-            uploadedBy: req.user?.email || null,
-            uplodedAt: new Date()
-        });
+        try {
+            const { objectPath } = await FileService.uploadFileToSupabase(buffer, {
+                idLoteAsociado,
+                tipo,
+                filename: originalname,
+                ventaId: TIPOS_REQUIEREN_VENTA.includes(tipo) ? ventaId : undefined,
+                uploadedBy: req.user?.email || null,
+                uplodedAt: new Date()
+            });
 
-        const newFile = await FileService.saveFileMetadata({
-            filename: originalname,
-            url: objectPath,
-            tipo,
-            idLoteAsociado,
-            ventaId: ventaId ?? null,
-            uploadedBy: req.user?.email || null
-        });
-        res.status(201).json({ message: 'Archivo subido', data: newFile });
+            const newFile = await FileService.saveFileMetadata({
+                filename: originalname,
+                url: objectPath,
+                tipo,
+                idLoteAsociado,
+                ventaId: ventaId ?? null,
+                uploadedBy: req.user?.email || null
+            });
+            res.status(201).json({ message: 'Archivo subido', data: newFile });
+        } catch (err: any) {
+            const status = err.statusCode ?? 500;
+            res.status(status).json({ message: err.message || "Error al subir archivo" });
+        }
     }
 }
 

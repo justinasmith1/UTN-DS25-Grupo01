@@ -4,22 +4,28 @@ import "../Base/cards.css";
 import "./documentos.css";
 import {
   getArchivosByLote,
+  getArchivosByVenta,
   getFileSignedUrl,
   uploadArchivo,
   deleteArchivo,
+  sustituirArchivo,
 } from "../../../lib/api/archivos";
 
 const DOC_INFO = {
   BOLETO: { title: "Boleto de Compraventa" },
   ESCRITURA: { title: "Escritura" },
   PLANOS: { title: "Planos" },
+  OTRO: { title: "Otros" },
 };
 
 const TIPO_MAP = {
   BOLETO: "BOLETO",
   ESCRITURA: "ESCRITURA",
   PLANOS: "PLANO",
+  OTRO: "OTRO",
 };
+
+const TIPOS_VENTA = ["BOLETO", "ESCRITURA", "OTRO"];
 
 function formatDate(dateStr) {
   if (!dateStr) return "";
@@ -41,6 +47,8 @@ export default function DocumentoVerCard({
   tipoDocumento,
   loteId,
   loteNumero,
+  ventaId,
+  ventaNumero,
   canUpload = false,
   canDelete = false,
 }) {
@@ -52,11 +60,13 @@ export default function DocumentoVerCard({
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [sustituyendo, setSustituyendo] = useState(false);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
 
   const tipoBackend = TIPO_MAP[tipoDocumento] || tipoDocumento;
   const info = DOC_INFO[tipoDocumento] || { title: "Documento" };
+  const esDocVenta = TIPOS_VENTA.includes(tipoDocumento);
 
   const limpiarMapId = (mapId) => {
     if (!mapId) return mapId;
@@ -65,22 +75,30 @@ export default function DocumentoVerCard({
   };
   const numeroLote = limpiarMapId(loteNumero) || loteId || "XXXX";
 
-  const titulo =
-    tipoDocumento === "BOLETO"
-      ? `Boleto de CompraVenta de Lote N\u00B0 ${numeroLote}`
+  const titulo = esDocVenta
+    ? tipoDocumento === "BOLETO"
+      ? `Boleto de CompraVenta — Venta N\u00B0 ${ventaNumero || "?"}`
       : tipoDocumento === "ESCRITURA"
-      ? `Escritura de Lote N\u00B0 ${numeroLote}`
-      : `Planos de Lote N\u00B0 ${numeroLote}`;
+      ? `Escritura — Venta N\u00B0 ${ventaNumero || "?"}`
+      : `Otros documentos — Venta N\u00B0 ${ventaNumero || "?"}`
+    : `Planos de Lote N\u00B0 ${numeroLote}`;
+
+  const entityLabel = esDocVenta ? "esta venta" : "este lote";
 
   const fetchArchivos = useCallback(async () => {
-    if (!loteId) return;
+    if (esDocVenta && !ventaId) return [];
+    if (!esDocVenta && !loteId) return [];
     setLoading(true);
     setError("");
     try {
-      const all = await getArchivosByLote(loteId);
-      const filtered = all
-        .filter((a) => a.tipo === tipoBackend)
-        .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+      let filtered;
+      if (esDocVenta) {
+        filtered = await getArchivosByVenta(ventaId, tipoBackend);
+      } else {
+        const all = await getArchivosByLote(loteId);
+        filtered = all.filter((a) => a.tipo === tipoBackend);
+      }
+      filtered.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
       setArchivos(filtered);
       return filtered;
     } catch (err) {
@@ -91,7 +109,7 @@ export default function DocumentoVerCard({
     } finally {
       setLoading(false);
     }
-  }, [loteId, tipoBackend]);
+  }, [esDocVenta, ventaId, loteId, tipoBackend]);
 
   const loadSignedUrl = useCallback(async (fileId) => {
     if (!fileId) {
@@ -117,7 +135,7 @@ export default function DocumentoVerCard({
   }, []);
 
   useEffect(() => {
-    if (open && loteId) {
+    if (open && (esDocVenta ? ventaId : loteId)) {
       (async () => {
         const list = await fetchArchivos();
         if (list && list.length > 0) {
@@ -129,7 +147,7 @@ export default function DocumentoVerCard({
         }
       })();
     }
-  }, [open, loteId, tipoDocumento]);
+  }, [open, loteId, ventaId, tipoDocumento]);
 
   useEffect(() => {
     if (!open) {
@@ -140,6 +158,7 @@ export default function DocumentoVerCard({
       setUploading(false);
       setDeleting(false);
       setConfirmingDelete(false);
+      setSustituyendo(false);
     }
   }, [open]);
 
@@ -147,6 +166,7 @@ export default function DocumentoVerCard({
     if (fileId === selectedId) return;
     setSelectedId(fileId);
     setSignedUrl("");
+    setConfirmingDelete(false);
     loadSignedUrl(fileId);
   };
 
@@ -158,7 +178,12 @@ export default function DocumentoVerCard({
     setUploading(true);
     setError("");
     try {
-      const saved = await uploadArchivo(file, loteId, tipoBackend);
+      const saved = await uploadArchivo(
+        file,
+        loteId,
+        tipoBackend,
+        esDocVenta ? ventaId : undefined
+      );
       const list = await fetchArchivos();
       const newId = saved?.id || list?.[0]?.id;
       if (newId) {
@@ -169,6 +194,23 @@ export default function DocumentoVerCard({
       setError(err?.message || "Error al subir el archivo");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleSustituir = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file || !selectedId) return;
+    setSustituyendo(true);
+    setError("");
+    try {
+      const nuevo = await sustituirArchivo(selectedId, file);
+      await fetchArchivos();
+      setSelectedId(nuevo.id);
+      loadSignedUrl(nuevo.id);
+    } catch (err) {
+      setError(err?.message || "Error al sustituir documento");
+    } finally {
+      setSustituyendo(false);
     }
   };
 
@@ -234,7 +276,6 @@ export default function DocumentoVerCard({
 
         <div className="c-body">
           <div className="doc-panel">
-            {/* Sidebar: lista de documentos */}
             <div className="doc-sidebar">
               <div className="doc-sidebar__header">
                 {info.title} ({archivos.length})
@@ -248,7 +289,7 @@ export default function DocumentoVerCard({
                       Sin documentos
                     </span>
                     <span>
-                      No hay {info.title.toLowerCase()} cargados para este lote
+                      No hay {info.title.toLowerCase()} cargados para {entityLabel}
                     </span>
                   </div>
                 ) : (
@@ -275,7 +316,6 @@ export default function DocumentoVerCard({
               </div>
             </div>
 
-            {/* Preview */}
             <div className="doc-preview">
               <div className="doc-preview__frame">
                 {loadingUrl ? (
@@ -305,7 +345,7 @@ export default function DocumentoVerCard({
                     </span>
                     <span className="doc-preview__placeholder-sub">
                       {archivos.length === 0
-                        ? `Este lote no tiene ${info.title.toLowerCase()} cargado`
+                        ? `No tiene ${info.title.toLowerCase()} cargado`
                         : "Hac\u00E9 click en un archivo de la lista para previsualizarlo"}
                     </span>
                   </div>
@@ -316,7 +356,6 @@ export default function DocumentoVerCard({
 
           {error && <div className="doc-error-inline">{error}</div>}
 
-          {/* Confirmación inline de eliminación */}
           {confirmingDelete && selectedFile && (
             <div className="doc-confirm-delete">
               <span className="doc-confirm-delete__msg">
@@ -341,7 +380,6 @@ export default function DocumentoVerCard({
             </div>
           )}
 
-          {/* Barra de acciones */}
           <div className="doc-actions">
             {canUpload && (
               <>
@@ -356,9 +394,29 @@ export default function DocumentoVerCard({
                   type="button"
                   className="btn btn-primary"
                   onClick={() => fileInputRef.current?.click()}
-                  disabled={uploading || confirmingDelete}
+                  disabled={uploading || confirmingDelete || sustituyendo}
                 >
                   {uploading ? "Subiendo..." : "Agregar"}
+                </button>
+              </>
+            )}
+
+            {selectedId && canUpload && esDocVenta && (
+              <>
+                <input
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp"
+                  onChange={handleSustituir}
+                  style={{ display: "none" }}
+                  id="sustituir-doc-input"
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  onClick={() => document.getElementById("sustituir-doc-input")?.click()}
+                  disabled={sustituyendo || uploading || confirmingDelete}
+                >
+                  {sustituyendo ? "Sustituyendo..." : "Sustituir"}
                 </button>
               </>
             )}

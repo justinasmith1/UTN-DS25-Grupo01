@@ -43,6 +43,40 @@ export async function getArchivosByLote(loteId) {
 }
 
 /**
+ * Obtiene todos los archivos de una venta
+ * @param {number} ventaId - ID de la venta
+ * @param {string} [tipo] - Opcional: BOLETO | ESCRITURA | OTRO
+ * @returns {Promise<Array>} Lista de archivos
+ */
+export async function getArchivosByVenta(ventaId, tipo) {
+  if (!ventaId) return [];
+  try {
+    const path = tipo
+      ? `${PRIMARY}/venta/${ventaId}?tipo=${encodeURIComponent(tipo)}`
+      : `${PRIMARY}/venta/${ventaId}`;
+    const res = await http(path, { method: "GET" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.message || "Error al obtener archivos");
+    }
+    const archivos = Array.isArray(data) ? data : (data?.archivos || data?.data || []);
+    return archivos.map((archivo) => ({
+      id: archivo.id,
+      filename: archivo.filename || archivo.nombreArchivo,
+      url: archivo.url || archivo.linkArchivo,
+      tipo: archivo.tipo,
+      uploadedAt: archivo.uploadedAt || archivo.createdAt,
+      uploadedBy: archivo.uploadedBy,
+      idLoteAsociado: archivo.idLoteAsociado,
+      ventaId: archivo.ventaId,
+    }));
+  } catch (error) {
+    console.error("Error obteniendo archivos por venta:", error);
+    return [];
+  }
+}
+
+/**
  * Obtiene un archivo por ID
  * @param {number} id - ID del archivo
  * @returns {Promise<Object>} Archivo
@@ -77,10 +111,11 @@ export async function getArchivoById(id) {
  * Sube un archivo al backend
  * @param {File} file - Archivo a subir
  * @param {number} idLoteAsociado - ID del lote asociado
- * @param {string} tipo - Tipo de archivo: 'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN'
+ * @param {string} tipo - Tipo de archivo: 'BOLETO' | 'ESCRITURA' | 'PLANO' | 'IMAGEN' | 'OTRO'
+ * @param {number} [ventaId] - Opcional, obligatorio para BOLETO/ESCRITURA/OTRO
  * @returns {Promise<Object>} Archivo subido con metadata
  */
-export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
+export async function uploadArchivo(file, idLoteAsociado, tipo = "IMAGEN", ventaId) {
   if (!file) {
     throw new Error("No se proporcionó ningún archivo");
   }
@@ -89,13 +124,15 @@ export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
   }
 
   try {
-    // Crear FormData para multipart/form-data
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('idLoteAsociado', String(idLoteAsociado));
-    formData.append('tipo', tipo);
+    formData.append("file", file);
+    formData.append("idLoteAsociado", String(idLoteAsociado));
+    formData.append("tipo", tipo);
+    if (ventaId != null && ventaId !== "") {
+      formData.append("ventaId", String(ventaId));
+    }
 
-    const { getAccessToken } = await import('../auth/token');
+    const { getAccessToken } = await import("../auth/token");
     const access = getAccessToken();
     const url = `${getApiBase()}${PRIMARY}`;
 
@@ -124,9 +161,51 @@ export async function uploadArchivo(file, idLoteAsociado, tipo = 'IMAGEN') {
       uploadedAt: archivo.uploadedAt || archivo.createdAt,
       uploadedBy: archivo.uploadedBy,
       idLoteAsociado: archivo.idLoteAsociado,
+      ventaId: archivo.ventaId,
     };
   } catch (error) {
     console.error("Error subiendo archivo:", error);
+    throw error;
+  }
+}
+
+/**
+ * Sustituye un archivo existente por uno nuevo (mismo tipo, mismo ventaId)
+ * @param {number} fileId - ID del archivo a sustituir
+ * @param {File} file - Nuevo archivo
+ * @returns {Promise<Object>} Nuevo archivo creado
+ */
+export async function sustituirArchivo(fileId, file) {
+  if (!fileId) throw new Error("Se requiere el ID del archivo");
+  if (!file) throw new Error("Se requiere el archivo para sustituir");
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const { getAccessToken } = await import("../auth/token");
+    const access = getAccessToken();
+    const res = await fetch(`${getApiBase()}${PRIMARY}/${fileId}/sustituir`, {
+      method: "POST",
+      headers: { ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+      credentials: "include",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data?.message || "Error al sustituir archivo");
+    }
+    const archivo = data?.data || data?.archivo || data;
+    return {
+      id: archivo.id,
+      filename: archivo.filename || archivo.nombreArchivo,
+      url: archivo.url || archivo.linkArchivo,
+      tipo: archivo.tipo,
+      uploadedAt: archivo.uploadedAt || archivo.createdAt,
+      uploadedBy: archivo.uploadedBy,
+      idLoteAsociado: archivo.idLoteAsociado,
+      ventaId: archivo.ventaId,
+    };
+  } catch (error) {
+    console.error("Error sustituyendo archivo:", error);
     throw error;
   }
 }

@@ -267,6 +267,58 @@ async function apiReactivar(id) {
   return ok(fromApi(data?.data ?? data));
 }
 
+function getApiBase() {
+  const RAW_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "";
+  const FORCE_ABS = import.meta.env.VITE_API_FORCE_ABSOLUTE === "true";
+  const isLocalAbs = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(RAW_BASE);
+  return (import.meta.env.DEV && isLocalAbs && !FORCE_ABS) ? "/api" : (RAW_BASE || "/api");
+}
+
+async function apiRegistrarBoleto(ventaId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { getAccessToken } = await import("../auth/token");
+  const access = getAccessToken();
+  const res = await fetch(`${getApiBase()}${PRIMARY}/${ventaId}/registrar-boleto`, {
+    method: "POST",
+    headers: { ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || "Error al registrar boleto");
+  }
+  const raw = data?.data ?? data;
+  return ok({
+    archivo: raw?.archivo ?? null,
+    venta: raw?.venta ? fromApi(raw.venta) : null,
+  });
+}
+
+async function apiRegistrarEscritura(ventaId, file, fechaEscritura) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fechaEscritura", typeof fechaEscritura === "string" ? fechaEscritura : fechaEscritura?.toISOString?.() ?? String(fechaEscritura));
+  const { getAccessToken } = await import("../auth/token");
+  const access = getAccessToken();
+  const res = await fetch(`${getApiBase()}${PRIMARY}/${ventaId}/registrar-escritura`, {
+    method: "POST",
+    headers: { ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || "Error al registrar escritura");
+  }
+  const raw = data?.data ?? data;
+  return ok({
+    archivo: raw?.archivo ?? null,
+    venta: raw?.venta ? fromApi(raw.venta) : null,
+  });
+}
+
 export const getAllVentas = apiGetAll;
 export const getVentaById = apiGetById;
 export const createVenta = apiCreate;
@@ -275,3 +327,5 @@ export const deleteVenta = apiDelete;
 export const desactivarVenta = apiDesactivar;
 export const reactivarVenta = apiReactivar;
 export const getVentasByInmobiliaria = apiGetByInmobiliaria;
+export const registrarBoleto = apiRegistrarBoleto;
+export const registrarEscritura = apiRegistrarEscritura;

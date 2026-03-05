@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { PrismaClient } from "../generated/prisma";
 import type { FileMetadata, TipoFile, NewFileMetadata, UpdateFileMetadata } from "../types/files.types";
@@ -18,28 +19,85 @@ function getEnv() {
 const { url, key, bucket } = getEnv();
 const supabase = createClient(url, key);
 
-function buildObjectPath(params: { idLoteAsociado: number; tipo: TipoFile; filename: string }) {
-  return `lote-${params.idLoteAsociado}/${params.tipo}/${params.filename}`;
+const TIPOS_DOC_VENTA: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO"];
+const TIPOS_DOC_LOTE: TipoFile[] = ["PLANO", "IMAGEN"];
+const MAX_FILENAME_LEN = 200;
+
+/**
+ * Sanitiza el nombre de archivo: solo [a-zA-Z0-9._-], sin espacios ni caracteres raros.
+ */
+function sanitizeFilename(original: string): string {
+  if (!original || typeof original !== "string") return "archivo";
+  const base = original.replace(/[^a-zA-Z0-9._-]/g, "_").trim() || "archivo";
+  return base.length > MAX_FILENAME_LEN ? base.slice(0, MAX_FILENAME_LEN) : base;
+}
+
+/**
+ * Genera path único en Supabase Storage para evitar sobrescrituras (Etapa 5.3).
+ * Incluye uuid + YYYY-MM. No reutiliza paths de archivos existentes.
+ * PLANO/IMAGEN: lote-{loteId}/{tipo}/{YYYY-MM}/{uuid}-{sanitizedFilename}
+ * BOLETO/ESCRITURA/OTRO: lote-{loteId}/{tipo}/venta-{ventaId}/{YYYY-MM}/{uuid}-{sanitizedFilename}
+ */
+function buildStoragePath(params: {
+  loteId: number;
+  tipo: TipoFile;
+  originalFilename: string;
+  ventaId?: number | null;
+}): string {
+  const { loteId, tipo, originalFilename, ventaId } = params;
+
+  if (TIPOS_DOC_LOTE.includes(tipo)) {
+    if (ventaId != null) {
+      throw new Error(`Para tipo ${tipo} no se permite ventaId`);
+    }
+  } else if (TIPOS_DOC_VENTA.includes(tipo)) {
+    if (ventaId == null || typeof ventaId !== "number") {
+      throw new Error(`Para tipo ${tipo} se requiere ventaId`);
+    }
+  }
+
+  const now = new Date();
+  const yyyyMm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const uuid = randomUUID();
+  const sanitized = sanitizeFilename(originalFilename);
+
+  if (TIPOS_DOC_VENTA.includes(tipo)) {
+    return `lote-${loteId}/${tipo}/venta-${ventaId}/${yyyyMm}/${uuid}-${sanitized}`;
+  }
+  return `lote-${loteId}/${tipo}/${yyyyMm}/${uuid}-${sanitized}`;
 }
 
 export async function uploadFileToSupabase(
   fileBuffer: Buffer,
-  metadata: { idLoteAsociado: number; tipo: TipoFile; filename: string; uploadedBy?: string | null; uplodedAt: Date }
+  metadata: {
+    idLoteAsociado: number;
+    tipo: TipoFile;
+    filename: string;
+    ventaId?: number | null;
+    uploadedBy?: string | null;
+    uplodedAt: Date;
+  }
 ): Promise<{ objectPath: string }> {
-  const objectPath = buildObjectPath({
-    idLoteAsociado: metadata.idLoteAsociado,
+  const objectPath = buildStoragePath({
+    loteId: metadata.idLoteAsociado,
     tipo: metadata.tipo,
-    filename: metadata.filename,
+    originalFilename: metadata.filename,
+    ventaId: metadata.ventaId,
   });
 
   const { error } = await supabase.storage
     .from(bucket)
     .upload(objectPath, fileBuffer, {
       contentType: "application/octet-stream",
-      upsert: true, // Permitir sobrescribir archivos existentes
+      upsert: false,
     });
 
-  if (error) throw new Error(`Error uploading file: ${error.message}`);
+  if (error) {
+    if (error.message?.toLowerCase().includes("already exists") || error.message?.toLowerCase().includes("duplicate")) {
+      throw Object.assign(new Error("El archivo ya existe en storage (path duplicado). Reintente."), { statusCode: 409 });
+    }
+    throw new Error(`Error uploading file: ${error.message}`);
+  }
 
   return { objectPath };
 }
@@ -191,6 +249,7 @@ export async function sustituirArchivo(
     idLoteAsociado: oldFile.idLoteAsociado,
     tipo,
     filename: originalname,
+    ventaId: oldFile.ventaId,
     uploadedBy: uploadedBy || null,
     uplodedAt: new Date(),
   });

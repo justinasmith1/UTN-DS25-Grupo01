@@ -1,11 +1,7 @@
 import { useRef, useEffect } from "react";
 import "../Base/cards.css";
 
-const TIPOS_DOCUMENTO = [
-  { value: "BOLETO", label: "Boleto de Compraventa" },
-  { value: "ESCRITURA", label: "Escritura" },
-  { value: "PLANOS", label: "Planos" },
-];
+const TIPOS_DEFAULT = [{ value: "PLANOS", label: "Planos" }];
 
 export default function DocumentoDropdown({
   open,
@@ -13,7 +9,10 @@ export default function DocumentoDropdown({
   onSelectTipo,
   onAddDocumento,
   canUpload = false,
+  tipos = null,
+  titulo = "Ver Documentos",
 }) {
+  const tiposList = tipos || TIPOS_DEFAULT;
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -39,7 +38,7 @@ export default function DocumentoDropdown({
         style={{ width: "min(420px, 90vw)", maxHeight: "auto" }}
       >
         <header className="c-header">
-          <h2 className="c-title">Ver Documentos</h2>
+          <h2 className="c-title">{titulo}</h2>
           <button
             type="button"
             className="cclf-btn-close"
@@ -54,7 +53,7 @@ export default function DocumentoDropdown({
           <div
             style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
-            {TIPOS_DOCUMENTO.map((tipo) => (
+            {tiposList.map((tipo) => (
               <button
                 key={tipo.value}
                 type="button"
@@ -84,7 +83,7 @@ export default function DocumentoDropdown({
               </button>
             ))}
 
-            {canUpload && (
+            {canUpload && onAddDocumento && (
               <button
                 type="button"
                 className="tl-btn tl-btn--soft"
