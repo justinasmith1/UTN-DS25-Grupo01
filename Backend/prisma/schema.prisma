@@ -332,6 +332,7 @@ model Venta {
   inmobiliaria        Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
   reservaConsumo      Reserva?        @relation("VentaConsumeReserva")
   compradores         Persona[]       @relation("VentaCompradores")
+  archivos            Archivos[]
   createdAt           DateTime        @default(now())
   updateAt            DateTime?
 
@@ -417,7 +418,9 @@ model Archivos {
   linkArchivo     String
   tipo            TiposArchivos
   idLoteAsociado  Int
+  ventaId         Int?
   lote            Lote            @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
+  venta           Venta?          @relation(fields: [ventaId], references: [id], onDelete: SetNull)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   uploadedBy      String?

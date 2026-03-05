@@ -66,6 +66,7 @@ function toFileMetadata(row: any): FileMetadata {
     updatedAt: row.updatedAt,
     uploadedBy: row.uploadedBy,
     idLoteAsociado: row.idLoteAsociado,
+    ventaId: row.ventaId ?? null,
     estadoOperativo: row.estadoOperativo,
     deletedBy: row.deletedBy,
   };
@@ -78,6 +79,7 @@ export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileM
       linkArchivo: metadata.url,
       tipo: metadata.tipo,
       idLoteAsociado: metadata.idLoteAsociado,
+      ventaId: metadata.ventaId ?? null,
       uploadedBy: metadata.uploadedBy || null,
     },
   });
@@ -88,6 +90,21 @@ export async function listByLote(idLoteAsociado: number, includeDeleted = false)
   const where: any = { idLoteAsociado };
   if (!includeDeleted) {
     where.estadoOperativo = "OPERATIVO";
+  }
+  const rows = await prisma.archivos.findMany({
+    where,
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map(toFileMetadata);
+}
+
+export async function listByVenta(
+  ventaId: number,
+  tipo?: TipoFile
+): Promise<FileMetadata[]> {
+  const where: any = { ventaId, estadoOperativo: "OPERATIVO" };
+  if (tipo) {
+    where.tipo = tipo;
   }
   const rows = await prisma.archivos.findMany({
     where,
@@ -131,6 +148,7 @@ export async function updateFileMetadata(id: number, updates: UpdateFileMetadata
       linkArchivo: updates.url || existingFile.linkArchivo,
       tipo: updates.tipo || (existingFile.tipo as TipoFile),
       idLoteAsociado: updates.idLoteAsociado || existingFile.idLoteAsociado,
+      ventaId: updates.ventaId !== undefined ? updates.ventaId : existingFile.ventaId,
       uploadedBy: updates.uploadedBy !== undefined ? updates.uploadedBy : existingFile.uploadedBy,
     },
   });
@@ -143,4 +161,59 @@ export async function getOperativeFileRaw(id: number) {
   const file = await prisma.archivos.findUnique({ where: { id } });
   if (!file || file.estadoOperativo === "ELIMINADO") return null;
   return file;
+}
+
+/**
+ * Sustituir documento: soft delete del anterior + subir nuevo del mismo tipo, loteId, ventaId.
+ * NO cambia EstadoVenta.
+ */
+export async function sustituirArchivo(
+  id: number,
+  fileBuffer: Buffer,
+  originalname: string,
+  uploadedBy?: string | null,
+  deletedByEmail?: string
+): Promise<FileMetadata> {
+  const oldFile = await prisma.archivos.findUnique({ where: { id } });
+  if (!oldFile) throw new Error("Archivo no encontrado");
+  if (oldFile.estadoOperativo === "ELIMINADO") {
+    throw new Error("No se puede sustituir un archivo eliminado");
+  }
+  const tipo = oldFile.tipo as TipoFile;
+  const tiposSustituibles: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO"];
+  if (!tiposSustituibles.includes(tipo)) {
+    throw new Error(
+      `No se puede sustituir archivos de tipo ${tipo}. Solo BOLETO, ESCRITURA u OTRO.`
+    );
+  }
+
+  const { objectPath } = await uploadFileToSupabase(fileBuffer, {
+    idLoteAsociado: oldFile.idLoteAsociado,
+    tipo,
+    filename: originalname,
+    uploadedBy: uploadedBy || null,
+    uplodedAt: new Date(),
+  });
+
+  const newFile = await prisma.$transaction(async (tx) => {
+    await tx.archivos.update({
+      where: { id },
+      data: {
+        estadoOperativo: "ELIMINADO",
+        fechaBaja: new Date(),
+        deletedBy: deletedByEmail || null,
+      },
+    });
+    return tx.archivos.create({
+      data: {
+        nombreArchivo: originalname,
+        linkArchivo: objectPath,
+        tipo,
+        idLoteAsociado: oldFile.idLoteAsociado,
+        ventaId: oldFile.ventaId,
+        uploadedBy: uploadedBy || null,
+      },
+    });
+  });
+  return toFileMetadata(newFile);
 }

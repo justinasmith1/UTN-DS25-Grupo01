@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import id from 'zod/v4/locales/id.js';
 
 export const fileMetadataSchema = z.object({
     filename: z.string().min(1, "El nombre del archivo es obligatorio"),
@@ -12,6 +11,7 @@ export const fileMetadataSchema = z.object({
 export const createFileMetadataSchema = z.object({
     idLoteAsociado: z.preprocess((val) => Number(val), z.number().int().positive()),
     tipo: z.enum(['BOLETO', 'ESCRITURA', 'PLANO', 'IMAGEN', 'OTRO']),
+    ventaId: z.preprocess((val) => (val === '' || val === undefined ? undefined : Number(val)), z.number().int().positive().optional()),
 });
 
 export const updateFileMetadataSchema = z.object({

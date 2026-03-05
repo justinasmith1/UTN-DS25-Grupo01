@@ -1,14 +1,20 @@
 import { Router } from 'express';
 import multer from 'multer';
-import fetch from 'node-fetch';
-import { validate, validateParams} from '../middlewares/validation.middleware';
+import { validate } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
-import { fileMetadataSchema, createFileMetadataSchema, updateFileMetadataSchema, deleteFileMetadataSchema } from '../validations/filemeta.validation';
+import { createFileMetadataSchema } from '../validations/filemeta.validation';
 import * as fileController from '../controllers/file.controller';
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 const router = Router();
+
+// GET /api/files/venta/:ventaId (antes de /:id para evitar conflicto)
+router.get(
+    '/venta/:ventaId',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
+    fileController.getAllFilesByVentaController);
 
 //GET /api/files/lote/:idLoteAsociado
 // Permitido para ADMINISTRADOR, GESTOR, TECNICO e INMOBILIARIA
@@ -36,6 +42,14 @@ router.post(
     authenticate,
     authorize('ADMINISTRADOR', 'GESTOR', 'TECNICO', 'INMOBILIARIA'),
     fileController.generateSignedUrlController);
+
+// POST /api/files/:id/sustituir (multipart)
+router.post(
+    '/:id/sustituir',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    upload.single('file'),
+    fileController.sustituirArchivoController);
 
 //POST /api/files
 router.post(

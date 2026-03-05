@@ -10,6 +10,7 @@ export interface FileMetadata {
     updatedAt: Date;
     uploadedBy?: string | null;
     idLoteAsociado: number;
+    ventaId?: number | null;
     estadoOperativo: EstadoOperativoFile;
     deletedBy?: string | null;
 }
@@ -20,6 +21,7 @@ export interface NewFileMetadata {
     tipo: TipoFile;
     uploadedBy?: string | null;
     idLoteAsociado: number;
+    ventaId?: number | null;
 }
 
 export interface UpdateFileMetadata {
@@ -28,6 +30,7 @@ export interface UpdateFileMetadata {
     tipo?: TipoFile;
     uploadedBy?: string | null;
     idLoteAsociado?: number;
+    ventaId?: number | null;
 }
 
 export interface DeleteFileMetadata {
