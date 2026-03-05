@@ -85,6 +85,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-sidebar__badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4b5563;
+  background: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 
 .doc-sidebar__item-meta {

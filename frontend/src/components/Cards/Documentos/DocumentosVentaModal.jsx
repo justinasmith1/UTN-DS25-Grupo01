@@ -48,8 +48,10 @@ export default function DocumentosVentaModal({
   const [loading, setLoading] = useState(false);
   const [selectedSeccion, setSelectedSeccion] = useState("BOLETO");
   const [selectedId, setSelectedId] = useState(null);
-  const [signedUrl, setSignedUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [loadingUrl, setLoadingUrl] = useState(false);
+  const previewBlobRef = useRef(null);
+  const loadingFileIdRef = useRef(null);
   const [error, setError] = useState("");
   const [uploading, setUploading] = useState(false);
   const [sustituyendo, setSustituyendo] = useState(false);
@@ -81,22 +83,51 @@ export default function DocumentosVentaModal({
     }
   }, [ventaId]);
 
-  const loadSignedUrl = useCallback(async (fileId) => {
+  const loadPreviewUrl = useCallback(async (fileId, filename) => {
     if (!fileId) {
-      setSignedUrl("");
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
+      setPreviewUrl("");
+      loadingFileIdRef.current = null;
       return;
     }
+    loadingFileIdRef.current = fileId;
     setLoadingUrl(true);
     setError("");
+    if (previewBlobRef.current) {
+      URL.revokeObjectURL(previewBlobRef.current);
+      previewBlobRef.current = null;
+    }
     try {
-      const url = await getFileSignedUrl(fileId);
-      setSignedUrl(url || "");
-      if (!url) setError("No se pudo obtener la URL del documento");
+      const signedUrl = await getFileSignedUrl(fileId);
+      if (loadingFileIdRef.current !== fileId) return;
+      if (!signedUrl) {
+        setPreviewUrl("");
+        setError("No se pudo obtener la URL del documento");
+        return;
+      }
+      const res = await fetch(signedUrl);
+      if (loadingFileIdRef.current !== fileId) return;
+      if (!res.ok) throw new Error("Error al cargar vista previa");
+      const blob = await res.blob();
+      if (loadingFileIdRef.current !== fileId) return;
+      const isPdf = (filename || "").toLowerCase().endsWith(".pdf");
+      const mime = isPdf ? "application/pdf" : (blob.type || "image/jpeg");
+      const blobWithType = blob.type !== mime ? new Blob([blob], { type: mime }) : blob;
+      const objectUrl = URL.createObjectURL(blobWithType);
+      previewBlobRef.current = objectUrl;
+      setPreviewUrl(objectUrl);
     } catch {
-      setSignedUrl("");
+      if (loadingFileIdRef.current !== fileId) return;
+      setPreviewUrl("");
       setError("Error al obtener la URL del documento");
     } finally {
-      setLoadingUrl(false);
+      if (loadingFileIdRef.current === fileId) {
+        loadingFileIdRef.current = null;
+        setLoadingUrl(false);
+      }
     }
   }, []);
 
@@ -108,9 +139,13 @@ export default function DocumentosVentaModal({
 
   useEffect(() => {
     if (!open) {
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
       setArchivos({ BOLETO: [], ESCRITURA: [], OTRO: [] });
       setSelectedId(null);
-      setSignedUrl("");
+      setPreviewUrl("");
       setError("");
       setConfirmDelete(false);
     }
@@ -119,21 +154,25 @@ export default function DocumentosVentaModal({
   useEffect(() => {
     const list = archivos[selectedSeccion] || [];
     if (selectedId && list.some((a) => a.id === selectedId)) {
-      loadSignedUrl(selectedId);
+      const arch = list.find((a) => a.id === selectedId);
+      loadPreviewUrl(selectedId, arch?.filename);
     } else if (list.length > 0) {
-      setSelectedId(list[0].id);
-      loadSignedUrl(list[0].id);
+      const first = list[0];
+      setSelectedId(first.id);
+      loadPreviewUrl(first.id, first.filename);
     } else {
       setSelectedId(null);
-      setSignedUrl("");
+      setPreviewUrl("");
     }
-  }, [selectedSeccion, archivos, selectedId, loadSignedUrl]);
+  }, [selectedSeccion, archivos, selectedId, loadPreviewUrl]);
 
   const handleSelect = (fileId) => {
+    const list = archivos[selectedSeccion] || [];
+    const arch = list.find((a) => a.id === fileId);
     setSelectedId(fileId);
-    setSignedUrl("");
+    setPreviewUrl("");
     setConfirmDelete(false);
-    loadSignedUrl(fileId);
+    loadPreviewUrl(fileId, arch?.filename);
   };
 
   const handleAgregar = async (e) => {
@@ -147,7 +186,7 @@ export default function DocumentosVentaModal({
       await fetchArchivos();
       if (saved?.id) {
         setSelectedId(saved.id);
-        loadSignedUrl(saved.id);
+        loadPreviewUrl(saved.id, saved.filename);
       }
     } catch (err) {
       setError(err?.message || "Error al subir el archivo");
@@ -165,7 +204,7 @@ export default function DocumentosVentaModal({
       const nuevo = await sustituirArchivo(selectedId, file);
       await fetchArchivos();
       setSelectedId(nuevo.id);
-      loadSignedUrl(nuevo.id);
+      loadPreviewUrl(nuevo.id, nuevo.filename);
     } catch (err) {
       setError(err?.message || "Error al sustituir documento");
     } finally {
@@ -181,7 +220,11 @@ export default function DocumentosVentaModal({
       await deleteArchivo(selectedId);
       setConfirmDelete(false);
       setSelectedId(null);
-      setSignedUrl("");
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
+      setPreviewUrl("");
       await fetchArchivos();
     } catch (err) {
       setError(err?.message || "Error al eliminar documento");
@@ -190,17 +233,26 @@ export default function DocumentosVentaModal({
     }
   };
 
-  const handleDescargar = () => {
-    if (!signedUrl) return;
+  const handleDescargar = async () => {
+    if (!selectedId) return;
     const list = archivos[selectedSeccion] || [];
     const selected = list.find((a) => a.id === selectedId);
-    const link = document.createElement("a");
-    link.href = signedUrl;
-    link.target = "_blank";
-    link.download = selected?.filename || "documento";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const signedUrl = await getFileSignedUrl(selectedId);
+      if (!signedUrl) {
+        setError("No se pudo obtener la URL para descargar");
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = signedUrl;
+      link.download = selected?.filename || "documento";
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      setError("Error al descargar el documento");
+    }
   };
 
   if (!open) return null;
@@ -208,9 +260,7 @@ export default function DocumentosVentaModal({
   const list = archivos[selectedSeccion] || [];
   const selectedFile = list.find((a) => a.id === selectedId);
   const sec = SECCIONES.find((s) => s.tipo === selectedSeccion);
-  const isPdf =
-    selectedFile?.filename?.toLowerCase().endsWith(".pdf") ||
-    signedUrl?.toLowerCase().includes(".pdf");
+  const isPdf = selectedFile?.filename?.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="c-backdrop" onClick={onClose}>
@@ -284,17 +334,17 @@ export default function DocumentosVentaModal({
               <div className="doc-preview__frame">
                 {loadingUrl ? (
                   <div className="doc-preview__loading">Cargando vista previa...</div>
-                ) : selectedId && signedUrl ? (
+                ) : selectedId && previewUrl ? (
                   isPdf ? (
                     <embed
-                      src={signedUrl}
+                      src={previewUrl}
                       type="application/pdf"
                       title={selectedFile?.filename}
                     />
                   ) : (
-                    <img src={signedUrl} alt={selectedFile?.filename || ""} />
+                    <img src={previewUrl} alt={selectedFile?.filename || ""} />
                   )
-                ) : selectedId && !signedUrl && !loadingUrl ? (
+                ) : selectedId && !previewUrl && !loadingUrl ? (
                   <div className="doc-preview__error">No se pudo cargar la vista previa</div>
                 ) : (
                   <div className="doc-preview__placeholder">
@@ -382,7 +432,7 @@ export default function DocumentosVentaModal({
               type="button"
               className="btn btn-primary"
               onClick={handleDescargar}
-              disabled={!selectedId || !signedUrl}
+              disabled={!selectedId}
             >
               Descargar
             </button>

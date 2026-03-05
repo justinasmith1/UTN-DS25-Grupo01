@@ -35,6 +35,8 @@ export async function getArchivosByLote(loteId) {
       uploadedAt: archivo.uploadedAt || archivo.createdAt,
       uploadedBy: archivo.uploadedBy,
       idLoteAsociado: archivo.idLoteAsociado,
+      ventaId: archivo.ventaId,
+      ventaNumero: archivo.ventaNumero,
     }));
   } catch (error) {
     console.error("Error obteniendo archivos por lote:", error);

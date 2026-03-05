@@ -54,9 +54,10 @@ export default function DocumentoVerCard({
 }) {
   const [archivos, setArchivos] = useState([]);
   const [selectedId, setSelectedId] = useState(null);
-  const [signedUrl, setSignedUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingUrl, setLoadingUrl] = useState(false);
+  const previewBlobRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -66,7 +67,7 @@ export default function DocumentoVerCard({
 
   const tipoBackend = TIPO_MAP[tipoDocumento] || tipoDocumento;
   const info = DOC_INFO[tipoDocumento] || { title: "Documento" };
-  const esDocVenta = TIPOS_VENTA.includes(tipoDocumento);
+  const esDocVenta = TIPOS_VENTA.includes(tipoDocumento) && Boolean(ventaId);
 
   const limpiarMapId = (mapId) => {
     if (!mapId) return mapId;
@@ -81,9 +82,15 @@ export default function DocumentoVerCard({
       : tipoDocumento === "ESCRITURA"
       ? `Escritura — Venta N\u00B0 ${ventaNumero || "?"}`
       : `Otros documentos — Venta N\u00B0 ${ventaNumero || "?"}`
-    : `Planos de Lote N\u00B0 ${numeroLote}`;
+    : tipoDocumento === "BOLETO"
+    ? `Boletos del Lote N\u00B0 ${numeroLote}`
+    : tipoDocumento === "ESCRITURA"
+    ? `Escrituras del Lote N\u00B0 ${numeroLote}`
+    : `Planos del Lote N\u00B0 ${numeroLote}`;
 
   const entityLabel = esDocVenta ? "esta venta" : "este lote";
+  // En contexto lote, BOLETO/ESCRITURA/OTRO requieren ventaId para subir; solo PLANOS se puede agregar
+  const canUploadEffective = canUpload && (esDocVenta || tipoDocumento === "PLANOS");
 
   const fetchArchivos = useCallback(async () => {
     if (esDocVenta && !ventaId) return [];
@@ -111,26 +118,52 @@ export default function DocumentoVerCard({
     }
   }, [esDocVenta, ventaId, loteId, tipoBackend]);
 
-  const loadSignedUrl = useCallback(async (fileId) => {
+  const loadingFileIdRef = useRef(null);
+  const loadPreviewUrl = useCallback(async (fileId, filename) => {
     if (!fileId) {
-      setSignedUrl("");
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
+      setPreviewUrl("");
+      loadingFileIdRef.current = null;
       return;
     }
+    loadingFileIdRef.current = fileId;
     setLoadingUrl(true);
     setError("");
+    if (previewBlobRef.current) {
+      URL.revokeObjectURL(previewBlobRef.current);
+      previewBlobRef.current = null;
+    }
     try {
-      const url = await getFileSignedUrl(fileId);
-      if (url) {
-        setSignedUrl(url);
-      } else {
-        setSignedUrl("");
+      const signedUrl = await getFileSignedUrl(fileId);
+      if (loadingFileIdRef.current !== fileId) return;
+      if (!signedUrl) {
+        setPreviewUrl("");
         setError("No se pudo obtener la URL del documento");
+        return;
       }
+      const res = await fetch(signedUrl);
+      if (loadingFileIdRef.current !== fileId) return;
+      if (!res.ok) throw new Error("Error al cargar vista previa");
+      const blob = await res.blob();
+      if (loadingFileIdRef.current !== fileId) return;
+      const isPdf = (filename || "").toLowerCase().endsWith(".pdf");
+      const mime = isPdf ? "application/pdf" : (blob.type || "image/jpeg");
+      const blobWithType = blob.type !== mime ? new Blob([blob], { type: mime }) : blob;
+      const objectUrl = URL.createObjectURL(blobWithType);
+      previewBlobRef.current = objectUrl;
+      setPreviewUrl(objectUrl);
     } catch {
-      setSignedUrl("");
+      if (loadingFileIdRef.current !== fileId) return;
+      setPreviewUrl("");
       setError("Error al obtener la URL del documento");
     } finally {
-      setLoadingUrl(false);
+      if (loadingFileIdRef.current === fileId) {
+        loadingFileIdRef.current = null;
+        setLoadingUrl(false);
+      }
     }
   }, []);
 
@@ -139,21 +172,26 @@ export default function DocumentoVerCard({
       (async () => {
         const list = await fetchArchivos();
         if (list && list.length > 0) {
-          setSelectedId(list[0].id);
-          loadSignedUrl(list[0].id);
+          const first = list[0];
+          setSelectedId(first.id);
+          loadPreviewUrl(first.id, first.filename);
         } else {
           setSelectedId(null);
-          setSignedUrl("");
+          setPreviewUrl("");
         }
       })();
     }
-  }, [open, loteId, ventaId, tipoDocumento]);
+  }, [open, loteId, ventaId, tipoDocumento, fetchArchivos, loadPreviewUrl]);
 
   useEffect(() => {
     if (!open) {
+      if (previewBlobRef.current) {
+        URL.revokeObjectURL(previewBlobRef.current);
+        previewBlobRef.current = null;
+      }
       setArchivos([]);
       setSelectedId(null);
-      setSignedUrl("");
+      setPreviewUrl("");
       setError("");
       setUploading(false);
       setDeleting(false);
@@ -164,10 +202,11 @@ export default function DocumentoVerCard({
 
   const handleSelect = (fileId) => {
     if (fileId === selectedId) return;
+    const arch = archivos.find((a) => a.id === fileId);
     setSelectedId(fileId);
-    setSignedUrl("");
+    setPreviewUrl("");
     setConfirmingDelete(false);
-    loadSignedUrl(fileId);
+    loadPreviewUrl(fileId, arch?.filename);
   };
 
   const handleUpload = async (e) => {
@@ -185,10 +224,11 @@ export default function DocumentoVerCard({
         esDocVenta ? ventaId : undefined
       );
       const list = await fetchArchivos();
-      const newId = saved?.id || list?.[0]?.id;
+      const newFile = saved || list?.[0];
+      const newId = newFile?.id;
       if (newId) {
         setSelectedId(newId);
-        loadSignedUrl(newId);
+        loadPreviewUrl(newId, newFile?.filename);
       }
     } catch (err) {
       setError(err?.message || "Error al subir el archivo");
@@ -206,7 +246,7 @@ export default function DocumentoVerCard({
       const nuevo = await sustituirArchivo(selectedId, file);
       await fetchArchivos();
       setSelectedId(nuevo.id);
-      loadSignedUrl(nuevo.id);
+      loadPreviewUrl(nuevo.id, nuevo.filename);
     } catch (err) {
       setError(err?.message || "Error al sustituir documento");
     } finally {
@@ -223,11 +263,12 @@ export default function DocumentoVerCard({
       setConfirmingDelete(false);
       const list = await fetchArchivos();
       if (list.length > 0) {
-        setSelectedId(list[0].id);
-        loadSignedUrl(list[0].id);
+        const first = list[0];
+        setSelectedId(first.id);
+        loadPreviewUrl(first.id, first.filename);
       } else {
         setSelectedId(null);
-        setSignedUrl("");
+        setPreviewUrl("");
       }
     } catch (err) {
       setError(err?.message || "Error al eliminar el documento");
@@ -236,24 +277,31 @@ export default function DocumentoVerCard({
     }
   };
 
-  const handleDescargar = () => {
-    if (!signedUrl) return;
+  const handleDescargar = async () => {
+    if (!selectedId) return;
     const selected = archivos.find((a) => a.id === selectedId);
-    const link = document.createElement("a");
-    link.href = signedUrl;
-    link.target = "_blank";
-    link.download = selected?.filename || "documento";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      const signedUrl = await getFileSignedUrl(selectedId);
+      if (!signedUrl) {
+        setError("No se pudo obtener la URL para descargar");
+        return;
+      }
+      const link = document.createElement("a");
+      link.href = signedUrl;
+      link.download = selected?.filename || "documento";
+      link.target = "_blank";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch {
+      setError("Error al descargar el documento");
+    }
   };
 
   if (!open) return null;
 
   const selectedFile = archivos.find((a) => a.id === selectedId);
-  const isPdf =
-    selectedFile?.filename?.toLowerCase().endsWith(".pdf") ||
-    signedUrl?.toLowerCase().includes(".pdf");
+  const isPdf = selectedFile?.filename?.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="c-backdrop" onClick={onClose}>
@@ -305,6 +353,9 @@ export default function DocumentoVerCard({
                     >
                       <div className="doc-sidebar__item-name">
                         {arch.filename}
+                        {!esDocVenta && arch.ventaNumero && (
+                          <span className="doc-sidebar__badge">Venta N° {arch.ventaNumero}</span>
+                        )}
                       </div>
                       <div className="doc-sidebar__item-meta">
                         {formatDate(arch.uploadedAt)}
@@ -322,17 +373,17 @@ export default function DocumentoVerCard({
                   <div className="doc-preview__loading">
                     Cargando vista previa...
                   </div>
-                ) : selectedId && signedUrl ? (
+                ) : selectedId && previewUrl ? (
                   isPdf ? (
                     <embed
-                      src={signedUrl}
+                      src={previewUrl}
                       type="application/pdf"
                       title={selectedFile?.filename}
                     />
                   ) : (
-                    <img src={signedUrl} alt={selectedFile?.filename || ""} />
+                    <img src={previewUrl} alt={selectedFile?.filename || ""} />
                   )
-                ) : selectedId && !signedUrl && !loadingUrl ? (
+                ) : selectedId && !previewUrl && !loadingUrl ? (
                   <div className="doc-preview__error">
                     No se pudo cargar la vista previa
                   </div>
@@ -381,7 +432,7 @@ export default function DocumentoVerCard({
           )}
 
           <div className="doc-actions">
-            {canUpload && (
+            {canUploadEffective && (
               <>
                 <input
                   ref={fileInputRef}
@@ -401,7 +452,7 @@ export default function DocumentoVerCard({
               </>
             )}
 
-            {selectedId && canUpload && esDocVenta && (
+            {selectedId && canUploadEffective && esDocVenta && (
               <>
                 <input
                   type="file"
@@ -425,7 +476,7 @@ export default function DocumentoVerCard({
               type="button"
               className="btn btn-primary"
               onClick={handleDescargar}
-              disabled={!selectedId || !signedUrl || confirmingDelete}
+              disabled={!selectedId || confirmingDelete}
             >
               Descargar
             </button>

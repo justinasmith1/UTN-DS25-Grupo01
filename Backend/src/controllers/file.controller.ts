@@ -1,10 +1,32 @@
 import { Request, Response } from "express";
 import * as FileService from "../services/file.service";
 import { NewFileMetadata, UpdateFileMetadata, TipoFile } from "../types/files.types";
+import { isInmobiliaria, canUserAccessArchivo } from "../utils/file.auth.utils";
 import prisma from "../config/prisma";
 
 const TIPOS_REQUIEREN_VENTA: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO"];
 const TIPOS_PROHIBEN_VENTA: TipoFile[] = ["PLANO", "IMAGEN"];
+
+/** Etapa 5.4: Verifica acceso INMOBILIARIA. Retorna false si debe responder 404. */
+async function verifyInmobiliariaArchivoAccess(
+  user: { role: string; inmobiliariaId?: number | null } | undefined,
+  archivo: { tipo: TipoFile | string; ventaId?: number | null; estadoOperativo?: string }
+): Promise<boolean> {
+  if (!isInmobiliaria(user)) return true;
+  let venta: { inmobiliariaId: number | null } | null = null;
+  if (archivo.ventaId != null && TIPOS_REQUIEREN_VENTA.includes(archivo.tipo as TipoFile)) {
+    venta = await prisma.venta.findUnique({
+      where: { id: archivo.ventaId },
+      select: { inmobiliariaId: true },
+    });
+  }
+  const archivoForAuth = {
+    tipo: archivo.tipo as TipoFile,
+    ventaId: archivo.ventaId,
+    estadoOperativo: archivo.estadoOperativo,
+  };
+  return canUserAccessArchivo(user, archivoForAuth, venta);
+}
 
 export class fileController {
     static async upload(req: Request, res: Response) {
@@ -84,7 +106,7 @@ export const getAllFilesController = async (req: Request, res: Response) => {
     try {
         const idLote = req.params.idLoteAsociado ? parseInt(req.params.idLoteAsociado as string, 10) : 0;
         const includeDeleted = req.query.includeDeleted === "true";
-        const files = await FileService.listByLote(idLote, includeDeleted);
+        const files = await FileService.listByLote(idLote, includeDeleted, req.user);
         res.status(200).json(files);
     } catch (error) {
         res.status(500).json({ message: "Error retrieving files", error });
@@ -96,6 +118,15 @@ export const getAllFilesByVentaController = async (req: Request, res: Response) 
         const ventaId = parseInt(req.params.ventaId, 10);
         if (isNaN(ventaId)) {
             return res.status(400).json({ message: "ventaId inválido" });
+        }
+        if (isInmobiliaria(req.user)) {
+            const venta = await prisma.venta.findUnique({
+                where: { id: ventaId },
+                select: { inmobiliariaId: true },
+            });
+            if (!venta || venta.inmobiliariaId !== req.user?.inmobiliariaId) {
+                return res.status(404).json({ message: "No encontrado" });
+            }
         }
         const tipo = req.query.tipo as TipoFile | undefined;
         const files = await FileService.listByVenta(ventaId, tipo);
@@ -141,6 +172,9 @@ export const generateSignedUrlController = async (req: Request, res: Response) =
         if (!file) {
             return res.status(404).json({ message: "Archivo no encontrado o eliminado" });
         }
+        if (!(await verifyInmobiliariaArchivoAccess(req.user, file))) {
+            return res.status(404).json({ message: "Archivo no encontrado o eliminado" });
+        }
 
         const expiresIn = 3600;
         const signedUrl = await FileService.generateSignedUrl(file.linkArchivo, expiresIn);
@@ -156,6 +190,9 @@ export const getFileByIdController = async (req: Request, res: Response) => {
     try {
         const file = await FileService.getFileById(id);
         if (!file) {
+            return res.status(404).json({ message: "File not found" });
+        }
+        if (!(await verifyInmobiliariaArchivoAccess(req.user, file))) {
             return res.status(404).json({ message: "File not found" });
         }
         res.status(200).json(file);

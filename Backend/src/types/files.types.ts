@@ -11,6 +11,7 @@ export interface FileMetadata {
     uploadedBy?: string | null;
     idLoteAsociado: number;
     ventaId?: number | null;
+    ventaNumero?: string | null;
     estadoOperativo: EstadoOperativoFile;
     deletedBy?: string | null;
 }

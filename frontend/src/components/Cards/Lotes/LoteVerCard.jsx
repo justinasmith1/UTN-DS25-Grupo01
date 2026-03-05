@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "../Base/cards.css";
 import LoteEditarCard from "./LoteEditarCard.jsx";
+import DocumentoVerCard from "../Documentos/DocumentoVerCard.jsx";
 import NiceSelect from "../../Base/NiceSelect.jsx";
 import { getArchivosByLote, getFileSignedUrl } from "../../../lib/api/archivos.js";
 import { getAllReservas } from "../../../lib/api/reservas.js";
@@ -31,12 +32,17 @@ const SUBESTADOS_LOTE = [
  * - Alinea las etiquetas calculando un ancho único según el label más largo.
  * - Expone botones de cabecera (Editar / Reservar) y tres botones inferiores para documentos.
  */
+const DOC_TIPOS = [
+  { label: "Escritura", type: "ESCRITURA" },
+  { label: "Boleto CompraVenta", type: "BOLETO" },
+  { label: "Planos", type: "PLANOS" },
+];
+
 export default function LoteVerCard({
   open,
   onClose,
   onEdit,
   onReserve,
-  onOpenDocument,
   onUpdated,
   lote,
   loteId,
@@ -54,6 +60,8 @@ export default function LoteVerCard({
   const [currentLot, setCurrentLot] = useState(resolvedLot);
   const [editOpen, setEditOpen] = useState(false);
   const [reservaActiva, setReservaActiva] = useState(null);
+  const [docModalOpen, setDocModalOpen] = useState(false);
+  const [docTipoSeleccionado, setDocTipoSeleccionado] = useState(null);
 
   useEffect(() => {
     setCurrentLot(resolvedLot);
@@ -133,7 +141,11 @@ export default function LoteVerCard({
   }, [open, currentLot?.id, currentLot?.estado]);
 
   useEffect(() => {
-    if (!open) setEditOpen(false);
+    if (!open) {
+      setEditOpen(false);
+      setDocModalOpen(false);
+      setDocTipoSeleccionado(null);
+    }
   }, [open]);
 
   const lot = currentLot;
@@ -301,34 +313,14 @@ export default function LoteVerCard({
     ["ACTUALIZADO", fmtDate(lot?.updateAt ?? lot?.updatedAt)],
   ];
 
-  const docs = useMemo(() => {
-    if (!lot) return [];
-    const pool = []
-      .concat(lot.archivos ?? [])
-      .concat(lot.files ?? [])
-      .concat(lot.documentos ?? []);
-    return pool;
-  }, [lot]);
-
-  const getDocByType = (type) => {
-    const match = docs.find(
-      (f) => (f.tipo || f.type || "").toUpperCase() === type
-    );
-    if (!match) return null;
-    return {
-      ...match,
-      url: match.url || match.signedUrl || null,
-    };
-  };
-
-  const docButtons = [
-    { label: "Escritura", type: "ESCRITURA" },
-    { label: "Boleto CompraVenta", type: "BOLETO" },
-    { label: "Planos", type: "PLANO" },
-  ].map((btn) => ({
-    ...btn,
-    file: getDocByType(btn.type),
-  }));
+  const canUploadDocs = useMemo(
+    () => ["ADMINISTRADOR", "GESTOR", "TECNICO"].includes(user?.role),
+    [user?.role]
+  );
+  const canDeleteDocs = useMemo(
+    () => ["ADMINISTRADOR", "GESTOR"].includes(user?.role),
+    [user?.role]
+  );
 
   const [imageUrls, setImageUrls] = useState([]);
 
@@ -433,8 +425,9 @@ export default function LoteVerCard({
     color: val === NA ? "#6B7280" : "#111827",
   });
 
-  const handleOpenDocument = (type, file) => {
-    onOpenDocument?.({ type, file, lote: lot });
+  const handleOpenDocModal = (type) => {
+    setDocTipoSeleccionado(type);
+    setDocModalOpen(true);
   };
 
   return (
@@ -612,19 +605,17 @@ export default function LoteVerCard({
               </div>
 
               <div className="lote-doc-buttons" style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {docButtons.map(({ label, type, file }, index) => {
-                  // Escritura ocupa toda la primera fila, luego Boleto y Planos comparten la segunda fila
-                  const flexStyle = index === 0 
-                    ? { flex: "1 1 100%" } 
+                {DOC_TIPOS.map(({ label, type }, index) => {
+                  const flexStyle = index === 0
+                    ? { flex: "1 1 100%" }
                     : { flex: "1 1 calc(50% - 4px)" };
-                  
                   return (
                     <button
                       key={type}
                       type="button"
                       className="lote-doc-button"
-                      disabled={!file}
-                      onClick={() => file && handleOpenDocument(type, file)}
+                      disabled={!lot?.id}
+                      onClick={() => lot?.id && handleOpenDocModal(type)}
                       style={flexStyle}
                     >
                       {label}
@@ -650,6 +641,20 @@ export default function LoteVerCard({
           }
         }}
       />
+      {docTipoSeleccionado && (
+        <DocumentoVerCard
+          open={docModalOpen}
+          onClose={() => {
+            setDocModalOpen(false);
+            setDocTipoSeleccionado(null);
+          }}
+          tipoDocumento={docTipoSeleccionado}
+          loteId={lot?.id}
+          loteNumero={loteDisplayId}
+          canUpload={canUploadDocs}
+          canDelete={canDeleteDocs}
+        />
+      )}
     </div>
   );
 }

@@ -2,6 +2,11 @@ import { randomUUID } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { PrismaClient } from "../generated/prisma";
 import type { FileMetadata, TipoFile, NewFileMetadata, UpdateFileMetadata } from "../types/files.types";
+import {
+  isInmobiliaria,
+  canUserAccessArchivo,
+  type FileAuthUser,
+} from "../utils/file.auth.utils";
 
 const prisma = new PrismaClient();
 
@@ -105,7 +110,7 @@ export async function uploadFileToSupabase(
 export async function generateSignedUrl(objectPath: string, expiresIn: number = 3660): Promise<string> {
   const { data, error } = await supabase.storage
     .from(bucket)
-    .createSignedUrl(objectPath, expiresIn);
+    .createSignedUrl(objectPath, expiresIn, { download: false });
 
   if (error || !data?.signedUrl) {
     throw new Error(`Error generating signed URL: ${error?.message}`);
@@ -125,6 +130,7 @@ function toFileMetadata(row: any): FileMetadata {
     uploadedBy: row.uploadedBy,
     idLoteAsociado: row.idLoteAsociado,
     ventaId: row.ventaId ?? null,
+    ventaNumero: row.venta?.numero ?? null,
     estadoOperativo: row.estadoOperativo,
     deletedBy: row.deletedBy,
   };
@@ -144,7 +150,16 @@ export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileM
   return toFileMetadata(newFile);
 }
 
-export async function listByLote(idLoteAsociado: number, includeDeleted = false): Promise<FileMetadata[]> {
+/**
+ * Lista archivos por lote. Si user es INMOBILIARIA (Etapa 5.4), filtra:
+ * - PLANO/IMAGEN: incluir siempre.
+ * - BOLETO/ESCRITURA/OTRO: solo si venta.inmobiliariaId == user.inmobiliariaId.
+ */
+export async function listByLote(
+  idLoteAsociado: number,
+  includeDeleted = false,
+  user?: FileAuthUser
+): Promise<FileMetadata[]> {
   const where: any = { idLoteAsociado };
   if (!includeDeleted) {
     where.estadoOperativo = "OPERATIVO";
@@ -152,8 +167,30 @@ export async function listByLote(idLoteAsociado: number, includeDeleted = false)
   const rows = await prisma.archivos.findMany({
     where,
     orderBy: { createdAt: "desc" },
+    include: { venta: { select: { numero: true } } },
   });
-  return rows.map(toFileMetadata);
+
+  if (!isInmobiliaria(user)) {
+    return rows.map(toFileMetadata);
+  }
+
+  const ventaIds = [...new Set(rows.map((r) => r.ventaId).filter((id): id is number => id != null))];
+  const ventas =
+    ventaIds.length > 0
+      ? await prisma.venta.findMany({
+          where: { id: { in: ventaIds } },
+          select: { id: true, inmobiliariaId: true },
+        })
+      : [];
+  const ventaMap = new Map(ventas.map((v) => [v.id, v]));
+
+  const filtered = rows.filter((row) => {
+    const metadata = { tipo: row.tipo as TipoFile, ventaId: row.ventaId, estadoOperativo: row.estadoOperativo };
+    const venta = row.ventaId != null ? ventaMap.get(row.ventaId) ?? null : null;
+    return canUserAccessArchivo(user, metadata, venta);
+  });
+
+  return filtered.map(toFileMetadata);
 }
 
 export async function listByVenta(
