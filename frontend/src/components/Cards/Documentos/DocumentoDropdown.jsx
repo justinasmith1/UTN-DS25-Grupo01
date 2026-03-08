@@ -1,23 +1,19 @@
-// src/components/Cards/Documentos/DocumentoDropdown.jsx
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import "../Base/cards.css";
-import { loadLocalDocs } from "../../../lib/storage/docsLocal";
 
-const TIPOS_DOCUMENTO = [
-  { value: "BOLETO", label: "Boleto de Compraventa" },
-  { value: "ESCRITURA", label: "Escritura" },
-  { value: "PLANOS", label: "Planos" },
-];
+const TIPOS_DEFAULT = [{ value: "PLANOS", label: "Planos" }];
 
 export default function DocumentoDropdown({
   open,
   onClose,
   onSelectTipo,
-  loteId,
   onAddDocumento,
+  canUpload = false,
+  tipos = null,
+  titulo = "Ver Documentos",
 }) {
+  const tiposList = tipos || TIPOS_DEFAULT;
   const dropdownRef = useRef(null);
-  const [customDocs, setCustomDocs] = useState([]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -31,19 +27,7 @@ export default function DocumentoDropdown({
     }
   }, [open, onClose]);
 
-  // Cargar documentos locales cuando se abre
-  useEffect(() => {
-    if (open && loteId) {
-      setCustomDocs(loadLocalDocs(loteId));
-    }
-  }, [open, loteId]);
-
   if (!open) return null;
-
-  const allOptions = [
-    ...TIPOS_DOCUMENTO.map((t) => ({ ...t, custom: false })),
-    ...customDocs.map((d) => ({ value: `CUSTOM_${d.id}`, label: d.nombre, custom: true, doc: d })),
-  ];
 
   return (
     <div className="c-backdrop" onClick={onClose}>
@@ -51,13 +35,10 @@ export default function DocumentoDropdown({
         className="c-card"
         ref={dropdownRef}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "min(420px, 90vw)",
-          maxHeight: "auto",
-        }}
+        style={{ width: "min(420px, 90vw)", maxHeight: "auto" }}
       >
         <header className="c-header">
-          <h2 className="c-title">Ver Documentos</h2>
+          <h2 className="c-title">{titulo}</h2>
           <button
             type="button"
             className="cclf-btn-close"
@@ -70,23 +51,15 @@ export default function DocumentoDropdown({
 
         <div className="c-body">
           <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "12px",
-            }}
+            style={{ display: "flex", flexDirection: "column", gap: "12px" }}
           >
-            {allOptions.map((tipo) => (
+            {tiposList.map((tipo) => (
               <button
                 key={tipo.value}
                 type="button"
                 className="btn btn-ghost"
                 onClick={() => {
-                  if (tipo.custom && tipo.doc) {
-                    onSelectTipo?.("CUSTOM", tipo.doc.nombre, tipo.doc);
-                  } else {
-                    onSelectTipo?.(tipo.value, tipo.label);
-                  }
+                  onSelectTipo?.(tipo.value, tipo.label);
                   onClose?.();
                 }}
                 style={{
@@ -110,25 +83,27 @@ export default function DocumentoDropdown({
               </button>
             ))}
 
-            <button
-              type="button"
-              className="tl-btn tl-btn--soft"
-              onClick={() => {
-                onAddDocumento?.();
-                onClose?.();
-              }}
-              style={{
-                marginTop: "4px",
-                alignSelf: "flex-start",
-                width: "100%",
-                textAlign: "center",
-                padding: "12px 16px",
-                fontSize: "15px",
-                fontWeight: 500,
-              }}
-            >
-              + Agregar documento
-            </button>
+            {canUpload && onAddDocumento && (
+              <button
+                type="button"
+                className="tl-btn tl-btn--soft"
+                onClick={() => {
+                  onAddDocumento?.();
+                  onClose?.();
+                }}
+                style={{
+                  marginTop: "4px",
+                  alignSelf: "flex-start",
+                  width: "100%",
+                  textAlign: "center",
+                  padding: "12px 16px",
+                  fontSize: "15px",
+                  fontWeight: 500,
+                }}
+              >
+                + Agregar documento
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -29,7 +29,6 @@ import VentaReactivarDialog from "../components/Cards/Ventas/VentaReactivarDialo
 import VentaCrearCard from "../components/Cards/Ventas/VentaCrearCard.jsx";
 import DocumentoDropdown from "../components/Cards/Documentos/DocumentoDropdown.jsx";
 import DocumentoVerCard from "../components/Cards/Documentos/DocumentoVerCard.jsx";
-import DocumentoFormCard from "../components/Cards/Documentos/DocumentoFormCard.jsx";
 
 /* Util: toma el array “correcto” dentro de una respuesta heterogénea */
 const pickArray = (resp, candidates = []) => {
@@ -175,6 +174,10 @@ export default function VentasPage() {
   // Permisos (en esta pantalla Editar abre siempre)
   const canSaleView = can(user, PERMISSIONS.SALE_VIEW);
   const canSaleDelete = can(user, PERMISSIONS.SALE_DELETE);
+
+  // Permisos de archivos (coinciden con lo que el backend permite por rol)
+  const canUploadFiles = ['ADMINISTRADOR', 'GESTOR', 'TECNICO'].includes(user?.role);
+  const canDeleteFiles = ['ADMINISTRADOR', 'GESTOR'].includes(user?.role);
 
   // Función reutilizable para cargar datos
   const loadVentasData = useCallback(async () => {
@@ -341,13 +344,16 @@ export default function VentasPage() {
     setOpenEliminar(true);
   }, []);
 
-  // Estados para documentos
   const [openDocumentoDropdown, setOpenDocumentoDropdown] = useState(false);
   const [openDocumentoVer, setOpenDocumentoVer] = useState(false);
-  const [openDocumentoForm, setOpenDocumentoForm] = useState(false);
   const [tipoDocumentoSeleccionado, setTipoDocumentoSeleccionado] = useState(null);
-  const [labelDocumentoSeleccionado, setLabelDocumentoSeleccionado] = useState(null);
-  const [docCustomSeleccionado, setDocCustomSeleccionado] = useState(null);
+
+  const TIPOS_DOC_VENTA = [
+    { value: "BOLETO", label: "Boleto de Compraventa" },
+    { value: "ESCRITURA", label: "Escritura" },
+    { value: "PLANOS", label: "Planos" },
+    { value: "OTRO", label: "Otros" },
+  ];
 
   const onVerDocumentos = useCallback((venta) => {
     if (!venta) return;
@@ -355,31 +361,15 @@ export default function VentasPage() {
     setOpenDocumentoDropdown(true);
   }, []);
 
-  const handleSelectTipoDocumento = useCallback((tipo, label, doc) => {
+  const handleSelectTipoDocumento = useCallback((tipo, label) => {
     setTipoDocumentoSeleccionado(tipo);
-    setLabelDocumentoSeleccionado(label);
-    setDocCustomSeleccionado(doc || null);
     setOpenDocumentoDropdown(false);
-    setOpenDocumentoVer(true);
-  }, []);
-
-  const handleAbrirFormularioDoc = useCallback(() => {
-    setOpenDocumentoDropdown(false);
-    setOpenDocumentoForm(true);
-  }, []);
-
-  const handleDocumentoGuardado = useCallback((doc) => {
-    setDocCustomSeleccionado(doc);
-    setTipoDocumentoSeleccionado("CUSTOM");
-    setLabelDocumentoSeleccionado(doc?.nombre || "Documento");
-    setOpenDocumentoForm(false);
     setOpenDocumentoVer(true);
   }, []);
 
   const handleCerrarDocumentoVer = useCallback(() => {
     setOpenDocumentoVer(false);
     setTipoDocumentoSeleccionado(null);
-    setLabelDocumentoSeleccionado(null);
   }, []);
 
   const onAgregarVenta = useCallback(() => {
@@ -663,24 +653,17 @@ export default function VentasPage() {
         loteIdPreSeleccionado={new URLSearchParams(searchParamsString).get("lotId")}
       />
 
-      {/* Dropdown de documentos */}
+      {/* Dropdown selector de documentos (card chico) */}
       <DocumentoDropdown
         open={openDocumentoDropdown}
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
-        onAddDocumento={handleAbrirFormularioDoc}
-        loteId={ventaSel?.loteId || ventaSel?.lote?.id}
+        tipos={TIPOS_DOC_VENTA}
+        titulo="Documentos de Venta"
+        canUpload={false}
       />
 
-      {/* Formulario de documento (modal) */}
-      <DocumentoFormCard
-        open={openDocumentoForm}
-        onClose={() => setOpenDocumentoForm(false)}
-        loteId={ventaSel?.loteId || ventaSel?.lote?.id}
-        onSaved={handleDocumentoGuardado}
-      />
-
-      {/* Modal de visualización de documento */}
+      {/* Card grande de visualización de documento */}
       <DocumentoVerCard
         open={openDocumentoVer}
         onClose={handleCerrarDocumentoVer}
@@ -691,14 +674,10 @@ export default function VentasPage() {
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={ventaSel?.loteId || ventaSel?.lote?.id}
         loteNumero={ventaSel?.lote?.mapId ?? ventaSel?.lotMapId ?? ventaSel?.loteId ?? ventaSel?.lote?.id}
-        documentoUrl={null}
-        selectedDoc={docCustomSeleccionado}
-        onModificar={(url) => {
-          console.log("Modificar documento:", url);
-        }}
-        onDescargar={(url) => {
-          console.log("Descargar documento:", url);
-        }}
+        ventaId={ventaSel?.id}
+        ventaNumero={ventaSel?.numero}
+        canUpload={canUploadFiles}
+        canDelete={canDeleteFiles}
       />
 
       {/* Animación de éxito al eliminar */}

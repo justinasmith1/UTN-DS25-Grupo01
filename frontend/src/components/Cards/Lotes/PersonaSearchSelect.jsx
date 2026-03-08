@@ -27,6 +27,7 @@ export default function PersonaSearchSelect({
   disabled = false,
   error = null,
   required = false,
+  noLabel = false, // cuando true: omite el field-label y renderiza solo el input
 }) {
   const [busqueda, setBusqueda] = useState(null);
   const inputRef = useRef(null);
@@ -118,6 +119,83 @@ export default function PersonaSearchSelect({
     inputElementRef.current?.blur();
   };
 
+  // Bloque de input reutilizable (usado en ambos modos: con y sin label)
+  const inputBlock = (
+    <div ref={inputRef} className="propietario-search-wrapper">
+      <div className="propietario-search-input-wrapper">
+        <input
+          ref={inputElementRef}
+          id={inputIdRef.current}
+          className={`field-input ${error ? "is-invalid" : ""}`}
+          type="text"
+          placeholder={loading ? "Cargando..." : placeholder}
+          value={displayText}
+          onChange={handleInputChange}
+          onFocus={handleFocus}
+          disabled={disabled}
+        />
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          className="propietario-search-icon"
+        >
+          <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none" />
+          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2" />
+        </svg>
+        {tooltipText && (
+          <span
+            className="propietario-info-icon-inline"
+            data-tooltip={tooltipText}
+          >
+            <Info size={16} />
+          </span>
+        )}
+      </div>
+      {busqueda !== null && busqueda !== undefined && busqueda !== "" && (
+        <div ref={dropdownRef} className="propietario-dropdown">
+          {personasFiltradas.length === 0 ? (
+            <div className="propietario-dropdown-empty">Sin resultados</div>
+          ) : (
+            personasFiltradas.map((p) => {
+              const id = p.id ?? p.idPersona;
+              const nombre = p.nombre ?? "";
+              const apellido = p.apellido ?? "";
+              const razonSocial = p.razonSocial;
+              const identificadorTipo = p.identificadorTipo;
+              const identificadorValor = p.identificadorValor;
+              const displayText = razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${id}`;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className="propietario-dropdown-item"
+                  onClick={() => handleSelectPersona(id)}
+                >
+                  <div className="propietario-dropdown-item-name">{displayText}</div>
+                  {identificadorValor && (
+                    <div className="propietario-dropdown-item-id">
+                      {identificadorTipo ? `${identificadorTipo} ${identificadorValor}` : identificadorValor}
+                    </div>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  // Modo sin label: renderiza solo el input (sin field-row, sin cuadrado vacío)
+  if (noLabel) {
+    return (
+      <div className={`field-value p0 ${error ? "hasError" : ""}`}>
+        {inputBlock}
+      </div>
+    );
+  }
+
   return (
     <div className={`field-row ${error ? "hasError" : ""}`}>
       <div className="field-label">
@@ -126,75 +204,7 @@ export default function PersonaSearchSelect({
         </label>
       </div>
       <div className="field-value p0">
-        <div ref={inputRef} className="propietario-search-wrapper">
-          <div className="propietario-search-input-wrapper">
-            <input
-              ref={inputElementRef}
-              id={inputIdRef.current}
-              className={`field-input ${error ? "is-invalid" : ""}`}
-              type="text"
-              placeholder={loading ? "Cargando..." : placeholder}
-              value={displayText}
-              onChange={handleInputChange}
-              onFocus={handleFocus}
-              disabled={disabled}
-            />
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              className="propietario-search-icon"
-            >
-              <circle cx="11" cy="11" r="7" stroke="#666" strokeWidth="2" fill="none" />
-              <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#666" strokeWidth="2" />
-            </svg>
-            {tooltipText && (
-              <span
-                className="propietario-info-icon-inline"
-                data-tooltip={tooltipText}
-              >
-                <Info size={16} />
-              </span>
-            )}
-          </div>
-          {busqueda !== null && busqueda !== undefined && busqueda !== "" && (
-            <div
-              ref={dropdownRef}
-              className="propietario-dropdown"
-            >
-              {personasFiltradas.length === 0 ? (
-                <div className="propietario-dropdown-empty">
-                  Sin resultados
-                </div>
-              ) : (
-                personasFiltradas.map((p) => {
-                  const id = p.id ?? p.idPersona;
-                  const nombre = p.nombre ?? "";
-                  const apellido = p.apellido ?? "";
-                  const razonSocial = p.razonSocial;
-                  const identificadorTipo = p.identificadorTipo;
-                  const identificadorValor = p.identificadorValor;
-                  const displayText = razonSocial || `${nombre} ${apellido}`.trim() || `Persona ${id}`;
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      className="propietario-dropdown-item"
-                      onClick={() => handleSelectPersona(id)}
-                    >
-                      <div className="propietario-dropdown-item-name">{displayText}</div>
-                      {identificadorValor && (
-                        <div className="propietario-dropdown-item-id">
-                          {identificadorTipo ? `${identificadorTipo} ${identificadorValor}` : identificadorValor}
-                        </div>
-                      )}
-                    </button>
-                  );
-                })
-              )}
-            </div>
-          )}
-        </div>
+        {inputBlock}
       </div>
     </div>
   );

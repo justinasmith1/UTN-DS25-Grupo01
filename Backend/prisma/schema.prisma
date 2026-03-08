@@ -99,6 +99,12 @@ enum EstadoOperativo {
   ELIMINADO
 }
 
+enum EstadoAprobacionPlano {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
 enum TiposArchivos {
   BOLETO
   ESCRITURA
@@ -190,6 +196,7 @@ model Persona {
 
   Venta   Venta[]
   Reserva Reserva[]
+  ventasComoComprador Venta[] @relation("VentaCompradores")
 
   @@unique([identificadorTipo, identificadorValor])
   @@index([estadoOperativo])
@@ -330,6 +337,8 @@ model Venta {
   inmobiliariaId      Int?
   inmobiliaria        Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
   reservaConsumo      Reserva?        @relation("VentaConsumeReserva")
+  compradores         Persona[]       @relation("VentaCompradores")
+  archivos            Archivos[]
   createdAt           DateTime        @default(now())
   updateAt            DateTime?
 
@@ -410,15 +419,34 @@ model Promocion {
 // Archivos
 
 model Archivos {
-  id             Int           @id @default(autoincrement())
-  nombreArchivo  String
-  linkArchivo    String
-  tipo           TiposArchivos
-  idLoteAsociado Int
-  lote           Lote          @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
-  createdAt      DateTime      @default(now())
-  uploadedBy     String?
-  user           User?         @relation(fields: [uploadedBy], references: [email])
+  id              Int             @id @default(autoincrement())
+  nombreArchivo   String
+  linkArchivo     String
+  tipo            TiposArchivos
+  idLoteAsociado  Int
+  ventaId         Int?
+  lote            Lote            @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
+  venta           Venta?          @relation(fields: [ventaId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  uploadedBy      String?
+  user            User?           @relation(fields: [uploadedBy], references: [email])
+  estadoOperativo EstadoOperativo @default(OPERATIVO)
+  fechaBaja       DateTime?
+  deletedBy       String?
+
+  // Aprobaciones PLANO (Etapa 5.5) — solo aplican cuando tipo = PLANO
+  estadoAprobacionComision      EstadoAprobacionPlano?
+  fechaAprobacionComision        DateTime?
+  aprobadoComisionBy             String?
+  observacionAprobacionComision  String?
+
+  estadoAprobacionMunicipio      EstadoAprobacionPlano?
+  fechaAprobacionMunicipio       DateTime?
+  aprobadoMunicipioBy            String?
+  observacionAprobacionMunicipio String?
+
+  @@index([estadoOperativo])
 }
 
 // Alquiler
