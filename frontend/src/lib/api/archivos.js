@@ -283,18 +283,8 @@ export async function actualizarAprobacion(fileId, { target, estado, observacion
 export async function getFileSignedUrl(fileId) {
   if (!fileId) return null;
   try {
-    const res = await http(`${PRIMARY}/${fileId}`, { method: "GET" });
-    const data = await res.json().catch(() => ({}));
-    
-    if (!res.ok || !data) return null;
-    
-    const archivo = data?.archivo || data?.data || data;
-    const objectPath = archivo?.url || archivo?.linkArchivo;
-    if (!objectPath) return null;
-    
     const { getAccessToken } = await import('../auth/token');
     const access = getAccessToken();
-    
     const urlRes = await fetch(`${getApiBase()}${PRIMARY}/${fileId}/url`, {
       method: "POST",
       headers: {
@@ -302,12 +292,10 @@ export async function getFileSignedUrl(fileId) {
         ...(access ? { Authorization: `Bearer ${access}` } : {}),
       },
       credentials: 'include',
-      body: JSON.stringify({ filename: objectPath })
+      body: JSON.stringify({}),
     });
-    
     const urlData = await urlRes.json().catch(() => ({}));
     if (!urlRes.ok) return null;
-    
     return urlData?.signedURL || urlData?.signedUrl || null;
   } catch (error) {
     return null;

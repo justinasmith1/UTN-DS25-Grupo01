@@ -696,8 +696,6 @@ export default function Reservas() {
         open={openDocumentoDropdown}
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
-        loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
         canUpload={canUploadFiles}
       />
 

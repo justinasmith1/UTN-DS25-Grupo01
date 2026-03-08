@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import * as FileService from "../services/file.service";
-import { NewFileMetadata, UpdateFileMetadata, TipoFile } from "../types/files.types";
+import { UpdateFileMetadata, TipoFile } from "../types/files.types";
 import { isInmobiliaria, canUserAccessArchivo, canUseIncludeDeleted } from "../utils/file.auth.utils";
 import { validateUploadFile } from "../utils/file.upload.validation";
 import { ensureVentaPerteneceALote } from "../utils/file.validation.utils";
@@ -39,7 +39,7 @@ export class fileController {
         const ventaId = ventaIdRaw ? parseInt(ventaIdRaw, 10) : undefined;
 
         if (!file) {
-            return res.status(400).json({ message: "No file uploaded" });
+            return res.status(400).json({ message: "No se subió ningún archivo" });
         }
         if (!idLoteAsociado || isNaN(idLoteAsociado)) {
             return res.status(400).json({ message: "idLoteAsociado es obligatorio" });
@@ -87,7 +87,7 @@ export class fileController {
                 filename: originalname,
                 ventaId: TIPOS_REQUIEREN_VENTA.includes(tipo) ? ventaId : undefined,
                 uploadedBy: req.user?.email || null,
-                uplodedAt: new Date()
+                uploadedAt: new Date()
             });
 
             const newFile = await FileService.saveFileMetadata({
@@ -114,7 +114,7 @@ export const getAllFilesController = async (req: Request, res: Response) => {
         const files = await FileService.listByLote(idLote, includeDeleted, req.user);
         res.status(200).json(files);
     } catch (error) {
-        res.status(500).json({ message: "Error retrieving files", error });
+        res.status(500).json({ message: "Error al obtener archivos", error });
     }
 };
 
@@ -139,7 +139,7 @@ export const getAllFilesByVentaController = async (req: Request, res: Response) 
         const files = await FileService.listByVenta(ventaId, tipo, includeDeleted);
         res.status(200).json(files);
     } catch (error) {
-        res.status(500).json({ message: "Error retrieving files by venta", error });
+        res.status(500).json({ message: "Error al obtener archivos por venta", error });
     }
 };
 
@@ -190,7 +190,7 @@ export const generateSignedUrlController = async (req: Request, res: Response) =
         const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
         res.status(200).json({ signedUrl, signedURL: signedUrl, expiresAt });
     } catch (error) {
-        res.status(500).json({ message: "Error generating signed URL", error });
+        res.status(500).json({ message: "Error al generar URL firmada", error });
     }
 };
 
@@ -199,24 +199,14 @@ export const getFileByIdController = async (req: Request, res: Response) => {
     try {
         const file = await FileService.getFileById(id);
         if (!file) {
-            return res.status(404).json({ message: "File not found" });
+            return res.status(404).json({ message: "Archivo no encontrado" });
         }
         if (!(await verifyInmobiliariaArchivoAccess(req.user, file))) {
-            return res.status(404).json({ message: "File not found" });
+            return res.status(404).json({ message: "Archivo no encontrado" });
         }
         res.status(200).json(file);
     } catch (error) {
-        res.status(500).json({ message: "Error retrieving file", error });
-    }
-};
-
-export const createFileController = async (req: Request, res: Response) => {
-    const metadata: NewFileMetadata = req.body;
-    try {
-        const newFile = await FileService.saveFileMetadata(metadata);
-        res.status(201).json(newFile);
-    } catch (error) {
-        res.status(500).json({ message: "Error saving file metadata", error });
+        res.status(500).json({ message: "Error al obtener archivo", error });
     }
 };
 
@@ -226,12 +216,12 @@ export const updateFileController = async (req: Request, res: Response) => {
     try {
         const updatedFile = await FileService.updateFileMetadata(id, updates);
         if (!updatedFile) {
-            return res.status(404).json({ message: "File not found" });
+            return res.status(404).json({ message: "Archivo no encontrado" });
         }
         res.status(200).json(updatedFile);
     } catch (error: any) {
         const status = error.message?.includes("eliminado") ? 400 : 500;
-        res.status(status).json({ message: error.message || "Error updating file metadata" });
+        res.status(status).json({ message: error.message || "Error al actualizar metadata del archivo" });
     }
 };
 
@@ -243,7 +233,7 @@ export const deleteFileController = async (req: Request, res: Response) => {
         res.status(204).send();
     } catch (error: any) {
         const status = error?.statusCode ?? 500;
-        res.status(status).json({ message: error?.message || "Error deleting file" });
+        res.status(status).json({ message: error?.message || "Error al eliminar archivo" });
     }
 };
 

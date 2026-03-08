@@ -5,7 +5,7 @@ export const fileMetadataSchema = z.object({
     url: z.string().url("La URL debe ser válida"),
     idLoteAsociado: z.number().int().positive("El ID del lote asociado debe ser un número entero positivo"),
     uploadedBy: z.string().nullable(),
-    uplodedAt: z.date().default(() => new Date())
+    uploadedAt: z.date().default(() => new Date())
 });
 
 export const createFileMetadataSchema = z.object({
@@ -19,7 +19,7 @@ export const updateFileMetadataSchema = z.object({
     url: z.string().url("La URL debe ser válida").optional(),   
     idLoteAsociado: z.number().int().positive("El ID del lote asociado debe ser un número entero positivo").optional(),
     uploadedBy: z.string().nullable().optional(),
-    uplodedAt: z.date().optional()
+    uploadedAt: z.date().optional()
 });
 
 export const deleteFileMetadataSchema = z.object({

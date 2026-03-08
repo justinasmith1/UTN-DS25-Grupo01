@@ -82,7 +82,7 @@ export async function uploadFileToSupabase(
     filename: string;
     ventaId?: number | null;
     uploadedBy?: string | null;
-    uplodedAt: Date;
+    uploadedAt: Date;
   }
 ): Promise<{ objectPath: string }> {
   const objectPath = buildStoragePath({
@@ -354,7 +354,7 @@ export async function sustituirArchivo(
     filename: originalname,
     ventaId: oldFile.ventaId,
     uploadedBy: uploadedBy || null,
-    uplodedAt: new Date(),
+    uploadedAt: new Date(),
   });
 
   const newFile = await prisma.$transaction(async (tx) => {
