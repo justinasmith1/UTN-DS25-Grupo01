@@ -26,3 +26,9 @@ export const deleteFileMetadataSchema = z.object({
     id: z.number().int().positive("El ID del archivo debe ser un número entero positivo")
 });
 
+export const updateAprobacionSchema = z.object({
+    target: z.enum(['COMISION', 'MUNICIPIO'], { required_error: "target es obligatorio" }),
+    estado: z.enum(['PENDIENTE', 'APROBADO', 'RECHAZADO'], { required_error: "estado es obligatorio" }),
+    observacion: z.string().max(500).optional(),
+});
+

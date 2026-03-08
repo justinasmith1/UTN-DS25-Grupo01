@@ -1,12 +1,14 @@
 import { randomUUID } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { PrismaClient } from "../generated/prisma";
-import type { FileMetadata, TipoFile, NewFileMetadata, UpdateFileMetadata } from "../types/files.types";
+import type { FileMetadata, TipoFile, NewFileMetadata, UpdateFileMetadata, EstadoAprobacion, TargetAprobacion } from "../types/files.types";
 import {
   isInmobiliaria,
   canUserAccessArchivo,
+  canUpdateAprobacion,
   type FileAuthUser,
 } from "../utils/file.auth.utils";
+import { ensureVentaPerteneceALote } from "../utils/file.validation.utils";
 
 const prisma = new PrismaClient();
 
@@ -132,11 +134,21 @@ function toFileMetadata(row: any): FileMetadata {
     ventaId: row.ventaId ?? null,
     ventaNumero: row.venta?.numero ?? null,
     estadoOperativo: row.estadoOperativo,
+    fechaBaja: row.fechaBaja ?? null,
     deletedBy: row.deletedBy,
+    estadoAprobacionComision: row.estadoAprobacionComision ?? null,
+    fechaAprobacionComision: row.fechaAprobacionComision ?? null,
+    aprobadoComisionBy: row.aprobadoComisionBy ?? null,
+    observacionAprobacionComision: row.observacionAprobacionComision ?? null,
+    estadoAprobacionMunicipio: row.estadoAprobacionMunicipio ?? null,
+    fechaAprobacionMunicipio: row.fechaAprobacionMunicipio ?? null,
+    aprobadoMunicipioBy: row.aprobadoMunicipioBy ?? null,
+    observacionAprobacionMunicipio: row.observacionAprobacionMunicipio ?? null,
   };
 }
 
 export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileMetadata> {
+  const isPlano = metadata.tipo === "PLANO";
   const newFile = await prisma.archivos.create({
     data: {
       nombreArchivo: metadata.filename,
@@ -145,6 +157,10 @@ export async function saveFileMetadata(metadata: NewFileMetadata): Promise<FileM
       idLoteAsociado: metadata.idLoteAsociado,
       ventaId: metadata.ventaId ?? null,
       uploadedBy: metadata.uploadedBy || null,
+      ...(isPlano && {
+        estadoAprobacionComision: "PENDIENTE",
+        estadoAprobacionMunicipio: "PENDIENTE",
+      }),
     },
   });
   return toFileMetadata(newFile);
@@ -195,15 +211,20 @@ export async function listByLote(
 
 export async function listByVenta(
   ventaId: number,
-  tipo?: TipoFile
+  tipo?: TipoFile,
+  includeDeleted = false
 ): Promise<FileMetadata[]> {
-  const where: any = { ventaId, estadoOperativo: "OPERATIVO" };
+  const where: any = { ventaId };
+  if (!includeDeleted) {
+    where.estadoOperativo = "OPERATIVO";
+  }
   if (tipo) {
     where.tipo = tipo;
   }
   const rows = await prisma.archivos.findMany({
     where,
     orderBy: { createdAt: "desc" },
+    include: { venta: { select: { numero: true } } },
   });
   return rows.map(toFileMetadata);
 }
@@ -214,10 +235,19 @@ export async function getFileById(id: number): Promise<FileMetadata | null> {
   return toFileMetadata(file);
 }
 
-// Soft delete: marca el registro como ELIMINADO sin tocar el binario en storage
+// Soft delete: marca el registro como ELIMINADO sin tocar el binario en storage (Etapa 5.4.3)
 export async function deleteFileById(id: number, deletedByEmail?: string): Promise<void> {
   const file = await prisma.archivos.findUnique({ where: { id } });
-  if (!file) throw new Error("File not found");
+  if (!file) {
+    const err = new Error("Archivo no encontrado") as Error & { statusCode?: number };
+    err.statusCode = 404;
+    throw err;
+  }
+  if (file.estadoOperativo === "ELIMINADO") {
+    const err = new Error("El archivo ya está eliminado") as Error & { statusCode?: number };
+    err.statusCode = 400;
+    throw err;
+  }
 
   await prisma.archivos.update({
     where: { id },
@@ -227,6 +257,37 @@ export async function deleteFileById(id: number, deletedByEmail?: string): Promi
       deletedBy: deletedByEmail || null,
     },
   });
+}
+
+/** Restaurar archivo eliminado: OPERATIVO, limpia fechaBaja y deletedBy */
+export async function restoreFileById(id: number): Promise<FileMetadata> {
+  const file = await prisma.archivos.findUnique({ where: { id }, include: { venta: { select: { numero: true } } } });
+  if (!file) throw new Error("Archivo no encontrado");
+  if (file.estadoOperativo !== "ELIMINADO") {
+    throw new Error("Solo se pueden restaurar archivos eliminados");
+  }
+  const updated = await prisma.archivos.update({
+    where: { id },
+    data: {
+      estadoOperativo: "OPERATIVO",
+      fechaBaja: null,
+      deletedBy: null,
+    },
+    include: { venta: { select: { numero: true } } },
+  });
+  return toFileMetadata(updated);
+}
+
+/** Purga definitiva: borra en Supabase Storage + registro en DB */
+export async function purgeFileById(id: number): Promise<void> {
+  const file = await prisma.archivos.findUnique({ where: { id } });
+  if (!file) throw new Error("Archivo no encontrado");
+  const objectPath = file.linkArchivo;
+  const { error } = await supabase.storage.from(bucket).remove([objectPath]);
+  if (error) {
+    console.warn(`Supabase remove: ${error.message} (continuando con borrado DB)`);
+  }
+  await prisma.archivos.delete({ where: { id } });
 }
 
 export async function updateFileMetadata(id: number, updates: UpdateFileMetadata): Promise<FileMetadata> {
@@ -275,11 +336,16 @@ export async function sustituirArchivo(
     throw new Error("No se puede sustituir un archivo eliminado");
   }
   const tipo = oldFile.tipo as TipoFile;
-  const tiposSustituibles: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO"];
+  const tiposSustituibles: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO", "PLANO"];
   if (!tiposSustituibles.includes(tipo)) {
     throw new Error(
-      `No se puede sustituir archivos de tipo ${tipo}. Solo BOLETO, ESCRITURA u OTRO.`
+      `No se puede sustituir archivos de tipo ${tipo}. Solo BOLETO, ESCRITURA, OTRO o PLANO.`
     );
+  }
+
+  // Etapa 5.4.3: validar Venta ↔ Lote para documentos de venta
+  if (oldFile.ventaId != null) {
+    await ensureVentaPerteneceALote(oldFile.ventaId, oldFile.idLoteAsociado);
   }
 
   const { objectPath } = await uploadFileToSupabase(fileBuffer, {
@@ -308,8 +374,69 @@ export async function sustituirArchivo(
         idLoteAsociado: oldFile.idLoteAsociado,
         ventaId: oldFile.ventaId,
         uploadedBy: uploadedBy || null,
+        ...(tipo === "PLANO" && {
+          estadoAprobacionComision: "PENDIENTE",
+          estadoAprobacionMunicipio: "PENDIENTE",
+        }),
       },
     });
   });
   return toFileMetadata(newFile);
+}
+
+/**
+ * Etapa 5.5: Actualiza aprobación (Comisión o Municipio) de un archivo tipo PLANO.
+ */
+export async function updateAprobacionPlano(
+  id: number,
+  target: TargetAprobacion,
+  estado: EstadoAprobacion,
+  userEmail: string,
+  userRole: string,
+  observacion?: string
+): Promise<FileMetadata> {
+  const file = await prisma.archivos.findUnique({ where: { id }, include: { venta: { select: { numero: true } } } });
+  if (!file) {
+    const err = new Error("Archivo no encontrado") as Error & { statusCode?: number };
+    err.statusCode = 404;
+    throw err;
+  }
+  if (file.tipo !== "PLANO") {
+    const err = new Error("Solo se pueden modificar aprobaciones de archivos tipo PLANO") as Error & { statusCode?: number };
+    err.statusCode = 400;
+    throw err;
+  }
+  if (file.estadoOperativo === "ELIMINADO") {
+    const err = new Error("No se puede modificar la aprobación de un archivo eliminado") as Error & { statusCode?: number };
+    err.statusCode = 400;
+    throw err;
+  }
+  if (!canUpdateAprobacion(userRole, target)) {
+    const err = new Error(`No tenés permiso para modificar la aprobación de ${target}`) as Error & { statusCode?: number };
+    err.statusCode = 403;
+    throw err;
+  }
+
+  const now = new Date();
+  const isReset = estado === "PENDIENTE";
+
+  const data: Record<string, any> = {};
+  if (target === "COMISION") {
+    data.estadoAprobacionComision = estado;
+    data.fechaAprobacionComision = isReset ? null : now;
+    data.aprobadoComisionBy = isReset ? null : userEmail;
+    data.observacionAprobacionComision = isReset ? null : (observacion ?? null);
+  } else {
+    data.estadoAprobacionMunicipio = estado;
+    data.fechaAprobacionMunicipio = isReset ? null : now;
+    data.aprobadoMunicipioBy = isReset ? null : userEmail;
+    data.observacionAprobacionMunicipio = isReset ? null : (observacion ?? null);
+  }
+
+  const updated = await prisma.archivos.update({
+    where: { id },
+    data,
+    include: { venta: { select: { numero: true } } },
+  });
+  return toFileMetadata(updated);
 }

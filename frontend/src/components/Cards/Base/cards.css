@@ -775,14 +775,21 @@ select.field {
   margin-right: 14px;
 }
 
-.lote-header-actions .cclf-tab.thin.reserve {
+/* Variante verde "reserve" (Reservar, Restaurar): reutilizable en header, doc-actions, side-panel */
+.cclf-tab.thin.reserve {
   background: #0b8b67;
   border-color: #0b8b67;
   color: #fff;
 }
 
-.lote-header-actions .cclf-tab.thin.reserve:hover {
+.cclf-tab.thin.reserve:hover:not(:disabled) {
   filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.cclf-tab.thin.reserve:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 @media (max-width: 980px) {

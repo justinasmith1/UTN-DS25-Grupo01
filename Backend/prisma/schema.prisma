@@ -99,6 +99,12 @@ enum EstadoOperativo {
   ELIMINADO
 }
 
+enum EstadoAprobacionPlano {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
 enum TiposArchivos {
   BOLETO
   ESCRITURA
@@ -428,6 +434,17 @@ model Archivos {
   estadoOperativo EstadoOperativo @default(OPERATIVO)
   fechaBaja       DateTime?
   deletedBy       String?
+
+  // Aprobaciones PLANO (Etapa 5.5) — solo aplican cuando tipo = PLANO
+  estadoAprobacionComision      EstadoAprobacionPlano?
+  fechaAprobacionComision        DateTime?
+  aprobadoComisionBy             String?
+  observacionAprobacionComision  String?
+
+  estadoAprobacionMunicipio      EstadoAprobacionPlano?
+  fechaAprobacionMunicipio       DateTime?
+  aprobadoMunicipioBy            String?
+  observacionAprobacionMunicipio String?
 
   @@index([estadoOperativo])
 }

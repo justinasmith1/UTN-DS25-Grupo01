@@ -82,3 +82,20 @@ export function canUserAccessArchivo(
 
   return true; // Tipos no contemplados: permitir por defecto (conservador)
 }
+
+/** Etapa 5.4.3: Solo ADMINISTRADOR y GESTOR pueden usar includeDeleted=true. */
+export function canUseIncludeDeleted(user: FileAuthUser | undefined): boolean {
+  const role = user?.role;
+  return role === "ADMINISTRADOR" || role === "GESTOR";
+}
+
+/** Etapa 5.5: Verifica si el rol puede cambiar la aprobación del target dado. */
+export function canUpdateAprobacion(
+  role: string,
+  target: "COMISION" | "MUNICIPIO"
+): boolean {
+  if (target === "COMISION") {
+    return ["ADMINISTRADOR", "GESTOR", "TECNICO"].includes(role);
+  }
+  return ["ADMINISTRADOR", "GESTOR"].includes(role);
+}

@@ -12,66 +12,68 @@ const getApiBase = () => {
 /**
  * Obtiene todos los archivos de un lote
  * @param {number} loteId - ID del lote
+ * @param {boolean} [includeDeleted=false] - Incluir eliminados (solo ADMIN/GESTOR)
  * @returns {Promise<Array>} Lista de archivos
  */
-export async function getArchivosByLote(loteId) {
+export async function getArchivosByLote(loteId, includeDeleted = false) {
   if (!loteId) return [];
-  
   try {
-    const res = await http(`${PRIMARY}/lote/${loteId}`, { method: "GET" });
+    const qs = includeDeleted ? "?includeDeleted=true" : "";
+    const res = await http(`${PRIMARY}/lote/${loteId}${qs}`, { method: "GET" });
     const data = await res.json().catch(() => ({}));
-    
-    if (!res.ok) {
-      throw new Error(data?.message || "Error al obtener archivos");
-    }
-    
+    if (!res.ok) throw new Error(data?.message || "Error al obtener archivos");
     const archivos = Array.isArray(data) ? data : (data?.archivos || data?.data || []);
-    
-    return archivos.map(archivo => ({
-      id: archivo.id,
-      filename: archivo.filename || archivo.nombreArchivo,
-      url: archivo.url || archivo.linkArchivo,
-      tipo: archivo.tipo,
-      uploadedAt: archivo.uploadedAt || archivo.createdAt,
-      uploadedBy: archivo.uploadedBy,
-      idLoteAsociado: archivo.idLoteAsociado,
-      ventaId: archivo.ventaId,
-      ventaNumero: archivo.ventaNumero,
-    }));
+    return archivos.map(archivo => mapArchivo(archivo));
   } catch (error) {
     console.error("Error obteniendo archivos por lote:", error);
     return [];
   }
 }
 
+function mapArchivo(archivo) {
+  return {
+    id: archivo.id,
+    filename: archivo.filename || archivo.nombreArchivo,
+    url: archivo.url || archivo.linkArchivo,
+    tipo: archivo.tipo,
+    uploadedAt: archivo.uploadedAt || archivo.createdAt,
+    uploadedBy: archivo.uploadedBy,
+    idLoteAsociado: archivo.idLoteAsociado,
+    ventaId: archivo.ventaId,
+    ventaNumero: archivo.ventaNumero,
+    estadoOperativo: archivo.estadoOperativo || "OPERATIVO",
+    fechaBaja: archivo.fechaBaja ?? null,
+    deletedBy: archivo.deletedBy ?? null,
+    estadoAprobacionComision: archivo.estadoAprobacionComision ?? null,
+    fechaAprobacionComision: archivo.fechaAprobacionComision ?? null,
+    aprobadoComisionBy: archivo.aprobadoComisionBy ?? null,
+    observacionAprobacionComision: archivo.observacionAprobacionComision ?? null,
+    estadoAprobacionMunicipio: archivo.estadoAprobacionMunicipio ?? null,
+    fechaAprobacionMunicipio: archivo.fechaAprobacionMunicipio ?? null,
+    aprobadoMunicipioBy: archivo.aprobadoMunicipioBy ?? null,
+    observacionAprobacionMunicipio: archivo.observacionAprobacionMunicipio ?? null,
+  };
+}
+
 /**
  * Obtiene todos los archivos de una venta
  * @param {number} ventaId - ID de la venta
  * @param {string} [tipo] - Opcional: BOLETO | ESCRITURA | OTRO
+ * @param {boolean} [includeDeleted=false] - Incluir eliminados (solo ADMIN/GESTOR)
  * @returns {Promise<Array>} Lista de archivos
  */
-export async function getArchivosByVenta(ventaId, tipo) {
+export async function getArchivosByVenta(ventaId, tipo, includeDeleted = false) {
   if (!ventaId) return [];
   try {
-    const path = tipo
-      ? `${PRIMARY}/venta/${ventaId}?tipo=${encodeURIComponent(tipo)}`
-      : `${PRIMARY}/venta/${ventaId}`;
-    const res = await http(path, { method: "GET" });
+    const params = new URLSearchParams();
+    if (tipo) params.set("tipo", tipo);
+    if (includeDeleted) params.set("includeDeleted", "true");
+    const qs = params.toString() ? `?${params}` : "";
+    const res = await http(`${PRIMARY}/venta/${ventaId}${qs}`, { method: "GET" });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      throw new Error(data?.message || "Error al obtener archivos");
-    }
+    if (!res.ok) throw new Error(data?.message || "Error al obtener archivos");
     const archivos = Array.isArray(data) ? data : (data?.archivos || data?.data || []);
-    return archivos.map((archivo) => ({
-      id: archivo.id,
-      filename: archivo.filename || archivo.nombreArchivo,
-      url: archivo.url || archivo.linkArchivo,
-      tipo: archivo.tipo,
-      uploadedAt: archivo.uploadedAt || archivo.createdAt,
-      uploadedBy: archivo.uploadedBy,
-      idLoteAsociado: archivo.idLoteAsociado,
-      ventaId: archivo.ventaId,
-    }));
+    return archivos.map(mapArchivo);
   } catch (error) {
     console.error("Error obteniendo archivos por venta:", error);
     return [];
@@ -215,13 +217,60 @@ export async function sustituirArchivo(fileId, file) {
 export async function deleteArchivo(id) {
   try {
     const res = await http(`${PRIMARY}/${id}`, { method: "DELETE" });
-    const data = await res.json().catch(() => ({}));  
-    if (!res.ok) {
-      throw new Error(data?.message || "Error al eliminar archivo");
-    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Error al eliminar archivo");
     return true;
   } catch (error) {
     console.error("Error eliminando archivo:", error);
+    throw error;
+  }
+}
+
+export async function restoreArchivo(id) {
+  try {
+    const res = await http(`${PRIMARY}/${id}/restore`, { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Error al restaurar archivo");
+    return data?.data || data;
+  } catch (error) {
+    console.error("Error restaurando archivo:", error);
+    throw error;
+  }
+}
+
+export async function purgeArchivo(id) {
+  try {
+    const res = await http(`${PRIMARY}/${id}/purge`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(data?.message || "Error al purgar archivo");
+    }
+    return true;
+  } catch (error) {
+    console.error("Error purgando archivo:", error);
+    throw error;
+  }
+}
+
+/**
+ * Actualiza la aprobación (Comisión o Municipio) de un archivo tipo PLANO
+ * @param {number} fileId - ID del archivo
+ * @param {{ target: 'COMISION'|'MUNICIPIO', estado: 'PENDIENTE'|'APROBADO'|'RECHAZADO', observacion?: string }} body
+ * @returns {Promise<Object>} Archivo actualizado
+ */
+export async function actualizarAprobacion(fileId, { target, estado, observacion }) {
+  if (!fileId) throw new Error("Se requiere el ID del archivo");
+  try {
+    const res = await http(`${PRIMARY}/${fileId}/aprobaciones`, {
+      method: "PATCH",
+      body: { target, estado, observacion },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || "Error al actualizar aprobación");
+    const archivo = data?.data || data;
+    return mapArchivo(archivo);
+  } catch (error) {
+    console.error("Error actualizando aprobación:", error);
     throw error;
   }
 }

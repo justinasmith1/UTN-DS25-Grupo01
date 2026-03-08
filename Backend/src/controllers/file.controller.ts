@@ -1,7 +1,9 @@
 import { Request, Response } from "express";
 import * as FileService from "../services/file.service";
 import { NewFileMetadata, UpdateFileMetadata, TipoFile } from "../types/files.types";
-import { isInmobiliaria, canUserAccessArchivo } from "../utils/file.auth.utils";
+import { isInmobiliaria, canUserAccessArchivo, canUseIncludeDeleted } from "../utils/file.auth.utils";
+import { validateUploadFile } from "../utils/file.upload.validation";
+import { ensureVentaPerteneceALote } from "../utils/file.validation.utils";
 import prisma from "../config/prisma";
 
 const TIPOS_REQUIEREN_VENTA: TipoFile[] = ["BOLETO", "ESCRITURA", "OTRO"];
@@ -64,15 +66,17 @@ export class fileController {
         }
 
         if (ventaId != null && !isNaN(ventaId)) {
-            const venta = await prisma.venta.findUnique({ where: { id: ventaId }, select: { loteId: true } });
-            if (!venta) {
-                return res.status(400).json({ message: "Venta no encontrada" });
+            try {
+                await ensureVentaPerteneceALote(ventaId, idLoteAsociado);
+            } catch (err: any) {
+                return res.status(err.statusCode ?? 400).json({ message: err.message });
             }
-            if (venta.loteId !== idLoteAsociado) {
-                return res.status(400).json({
-                    message: "La venta no pertenece al mismo lote que idLoteAsociado",
-                });
-            }
+        }
+
+        try {
+            validateUploadFile(file);
+        } catch (err: any) {
+            return res.status(err.statusCode ?? 400).json({ message: err.message });
         }
 
         const { originalname, buffer } = file;
@@ -105,7 +109,8 @@ export class fileController {
 export const getAllFilesController = async (req: Request, res: Response) => {
     try {
         const idLote = req.params.idLoteAsociado ? parseInt(req.params.idLoteAsociado as string, 10) : 0;
-        const includeDeleted = req.query.includeDeleted === "true";
+        let includeDeleted = req.query.includeDeleted === "true";
+        if (!canUseIncludeDeleted(req.user)) includeDeleted = false;
         const files = await FileService.listByLote(idLote, includeDeleted, req.user);
         res.status(200).json(files);
     } catch (error) {
@@ -129,7 +134,9 @@ export const getAllFilesByVentaController = async (req: Request, res: Response) 
             }
         }
         const tipo = req.query.tipo as TipoFile | undefined;
-        const files = await FileService.listByVenta(ventaId, tipo);
+        let includeDeleted = req.query.includeDeleted === "true";
+        if (!canUseIncludeDeleted(req.user)) includeDeleted = false;
+        const files = await FileService.listByVenta(ventaId, tipo, includeDeleted);
         res.status(200).json(files);
     } catch (error) {
         res.status(500).json({ message: "Error retrieving files by venta", error });
@@ -142,8 +149,10 @@ export const sustituirArchivoController = async (req: Request, res: Response) =>
     if (isNaN(id)) {
         return res.status(400).json({ message: "ID de archivo inválido" });
     }
-    if (!file) {
-        return res.status(400).json({ message: "No se proporcionó archivo para sustituir" });
+    try {
+        validateUploadFile(file);
+    } catch (err: any) {
+        return res.status(err.statusCode ?? 400).json({ message: err.message });
     }
     try {
         const newFile = await FileService.sustituirArchivo(
@@ -228,11 +237,63 @@ export const updateFileController = async (req: Request, res: Response) => {
 
 export const deleteFileController = async (req: Request, res: Response) => {
     const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de archivo inválido" });
     try {
         await FileService.deleteFileById(id, req.user?.email);
         res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ message: "Error deleting file", error });
+    } catch (error: any) {
+        const status = error?.statusCode ?? 500;
+        res.status(status).json({ message: error?.message || "Error deleting file" });
+    }
+};
+
+export const restoreFileController = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de archivo inválido" });
+    try {
+        const file = await FileService.restoreFileById(id);
+        res.status(200).json({ message: "Archivo restaurado", data: file });
+    } catch (error: any) {
+        const status = error.message?.includes("encontrado") || error.message?.includes("eliminados") ? 400 : 500;
+        res.status(status).json({ message: error.message || "Error al restaurar archivo" });
+    }
+};
+
+export const updateAprobacionController = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de archivo inválido" });
+
+    const { target, estado, observacion } = req.body;
+    try {
+        const updated = await FileService.updateAprobacionPlano(
+            id,
+            target,
+            estado,
+            req.user?.email || "",
+            req.user?.role || "",
+            observacion
+        );
+        res.status(200).json({ message: "Aprobación actualizada", data: updated });
+    } catch (error: any) {
+        const status = error.statusCode ?? 500;
+        res.status(status).json({ message: error.message || "Error al actualizar aprobación" });
+    }
+};
+
+export const purgeFileController = async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ message: "ID de archivo inválido" });
+    try {
+        const file = await prisma.archivos.findUnique({ where: { id } });
+        if (!file) return res.status(404).json({ message: "Archivo no encontrado" });
+        if (!(await verifyInmobiliariaArchivoAccess(req.user, file))) {
+            return res.status(404).json({ message: "Archivo no encontrado" });
+        }
+        await FileService.purgeFileById(id);
+        res.status(204).send();
+    } catch (error: any) {
+        const status = error.message?.includes("encontrado") ? 404 : 500;
+        res.status(status).json({ message: error.message || "Error al purgar archivo" });
     }
 };
 
