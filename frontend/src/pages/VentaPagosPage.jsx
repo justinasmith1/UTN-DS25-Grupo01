@@ -6,6 +6,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
+import PlanCrearForm from "../components/Pagos/PlanCrearForm";
+import Can from "../components/Can";
+import { PERMISSIONS } from "../lib/auth/rbac";
 import "./VentaPagosPage.css";
 
 // Formatear monto según moneda del plan (ARS/USD)
@@ -79,6 +82,7 @@ export default function VentaPagosPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
+  const [showFormPlan, setShowFormPlan] = useState(false);
 
   const fetchContext = useCallback(async () => {
     const id = parseInt(ventaId, 10);
@@ -210,10 +214,10 @@ export default function VentaPagosPage() {
         </div>
       </div>
 
-      {/* C. Plan vigente */}
-      <div className="vp-summary-card mb-4">
-        <h5 className="vp-section-title mb-3">Plan vigente</h5>
-        {planVigente ? (
+      {/* C. Plan vigente o formulario de creación */}
+      {planVigente ? (
+        <div className="vp-summary-card mb-4">
+          <h5 className="vp-section-title mb-3">Plan vigente</h5>
           <div className="vp-plan-grid">
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Nombre</div>
@@ -250,10 +254,24 @@ export default function VentaPagosPage() {
               </div>
             )}
           </div>
-        ) : (
-          <div className="vp-empty">Esta venta no tiene plan de pago definido.</div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="vp-summary-card vp-plan-empty-card mb-4">
+          <div className="vp-plan-empty-header">
+            <h5 className="vp-section-title mb-0">Plan vigente</h5>
+            <Can permission={PERMISSIONS.SALE_EDIT}>
+              <button
+                type="button"
+                className="vp-btn-crear-plan"
+                onClick={() => setShowFormPlan(true)}
+              >
+                Crear plan
+              </button>
+            </Can>
+          </div>
+          <div className="vp-empty vp-empty--plan">Esta venta no tiene plan de pago definido.</div>
+        </div>
+      )}
 
       {/* D. Cronograma de cuotas */}
       <div className="vp-summary-card mb-4">
@@ -343,6 +361,19 @@ export default function VentaPagosPage() {
           <div className="vp-empty">No hay pagos registrados.</div>
         )}
       </div>
+
+      {/* Modal flotante: Crear plan de pago */}
+      {!planVigente && (
+        <PlanCrearForm
+          open={showFormPlan}
+          ventaId={parseInt(ventaId, 10)}
+          onSuccess={() => {
+            setShowFormPlan(false);
+            fetchContext();
+          }}
+          onCancel={() => setShowFormPlan(false)}
+        />
+      )}
     </div>
   );
 }

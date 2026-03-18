@@ -1,6 +1,6 @@
 /* VentaPagosPage - estilos coherentes con el sistema (tl-*, colores existentes) */
 
-/* Botón Volver - mismo lenguaje que "Registrar venta" (tl-btn--soft) */
+/* BotÃ³n Volver - mismo lenguaje que "Registrar venta" (tl-btn--soft) */
 .vp-btn-volver {
   border: 1px solid #d1ece3;
   background: #eef7f4;
@@ -18,6 +18,42 @@
 .vp-btn-volver:hover {
   background: #d9f0e8;
   filter: brightness(1.02);
+}
+
+/* CTA Crear plan - mismo lenguaje que Registrar venta (tl-btn--soft) */
+.vp-btn-crear-plan {
+  border: 1px solid #d1ece3;
+  background: #eef7f4;
+  color: #116149;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-btn-crear-plan:hover {
+  background: #d9f0e8;
+  filter: brightness(1.02);
+}
+
+/* Empty state "sin plan" */
+.vp-plan-empty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.vp-plan-empty-card .vp-empty--plan {
+  margin-bottom: 0;
+}
+.vp-empty--plan {
+  margin-top: 0;
 }
 
 /* Encabezado */
@@ -180,3 +216,161 @@
 .vp-table .vp-badge--PAGO_PARCIAL { background: #FFF6E5; color: #B45309; }
 .vp-table .vp-badge--PAGA { background: #E7F7EE; color: #18794E; }
 .vp-table .vp-badge--vencida { background: #FEECEC; color: #C23B3B; }
+
+/* Formulario crear plan (PlanCrearForm - Bloque 1 I3) - Modal flotante cclf-* */
+.vp-plan-form__subtitle-modal {
+  margin: 4px 0 0 0;
+  font-size: 0.875rem;
+  color: #475467;
+  font-weight: 400;
+}
+
+.vp-plan-form__section {
+  margin-bottom: 1.5rem;
+}
+.vp-plan-form__section:first-of-type {
+  margin-top: 0;
+}
+.vp-plan-form__section:last-of-type {
+  margin-bottom: 1rem;
+}
+.vp-plan-form__subtitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #2b3748;
+  margin-bottom: 0.75rem;
+}
+.vp-plan-form__cronograma {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #eef2f6;
+}
+.vp-plan-form__cronograma-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.vp-plan-form__cronograma-header .vp-plan-form__subtitle {
+  margin-bottom: 0;
+}
+.vp-plan-form__cuota-counter {
+  font-size: 0.8125rem;
+  color: #475467;
+  font-weight: 500;
+}
+.vp-plan-form__cuota-error {
+  font-size: 12px;
+  color: #C23B3B;
+}
+.vp-plan-form__cell-error {
+  font-size: 11px;
+  color: #C23B3B;
+  margin-top: 2px;
+}
+.vp-plan-form .field-value.p0 {
+  padding: 0;
+}
+/* Inputs del cronograma: mismo look que Datos generales (field-input dentro de field-value) */
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input {
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  padding: 6px 10px !important;
+  font-size: 0.875rem !important;
+  outline: none !important;
+}
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input.is-invalid {
+  border-color: rgba(220, 53, 69, 0.6) !important;
+}
+/* Columna y celda de acciones para el ícono eliminar */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-actions,
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions {
+  width: 52px;
+  min-width: 52px;
+  text-align: center;
+  vertical-align: middle;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions .tl-icon {
+  flex-shrink: 0;
+}
+/* Columna Monto: alineación consistente con el resto (izquierda) */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-num {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto .vp-input-monto {
+  width: 100%;
+  min-width: 90px;
+}
+
+/* Botón Agregar cuota: más pequeño y separado de la tabla */
+.vp-btn-agregar-cuota {
+  padding: 5px 12px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+/* ===== PlanCrearForm: ajustes específicos ===== */
+
+/* Ocultar picker/spinner en campos monetarios (evitar cambios accidentales) */
+.vp-plan-form__body .vp-input-monto {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.vp-plan-form__body .vp-input-monto::-webkit-outer-spin-button,
+.vp-plan-form__body .vp-input-monto::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Label Monto total: icono de info con tooltip (siempre visible, al inicio) */
+.vp-label-monto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.vp-label-monto__icon {
+  flex-shrink: 0;
+  cursor: help;
+  color: #6b7280;
+  display: inline-flex;
+}
+.vp-label-monto__icon:hover {
+  color: #116149;
+}
+.vp-label-monto__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Contenedor scroll + footer sticky dentro del card */
+.vp-plan-form__body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.vp-plan-form__scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.vp-plan-form__footer {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  margin-top: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}

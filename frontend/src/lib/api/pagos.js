@@ -25,3 +25,27 @@ export async function getPagosContextByVentaId(ventaId) {
 
   return data?.data ?? data;
 }
+
+/**
+ * Crea el plan inicial de pago para una venta.
+ * @param {number} ventaId - ID de la venta
+ * @param {object} payload - { nombre, tipoFinanciacion, moneda, cantidadCuotas, montoTotalPlanificado, fechaInicio, montoAnticipo?, observaciones?, descripcion?, cuotas }
+ * @returns {Promise<object>}
+ */
+export async function createPlanPagoInicial(ventaId, payload) {
+  const res = await http(`${BASE}/${ventaId}/pagos/plan`, {
+    method: "POST",
+    body: payload,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = data?.message || "Error al crear el plan de pago";
+    const err = new Error(msg);
+    err.statusCode = res.status;
+    err.response = data;
+    throw err;
+  }
+
+  return data?.data ?? data;
+}
