@@ -1,0 +1,182 @@
+/* VentaPagosPage - estilos coherentes con el sistema (tl-*, colores existentes) */
+
+/* Botón Volver - mismo lenguaje que "Registrar venta" (tl-btn--soft) */
+.vp-btn-volver {
+  border: 1px solid #d1ece3;
+  background: #eef7f4;
+  color: #116149;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-btn-volver:hover {
+  background: #d9f0e8;
+  filter: brightness(1.02);
+}
+
+/* Encabezado */
+.vp-header {
+  border-bottom: 1px solid #e6ebf2;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+.vp-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+}
+.vp-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+}
+.vp-context-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-context-label {
+  color: #6b7280;
+}
+.vp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.vp-badge--muted { background: #F2F4F7; color: #475467; }
+.vp-badge--success { background: #E7F7EE; color: #18794E; }
+.vp-badge--warn { background: #FFF6E5; color: #B45309; }
+.vp-badge--danger { background: #FEECEC; color: #C23B3B; }
+
+/* Cards resumen */
+.vp-summary-card {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #fff;
+  transition: box-shadow 0.15s ease;
+}
+.vp-summary-card:hover {
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+}
+.vp-summary-card--highlight {
+  border-color: #d1ece3;
+  background: #f8fcf9;
+}
+.vp-summary-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+.vp-summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-summary-value--success { color: #18794E; }
+.vp-summary-value--warn { color: #B45309; }
+
+/* Plan vigente */
+.vp-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem 1.5rem;
+}
+.vp-plan-field {
+  font-size: 0.875rem;
+}
+.vp-plan-field__label {
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+.vp-plan-field__value {
+  font-weight: 600;
+  color: #0f172a;
+}
+.vp-section-title {
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+.vp-table th.vp-th-num {
+  text-align: right;
+}
+.vp-empty {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #e5e7eb;
+}
+
+/* Tablas */
+.vp-table-wrap {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.vp-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.vp-table th {
+  background: #f7fafc;
+  font-weight: 600;
+  color: #2b3748;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e6ebf2;
+}
+.vp-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: middle;
+}
+.vp-table tbody tr:hover {
+  background: #fcfdfe;
+}
+.vp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.vp-table .vp-cell-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.vp-table tbody tr.vp-cell--vencida {
+  background: #fffbf0;
+}
+.vp-table tbody tr.vp-cell--vencida:hover {
+  background: #fff8e6;
+}
+.vp-table .vp-badge-cuota {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.vp-table .vp-badge--PENDIENTE { background: #F2F4F7; color: #475467; }
+.vp-table .vp-badge--PAGO_PARCIAL { background: #FFF6E5; color: #B45309; }
+.vp-table .vp-badge--PAGA { background: #E7F7EE; color: #18794E; }
+.vp-table .vp-badge--vencida { background: #FEECEC; color: #C23B3B; }

@@ -2,7 +2,7 @@
 // Página de Ventas: lista, filtra y abre modales de Ver / Editar / Eliminar.
 
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
-import { useSearchParams, useLocation } from "react-router-dom";
+import { useSearchParams, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../app/providers/AuthProvider";
 import { can, PERMISSIONS } from "../lib/auth/rbac";
 
@@ -90,6 +90,7 @@ const enrichVenta = (v, personasById = {}, inmosById = {}) => {
 
 export default function VentasPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const crearParam = searchParams.get('crear') === 'true';
@@ -331,6 +332,11 @@ export default function VentasPage() {
     setVentaSel(venta);
     setOpenVer(true);
   }, []);
+
+  const onPagos = useCallback((venta) => {
+    if (!venta?.id) return;
+    navigate(`/ventas/${venta.id}/pagos`);
+  }, [navigate]);
 
   // Editar: abre siempre (VentaEditarCard carga los datos completos internamente)
   const onEditarAlways = useCallback((venta) => {
@@ -599,6 +605,7 @@ export default function VentasPage() {
         onEliminar={canSaleDelete ? onEliminar : null}
         onReactivar={canSaleDelete ? onReactivar : null}
         onVerDocumentos={canSaleView ? onVerDocumentos : null}
+        onPagos={canSaleView ? onPagos : null}
         onAgregarVenta={can(user, PERMISSIONS.SALE_CREATE) ? onAgregarVenta : null}
         selectedIds={selectedIds}
         onSelectedChange={setSelectedIds}
