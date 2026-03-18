@@ -62,6 +62,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
     formState: { errors },
     reset,
     setError,
+    clearErrors,
     watch,
   } = useForm({
     resolver: zodResolver(planPagoCreateSchema),
@@ -101,6 +102,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
   };
 
   const onSubmit = async (data) => {
+    clearErrors();
     setSaving(true);
 
     try {

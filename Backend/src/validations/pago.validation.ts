@@ -63,9 +63,13 @@ export const createPlanPagoSchema = z.object({
   message: 'No se permiten números de cuota repetidos',
   path: ['cuotas'],
 }).superRefine((data, ctx) => {
-  const fechaInicioTs = new Date(data.fechaInicio).setHours(0, 0, 0, 0);
+  const toUtcMidnight = (iso: string) => {
+    const d = new Date(iso);
+    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  };
+  const fechaInicioTs = toUtcMidnight(data.fechaInicio);
   data.cuotas.forEach((c, i) => {
-    const fechaVtoTs = new Date(c.fechaVencimiento).setHours(0, 0, 0, 0);
+    const fechaVtoTs = toUtcMidnight(c.fechaVencimiento);
     if (fechaVtoTs < fechaInicioTs) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
