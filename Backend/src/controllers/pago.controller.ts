@@ -22,3 +22,14 @@ export async function crearPlanPagoInicial(req: Request, res: Response, next: Ne
     next(error);
   }
 }
+
+export async function registrarPago(req: Request, res: Response, next: NextFunction) {
+  try {
+    const ventaId = parseInt(req.params.ventaId);
+    const user = req.user;
+    const result = await pagoService.registrarPagoEnVenta(ventaId, req.body, user);
+    res.status(201).json({ success: true, message: 'Pago registrado correctamente', data: result });
+  } catch (error) {
+    next(error);
+  }
+}

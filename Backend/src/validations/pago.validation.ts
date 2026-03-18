@@ -17,6 +17,7 @@ const isoDate = z
 const tipoFinanciacionEnum = z.enum(['CONTADO', 'ANTICIPO_CUOTAS', 'CUOTAS_FIJAS', 'PERSONALIZADO']);
 const monedaEnum = z.enum(['ARS', 'USD']);
 const tipoCuotaEnum = z.enum(['ANTICIPO', 'CUOTA', 'OTRO']);
+const medioPagoEnum = z.enum(['EFECTIVO', 'TRANSFERENCIA', 'DEPOSITO', 'CHEQUE', 'OTRO']);
 
 // Params: ventaId
 export const ventaIdParamSchema = z.object({
@@ -61,4 +62,14 @@ export const createPlanPagoSchema = z.object({
 }, {
   message: 'No se permiten números de cuota repetidos',
   path: ['cuotas'],
+});
+
+// Body: registrar pago sobre una cuota
+export const registrarPagoSchema = z.object({
+  cuotaId: idInt,
+  fechaPago: isoDate,
+  monto: dineroPositivo,
+  medioPago: medioPagoEnum,
+  referencia: z.string().trim().optional(),
+  observacion: z.string().trim().optional(),
 });

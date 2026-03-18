@@ -3,7 +3,10 @@ import prisma from '../config/prisma';
 import { Decimal } from '../generated/prisma/runtime/library';
 import {
   calcularMontoFinanciado,
+  determinarEstadoCuota,
+  determinarEstadoCobro,
   estaCuotaVencida,
+  obtenerPrimeraCuotaPendiente,
 } from '../domain/pagoState/pagoState.rules';
 
 const VENTA_INCLUDE_PAGOS = {
@@ -244,6 +247,214 @@ export async function createPlanPagoInicial(
       where: { id: plan.id },
       include: PLAN_INCLUDE,
     });
+  });
+
+  return result;
+}
+
+interface RegistrarPagoPayload {
+  cuotaId: number;
+  fechaPago: string;
+  monto: number;
+  medioPago: string;
+  referencia?: string;
+  observacion?: string;
+}
+
+export async function registrarPagoEnVenta(
+  ventaId: number,
+  payload: RegistrarPagoPayload,
+  user?: UserContext
+) {
+  const venta = await prisma.venta.findUnique({
+    where: { id: ventaId },
+    select: { id: true, estadoOperativo: true },
+  });
+
+  if (!venta) {
+    const error = new Error('Venta no encontrada') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (venta.estadoOperativo === 'ELIMINADO') {
+    const error = new Error('La venta está eliminada') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const plan = await prisma.planPago.findFirst({
+    where: { ventaId, esVigente: true },
+    include: PLAN_INCLUDE,
+  });
+
+  if (!plan) {
+    const error = new Error('La venta no tiene un plan de pago vigente') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const cuota = await prisma.cuotaPlanPago.findUnique({
+    where: { id: payload.cuotaId },
+  });
+
+  if (!cuota) {
+    const error = new Error('Cuota no encontrada') as any;
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (cuota.planPagoId !== plan.id) {
+    const error = new Error('La cuota indicada no pertenece al plan vigente de la venta') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const saldoPendiente = toNum(cuota.saldoPendiente);
+  if (saldoPendiente <= 0 || cuota.estadoCuota === 'PAGA') {
+    const error = new Error('La cuota ya está paga o no tiene saldo pendiente') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const cuotasParaEvaluacion = plan.cuotas.map((c) => ({
+    numeroCuota: c.numeroCuota,
+    fechaVencimiento: c.fechaVencimiento,
+    saldoPendiente: toNum(c.saldoPendiente),
+  }));
+  const primeraPendiente = obtenerPrimeraCuotaPendiente(cuotasParaEvaluacion);
+  if (!primeraPendiente) {
+    const error = new Error('No hay cuotas pendientes de pago') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+  const cuotaHabilitada = plan.cuotas.find((c) => c.numeroCuota === primeraPendiente.numeroCuota);
+  if (!cuotaHabilitada || cuotaHabilitada.id !== payload.cuotaId) {
+    const error = new Error('Solo puede registrarse pago sobre la primera cuota con saldo pendiente') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  if (payload.monto > saldoPendiente) {
+    const error = new Error('El monto del pago supera el saldo pendiente de la cuota') as any;
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const registradoBy = user?.email ?? null;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const pagoCreado = await tx.pagoRegistrado.create({
+      data: {
+        ventaId,
+        planPagoId: plan.id,
+        cuotaId: cuota.id,
+        fechaPago: new Date(payload.fechaPago),
+        monto: payload.monto,
+        medioPago: payload.medioPago as any,
+        referencia: payload.referencia ?? null,
+        observacion: payload.observacion ?? null,
+        registradoBy,
+      },
+    });
+
+    const montoPagadoActual = toNum(cuota.montoPagado);
+    const montoTotalExigible = toNum(cuota.montoTotalExigible);
+    const nuevoMontoPagado = montoPagadoActual + payload.monto;
+    const nuevoSaldoPendiente = Math.max(0, montoTotalExigible - nuevoMontoPagado);
+    const nuevoEstadoCuota = determinarEstadoCuota(nuevoMontoPagado, nuevoSaldoPendiente);
+    const fechaPagoCompleto = nuevoSaldoPendiente <= 0 ? new Date(payload.fechaPago) : null;
+
+    const cuotaActualizada = await tx.cuotaPlanPago.update({
+      where: { id: cuota.id },
+      data: {
+        montoPagado: nuevoMontoPagado,
+        saldoPendiente: nuevoSaldoPendiente,
+        estadoCuota: nuevoEstadoCuota,
+        fechaPagoCompleto,
+        updateAt: new Date(),
+      },
+    });
+
+    const cuotasActualizadas = await tx.cuotaPlanPago.findMany({
+      where: { planPagoId: plan.id },
+      orderBy: { numeroCuota: 'asc' },
+    });
+
+    let montoTotalPagado = 0;
+    let saldoPendienteTotal = 0;
+    let cuotasPagas = 0;
+    let cuotasPendientes = 0;
+    let cuotasVencidas = 0;
+    const ahora = new Date();
+
+    for (const c of cuotasActualizadas) {
+      const pagado = toNum(c.montoPagado);
+      const saldo = toNum(c.saldoPendiente);
+      montoTotalPagado += pagado;
+      saldoPendienteTotal += saldo;
+
+      if (c.estadoCuota === 'PAGA') {
+        cuotasPagas++;
+      } else {
+        cuotasPendientes++;
+        if (estaCuotaVencida(c.fechaVencimiento, saldo, ahora)) {
+          cuotasVencidas++;
+        }
+      }
+    }
+
+    const estadoCobro = determinarEstadoCobro(montoTotalPagado, saldoPendienteTotal);
+
+    await tx.venta.update({
+      where: { id: ventaId },
+      data: { estadoCobro, updateAt: new Date() },
+    });
+
+    const cuotaHabilitadaSiguiente = obtenerPrimeraCuotaPendiente(
+      cuotasActualizadas.map((c) => ({
+        numeroCuota: c.numeroCuota,
+        fechaVencimiento: c.fechaVencimiento,
+        saldoPendiente: toNum(c.saldoPendiente),
+      }))
+    );
+    let cuotaSiguienteNormalizada = null;
+    if (cuotaHabilitadaSiguiente) {
+      const cuotaSiguiente = cuotasActualizadas.find(
+        (c) => c.numeroCuota === cuotaHabilitadaSiguiente.numeroCuota
+      );
+      if (cuotaSiguiente) {
+        cuotaSiguienteNormalizada = {
+          ...cuotaSiguiente,
+          montoOriginal: toNum(cuotaSiguiente.montoOriginal),
+          montoRecargoManual: toNum(cuotaSiguiente.montoRecargoManual),
+          montoTotalExigible: toNum(cuotaSiguiente.montoTotalExigible),
+          montoPagado: toNum(cuotaSiguiente.montoPagado),
+          saldoPendiente: toNum(cuotaSiguiente.saldoPendiente),
+        };
+      }
+    }
+
+    return {
+      pago: { ...pagoCreado, monto: toNum(pagoCreado.monto) },
+      cuota: {
+        ...cuotaActualizada,
+        montoOriginal: toNum(cuotaActualizada.montoOriginal),
+        montoRecargoManual: toNum(cuotaActualizada.montoRecargoManual),
+        montoTotalExigible: toNum(cuotaActualizada.montoTotalExigible),
+        montoPagado: toNum(cuotaActualizada.montoPagado),
+        saldoPendiente: toNum(cuotaActualizada.saldoPendiente),
+      },
+      resumen: {
+        montoTotalPagado,
+        saldoPendienteTotal,
+        cuotasPagas,
+        cuotasPendientes,
+        cuotasVencidas,
+        estadoCobro,
+      },
+      cuotaHabilitadaSiguiente: cuotaSiguienteNormalizada,
+    };
   });
 
   return result;

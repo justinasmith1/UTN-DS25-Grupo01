@@ -4,7 +4,7 @@ import * as pagoController from '../controllers/pago.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema } from '../validations/venta.validation';
-import { ventaIdParamSchema, createPlanPagoSchema } from '../validations/pago.validation';
+import { ventaIdParamSchema, createPlanPagoSchema, registrarPagoSchema } from '../validations/pago.validation';
 
 const router = Router();
 
@@ -83,6 +83,15 @@ router.get(
     authorize('ADMINISTRADOR', 'GESTOR'),
     validateParams(ventaIdParamSchema),
     pagoController.obtenerContextoPagos);
+
+// POST /api/ventas/:ventaId/pagos
+router.post(
+    '/:ventaId/pagos',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(registrarPagoSchema),
+    pagoController.registrarPago);
 
 // POST /api/ventas/:ventaId/pagos/plan
 router.post(
