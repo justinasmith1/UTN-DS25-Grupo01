@@ -9,7 +9,8 @@ import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
 import PlanCrearForm from "../components/Pagos/PlanCrearForm";
 import Can from "../components/Can";
 import { PERMISSIONS } from "../lib/auth/rbac";
-import "./VentaPagosPage.css";
+import { estaCuotaVencida } from "../utils/pagoUtils";
+import "../styles/venta-pagos.css";
 
 // Formatear monto según moneda del plan (ARS/USD)
 const fmtMonto = (v, moneda = "ARS") => {
@@ -51,21 +52,6 @@ const getEstadoBadgeClass = (estado) => {
   if (s === "PENDIENTE" || s === "INICIADA") return "vp-badge--muted";
   if (s === "CANCELADA") return "vp-badge--danger";
   return "vp-badge--muted";
-};
-
-// Cuota vencida: fechaVencimiento < hoy && saldoPendiente > 0 (guardrails: VENCIDA no persistida)
-const estaCuotaVencida = (fechaVencimiento, saldoPendiente) => {
-  if (saldoPendiente <= 0) return false;
-  if (!fechaVencimiento) return false;
-  try {
-    const vto = new Date(fechaVencimiento);
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    vto.setHours(0, 0, 0, 0);
-    return vto.getTime() < hoy.getTime();
-  } catch {
-    return false;
-  }
 };
 
 // Badge para estado de cuota (PENDIENTE, PAGO_PARCIAL, PAGA)

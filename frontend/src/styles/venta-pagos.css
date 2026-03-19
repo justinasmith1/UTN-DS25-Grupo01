@@ -1,26 +1,8 @@
-/* VentaPagosPage - estilos coherentes con el sistema (tl-*, colores existentes) */
+/* Módulo Pagos (VentaPagosPage, PlanCrearForm) - estilos coherentes con tl-* */
 
-/* BotÃ³n Volver - mismo lenguaje que "Registrar venta" (tl-btn--soft) */
-.vp-btn-volver {
-  border: 1px solid #d1ece3;
-  background: #eef7f4;
-  color: #116149;
-  border-radius: 12px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.vp-btn-volver:hover {
-  background: #d9f0e8;
-  filter: brightness(1.02);
-}
-
-/* CTA Crear plan - mismo lenguaje que Registrar venta (tl-btn--soft) */
+/* Botones secundarios (Volver, Crear plan) - mismo lenguaje que tl-btn--soft */
+.vp-btn--soft,
+.vp-btn-volver,
 .vp-btn-crear-plan {
   border: 1px solid #d1ece3;
   background: #eef7f4;
@@ -35,6 +17,8 @@
   align-items: center;
   gap: 6px;
 }
+.vp-btn--soft:hover,
+.vp-btn-volver:hover,
 .vp-btn-crear-plan:hover {
   background: #d9f0e8;
   filter: brightness(1.02);
@@ -217,7 +201,7 @@
 .vp-table .vp-badge--PAGA { background: #E7F7EE; color: #18794E; }
 .vp-table .vp-badge--vencida { background: #FEECEC; color: #C23B3B; }
 
-/* Formulario crear plan (PlanCrearForm - Bloque 1 I3) - Modal flotante cclf-* */
+/* Formulario crear plan (PlanCrearForm) - Modal flotante cclf-* */
 .vp-plan-form__subtitle-modal {
   margin: 4px 0 0 0;
   font-size: 0.875rem;
@@ -261,8 +245,13 @@
   font-weight: 500;
 }
 .vp-plan-form__cuota-error {
-  font-size: 12px;
+  font-size: 0.875rem;
   color: #C23B3B;
+  padding: 10px 12px;
+  background: #FEF2F2;
+  border: 1px solid rgba(194, 59, 59, 0.3);
+  border-radius: 8px;
+  font-weight: 500;
 }
 .vp-plan-form__cell-error {
   font-size: 11px;
@@ -272,7 +261,7 @@
 .vp-plan-form .field-value.p0 {
   padding: 0;
 }
-/* Inputs del cronograma: mismo look que Datos generales (field-input dentro de field-value) */
+/* Inputs del cronograma: mismo look que Datos generales */
 .vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input {
   background: #fff !important;
   border: 1px solid rgba(0, 0, 0, 0.18) !important;
@@ -319,17 +308,70 @@
   margin-top: 12px;
 }
 
+/* Sección configuración del cronograma (Bloque 2A) */
+.vp-plan-form__config {
+  border-top: 1px solid #eef2f6;
+  padding-top: 1rem;
+}
+/* Label "Primer vencimiento" - ancho suficiente para ambas palabras */
+.vp-plan-form__config .vp-label-primer-vencimiento {
+  min-width: 14em;
+  white-space: nowrap;
+}
+.vp-btn-generar {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+/* Bloque 2B: confirmación al regenerar cronograma */
+.vp-plan-form__confirm-regenerar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.vp-plan-form__confirm-msg {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-plan-form__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.vp-plan-form__config-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.vp-plan-form__cronograma-manual-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+.vp-field-anticipo--required .field-label {
+  font-weight: 600;
+  color: #116149;
+}
+
 /* ===== PlanCrearForm: ajustes específicos ===== */
 
 /* Ocultar picker/spinner en campos monetarios (evitar cambios accidentales) */
-.vp-plan-form__body .vp-input-monto {
-  -moz-appearance: textfield;
-  appearance: textfield;
+#plan-crear-form input[type="number"].vp-input-monto,
+.vp-plan-form__body input[type="number"].vp-input-monto {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
 }
-.vp-plan-form__body .vp-input-monto::-webkit-outer-spin-button,
-.vp-plan-form__body .vp-input-monto::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-inner-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Label Monto total: icono de info con tooltip (siempre visible, al inicio) */

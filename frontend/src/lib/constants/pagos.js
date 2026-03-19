@@ -1,0 +1,44 @@
+/**
+ * Constantes del submódulo Pagos (single source of truth).
+ * Usado por PlanCrearForm, validaciones y cronogramaGenerator.
+ */
+import { CADENCIA_MESES } from "../../utils/cronogramaGenerator";
+
+export const TIPOS_FINANCIACION = ["CONTADO", "ANTICIPO_CUOTAS", "CUOTAS_FIJAS", "PERSONALIZADO"];
+
+export const MONEDAS = ["ARS", "USD"];
+
+export const TIPOS_CUOTA = ["ANTICIPO", "CUOTA", "OTRO"];
+
+/** Opciones para select de cadencia, derivadas de cronogramaGenerator (single source of truth) */
+const CADENCIA_LABELS = {
+  mensual: "Mensual",
+  bimestral: "Bimestral",
+  trimestral: "Trimestral",
+  cuatrimestral: "Cuatrimestral",
+  semestral: "Semestral",
+  anual: "Anual",
+};
+
+export const CADENCIA_OPTIONS = Object.keys(CADENCIA_MESES).map((value) => ({
+  value,
+  label: CADENCIA_LABELS[value] ?? value,
+}));
+
+export const TIPOS_FINANCIACION_OPTIONS = [
+  { value: "CONTADO", label: "Contado" },
+  { value: "ANTICIPO_CUOTAS", label: "Anticipo + cuotas" },
+  { value: "CUOTAS_FIJAS", label: "Cuotas fijas" },
+  { value: "PERSONALIZADO", label: "Personalizado" },
+];
+
+export const MONEDAS_OPTIONS = [
+  { value: "ARS", label: "ARS" },
+  { value: "USD", label: "USD" },
+];
+
+export const TIPOS_CUOTA_OPTIONS = [
+  { value: "ANTICIPO", label: "Anticipo" },
+  { value: "CUOTA", label: "Cuota" },
+  { value: "OTRO", label: "Otro" },
+];

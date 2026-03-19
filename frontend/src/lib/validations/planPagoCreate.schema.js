@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TIPOS_FINANCIACION, MONEDAS, TIPOS_CUOTA } from "../constants/pagos";
 
 /** Helper para preprocesar números: convierte "" o NaN a undefined */
 const preprocessNumber = (val) => {
@@ -14,9 +15,26 @@ const validateDateString = (val) => {
   return Number.isNaN(date.getTime()) ? undefined : val;
 };
 
-const TIPOS_FINANCIACION = ["CONTADO", "ANTICIPO_CUOTAS", "CUOTAS_FIJAS", "PERSONALIZADO"];
-const MONEDAS = ["ARS", "USD"];
-const TIPOS_CUOTA = ["ANTICIPO", "CUOTA", "OTRO"];
+/** Tolerancia de redondeo para comparar montos (centavos) */
+const TOLERANCIA_MONTO = 0.01;
+
+/** Monto esperado que debe sumar el cronograma según tipo de financiación */
+function getMontoEsperadoParaCronograma(data) {
+  const total = data.montoTotalPlanificado ?? 0;
+  const anticipo = data.montoAnticipo ?? 0;
+  switch (data.tipoFinanciacion) {
+    case "CONTADO":
+      return total;
+    case "PERSONALIZADO":
+      return anticipo > 0 ? total - anticipo : total;
+    case "CUOTAS_FIJAS":
+      return total - anticipo;
+    case "ANTICIPO_CUOTAS":
+      return total; // tabla incluye cuota anticipo
+    default:
+      return total;
+  }
+}
 
 const cuotaFormSchema = z.object({
   numeroCuota: z
@@ -154,19 +172,83 @@ export const planPagoCreateSchema = z
     { message: "El anticipo no puede superar el monto total planificado", path: ["montoAnticipo"] }
   )
   .refine(
+    (data) => {
+      if (data.tipoFinanciacion !== "ANTICIPO_CUOTAS") return true;
+      const anticipo = data.montoAnticipo ?? 0;
+      return anticipo > 0;
+    },
+    {
+      message: "Para Anticipo + cuotas, el anticipo es obligatorio y debe ser mayor a 0",
+      path: ["montoAnticipo"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.tipoFinanciacion !== "ANTICIPO_CUOTAS") return true;
+      const anticipo = data.montoAnticipo ?? 0;
+      return anticipo < data.montoTotalPlanificado;
+    },
+    {
+      message: "El anticipo debe ser menor al monto total planificado",
+      path: ["montoAnticipo"],
+    }
+  )
+  .refine(
+    (data) => {
+      if (data.tipoFinanciacion !== "CONTADO") return true;
+      const anticipo = data.montoAnticipo ?? 0;
+      return anticipo === 0;
+    },
+    {
+      message: "Para Contado, el anticipo no aplica y debe ser 0",
+      path: ["montoAnticipo"],
+    }
+  )
+  .refine(
     (data) => data.cantidadCuotas === data.cuotas.length,
     {
       message: "Debe haber la misma cantidad de cuotas que la indicada",
       path: ["cantidadCuotas"],
     }
   )
-  .refine(
-    (data) => {
-      const numeros = data.cuotas.map((c) => c.numeroCuota).filter((n) => n != null);
-      return new Set(numeros).size === numeros.length;
-    },
-    { message: "No puede haber números de cuota repetidos", path: ["cuotas"] }
-  )
+  .superRefine((data, ctx) => {
+    const numeros = data.cuotas.map((c) => c.numeroCuota).filter((n) => n != null);
+    const duplicados = new Map();
+    numeros.forEach((n, i) => {
+      if (!duplicados.has(n)) duplicados.set(n, []);
+      duplicados.get(n).push(i);
+    });
+    const indicesConDuplicado = new Set();
+    duplicados.forEach((indices) => {
+      if (indices.length > 1) indices.forEach((i) => indicesConDuplicado.add(i));
+    });
+    if (indicesConDuplicado.size > 0) {
+      indicesConDuplicado.forEach((i) => {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Número de cuota duplicado",
+          path: ["cuotas", i, "numeroCuota"],
+        });
+      });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hay números de cuota repetidos",
+        path: ["cuotas"],
+      });
+    }
+  })
+  .superRefine((data, ctx) => {
+    const montoEsperado = getMontoEsperadoParaCronograma(data);
+    const sumaCuotas = data.cuotas.reduce((acc, c) => acc + (Number(c.montoOriginal) || 0), 0);
+    const diff = Math.abs(sumaCuotas - montoEsperado);
+    if (diff > TOLERANCIA_MONTO) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `La suma de las cuotas (${sumaCuotas.toFixed(2)}) no coincide con el monto esperado (${montoEsperado.toFixed(2)})`,
+        path: ["cuotas"],
+      });
+    }
+  })
   .superRefine((data, ctx) => {
     if (!data.fechaInicio) return;
     const fechaInicioTs = new Date(`${data.fechaInicio}T12:00:00.000Z`).getTime();

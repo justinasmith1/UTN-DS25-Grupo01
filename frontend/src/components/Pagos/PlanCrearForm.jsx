@@ -2,7 +2,7 @@
 // Formulario para crear el plan inicial de pagos (Bloque 1 I3).
 // Se abre como card/modal flotante bloqueante (cclf-overlay + cclf-card).
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2, Info } from "lucide-react";
@@ -10,28 +10,25 @@ import { createPlanPagoInicial } from "../../lib/api/pagos";
 import { toDateInputValue, fromDateInputToISO } from "../../utils/ventaDateUtils";
 import { mapPagoBackendError } from "../../utils/pagoErrorMapper";
 import { planPagoCreateSchema } from "../../lib/validations/planPagoCreate.schema.js";
+import {
+  TIPOS_FINANCIACION_OPTIONS,
+  MONEDAS_OPTIONS,
+  TIPOS_CUOTA_OPTIONS,
+  CADENCIA_OPTIONS,
+} from "../../lib/constants/pagos";
+import {
+  generateCuotasContado,
+  generateCuotasFijas,
+  generateCuotasAnticipo,
+  CADENCIA_MESES,
+} from "../../utils/cronogramaGenerator";
 import NiceSelect from "../Base/NiceSelect.jsx";
 import "../Cards/Base/cards.css";
 import "../Table/TablaLotes/TablaLotes.css";
-import "../../pages/VentaPagosPage.css";
+import "../../styles/venta-pagos.css";
 
-const TIPOS_FINANCIACION = [
-  { value: "CONTADO", label: "Contado" },
-  { value: "ANTICIPO_CUOTAS", label: "Anticipo + cuotas" },
-  { value: "CUOTAS_FIJAS", label: "Cuotas fijas" },
-  { value: "PERSONALIZADO", label: "Personalizado" },
-];
-
-const MONEDAS = [
-  { value: "ARS", label: "ARS" },
-  { value: "USD", label: "USD" },
-];
-
-const TIPOS_CUOTA = [
-  { value: "ANTICIPO", label: "Anticipo" },
-  { value: "CUOTA", label: "Cuota" },
-  { value: "OTRO", label: "Otro" },
-];
+/** Extrae el mensaje de error del cronograma (cuotas) desde el objeto errors */
+const getCronogramaError = (err) => err?.cuotas?.root?.message || err?.cuotas?.message;
 
 const emptyCuota = () => ({
   numeroCuota: "",
@@ -41,18 +38,23 @@ const emptyCuota = () => ({
   descripcion: "",
 });
 
-const getDefaultValues = () => ({
-  nombre: "",
-  tipoFinanciacion: "",
-  moneda: "ARS",
-  cantidadCuotas: "",
-  montoTotalPlanificado: "",
-  fechaInicio: toDateInputValue(new Date()),
-  montoAnticipo: "",
-  observaciones: "",
-  descripcion: "",
-  cuotas: [emptyCuota()],
-});
+const getDefaultValues = () => {
+  const fechaBase = toDateInputValue(new Date());
+  return {
+    nombre: "",
+    tipoFinanciacion: "",
+    moneda: "ARS",
+    cantidadCuotas: "",
+    montoTotalPlanificado: "",
+    fechaInicio: fechaBase,
+    montoAnticipo: "",
+    observaciones: "",
+    descripcion: "",
+    primerVencimiento: fechaBase,
+    cadencia: "mensual",
+    cuotas: [emptyCuota()],
+  };
+};
 
 export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
   const {
@@ -62,6 +64,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
     formState: { errors },
     reset,
     setError,
+    setValue,
     clearErrors,
     watch,
   } = useForm({
@@ -71,15 +74,20 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
     reValidateMode: "onChange",
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control,
     name: "cuotas",
   });
 
   const [saving, setSaving] = useState(false);
+  const [pendingRegenerarConfirm, setPendingRegenerarConfirm] = useState(false);
+  const cronogramaErrorRef = useRef(null);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setPendingRegenerarConfirm(false);
+      return;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
@@ -88,17 +96,130 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
   }, [open]);
 
   const formValues = watch();
+  const tipoFinanciacion = formValues.tipoFinanciacion;
+
+  useEffect(() => {
+    if (tipoFinanciacion === "CONTADO") {
+      setValue("cantidadCuotas", 1);
+      setValue("montoAnticipo", "");
+    } else if (tipoFinanciacion === "PERSONALIZADO") {
+      setValue("cantidadCuotas", fields.length);
+    }
+  }, [tipoFinanciacion, fields.length, setValue]);
+
+  const cronogramaErrorMsg = getCronogramaError(errors);
+  useEffect(() => {
+    if (cronogramaErrorMsg && cronogramaErrorRef.current) {
+      cronogramaErrorRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [cronogramaErrorMsg]);
+
+  const showConfigGeneracion = tipoFinanciacion && tipoFinanciacion !== "PERSONALIZADO";
+  const isContado = tipoFinanciacion === "CONTADO";
+  const isAnticipoCuotas = tipoFinanciacion === "ANTICIPO_CUOTAS";
   const cantidadCuotasNum = parseInt(formValues.cantidadCuotas, 10);
   const cantidadCuotasTarget =
-    !formValues.cantidadCuotas ||
-    Number.isNaN(cantidadCuotasNum) ||
-    cantidadCuotasNum <= 0
+    isContado
+      ? 1
+      : !formValues.cantidadCuotas ||
+        Number.isNaN(cantidadCuotasNum) ||
+        cantidadCuotasNum <= 0
       ? null
       : cantidadCuotasNum;
 
+  const ejecutarGeneracion = () => {
+    setPendingRegenerarConfirm(false);
+    clearErrors();
+    const cantidadCuotas = parseInt(formValues.cantidadCuotas, 10);
+    const montoTotalPlanificado = parseFloat(formValues.montoTotalPlanificado);
+    const montoAnticipo = parseFloat(formValues.montoAnticipo) || 0;
+    const primerVencimiento = (formValues.primerVencimiento || "").trim();
+    const cadencia = formValues.cadencia || "mensual";
+    const fechaInicio = (formValues.fechaInicio || "").trim();
+
+    const errores = [];
+    if (!formValues.montoTotalPlanificado || Number.isNaN(montoTotalPlanificado) || montoTotalPlanificado <= 0) {
+      setError("montoTotalPlanificado", { type: "manual", message: "El monto debe ser mayor a 0" });
+      errores.push("montoTotalPlanificado");
+    }
+    if (!fechaInicio || Number.isNaN(new Date(`${fechaInicio}T12:00:00`).getTime())) {
+      setError("fechaInicio", { type: "manual", message: "La fecha de inicio es obligatoria" });
+      errores.push("fechaInicio");
+    }
+    if (!primerVencimiento || Number.isNaN(new Date(`${primerVencimiento}T12:00:00`).getTime())) {
+      setError("primerVencimiento", { type: "manual", message: "El primer vencimiento es obligatorio" });
+      errores.push("primerVencimiento");
+    }
+    if (!isContado) {
+      if (!formValues.cantidadCuotas || Number.isNaN(cantidadCuotas) || cantidadCuotas <= 0) {
+        setError("cantidadCuotas", { type: "manual", message: "La cantidad de cuotas debe ser un número positivo" });
+        errores.push("cantidadCuotas");
+      }
+      if (!cadencia || !Object.keys(CADENCIA_MESES).includes(cadencia)) {
+        setError("cadencia", { type: "manual", message: "La cadencia es obligatoria" });
+        errores.push("cadencia");
+      }
+    }
+    if (isAnticipoCuotas && (Number.isNaN(montoAnticipo) || montoAnticipo <= 0)) {
+      setError("montoAnticipo", { type: "manual", message: "Para Anticipo + cuotas, el anticipo es obligatorio y debe ser mayor a 0" });
+      errores.push("montoAnticipo");
+    }
+    if (errores.length > 0) return;
+
+    let cuotas = [];
+    if (isContado) {
+      cuotas = generateCuotasContado(montoTotalPlanificado, primerVencimiento);
+      setValue("cantidadCuotas", 1);
+    } else if (isAnticipoCuotas) {
+      const montoFinanciado = montoTotalPlanificado - montoAnticipo;
+      cuotas = generateCuotasAnticipo(montoAnticipo, cantidadCuotas, montoFinanciado, primerVencimiento, cadencia);
+    } else {
+      const montoFinanciado = montoTotalPlanificado - montoAnticipo;
+      cuotas = generateCuotasFijas(cantidadCuotas, montoFinanciado, primerVencimiento, cadencia);
+    }
+    replace(cuotas);
+  };
+
+  const handleGenerarCronograma = () => {
+    const cuotas = formValues.cuotas ?? [];
+    const hayCuotasCargadas = cuotas.length > 1 || cuotas.some((c) => (c?.montoOriginal && parseFloat(c.montoOriginal) > 0) || (c?.fechaVencimiento && String(c.fechaVencimiento).trim()));
+    if (hayCuotasCargadas) {
+      setPendingRegenerarConfirm(true);
+      return;
+    }
+    ejecutarGeneracion();
+  };
+
+  const handleConfirmarRegenerar = () => {
+    ejecutarGeneracion();
+  };
+
+  const handleAppendCuota = () => {
+    const nuevaCantidad = fields.length + 1;
+    setValue("cantidadCuotas", nuevaCantidad);
+    append(emptyCuota());
+  };
+
+  const handleRemoveCuota = (i) => {
+    if (fields.length <= 1) return;
+    setValue("cantidadCuotas", fields.length - 1);
+    remove(i);
+  };
+
   const handleCancel = () => {
+    setPendingRegenerarConfirm(false);
     reset(getDefaultValues());
     onCancel?.();
+  };
+
+  const onInvalid = (validationErrors) => {
+    const msg = getCronogramaError(validationErrors);
+    if (msg) {
+      setError("cuotas.root", { type: "manual", message: msg });
+      if (cronogramaErrorRef.current) {
+        cronogramaErrorRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
   };
 
   const onSubmit = async (data) => {
@@ -177,7 +298,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
         {/* Body con scroll interno y footer sticky */}
         <div className="cclf-card__body vp-plan-form__body">
           <div className="vp-plan-form__scroll">
-            <form onSubmit={handleSubmit(onSubmit)} id="plan-crear-form">
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} id="plan-crear-form">
               {errors.root && (
                 <div className="alert alert-danger mb-3" role="alert">
                   {errors.root.message}
@@ -215,7 +336,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                             render={({ field: { onChange, value } }) => (
                               <NiceSelect
                                 value={value ?? ""}
-                                options={TIPOS_FINANCIACION}
+                                options={TIPOS_FINANCIACION_OPTIONS}
                                 placeholder="Seleccionar"
                                 showPlaceholderOption
                                 usePortal
@@ -244,7 +365,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                             render={({ field: { onChange, value } }) => (
                               <NiceSelect
                                 value={value ?? ""}
-                                options={MONEDAS}
+                                options={MONEDAS_OPTIONS}
                                 placeholder="Moneda"
                                 usePortal
                                 onChange={onChange}
@@ -258,25 +379,27 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                       )}
                     </div>
 
-                    <div className={`fieldRow ${errors.cantidadCuotas ? "hasError" : ""}`}>
-                      <div className="field-row">
-                        <div className="field-label">Cantidad cuotas *</div>
-                        <div className="field-value p0">
-                          <input
-                            type="number"
-                            min="1"
-                            className={`field-input ${errors.cantidadCuotas ? "is-invalid" : ""}`}
-                            {...register("cantidadCuotas")}
-                            placeholder="Ej: 12"
-                          />
+                    {!isContado && (
+                      <div className={`fieldRow ${errors.cantidadCuotas ? "hasError" : ""}`}>
+                        <div className="field-row">
+                          <div className="field-label">Cantidad cuotas *</div>
+                          <div className="field-value p0">
+                            <input
+                              type="number"
+                              min="1"
+                              className={`field-input ${errors.cantidadCuotas ? "is-invalid" : ""}`}
+                              {...register("cantidadCuotas")}
+                              placeholder="Ej: 12"
+                            />
+                          </div>
                         </div>
+                        {errors.cantidadCuotas && (
+                          <div className="fieldError">
+                            {errors.cantidadCuotas.message}
+                          </div>
+                        )}
                       </div>
-                      {errors.cantidadCuotas && (
-                        <div className="fieldError">
-                          {errors.cantidadCuotas.message}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
 
                   <div className="venta-col">
@@ -299,6 +422,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                             step="0.01"
                             inputMode="decimal"
                             className={`field-input vp-input-monto ${errors.montoTotalPlanificado ? "is-invalid" : ""}`}
+                            onWheel={(e) => e.currentTarget.blur()}
                             {...register("montoTotalPlanificado")}
                             placeholder="0"
                           />
@@ -329,27 +453,30 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                       )}
                     </div>
 
-                    <div className={`fieldRow ${errors.montoAnticipo ? "hasError" : ""}`}>
-                      <div className="field-row">
-                        <div className="field-label">Anticipo</div>
-                        <div className="field-value p0">
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            inputMode="decimal"
-                            className={`field-input vp-input-monto ${errors.montoAnticipo ? "is-invalid" : ""}`}
-                            {...register("montoAnticipo")}
-                            placeholder="0"
-                          />
+                    {!isContado && (
+                      <div className={`fieldRow ${errors.montoAnticipo ? "hasError" : ""} ${isAnticipoCuotas ? "vp-field-anticipo--required" : ""}`}>
+                        <div className="field-row">
+                          <div className="field-label">{isAnticipoCuotas ? "Anticipo *" : "Anticipo"}</div>
+                          <div className="field-value p0">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              className={`field-input vp-input-monto ${errors.montoAnticipo ? "is-invalid" : ""}`}
+                              onWheel={(e) => e.currentTarget.blur()}
+                              {...register("montoAnticipo")}
+                              placeholder="0"
+                            />
+                          </div>
                         </div>
+                        {errors.montoAnticipo && (
+                          <div className="fieldError">
+                            {errors.montoAnticipo.message}
+                          </div>
+                        )}
                       </div>
-                      {errors.montoAnticipo && (
-                        <div className="fieldError">
-                          {errors.montoAnticipo.message}
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
 
                   <div className="venta-col venta-col--span-all">
@@ -382,8 +509,92 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                 </div>
               </div>
 
-              {/* B. Cronograma de cuotas */}
+              {/* B. Configuración del cronograma (visible salvo PERSONALIZADO) */}
+              {showConfigGeneracion && (
+                <div className="vp-plan-form__section vp-plan-form__config">
+                  <h6 className="vp-plan-form__subtitle">Configuración del cronograma</h6>
+                  <div className="venta-grid" style={{ "--sale-label-w": "180px" }}>
+                    <div className="venta-col">
+                      <div className={`fieldRow ${errors.primerVencimiento ? "hasError" : ""}`}>
+                        <div className="field-row">
+                          <div className="field-label vp-label-primer-vencimiento">Primer vencimiento *</div>
+                          <div className="field-value p0">
+                            <input
+                              type="date"
+                              className={`field-input ${errors.primerVencimiento ? "is-invalid" : ""}`}
+                              {...register("primerVencimiento")}
+                            />
+                          </div>
+                        </div>
+                        {errors.primerVencimiento && (
+                          <div className="fieldError">{errors.primerVencimiento.message}</div>
+                        )}
+                      </div>
+                    </div>
+                    {!isContado && (
+                      <div className="venta-col">
+                        <div className={`fieldRow ${errors.cadencia ? "hasError" : ""}`}>
+                          <div className="field-row">
+                            <div className="field-label">Cadencia *</div>
+                            <div className="field-value p0">
+                              <Controller
+                                name="cadencia"
+                                control={control}
+                                render={({ field: { onChange, value } }) => (
+                                  <NiceSelect
+                                    value={value ?? "mensual"}
+                                    options={CADENCIA_OPTIONS}
+                                    placeholder="Seleccionar"
+                                    usePortal
+                                    onChange={onChange}
+                                  />
+                                )}
+                              />
+                            </div>
+                          </div>
+                          {errors.cadencia && (
+                            <div className="fieldError">{errors.cadencia.message}</div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    <div className="venta-col venta-col--span-all">
+                      {pendingRegenerarConfirm ? (
+                        <div className="vp-plan-form__confirm-regenerar">
+                          <p className="vp-plan-form__confirm-msg">El cronograma actual será reemplazado. ¿Regenerar?</p>
+                          <div className="vp-plan-form__confirm-actions">
+                            <button type="button" className="btn btn-outline" onClick={() => setPendingRegenerarConfirm(false)}>
+                              Cancelar
+                            </button>
+                            <button type="button" className="btn btn-primary" onClick={handleConfirmarRegenerar}>
+                              Sí, regenerar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="vp-plan-form__config-hint">Completá los campos obligatorios y generá. Al generar se reemplaza el cronograma actual.</p>
+                          <button
+                            type="button"
+                            className="btn btn-primary vp-btn-generar"
+                            onClick={handleGenerarCronograma}
+                          >
+                            Generar cronograma
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* C. Cronograma de cuotas */}
               <div className="vp-plan-form__section vp-plan-form__cronograma">
+                {tipoFinanciacion === "PERSONALIZADO" && (
+                  <p className="vp-plan-form__cronograma-manual-hint">
+                    Cargá las cuotas manualmente. Agregá o eliminá filas según necesites. La cantidad se sincroniza automáticamente.
+                  </p>
+                )}
                 <div className="vp-plan-form__cronograma-header">
                   <h6 className="vp-plan-form__subtitle">
                     Cronograma de cuotas
@@ -393,9 +604,9 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                     {cantidadCuotasTarget != null ? ` / ${cantidadCuotasTarget}` : ""}
                   </span>
                 </div>
-                {errors.cuotas?.message && (
-                  <div className="vp-plan-form__cuota-error mb-2">
-                    {errors.cuotas.message}
+                {cronogramaErrorMsg && (
+                  <div ref={cronogramaErrorRef} className="vp-plan-form__cuota-error mb-2" role="alert">
+                    {cronogramaErrorMsg}
                   </div>
                 )}
                 <div className="vp-table-wrap">
@@ -434,7 +645,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                               render={({ field: { onChange, value } }) => (
                                 <NiceSelect
                                   value={value ?? ""}
-                                  options={TIPOS_CUOTA}
+                                  options={TIPOS_CUOTA_OPTIONS}
                                   placeholder="Seleccionar"
                                   showPlaceholderOption
                                   usePortal
@@ -468,6 +679,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                               step="0.01"
                               inputMode="decimal"
                               className={`vp-cell-input field-input vp-input-monto ${errors.cuotas?.[i]?.montoOriginal ? "is-invalid" : ""}`}
+                              onWheel={(e) => e.currentTarget.blur()}
                               {...register(`cuotas.${i}.montoOriginal`)}
                               style={{ width: 110 }}
                             />
@@ -490,9 +702,10 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                             <button
                               type="button"
                               className="tl-icon tl-icon--delete"
-                              onClick={() => remove(i)}
+                              onClick={() => handleRemoveCuota(i)}
                               aria-label="Eliminar cuota"
                               title="Eliminar cuota"
+                              disabled={fields.length <= 1}
                             >
                               <Trash2 size={18} strokeWidth={2} />
                             </button>
@@ -505,7 +718,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                 <button
                   type="button"
                   className="btn btn-primary vp-btn-agregar-cuota"
-                  onClick={() => append(emptyCuota())}
+                  onClick={handleAppendCuota}
                 >
                   + Agregar cuota
                 </button>

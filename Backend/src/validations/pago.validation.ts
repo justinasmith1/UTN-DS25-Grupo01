@@ -52,6 +52,26 @@ export const createPlanPagoSchema = z.object({
   message: 'El monto total planificado debe ser mayor o igual al anticipo',
   path: ['montoAnticipo'],
 }).refine((data) => {
+  if (data.tipoFinanciacion !== 'CONTADO') return true;
+  return (data.montoAnticipo ?? 0) === 0;
+}, {
+  message: 'Para Contado, el anticipo no aplica y debe ser 0',
+  path: ['montoAnticipo'],
+}).refine((data) => {
+  if (data.tipoFinanciacion !== 'ANTICIPO_CUOTAS') return true;
+  const anticipo = data.montoAnticipo ?? 0;
+  return anticipo > 0;
+}, {
+  message: 'Para Anticipo + cuotas, el anticipo es obligatorio y debe ser mayor a 0',
+  path: ['montoAnticipo'],
+}).refine((data) => {
+  if (data.tipoFinanciacion !== 'ANTICIPO_CUOTAS') return true;
+  const anticipo = data.montoAnticipo ?? 0;
+  return anticipo < data.montoTotalPlanificado;
+}, {
+  message: 'El anticipo debe ser menor al monto total planificado',
+  path: ['montoAnticipo'],
+}).refine((data) => {
   return data.cantidadCuotas === data.cuotas.length;
 }, {
   message: 'La cantidad de cuotas debe coincidir con el número de cuotas enviadas',
@@ -62,6 +82,28 @@ export const createPlanPagoSchema = z.object({
 }, {
   message: 'No se permiten números de cuota repetidos',
   path: ['cuotas'],
+}).superRefine((data, ctx) => {
+  const TOLERANCIA = 0.01;
+  const getMontoEsperado = (d: typeof data) => {
+    const total = d.montoTotalPlanificado;
+    const anticipo = d.montoAnticipo ?? 0;
+    switch (d.tipoFinanciacion) {
+      case 'CONTADO': return total;
+      case 'PERSONALIZADO': return anticipo > 0 ? total - anticipo : total;
+      case 'CUOTAS_FIJAS': return total - anticipo;
+      case 'ANTICIPO_CUOTAS': return total;
+      default: return total;
+    }
+  };
+  const montoEsperado = getMontoEsperado(data);
+  const sumaCuotas = data.cuotas.reduce((acc, c) => acc + Number(c.montoOriginal), 0);
+  if (Math.abs(sumaCuotas - montoEsperado) > TOLERANCIA) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `La suma de las cuotas (${sumaCuotas.toFixed(2)}) no coincide con el monto esperado (${montoEsperado.toFixed(2)})`,
+      path: ['cuotas'],
+    });
+  }
 }).superRefine((data, ctx) => {
   const toUtcMidnight = (iso: string) => {
     const d = new Date(iso);
