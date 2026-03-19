@@ -49,3 +49,27 @@ export async function createPlanPagoInicial(ventaId, payload) {
 
   return data?.data ?? data;
 }
+
+/**
+ * Registra un pago sobre una cuota de la venta.
+ * @param {number} ventaId - ID de la venta
+ * @param {object} payload - { cuotaId, fechaPago, monto, medioPago, referencia?, observacion? }
+ * @returns {Promise<object>}
+ */
+export async function registrarPagoEnVenta(ventaId, payload) {
+  const res = await http(`${BASE}/${ventaId}/pagos`, {
+    method: "POST",
+    body: payload,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = data?.message || "Error al registrar el pago";
+    const err = new Error(msg);
+    err.statusCode = res.status;
+    err.response = data;
+    throw err;
+  }
+
+  return data?.data ?? data;
+}

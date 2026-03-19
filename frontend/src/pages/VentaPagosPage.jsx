@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
 import PlanCrearForm from "../components/Pagos/PlanCrearForm";
+import PagoRegistrarCard from "../components/Pagos/PagoRegistrarCard";
 import Can from "../components/Can";
 import { PERMISSIONS } from "../lib/auth/rbac";
 import { estaCuotaVencida } from "../utils/pagoUtils";
@@ -69,6 +70,7 @@ export default function VentaPagosPage() {
   const [error, setError] = useState(null);
   const [data, setData] = useState(null);
   const [showFormPlan, setShowFormPlan] = useState(false);
+  const [showFormPago, setShowFormPago] = useState(false);
 
   const fetchContext = useCallback(async () => {
     const id = parseInt(ventaId, 10);
@@ -100,6 +102,14 @@ export default function VentaPagosPage() {
       if (c?.id != null) map[String(c.id)] = c;
     });
     return map;
+  }, [data?.cuotas]);
+
+  // Cuota habilitada: primera del plan vigente con saldoPendiente > 0, ordenada por numeroCuota ASC
+  const cuotaHabilitada = useMemo(() => {
+    const list = (data?.cuotas ?? []).filter((c) => Number(c.saldoPendiente) > 0);
+    if (list.length === 0) return null;
+    const sorted = [...list].sort((a, b) => (a.numeroCuota ?? 0) - (b.numeroCuota ?? 0));
+    return sorted[0] ?? null;
   }, [data?.cuotas]);
 
   const volverAVentas = () => navigate("/ventas");
@@ -261,7 +271,24 @@ export default function VentaPagosPage() {
 
       {/* D. Cronograma de cuotas */}
       <div className="vp-summary-card mb-4">
-        <h5 className="vp-section-title mb-3">Cronograma de cuotas</h5>
+        <div className="vp-cronograma-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <h5 className="vp-section-title mb-0">Cronograma de cuotas</h5>
+          {planVigente && (
+            cuotaHabilitada ? (
+              <Can permission={PERMISSIONS.SALE_EDIT}>
+                <button
+                  type="button"
+                  className="vp-btn-crear-plan"
+                  onClick={() => setShowFormPago(true)}
+                >
+                  Registrar pago
+                </button>
+              </Can>
+            ) : (
+              <span className="vp-no-cuotas-msg text-muted">No hay cuotas pendientes para registrar pago</span>
+            )
+          )}
+        </div>
         {cuotas.length > 0 ? (
           <div className="vp-table-wrap">
             <table className="vp-table">
@@ -358,6 +385,21 @@ export default function VentaPagosPage() {
             fetchContext();
           }}
           onCancel={() => setShowFormPlan(false)}
+        />
+      )}
+
+      {/* Modal flotante: Registrar pago */}
+      {planVigente && cuotaHabilitada && (
+        <PagoRegistrarCard
+          open={showFormPago}
+          ventaId={parseInt(ventaId, 10)}
+          cuotaHabilitada={cuotaHabilitada}
+          moneda={moneda}
+          onSuccess={() => {
+            setShowFormPago(false);
+            fetchContext();
+          }}
+          onCancel={() => setShowFormPago(false)}
         />
       )}
     </div>

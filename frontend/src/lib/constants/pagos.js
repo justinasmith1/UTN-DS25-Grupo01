@@ -42,3 +42,12 @@ export const TIPOS_CUOTA_OPTIONS = [
   { value: "CUOTA", label: "Cuota" },
   { value: "OTRO", label: "Otro" },
 ];
+
+/** Medios de pago válidos para registrar un pago */
+export const MEDIOS_PAGO_OPTIONS = [
+  { value: "EFECTIVO", label: "Efectivo" },
+  { value: "TRANSFERENCIA", label: "Transferencia" },
+  { value: "DEPOSITO", label: "Depósito" },
+  { value: "CHEQUE", label: "Cheque" },
+  { value: "OTRO", label: "Otro" },
+];

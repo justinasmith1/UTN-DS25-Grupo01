@@ -416,3 +416,48 @@
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
 }
+
+/* Cronograma: header con CTA Registrar pago */
+.vp-cronograma-header {
+  flex-wrap: wrap;
+}
+.vp-no-cuotas-msg {
+  font-size: 0.875rem;
+}
+
+/* Contexto de cuota en card Registrar pago */
+.vp-pago-contexto-cuota {
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+  border-radius: 10px;
+}
+.vp-pago-contexto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+.vp-pago-contexto-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.vp-pago-contexto-item--vencida {
+  grid-column: 1 / -1;
+}
+.vp-pago-contexto-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.vp-pago-contexto-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-pago-contexto-value--warn {
+  color: #B45309;
+}
