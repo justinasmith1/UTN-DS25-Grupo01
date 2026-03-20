@@ -1,0 +1,463 @@
+/* Módulo Pagos (VentaPagosPage, PlanCrearForm) - estilos coherentes con tl-* */
+
+/* Botones secundarios (Volver, Crear plan) - mismo lenguaje que tl-btn--soft */
+.vp-btn--soft,
+.vp-btn-volver,
+.vp-btn-crear-plan {
+  border: 1px solid #d1ece3;
+  background: #eef7f4;
+  color: #116149;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-btn--soft:hover,
+.vp-btn-volver:hover,
+.vp-btn-crear-plan:hover {
+  background: #d9f0e8;
+  filter: brightness(1.02);
+}
+
+/* Empty state "sin plan" */
+.vp-plan-empty-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+.vp-plan-empty-card .vp-empty--plan {
+  margin-bottom: 0;
+}
+.vp-empty--plan {
+  margin-top: 0;
+}
+
+/* Encabezado */
+.vp-header {
+  border-bottom: 1px solid #e6ebf2;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+.vp-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+}
+.vp-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+}
+.vp-context-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-context-label {
+  color: #6b7280;
+}
+.vp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.vp-badge--muted { background: #F2F4F7; color: #475467; }
+.vp-badge--success { background: #E7F7EE; color: #18794E; }
+.vp-badge--warn { background: #FFF6E5; color: #B45309; }
+.vp-badge--danger { background: #FEECEC; color: #C23B3B; }
+
+/* Cards resumen */
+.vp-summary-card {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #fff;
+  transition: box-shadow 0.15s ease;
+}
+.vp-summary-card:hover {
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+}
+.vp-summary-card--highlight {
+  border-color: #d1ece3;
+  background: #f8fcf9;
+}
+.vp-summary-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+.vp-summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-summary-value--success { color: #18794E; }
+.vp-summary-value--warn { color: #B45309; }
+
+/* Plan vigente */
+.vp-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem 1.5rem;
+}
+.vp-plan-field {
+  font-size: 0.875rem;
+}
+.vp-plan-field__label {
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+.vp-plan-field__value {
+  font-weight: 600;
+  color: #0f172a;
+}
+.vp-section-title {
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+.vp-table th.vp-th-num {
+  text-align: right;
+}
+.vp-empty {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #e5e7eb;
+}
+
+/* Tablas */
+.vp-table-wrap {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.vp-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.vp-table th {
+  background: #f7fafc;
+  font-weight: 600;
+  color: #2b3748;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e6ebf2;
+}
+.vp-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: middle;
+}
+.vp-table tbody tr:hover {
+  background: #fcfdfe;
+}
+.vp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.vp-table .vp-cell-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.vp-table tbody tr.vp-cell--vencida {
+  background: #fffbf0;
+}
+.vp-table tbody tr.vp-cell--vencida:hover {
+  background: #fff8e6;
+}
+.vp-table .vp-badge-cuota {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.vp-table .vp-badge--PENDIENTE { background: #F2F4F7; color: #475467; }
+.vp-table .vp-badge--PAGO_PARCIAL { background: #FFF6E5; color: #B45309; }
+.vp-table .vp-badge--PAGA { background: #E7F7EE; color: #18794E; }
+.vp-table .vp-badge--vencida { background: #FEECEC; color: #C23B3B; }
+
+/* Formulario crear plan (PlanCrearForm) - Modal flotante cclf-* */
+.vp-plan-form__subtitle-modal {
+  margin: 4px 0 0 0;
+  font-size: 0.875rem;
+  color: #475467;
+  font-weight: 400;
+}
+
+.vp-plan-form__section {
+  margin-bottom: 1.5rem;
+}
+.vp-plan-form__section:first-of-type {
+  margin-top: 0;
+}
+.vp-plan-form__section:last-of-type {
+  margin-bottom: 1rem;
+}
+.vp-plan-form__subtitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #2b3748;
+  margin-bottom: 0.75rem;
+}
+.vp-plan-form__cronograma {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #eef2f6;
+}
+.vp-plan-form__cronograma-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.vp-plan-form__cronograma-header .vp-plan-form__subtitle {
+  margin-bottom: 0;
+}
+.vp-plan-form__cuota-counter {
+  font-size: 0.8125rem;
+  color: #475467;
+  font-weight: 500;
+}
+.vp-plan-form__cuota-error {
+  font-size: 0.875rem;
+  color: #C23B3B;
+  padding: 10px 12px;
+  background: #FEF2F2;
+  border: 1px solid rgba(194, 59, 59, 0.3);
+  border-radius: 8px;
+  font-weight: 500;
+}
+.vp-plan-form__cell-error {
+  font-size: 11px;
+  color: #C23B3B;
+  margin-top: 2px;
+}
+.vp-plan-form .field-value.p0 {
+  padding: 0;
+}
+/* Inputs del cronograma: mismo look que Datos generales */
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input {
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  padding: 6px 10px !important;
+  font-size: 0.875rem !important;
+  outline: none !important;
+}
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input.is-invalid {
+  border-color: rgba(220, 53, 69, 0.6) !important;
+}
+/* Columna y celda de acciones para el ícono eliminar */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-actions,
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions {
+  width: 52px;
+  min-width: 52px;
+  text-align: center;
+  vertical-align: middle;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions .tl-icon {
+  flex-shrink: 0;
+}
+/* Columna Monto: alineación consistente con el resto (izquierda) */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-num {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto .vp-input-monto {
+  width: 100%;
+  min-width: 90px;
+}
+
+/* Botón Agregar cuota: más pequeño y separado de la tabla */
+.vp-btn-agregar-cuota {
+  padding: 5px 12px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+/* Sección configuración del cronograma (Bloque 2A) */
+.vp-plan-form__config {
+  border-top: 1px solid #eef2f6;
+  padding-top: 1rem;
+}
+/* Label "Primer vencimiento" - ancho suficiente para ambas palabras */
+.vp-plan-form__config .vp-label-primer-vencimiento {
+  min-width: 14em;
+  white-space: nowrap;
+}
+.vp-btn-generar {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+/* Bloque 2B: confirmación al regenerar cronograma */
+.vp-plan-form__confirm-regenerar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.vp-plan-form__confirm-msg {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-plan-form__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.vp-plan-form__config-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.vp-plan-form__cronograma-manual-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+.vp-field-anticipo--required .field-label {
+  font-weight: 600;
+  color: #116149;
+}
+
+/* ===== PlanCrearForm: ajustes específicos ===== */
+
+/* Ocultar picker/spinner en campos monetarios (evitar cambios accidentales) */
+#plan-crear-form input[type="number"].vp-input-monto,
+.vp-plan-form__body input[type="number"].vp-input-monto {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-inner-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Label Monto total: icono de info con tooltip (siempre visible, al inicio) */
+.vp-label-monto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.vp-label-monto__icon {
+  flex-shrink: 0;
+  cursor: help;
+  color: #6b7280;
+  display: inline-flex;
+}
+.vp-label-monto__icon:hover {
+  color: #116149;
+}
+.vp-label-monto__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Contenedor scroll + footer sticky dentro del card */
+.vp-plan-form__body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+.vp-plan-form__scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.vp-plan-form__footer {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  margin-top: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+
+/* Cronograma: header con CTA Registrar pago */
+.vp-cronograma-header {
+  flex-wrap: wrap;
+}
+.vp-no-cuotas-msg {
+  font-size: 0.875rem;
+}
+
+/* Contexto de cuota en card Registrar pago */
+.vp-pago-contexto-cuota {
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+  border-radius: 10px;
+}
+.vp-pago-contexto-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem 1.25rem;
+}
+.vp-pago-contexto-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.vp-pago-contexto-item--vencida {
+  grid-column: 1 / -1;
+}
+.vp-pago-contexto-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.vp-pago-contexto-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-pago-contexto-value--warn {
+  color: #B45309;
+}

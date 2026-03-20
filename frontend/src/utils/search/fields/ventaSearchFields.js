@@ -5,9 +5,9 @@
 import { buildLoteSearchVariants } from '../loteFormat';
 
 /**
- * Extrae los campos buscables de una venta
- * Campos verificados según includes del backend en venta.service.ts
- * Nota: venta.comprador y venta.lote.propietario vienen completos (sin select específico)
+ * Extrae los campos buscables de una venta.
+ * Etapa 4: itera sobre compradores[] (múltiples) con fallback a comprador (único, legacy).
+ * Campos verificados según includes del backend en venta.service.ts.
  */
 export const getVentaSearchFields = (venta) => {
   if (!venta) return [];
@@ -20,31 +20,33 @@ export const getVentaSearchFields = (venta) => {
   // ID (para búsqueda directa)
   if (venta.id != null) fields.push(String(venta.id));
   
-  // Comprador (Persona completa)
-  if (venta.comprador) {
-    const comp = venta.comprador;
+  // Etapa 4: compradores múltiples — iterar sobre compradores[] con fallback a comprador legacy
+  const listaCompradores = venta.compradores?.length
+    ? venta.compradores
+    : (venta.comprador ? [venta.comprador] : []);
+
+  listaCompradores.forEach(comp => {
+    if (!comp) return;
     if (comp.nombre) fields.push(comp.nombre);
     if (comp.apellido) fields.push(comp.apellido);
     if (comp.razonSocial) fields.push(comp.razonSocial);
     
-    // Nombre completo
     const nombreCompleto = [comp.nombre, comp.apellido].filter(Boolean).join(' ');
     if (nombreCompleto) fields.push(nombreCompleto);
     
-    // Identificador (si existe)
     if (comp.identificadorValor) {
       fields.push(comp.identificadorValor);
       if (comp.identificadorTipo) {
         fields.push(`${comp.identificadorTipo} ${comp.identificadorValor}`);
       }
     }
-  }
+  });
   
-  // Lote asociado (variantes del ID estandarizado si existen fraccion/numero)
+  // Lote asociado
   if (venta.lote) {
     fields.push(...buildLoteSearchVariants(venta.lote));
     
-    // Propietario del lote (Persona completa)
+    // Propietario del lote
     if (venta.lote.propietario) {
       const prop = venta.lote.propietario;
       if (prop.nombre) fields.push(prop.nombre);

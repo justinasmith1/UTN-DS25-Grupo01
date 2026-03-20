@@ -99,6 +99,12 @@ enum EstadoOperativo {
   ELIMINADO
 }
 
+enum EstadoAprobacionPlano {
+  PENDIENTE
+  APROBADO
+  RECHAZADO
+}
+
 enum TiposArchivos {
   BOLETO
   ESCRITURA
@@ -123,6 +129,45 @@ enum PersonaCategoria {
 enum EstadoAlquiler {
   ACTIVO
   FINALIZADO
+}
+
+// --- Submódulo Pagos (dentro de Ventas) ---
+enum EstadoPlanPago {
+  VIGENTE
+  REEMPLAZADO
+  CANCELADO
+}
+
+enum TipoFinanciacion {
+  CONTADO
+  ANTICIPO_CUOTAS
+  CUOTAS_FIJAS
+  PERSONALIZADO
+}
+
+enum Moneda {
+  ARS
+  USD
+}
+
+enum TipoCuota {
+  ANTICIPO
+  CUOTA
+  OTRO
+}
+
+enum EstadoCuota {
+  PENDIENTE
+  PAGO_PARCIAL
+  PAGA
+}
+
+enum MedioPago {
+  EFECTIVO
+  TRANSFERENCIA
+  DEPOSITO
+  CHEQUE
+  OTRO
 }
 
 // ===================
@@ -190,6 +235,7 @@ model Persona {
 
   Venta   Venta[]
   Reserva Reserva[]
+  ventasComoComprador Venta[] @relation("VentaCompradores")
 
   @@unique([identificadorTipo, identificadorValor])
   @@index([estadoOperativo])
@@ -330,10 +376,97 @@ model Venta {
   inmobiliariaId      Int?
   inmobiliaria        Inmobiliaria?   @relation(fields: [inmobiliariaId], references: [id], onDelete: SetNull)
   reservaConsumo      Reserva?        @relation("VentaConsumeReserva")
+  compradores         Persona[]       @relation("VentaCompradores")
+  archivos            Archivos[]
+  planPagos           PlanPago[]
+  pagosRegistrados    PagoRegistrado[]
   createdAt           DateTime        @default(now())
   updateAt            DateTime?
 
   @@index([estadoOperativo], name: "idx_venta_estado_operativo")
+}
+
+// --- Submódulo Pagos (dentro de Ventas) ---
+model PlanPago {
+  id                   Int               @id @default(autoincrement())
+  ventaId              Int
+  venta                Venta             @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  nombre               String
+  estadoPlan           EstadoPlanPago    @default(VIGENTE)
+  tipoFinanciacion     TipoFinanciacion
+  moneda               Moneda
+  cantidadCuotas       Int
+  montoTotalPlanificado Decimal         @db.Decimal(12, 2)
+  montoFinanciado      Decimal           @db.Decimal(12, 2)
+  fechaInicio          DateTime
+  version              Int
+  esVigente            Boolean           @default(true)
+  montoAnticipo        Decimal           @default(0) @db.Decimal(12, 2)
+  descripcion          String?           @db.Text
+  observaciones        String?           @db.Text
+  createdAt            DateTime          @default(now())
+  updateAt             DateTime?
+  createdBy            String?
+
+  cuotas             CuotaPlanPago[]
+  pagos              PagoRegistrado[]
+
+  @@index([ventaId])
+  @@index([ventaId, estadoPlan])
+  @@index([ventaId, esVigente])
+  @@unique([ventaId, version])
+}
+
+model CuotaPlanPago {
+  id                   Int               @id @default(autoincrement())
+  planPagoId           Int
+  planPago             PlanPago          @relation(fields: [planPagoId], references: [id], onDelete: Restrict)
+  numeroCuota          Int
+  tipoCuota            TipoCuota
+  fechaVencimiento     DateTime
+  montoOriginal        Decimal           @db.Decimal(12, 2)
+  montoRecargoManual   Decimal           @db.Decimal(12, 2) @default(0)
+  montoTotalExigible   Decimal           @db.Decimal(12, 2)
+  montoPagado          Decimal           @db.Decimal(12, 2) @default(0)
+  saldoPendiente       Decimal           @db.Decimal(12, 2)
+  estadoCuota          EstadoCuota       @default(PENDIENTE)
+  descripcion          String?           @db.Text
+  fechaPagoCompleto    DateTime?
+  observacion          String?           @db.Text
+  motivoRecargo        String?           @db.Text
+  recargoAplicadoBy    String?
+  fechaAplicacionRecargo DateTime?
+  createdAt            DateTime          @default(now())
+  updateAt             DateTime?
+
+  pagos               PagoRegistrado[]
+
+  @@index([planPagoId])
+  @@unique([planPagoId, numeroCuota])
+  @@index([planPagoId, estadoCuota])
+  @@index([planPagoId, fechaVencimiento])
+}
+
+model PagoRegistrado {
+  id           Int           @id @default(autoincrement())
+  ventaId      Int
+  venta        Venta         @relation(fields: [ventaId], references: [id], onDelete: Restrict)
+  planPagoId   Int
+  planPago     PlanPago      @relation(fields: [planPagoId], references: [id], onDelete: Restrict)
+  cuotaId      Int
+  cuota        CuotaPlanPago @relation(fields: [cuotaId], references: [id], onDelete: Restrict)
+  fechaPago    DateTime
+  monto        Decimal       @db.Decimal(12, 2)
+  medioPago    MedioPago
+  referencia   String?       @db.Text
+  observacion  String?       @db.Text
+  registradoBy String?
+  createdAt    DateTime      @default(now())
+
+  @@index([ventaId])
+  @@index([planPagoId])
+  @@index([cuotaId])
+  @@index([fechaPago])
 }
 
 // Inmobiliaria
@@ -410,15 +543,34 @@ model Promocion {
 // Archivos
 
 model Archivos {
-  id             Int           @id @default(autoincrement())
-  nombreArchivo  String
-  linkArchivo    String
-  tipo           TiposArchivos
-  idLoteAsociado Int
-  lote           Lote          @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
-  createdAt      DateTime      @default(now())
-  uploadedBy     String?
-  user           User?         @relation(fields: [uploadedBy], references: [email])
+  id              Int             @id @default(autoincrement())
+  nombreArchivo   String
+  linkArchivo     String
+  tipo            TiposArchivos
+  idLoteAsociado  Int
+  ventaId         Int?
+  lote            Lote            @relation(fields: [idLoteAsociado], references: [id], onDelete: Restrict)
+  venta           Venta?          @relation(fields: [ventaId], references: [id], onDelete: SetNull)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  uploadedBy      String?
+  user            User?           @relation(fields: [uploadedBy], references: [email])
+  estadoOperativo EstadoOperativo @default(OPERATIVO)
+  fechaBaja       DateTime?
+  deletedBy       String?
+
+  // Aprobaciones PLANO (Etapa 5.5) — solo aplican cuando tipo = PLANO
+  estadoAprobacionComision      EstadoAprobacionPlano?
+  fechaAprobacionComision        DateTime?
+  aprobadoComisionBy             String?
+  observacionAprobacionComision  String?
+
+  estadoAprobacionMunicipio      EstadoAprobacionPlano?
+  fechaAprobacionMunicipio       DateTime?
+  aprobadoMunicipioBy            String?
+  observacionAprobacionMunicipio String?
+
+  @@index([estadoOperativo])
 }
 
 // Alquiler

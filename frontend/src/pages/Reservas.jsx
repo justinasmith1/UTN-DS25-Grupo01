@@ -136,6 +136,10 @@ export default function Reservas() {
   const canReservaEdit = can(user, PERMISSIONS.RES_EDIT);
   const canReservaDelete = can(user, PERMISSIONS.RES_DELETE);
 
+  // Permisos de archivos
+  const canUploadFiles = ['ADMINISTRADOR', 'GESTOR', 'TECNICO'].includes(user?.role);
+  const canDeleteFiles = ['ADMINISTRADOR', 'GESTOR'].includes(user?.role);
+
 
 
   // Manejar cambios de parámetros
@@ -692,8 +696,7 @@ export default function Reservas() {
         open={openDocumentoDropdown}
         onClose={() => setOpenDocumentoDropdown(false)}
         onSelectTipo={handleSelectTipoDocumento}
-        loteId={reservaSel?.loteId || reservaSel?.lote?.id}
-        loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
+        canUpload={canUploadFiles}
       />
 
       {/* Modal de visualización de documento */}
@@ -707,13 +710,8 @@ export default function Reservas() {
         tipoDocumento={tipoDocumentoSeleccionado}
         loteId={reservaSel?.loteId || reservaSel?.lote?.id}
         loteNumero={reservaSel?.lote?.mapId ?? reservaSel?.lotMapId ?? reservaSel?.loteId ?? reservaSel?.lote?.id}
-        documentoUrl={null}
-        onModificar={(url) => {
-          // TODO: Implementar modificación de documento
-        }}
-        onDescargar={(url) => {
-          // TODO: Implementar descarga de documento
-        }}
+        canUpload={canUploadFiles}
+        canDelete={canDeleteFiles}
       />
 
       {/* Animación de éxito al eliminar */}

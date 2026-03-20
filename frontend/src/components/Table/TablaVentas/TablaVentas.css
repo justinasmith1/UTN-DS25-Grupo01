@@ -1,5 +1,17 @@
 /* Estilos específicos para la tabla de Ventas */
 
+/* Botón Pagos: verde, coherente con tl-icon--money/tl-icon--success */
+.tl-icon--pagos {
+  background: #EAF7EE;
+  color: #1F8C5A;
+}
+.tl-icon--pagos:hover {
+  outline: 1px solid currentColor;
+  outline-offset: -3px;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.12);
+}
+
 /* Centrar el header de Acciones en la tabla de ventas */
 .tabla-ventas .tl-th--actions.tl-th--center {
   padding-left: 40px;

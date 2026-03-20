@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useState } from 'react';
 import TablaBase from '../TablaBase';
 import { useAuth } from '../../../app/providers/AuthProvider';
 import { canDashboardAction } from '../../../lib/auth/rbac.ui';
-import { Eye, Edit, Trash2, FileText, RotateCcw, Map as MapIcon } from 'lucide-react';
+import { Eye, Edit, Trash2, FileText, RotateCcw, Map as MapIcon, Banknote } from 'lucide-react';
 import { canEditByEstadoOperativo, isEliminado, canDeleteVenta, getVentaDeleteTooltip, canSelectForMap } from '../../../utils/estadoOperativo';
 import { useMapaSeleccion } from '../../../hooks/useMapaSeleccion';
 import { useMapaVistaControl } from '../../../hooks/useMapaVistaControl';
@@ -32,6 +32,7 @@ export default function TablaVentas({
   onEliminar,
   onReactivar, // <- NUEVO
   onVerDocumentos,
+  onPagos,
   onAgregarVenta,
   selectedIds = [],
   onSelectedChange,
@@ -276,6 +277,16 @@ export default function TablaVentas({
           onClick={() => onVerDocumentos?.(venta)}
         >
           <FileText size={18} strokeWidth={2} />
+        </button>
+      )}
+      {can('ver') && onPagos && (
+        <button
+          className="tl-icon tl-icon--pagos"
+          aria-label="Pagos"
+          data-tooltip="Pagos"
+          onClick={() => onPagos?.(venta)}
+        >
+          <Banknote size={18} strokeWidth={2} />
         </button>
       )}
       {can('eliminar') && (
