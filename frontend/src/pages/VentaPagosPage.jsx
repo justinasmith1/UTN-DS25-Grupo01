@@ -1,30 +1,22 @@
 // src/pages/VentaPagosPage.jsx
-// Página de pagos por venta (solo lectura). Bloque 1–2 I2.
+// Pagos por venta: contexto, plan vigente, cronograma, registro de pagos.
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
 import PlanCrearForm from "../components/Pagos/PlanCrearForm";
 import PagoRegistrarCard from "../components/Pagos/PagoRegistrarCard";
+import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import Can from "../components/Can";
 import { PERMISSIONS } from "../lib/auth/rbac";
-import { estaCuotaVencida } from "../utils/pagoUtils";
+import { fmtMonto, fmtMontoSinMoneda } from "../utils/pagoUtils";
 import "../styles/venta-pagos.css";
 
-// Formatear monto según moneda del plan (ARS/USD)
-const fmtMonto = (v, moneda = "ARS") => {
-  if (v == null || v === "") return "—";
-  const n = Number(v);
-  if (Number.isNaN(n)) return "—";
-  const currency = String(moneda || "ARS").toUpperCase();
-  return n.toLocaleString("es-AR", {
-    style: "currency",
-    currency: currency === "USD" ? "USD" : "ARS",
-    maximumFractionDigits: 2,
-  });
-};
+const SUCCESS_ANIM_MS = 1500;
+const MSG_PLAN_CREADO = "¡Plan de pago creado exitosamente!";
+const MSG_PAGO_REGISTRADO = "¡Pago registrado exitosamente!";
 
 // Comprador: nombre + apellido o razón social
 const getCompradorLabel = (comprador) => {
@@ -71,29 +63,69 @@ export default function VentaPagosPage() {
   const [data, setData] = useState(null);
   const [showFormPlan, setShowFormPlan] = useState(false);
   const [showFormPago, setShowFormPago] = useState(false);
+  const [successAnimMessage, setSuccessAnimMessage] = useState(null);
+  const [contextRefreshWarning, setContextRefreshWarning] = useState(null);
+  const successAnimTimerRef = useRef(null);
 
-  const fetchContext = useCallback(async () => {
+  const fetchContext = useCallback(async (options = {}) => {
+    const { showLoading = true } = options;
     const id = parseInt(ventaId, 10);
     if (isNaN(id)) {
       setError("ID de venta inválido");
-      setLoading(false);
-      return;
+      if (showLoading) setLoading(false);
+      return { ok: false };
     }
-    setLoading(true);
-    setError(null);
+    if (showLoading) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const result = await getPagosContextByVentaId(id);
       setData(result);
+      setContextRefreshWarning(null);
+      return { ok: true };
     } catch (err) {
-      setError(err?.message || "Error al cargar el contexto de pagos");
+      if (showLoading) {
+        setError(err?.message || "Error al cargar el contexto de pagos");
+      } else {
+        console.error("Error al actualizar el contexto de pagos:", err);
+      }
+      return { ok: false };
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [ventaId]);
 
   useEffect(() => {
     fetchContext();
   }, [fetchContext]);
+
+  useEffect(() => {
+    return () => {
+      if (successAnimTimerRef.current) clearTimeout(successAnimTimerRef.current);
+    };
+  }, []);
+
+  const showSuccessThenRefresh = useCallback(async (message) => {
+    if (successAnimTimerRef.current) clearTimeout(successAnimTimerRef.current);
+    setSuccessAnimMessage(message);
+    successAnimTimerRef.current = setTimeout(() => {
+      setSuccessAnimMessage(null);
+      successAnimTimerRef.current = null;
+    }, SUCCESS_ANIM_MS);
+    const { ok } = await fetchContext({ showLoading: false });
+    if (!ok) setContextRefreshWarning(MSG_REFRESH_FALLIDO);
+  }, [fetchContext]);
+
+  const handlePlanCreado = useCallback(() => {
+    setShowFormPlan(false);
+    showSuccessThenRefresh(MSG_PLAN_CREADO);
+  }, [showSuccessThenRefresh]);
+
+  const handlePagoRegistrado = useCallback(() => {
+    setShowFormPago(false);
+    showSuccessThenRefresh(MSG_PAGO_REGISTRADO);
+  }, [showSuccessThenRefresh]);
 
   const moneda = data?.planVigente?.moneda ?? "ARS";
   const cuotaById = useMemo(() => {
@@ -145,6 +177,23 @@ export default function VentaPagosPage() {
 
   return (
     <div className="container py-4">
+      <SuccessAnimation show={Boolean(successAnimMessage)} message={successAnimMessage ?? ""} />
+
+      {contextRefreshWarning ? (
+        <div
+          className="alert alert-warning alert-dismissible vp-refresh-warning mb-3"
+          role="alert"
+        >
+          {contextRefreshWarning}
+          <button
+            type="button"
+            className="btn-close"
+            aria-label="Cerrar"
+            onClick={() => setContextRefreshWarning(null)}
+          />
+        </div>
+      ) : null}
+
       {/* A. Encabezado / contexto de venta */}
       <div className="vp-header d-flex justify-content-between align-items-start flex-wrap gap-3">
         <div>
@@ -153,8 +202,16 @@ export default function VentaPagosPage() {
             <span className="vp-context-item">
               <span className="vp-context-label">Fecha:</span> {fmtFecha(venta?.fechaVenta)}
             </span>
-            <span className="vp-context-item">
-              <span className="vp-context-label">Monto:</span> {fmtMonto(venta?.monto, "ARS")}
+            <span
+              className="vp-context-item"
+              title={
+                planVigente
+                  ? undefined
+                  : "Monto de la venta; la moneda de cobro queda definida al crear el plan de pago."
+              }
+            >
+              <span className="vp-context-label">Monto venta:</span>{" "}
+              {planVigente ? fmtMonto(venta?.monto, planVigente.moneda) : fmtMontoSinMoneda(venta?.monto)}
             </span>
             <span className="vp-context-item">
               <span className={`vp-badge ${getEstadoBadgeClass(venta?.estado)}`}>
@@ -271,23 +328,34 @@ export default function VentaPagosPage() {
 
       {/* D. Cronograma de cuotas */}
       <div className="vp-summary-card mb-4">
-        <div className="vp-cronograma-header d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div className="vp-cronograma-header mb-3">
           <h5 className="vp-section-title mb-0">Cronograma de cuotas</h5>
-          {planVigente && (
-            cuotaHabilitada ? (
-              <Can permission={PERMISSIONS.SALE_EDIT}>
-                <button
-                  type="button"
-                  className="vp-btn-crear-plan"
-                  onClick={() => setShowFormPago(true)}
-                >
-                  Registrar pago
-                </button>
-              </Can>
+          {planVigente &&
+            (cuotaHabilitada ? (
+              <div className="vp-cronograma-cta">
+                <div className="vp-cronograma-cta__context">
+                  <span className="vp-cronograma-cta__label">Cuota habilitada para cobro</span>
+                  <span className="vp-cronograma-cta__meta">
+                    #{cuotaHabilitada.numeroCuota}
+                    <span className="vp-cronograma-cta__sep">·</span>
+                    {cuotaHabilitada.tipoCuota ?? "—"}
+                    <span className="vp-cronograma-cta__sep">·</span>
+                    {moneda}
+                  </span>
+                </div>
+                <Can permission={PERMISSIONS.SALE_EDIT}>
+                  <button
+                    type="button"
+                    className="vp-btn-crear-plan vp-btn-registrar-pago"
+                    onClick={() => setShowFormPago(true)}
+                  >
+                    Registrar pago
+                  </button>
+                </Can>
+              </div>
             ) : (
               <span className="vp-no-cuotas-msg text-muted">No hay cuotas pendientes para registrar pago</span>
-            )
-          )}
+            ))}
         </div>
         {cuotas.length > 0 ? (
           <div className="vp-table-wrap">
@@ -298,22 +366,29 @@ export default function VentaPagosPage() {
                   <th>Tipo</th>
                   <th>Vencimiento</th>
                   <th className="vp-th-num">Monto exigible</th>
-                  <th className="vp-th-num">Pagado</th>
-                  <th className="vp-th-num">Saldo</th>
+                  <th>Pagado</th>
+                  <th>Saldo</th>
                   <th>Estado</th>
                 </tr>
               </thead>
               <tbody>
                 {cuotas.map((c) => {
-                  const vencida = estaCuotaVencida(c.fechaVencimiento, c.saldoPendiente ?? 0);
+                  const vencida = Boolean(c.estaVencida);
+                  const habilitada = cuotaHabilitada && c.id === cuotaHabilitada.id;
+                  const rowClass = [
+                    vencida ? "vp-row--vencida" : "",
+                    habilitada ? "vp-row--habilitada" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
                   return (
-                    <tr key={c.id} className={vencida ? "vp-cell--vencida" : ""}>
+                    <tr key={c.id} className={rowClass || undefined}>
                       <td>{c.numeroCuota}</td>
                       <td>{c.tipoCuota ?? "—"}</td>
                       <td>{fmtFecha(c.fechaVencimiento)}</td>
                       <td className="vp-cell-num">{fmtMonto(c.montoTotalExigible ?? c.montoOriginal, moneda)}</td>
-                      <td className="vp-cell-num">{fmtMonto(c.montoPagado, moneda)}</td>
-                      <td className="vp-cell-num">{fmtMonto(c.saldoPendiente, moneda)}</td>
+                      <td className="vp-cell-saldo">{fmtMonto(c.montoPagado, moneda)}</td>
+                      <td className="vp-cell-saldo">{fmtMonto(c.saldoPendiente, moneda)}</td>
                       <td>
                         {vencida ? (
                           <span className="vp-badge-cuota vp-badge--vencida">Vencida</span>
@@ -380,10 +455,7 @@ export default function VentaPagosPage() {
         <PlanCrearForm
           open={showFormPlan}
           ventaId={parseInt(ventaId, 10)}
-          onSuccess={() => {
-            setShowFormPlan(false);
-            fetchContext();
-          }}
+          onSuccess={handlePlanCreado}
           onCancel={() => setShowFormPlan(false)}
         />
       )}
@@ -395,10 +467,7 @@ export default function VentaPagosPage() {
           ventaId={parseInt(ventaId, 10)}
           cuotaHabilitada={cuotaHabilitada}
           moneda={moneda}
-          onSuccess={() => {
-            setShowFormPago(false);
-            fetchContext();
-          }}
+          onSuccess={handlePagoRegistrado}
           onCancel={() => setShowFormPago(false)}
         />
       )}

@@ -1,5 +1,12 @@
 /* Módulo Pagos (VentaPagosPage, PlanCrearForm) - estilos coherentes con tl-* */
 
+.vp-refresh-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
 /* Botones secundarios (Volver, Crear plan) - mismo lenguaje que tl-btn--soft */
 .vp-btn--soft,
 .vp-btn-volver,
@@ -183,11 +190,32 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
 }
-.vp-table tbody tr.vp-cell--vencida {
+/* Saldo en cronograma: alineado a la izquierda como Nº / Tipo / Vencimiento */
+.vp-table .vp-cell-saldo {
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+}
+.vp-table tbody tr.vp-cell--vencida,
+.vp-table tbody tr.vp-row--vencida {
   background: #fffbf0;
 }
-.vp-table tbody tr.vp-cell--vencida:hover {
+.vp-table tbody tr.vp-cell--vencida:hover,
+.vp-table tbody tr.vp-row--vencida:hover {
   background: #fff8e6;
+}
+.vp-table tbody tr.vp-row--habilitada {
+  box-shadow: inset 3px 0 0 0 #116149;
+  background: #f3faf7;
+}
+.vp-table tbody tr.vp-row--habilitada:hover {
+  background: #ecf8f3;
+}
+.vp-table tbody tr.vp-row--habilitada.vp-row--vencida {
+  background: linear-gradient(90deg, #f3faf7 0%, #fffbf0 100%);
+  box-shadow: inset 3px 0 0 0 #116149;
+}
+.vp-table tbody tr.vp-row--habilitada.vp-row--vencida:hover {
+  background: linear-gradient(90deg, #ecf8f3 0%, #fff8e6 100%);
 }
 .vp-table .vp-badge-cuota {
   display: inline-flex;
@@ -419,7 +447,55 @@
 
 /* Cronograma: header con CTA Registrar pago */
 .vp-cronograma-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .vp-cronograma-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+}
+.vp-cronograma-cta {
+  display: flex;
   flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fcf9;
+  border: 1px solid #d1ece3;
+  border-radius: 10px;
+}
+.vp-cronograma-cta__context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.vp-cronograma-cta__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #116149;
+}
+.vp-cronograma-cta__meta {
+  font-size: 0.875rem;
+  color: #0f172a;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.vp-cronograma-cta__sep {
+  margin: 0 0.25rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+.vp-btn-registrar-pago {
+  flex-shrink: 0;
 }
 .vp-no-cuotas-msg {
   font-size: 0.875rem;
@@ -427,10 +503,64 @@
 
 /* Contexto de cuota en card Registrar pago */
 .vp-pago-contexto-cuota {
-  padding: 1rem;
+  padding: 0.85rem 1rem;
   background: #f8fafc;
   border: 1px solid #eef2f6;
   border-radius: 10px;
+}
+.vp-pago-resumen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #e6ebf2;
+}
+.vp-pago-resumen__nro {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.vp-pago-resumen__tipo {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475467;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+.vp-pago-resumen__moneda {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.vp-pago-resumen__head .vp-badge-cuota {
+  margin-left: auto;
+}
+.vp-pago-resumen__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem 1rem;
+}
+@media (min-width: 480px) {
+  .vp-pago-resumen__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.vp-pago-resumen__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.vp-pago-resumen__saldo {
+  grid-column: 1 / -1;
+}
+@media (min-width: 480px) {
+  .vp-pago-resumen__saldo {
+    grid-column: span 2;
+  }
 }
 .vp-pago-contexto-grid {
   display: grid;
@@ -460,4 +590,8 @@
 }
 .vp-pago-contexto-value--warn {
   color: #B45309;
+  font-size: 1.05rem;
+}
+.vp-pago-resumen__saldo .vp-pago-contexto-value--warn {
+  font-size: 1.1rem;
 }

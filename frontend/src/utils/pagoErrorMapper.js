@@ -30,3 +30,53 @@ export function mapPagoBackendError(error, options = {}) {
   // Errores 403/409 u otros: mensaje general sin campo
   return { fieldErrors, generalMessage: errorMsg };
 }
+
+const HINT_ACTUALIZAR = " Cerrá este formulario o actualizá la página y volvé a intentar.";
+
+/** Mensajes 409 del servicio de registro de pago → texto claro para el usuario */
+function mapRegistrarPagoConflictMessage(raw) {
+  const msg = String(raw || "").trim();
+  const table = {
+    "La venta está eliminada": "La venta no está disponible para registrar pagos.",
+    "La venta no tiene un plan de pago vigente": "No hay plan de pago vigente. Verificá la venta o actualizá la página.",
+    "Cuota no encontrada": "No se encontró la cuota indicada." + HINT_ACTUALIZAR,
+    "La cuota indicada no pertenece al plan vigente de la venta":
+      "Esa cuota no corresponde al plan vigente." + HINT_ACTUALIZAR,
+    "La cuota ya está paga o no tiene saldo pendiente":
+      "Esta cuota ya no tiene saldo pendiente (puede estar paga)." + HINT_ACTUALIZAR,
+    "No hay cuotas pendientes de pago": "No quedan cuotas pendientes de cobro.",
+    "Solo puede registrarse pago sobre la primera cuota con saldo pendiente":
+      "Solo se puede cobrar la próxima cuota en orden. Los datos pueden haber cambiado." + HINT_ACTUALIZAR,
+    "El monto del pago supera el saldo pendiente de la cuota":
+      "El monto supera el saldo pendiente de la cuota (puede haberse actualizado)." + HINT_ACTUALIZAR,
+  };
+  if (table[msg]) return table[msg];
+  if (msg.toLowerCase().includes("supera el saldo")) {
+    return table["El monto del pago supera el saldo pendiente de la cuota"];
+  }
+  if (msg.toLowerCase().includes("primera cuota")) {
+    return table["Solo puede registrarse pago sobre la primera cuota con saldo pendiente"];
+  }
+  return msg + (msg.endsWith(".") ? "" : ".") + HINT_ACTUALIZAR;
+}
+
+/**
+ * Errores al registrar un pago: campos Zod + conflictos 409 con mensajes accionables.
+ * @param {Error & { statusCode?: number; response?: object }} error
+ * @returns {{ fieldErrors: Record<string, string>, generalMessage: string | null }}
+ */
+export function mapRegistrarPagoError(error) {
+  const base = mapPagoBackendError(error, { defaultMessage: "Error al registrar el pago" });
+  if (Object.keys(base.fieldErrors).length > 0) {
+    return base;
+  }
+
+  const status = error?.statusCode;
+  const rawMsg = error?.message || error?.response?.message || "";
+
+  if (status === 409 && rawMsg) {
+    return { fieldErrors: {}, generalMessage: mapRegistrarPagoConflictMessage(rawMsg) };
+  }
+
+  return base;
+}

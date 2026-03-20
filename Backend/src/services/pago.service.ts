@@ -86,14 +86,18 @@ export async function getPagosContextByVentaId(ventaId: number) {
     }
   }
 
-  const cuotasNormalizadas = cuotas.map((c) => ({
-    ...c,
-    montoOriginal: toNum(c.montoOriginal),
-    montoRecargoManual: toNum(c.montoRecargoManual),
-    montoTotalExigible: toNum(c.montoTotalExigible),
-    montoPagado: toNum(c.montoPagado),
-    saldoPendiente: toNum(c.saldoPendiente),
-  }));
+  const cuotasNormalizadas = cuotas.map((c) => {
+    const saldo = toNum(c.saldoPendiente);
+    return {
+      ...c,
+      montoOriginal: toNum(c.montoOriginal),
+      montoRecargoManual: toNum(c.montoRecargoManual),
+      montoTotalExigible: toNum(c.montoTotalExigible),
+      montoPagado: toNum(c.montoPagado),
+      saldoPendiente: saldo,
+      estaVencida: estaCuotaVencida(c.fechaVencimiento, saldo, ahora),
+    };
+  });
 
   const pagosNormalizados = pagos.map((p) => ({
     ...p,

@@ -3,21 +3,32 @@
  */
 
 /**
- * Indica si una cuota está vencida: fechaVencimiento < hoy (a nivel día) y saldoPendiente > 0.
- * @param {string|Date} fechaVencimiento - Fecha de vencimiento
- * @param {number} saldoPendiente - Saldo pendiente de la cuota
- * @returns {boolean}
+ * Formatea un monto según moneda del plan (ARS/USD).
+ * @param {unknown} v
+ * @param {string} [moneda="ARS"]
+ * @returns {string}
  */
-export function estaCuotaVencida(fechaVencimiento, saldoPendiente) {
-  if (saldoPendiente <= 0) return false;
-  if (!fechaVencimiento) return false;
-  try {
-    const vto = new Date(fechaVencimiento);
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
-    vto.setHours(0, 0, 0, 0);
-    return vto.getTime() < hoy.getTime();
-  } catch {
-    return false;
-  }
+export function fmtMonto(v, moneda = "ARS") {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  const currency = String(moneda || "ARS").toUpperCase();
+  return n.toLocaleString("es-AR", {
+    style: "currency",
+    currency: currency === "USD" ? "USD" : "ARS",
+    maximumFractionDigits: 2,
+  });
+}
+
+/**
+ * Formato numérico local sin símbolo de moneda (ej. monto de venta antes de definir plan).
+ */
+export function fmtMontoSinMoneda(v) {
+  if (v == null || v === "") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return "—";
+  return n.toLocaleString("es-AR", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }

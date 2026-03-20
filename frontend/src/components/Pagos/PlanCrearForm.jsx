@@ -253,7 +253,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
       }
 
       await createPlanPagoInicial(ventaId, payload);
-      onSuccess?.();
+      await Promise.resolve(onSuccess?.());
     } catch (err) {
       const { fieldErrors, generalMessage } = mapPagoBackendError(err, {
         defaultMessage: "Error al crear el plan de pago",

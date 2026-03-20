@@ -52,8 +52,15 @@ export function determinarEstadoCuota(
   return EstadoCuota.PAGO_PARCIAL;
 }
 
+function inicioDiaLocal(d: Date): Date {
+  const x = new Date(d);
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
 /**
- * true si fechaVencimiento < fechaReferencia y saldoPendiente > 0
+ * Vencida si saldoPendiente > 0 y el día de vencimiento es anterior al día de referencia
+ * (comparación a nivel día civil, alineada al dominio: fechaVencimiento < hoy).
  * @param fechaReferencia - Si no se pasa, usa new Date() (útil para testear con fechas fijas)
  */
 export function estaCuotaVencida(
@@ -62,7 +69,9 @@ export function estaCuotaVencida(
   fechaReferencia: Date = new Date()
 ): boolean {
   if (saldoPendiente <= 0) return false;
-  return fechaVencimiento.getTime() < fechaReferencia.getTime();
+  const v = inicioDiaLocal(fechaVencimiento);
+  const r = inicioDiaLocal(fechaReferencia);
+  return v.getTime() < r.getTime();
 }
 
 /**
