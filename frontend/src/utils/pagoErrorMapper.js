@@ -80,3 +80,45 @@ export function mapRegistrarPagoError(error) {
 
   return base;
 }
+
+/** Mensajes 409 del servicio de recargo manual */
+function mapAplicarRecargoConflictMessage(raw) {
+  const msg = String(raw || "").trim();
+  const table = {
+    "La venta está eliminada": "La venta no está disponible para aplicar recargos.",
+    "La venta no tiene un plan de pago vigente": "No hay plan de pago vigente. Verificá la venta o actualizá la página.",
+    "Cuota no encontrada": "No se encontró la cuota indicada." + HINT_ACTUALIZAR,
+    "La cuota indicada no pertenece al plan vigente de la venta":
+      "Esa cuota no corresponde al plan vigente." + HINT_ACTUALIZAR,
+    "La cuota ya está paga o no tiene saldo pendiente":
+      "Esta cuota ya no tiene saldo pendiente (puede estar paga)." + HINT_ACTUALIZAR,
+    "Solo se puede aplicar recargo a una cuota vencida con saldo pendiente":
+      "Solo se puede aplicar recargo a una cuota vencida con saldo pendiente. Verificá fechas y saldo." +
+      HINT_ACTUALIZAR,
+  };
+  if (table[msg]) return table[msg];
+  if (msg.toLowerCase().includes("vencida")) {
+    return table["Solo se puede aplicar recargo a una cuota vencida con saldo pendiente"];
+  }
+  return msg + (msg.endsWith(".") ? "" : ".") + HINT_ACTUALIZAR;
+}
+
+/**
+ * Errores al aplicar recargo: Zod + 409.
+ * @param {Error & { statusCode?: number; response?: object }} error
+ */
+export function mapAplicarRecargoError(error) {
+  const base = mapPagoBackendError(error, { defaultMessage: "Error al aplicar el recargo" });
+  if (Object.keys(base.fieldErrors).length > 0) {
+    return base;
+  }
+
+  const status = error?.statusCode;
+  const rawMsg = error?.message || error?.response?.message || "";
+
+  if (status === 409 && rawMsg) {
+    return { fieldErrors: {}, generalMessage: mapAplicarRecargoConflictMessage(rawMsg) };
+  }
+
+  return base;
+}

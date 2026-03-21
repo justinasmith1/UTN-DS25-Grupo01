@@ -131,7 +131,7 @@ export default function PagoRegistrarCard({ open, ventaId, cuotaHabilitada, mone
                 </div>
               ) : null}
 
-              <div className="vp-plan-form__section">
+              <div className="vp-plan-form__section vp-plan-form__section--modal-tight">
                 <h6 className="vp-plan-form__subtitle">Cuota a pagar</h6>
                 <div className="vp-pago-contexto-cuota">
                   <div className="vp-pago-resumen__head">
@@ -163,7 +163,7 @@ export default function PagoRegistrarCard({ open, ventaId, cuotaHabilitada, mone
                 </div>
               </div>
 
-              <div className="vp-plan-form__section">
+              <div className="vp-plan-form__section vp-plan-form__section--modal-tight">
                 <h6 className="vp-plan-form__subtitle">Datos del pago</h6>
                 <div className="venta-grid" style={{ "--sale-label-w": "180px" }}>
                   <div className="venta-col">

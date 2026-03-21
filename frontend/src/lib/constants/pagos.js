@@ -51,3 +51,9 @@ export const MEDIOS_PAGO_OPTIONS = [
   { value: "CHEQUE", label: "Cheque" },
   { value: "OTRO", label: "Otro" },
 ];
+
+/** Tipo de ingreso del recargo en UI (el backend recibe solo el monto final) */
+export const RECARGO_TIPO_OPTIONS = [
+  { value: "FIJO", label: "Monto fijo" },
+  { value: "PORCENTAJE", label: "Porcentaje" },
+];

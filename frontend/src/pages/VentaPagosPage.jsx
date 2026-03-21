@@ -8,6 +8,7 @@ import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
 import PlanCrearForm from "../components/Pagos/PlanCrearForm";
 import PagoRegistrarCard from "../components/Pagos/PagoRegistrarCard";
+import RecargoAplicarCard from "../components/Pagos/RecargoAplicarCard";
 import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import Can from "../components/Can";
 import { PERMISSIONS } from "../lib/auth/rbac";
@@ -17,6 +18,9 @@ import "../styles/venta-pagos.css";
 const SUCCESS_ANIM_MS = 1500;
 const MSG_PLAN_CREADO = "¡Plan de pago creado exitosamente!";
 const MSG_PAGO_REGISTRADO = "¡Pago registrado exitosamente!";
+const MSG_RECARGO_APLICADO = "¡Recargo aplicado exitosamente!";
+const MSG_REFRESH_FALLIDO =
+  "La operación se completó pero no se pudo actualizar la vista. Actualizá la página para ver los datos al día.";
 
 // Comprador: nombre + apellido o razón social
 const getCompradorLabel = (comprador) => {
@@ -63,6 +67,8 @@ export default function VentaPagosPage() {
   const [data, setData] = useState(null);
   const [showFormPlan, setShowFormPlan] = useState(false);
   const [showFormPago, setShowFormPago] = useState(false);
+  const [showRecargoModal, setShowRecargoModal] = useState(false);
+  const [cuotaRecargoSeleccionada, setCuotaRecargoSeleccionada] = useState(null);
   const [successAnimMessage, setSuccessAnimMessage] = useState(null);
   const [contextRefreshWarning, setContextRefreshWarning] = useState(null);
   const successAnimTimerRef = useRef(null);
@@ -126,6 +132,15 @@ export default function VentaPagosPage() {
     setShowFormPago(false);
     showSuccessThenRefresh(MSG_PAGO_REGISTRADO);
   }, [showSuccessThenRefresh]);
+
+  const handleRecargoAplicado = useCallback(() => {
+    setShowRecargoModal(false);
+    setCuotaRecargoSeleccionada(null);
+    showSuccessThenRefresh(MSG_RECARGO_APLICADO);
+  }, [showSuccessThenRefresh]);
+
+  const puedeAplicarRecargoCuota = (c) =>
+    Boolean(c?.estaVencida) && Number(c?.saldoPendiente) > 0;
 
   const moneda = data?.planVigente?.moneda ?? "ARS";
   const cuotaById = useMemo(() => {
@@ -365,19 +380,23 @@ export default function VentaPagosPage() {
                   <th>Nº</th>
                   <th>Tipo</th>
                   <th>Vencimiento</th>
-                  <th className="vp-th-num">Monto exigible</th>
-                  <th>Pagado</th>
-                  <th>Saldo</th>
+                  <th className="vp-th-num vp-th-recargo">Recargo</th>
+                  <th className="vp-th-num vp-th-exigible">Monto exigible</th>
+                  <th className="vp-th-num vp-th-pagado">Pagado</th>
+                  <th className="vp-th-num vp-th-saldo">Saldo</th>
                   <th>Estado</th>
+                  <th className="vp-th-acciones">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {cuotas.map((c) => {
                   const vencida = Boolean(c.estaVencida);
                   const habilitada = cuotaHabilitada && c.id === cuotaHabilitada.id;
+                  const conRecargo = Number(c.montoRecargoManual) > 0;
                   const rowClass = [
                     vencida ? "vp-row--vencida" : "",
                     habilitada ? "vp-row--habilitada" : "",
+                    conRecargo ? "vp-row--con-recargo" : "",
                   ]
                     .filter(Boolean)
                     .join(" ");
@@ -386,16 +405,39 @@ export default function VentaPagosPage() {
                       <td>{c.numeroCuota}</td>
                       <td>{c.tipoCuota ?? "—"}</td>
                       <td>{fmtFecha(c.fechaVencimiento)}</td>
-                      <td className="vp-cell-num">{fmtMonto(c.montoTotalExigible ?? c.montoOriginal, moneda)}</td>
-                      <td className="vp-cell-saldo">{fmtMonto(c.montoPagado, moneda)}</td>
-                      <td className="vp-cell-saldo">{fmtMonto(c.saldoPendiente, moneda)}</td>
+                      <td className="vp-cell-num vp-cell-recargo">
+                        {fmtMonto(c.montoRecargoManual ?? 0, moneda)}
+                      </td>
+                      <td className="vp-cell-num vp-cell-exigible">
+                        {fmtMonto(c.montoTotalExigible ?? c.montoOriginal, moneda)}
+                      </td>
+                      <td className="vp-cell-num vp-cell-pagado">{fmtMonto(c.montoPagado, moneda)}</td>
+                      <td className="vp-cell-num vp-cell-saldo-crono">{fmtMonto(c.saldoPendiente, moneda)}</td>
                       <td>
                         {vencida ? (
-                          <span className="vp-badge-cuota vp-badge--vencida">Vencida</span>
+                          <span className="vp-badge-cuota vp-badge--vencida">VENCIDA</span>
                         ) : (
                           <span className={`vp-badge-cuota ${getCuotaBadgeClass(c.estadoCuota)}`}>
                             {c.estadoCuota ?? "—"}
                           </span>
+                        )}
+                      </td>
+                      <td className="vp-cell-acciones">
+                        {puedeAplicarRecargoCuota(c) ? (
+                          <Can permission={PERMISSIONS.SALE_EDIT}>
+                            <button
+                              type="button"
+                              className="vp-btn-recargo"
+                              onClick={() => {
+                                setCuotaRecargoSeleccionada(c);
+                                setShowRecargoModal(true);
+                              }}
+                            >
+                              Aplicar recargo
+                            </button>
+                          </Can>
+                        ) : (
+                          <span className="vp-acciones-vacio" aria-label="Sin acciones disponibles" />
                         )}
                       </td>
                     </tr>
@@ -469,6 +511,21 @@ export default function VentaPagosPage() {
           moneda={moneda}
           onSuccess={handlePagoRegistrado}
           onCancel={() => setShowFormPago(false)}
+        />
+      )}
+
+      {planVigente && cuotaRecargoSeleccionada && (
+        <RecargoAplicarCard
+          key={cuotaRecargoSeleccionada.id}
+          open={showRecargoModal}
+          ventaId={parseInt(ventaId, 10)}
+          cuota={cuotaRecargoSeleccionada}
+          moneda={moneda}
+          onSuccess={handleRecargoAplicado}
+          onCancel={() => {
+            setShowRecargoModal(false);
+            setCuotaRecargoSeleccionada(null);
+          }}
         />
       )}
     </div>

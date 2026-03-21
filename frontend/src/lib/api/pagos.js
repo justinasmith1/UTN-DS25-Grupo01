@@ -1,5 +1,5 @@
 // src/lib/api/pagos.js
-// API del submódulo Pagos (dentro de Ventas). Solo lectura en este bloque.
+// API del submódulo Pagos (dentro de Ventas).
 
 import { http } from "../http/http";
 
@@ -65,6 +65,29 @@ export async function registrarPagoEnVenta(ventaId, payload) {
 
   if (!res.ok) {
     const msg = data?.message || "Error al registrar el pago";
+    const err = new Error(msg);
+    err.statusCode = res.status;
+    err.response = data;
+    throw err;
+  }
+
+  return data?.data ?? data;
+}
+
+/**
+ * Aplica recargo manual sobre una cuota vencida (monto a sumar al recargo acumulado).
+ * @param {number} ventaId
+ * @param {{ cuotaId: number, montoRecargo: number, motivoRecargo: string }} payload
+ */
+export async function aplicarRecargoEnVenta(ventaId, payload) {
+  const res = await http(`${BASE}/${ventaId}/pagos/recargo`, {
+    method: "POST",
+    body: payload,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = data?.message || "Error al aplicar el recargo";
     const err = new Error(msg);
     err.statusCode = res.status;
     err.response = data;
