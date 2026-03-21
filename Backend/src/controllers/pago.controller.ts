@@ -33,3 +33,14 @@ export async function registrarPago(req: Request, res: Response, next: NextFunct
     next(error);
   }
 }
+
+export async function aplicarRecargoManual(req: Request, res: Response, next: NextFunction) {
+  try {
+    const ventaId = parseInt(req.params.ventaId);
+    const user = req.user;
+    await pagoService.aplicarRecargoManualEnVenta(ventaId, req.body, user);
+    res.status(201).json({ success: true, message: 'Recargo aplicado correctamente' });
+  } catch (error) {
+    next(error);
+  }
+}

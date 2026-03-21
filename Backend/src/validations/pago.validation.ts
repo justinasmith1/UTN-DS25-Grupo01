@@ -131,3 +131,10 @@ export const registrarPagoSchema = z.object({
   referencia: z.string().trim().optional(),
   observacion: z.string().trim().optional(),
 });
+
+// Body: aplicar recargo manual (importe final acumulativo sobre la cuota)
+export const aplicarRecargoSchema = z.object({
+  cuotaId: idInt,
+  montoRecargo: dineroPositivo,
+  motivoRecargo: z.string().min(1, 'El motivo del recargo es obligatorio').trim(),
+});
