@@ -4,7 +4,13 @@ import * as pagoController from '../controllers/pago.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema } from '../validations/venta.validation';
-import { ventaIdParamSchema, createPlanPagoSchema, registrarPagoSchema, aplicarRecargoSchema } from '../validations/pago.validation';
+import {
+  ventaIdParamSchema,
+  createPlanPagoSchema,
+  reemplazarPlanPagoSchema,
+  registrarPagoSchema,
+  aplicarRecargoSchema,
+} from '../validations/pago.validation';
 
 const router = Router();
 
@@ -101,6 +107,15 @@ router.post(
     validateParams(ventaIdParamSchema),
     validate(registrarPagoSchema),
     pagoController.registrarPago);
+
+// POST /api/ventas/:ventaId/pagos/plan/reemplazar (antes que /plan para no colisionar rutas)
+router.post(
+    '/:ventaId/pagos/plan/reemplazar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(reemplazarPlanPagoSchema),
+    pagoController.reemplazarPlanPago);
 
 // POST /api/ventas/:ventaId/pagos/plan
 router.post(

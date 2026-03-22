@@ -1,6 +1,6 @@
 // src/services/pago.service.ts
 import prisma from '../config/prisma';
-import { Decimal } from '../generated/prisma/runtime/library';
+import type { Prisma } from '../generated/prisma';
 import {
   calcularMontoFinanciado,
   calcularMontoTotalExigible,
@@ -10,20 +10,63 @@ import {
   estaCuotaVencida,
   obtenerPrimeraCuotaPendiente,
 } from '../domain/pagoState/pagoState.rules';
+import {
+  PLAN_INCLUDE,
+  VENTA_INCLUDE_PAGOS,
+  roundMoney2,
+  toNum,
+  type PagoUserContext,
+} from './pago.shared';
 
-const VENTA_INCLUDE_PAGOS = {
-  lote: { select: { id: true, numero: true, fraccion: { select: { numero: true } } } },
-  comprador: { select: { id: true, nombre: true, apellido: true, razonSocial: true } },
-  compradores: { select: { id: true, nombre: true, apellido: true, razonSocial: true } },
-  inmobiliaria: { select: { id: true, nombre: true } },
-} as const;
+type PagoConCuotaHistorica = Prisma.PagoRegistradoGetPayload<{
+  include: {
+    cuota: {
+      select: {
+        id: true;
+        numeroCuota: true;
+        tipoCuota: true;
+        planPagoId: true;
+        planPago: { select: { id: true; nombre: true; version: true } };
+      };
+    };
+  };
+}>;
 
-const PLAN_INCLUDE = {
-  cuotas: { orderBy: { numeroCuota: 'asc' as const } },
-} as const;
-
-function toNum(val: Decimal | number): number {
-  return typeof val === 'number' ? val : val.toNumber();
+/** Cuota del cronograma con montos numéricos y vencida calculada (plan vigente o histórico). */
+function normalizarCuotaPlanPagoContext(
+  c: {
+    id: number;
+    planPagoId: number;
+    numeroCuota: number;
+    tipoCuota: string;
+    fechaVencimiento: Date;
+    montoOriginal: Prisma.Decimal | number;
+    montoRecargoManual: Prisma.Decimal | number;
+    montoTotalExigible: Prisma.Decimal | number;
+    montoPagado: Prisma.Decimal | number;
+    saldoPendiente: Prisma.Decimal | number;
+    estadoCuota: string;
+    descripcion?: string | null;
+    fechaPagoCompleto?: Date | null;
+    observacion?: string | null;
+    motivoRecargo?: string | null;
+    recargoAplicadoBy?: string | null;
+    fechaAplicacionRecargo?: Date | null;
+    createdAt?: Date;
+    updateAt?: Date | null;
+  },
+  ahora: Date
+) {
+  const saldo = toNum(c.saldoPendiente);
+  return {
+    ...c,
+    montoOriginal: toNum(c.montoOriginal),
+    montoRecargoManual: toNum(c.montoRecargoManual),
+    montoTotalExigible: toNum(c.montoTotalExigible),
+    montoPagado: toNum(c.montoPagado),
+    saldoPendiente: saldo,
+    estaVencida: estaCuotaVencida(c.fechaVencimiento, saldo, ahora),
+  };
 }
 
 export async function getPagosContextByVentaId(ventaId: number) {
@@ -44,38 +87,67 @@ export async function getPagosContextByVentaId(ventaId: number) {
     throw error;
   }
 
+  const ahora = new Date();
+
   const planVigente = await prisma.planPago.findFirst({
     where: { ventaId, esVigente: true },
     include: PLAN_INCLUDE,
   });
 
   const cuotas = planVigente?.cuotas ?? [];
-  const pagos = await prisma.pagoRegistrado.findMany({
+  const pagos = (await prisma.pagoRegistrado.findMany({
     where: { ventaId },
     orderBy: { fechaPago: 'desc' },
-  });
+    include: {
+      cuota: {
+        select: {
+          id: true,
+          numeroCuota: true,
+          tipoCuota: true,
+          planPagoId: true,
+          planPago: { select: { id: true, nombre: true, version: true } },
+        },
+      },
+    },
+  })) as PagoConCuotaHistorica[];
 
-  const planesHistoricos = await prisma.planPago.findMany({
+  const planesHistoricosRaw = await prisma.planPago.findMany({
     where: { ventaId, esVigente: false },
     orderBy: { version: 'desc' },
+    include: PLAN_INCLUDE,
   });
 
-  const ahora = new Date();
-  let montoTotalPlanificado = 0;
+  const planesHistoricos = planesHistoricosRaw.map((ph) => ({
+    id: ph.id,
+    nombre: ph.nombre,
+    estadoPlan: ph.estadoPlan,
+    tipoFinanciacion: ph.tipoFinanciacion,
+    moneda: ph.moneda,
+    cantidadCuotas: ph.cantidadCuotas,
+    montoTotalPlanificado: toNum(ph.montoTotalPlanificado),
+    montoFinanciado: toNum(ph.montoFinanciado),
+    montoAnticipo: toNum(ph.montoAnticipo),
+    fechaInicio: ph.fechaInicio,
+    version: ph.version,
+    esVigente: ph.esVigente,
+    descripcion: ph.descripcion,
+    observaciones: ph.observaciones,
+    createdAt: ph.createdAt,
+    createdBy: ph.createdBy,
+    cuotas: ph.cuotas.map((c) => normalizarCuotaPlanPagoContext(c, ahora)),
+  }));
+
   let montoTotalPagado = 0;
   let saldoPendienteTotal = 0;
   let cuotasPagas = 0;
   let cuotasPendientes = 0;
   let cuotasVencidas = 0;
 
-  if (planVigente) {
-    montoTotalPlanificado = toNum(planVigente.montoTotalPlanificado);
-  }
+  // Total pagado de la venta: todos los pagos registrados (planes anteriores siguen referenciando sus cuotas).
+  montoTotalPagado = pagos.reduce((acc, p) => acc + toNum(p.monto), 0);
 
   for (const cuota of cuotas) {
-    const pagado = toNum(cuota.montoPagado);
     const saldo = toNum(cuota.saldoPendiente);
-    montoTotalPagado += pagado;
     saldoPendienteTotal += saldo;
 
     if (cuota.estadoCuota === 'PAGA') {
@@ -88,23 +160,51 @@ export async function getPagosContextByVentaId(ventaId: number) {
     }
   }
 
-  const cuotasNormalizadas = cuotas.map((c) => {
-    const saldo = toNum(c.saldoPendiente);
+  const cuotasNormalizadas = cuotas.map((c) => normalizarCuotaPlanPagoContext(c, ahora));
+
+  const planVigenteId = planVigente?.id ?? null;
+
+  const pagosNormalizados = pagos.map((p) => {
+    const { cuota, ...pagoSinCuota } = p;
+    const planCuota = cuota?.planPago;
+    const planPagoIdHist = planCuota?.id ?? p.planPagoId;
+    const planVersionHist = planCuota?.version ?? null;
+    const planNombreHist = planCuota?.nombre ?? null;
+
+    let referenciaCuotaUi = '—';
+    if (cuota) {
+      const tipo = String(cuota.tipoCuota ?? '');
+      const base =
+        tipo.length > 0
+          ? `Cuota ${cuota.numeroCuota} · ${tipo}`
+          : `Cuota ${cuota.numeroCuota}`;
+      const esOtroPlan =
+        planVigenteId != null &&
+        planPagoIdHist != null &&
+        planPagoIdHist !== planVigenteId;
+      referenciaCuotaUi =
+        esOtroPlan && planVersionHist != null ? `${base} (v${planVersionHist})` : base;
+    }
+
     return {
-      ...c,
-      montoOriginal: toNum(c.montoOriginal),
-      montoRecargoManual: toNum(c.montoRecargoManual),
-      montoTotalExigible: toNum(c.montoTotalExigible),
-      montoPagado: toNum(c.montoPagado),
-      saldoPendiente: saldo,
-      estaVencida: estaCuotaVencida(c.fechaVencimiento, saldo, ahora),
+      ...pagoSinCuota,
+      monto: toNum(p.monto),
+      cuotaHistorica: cuota
+        ? {
+            cuotaId: cuota.id,
+            numeroCuota: cuota.numeroCuota,
+            tipoCuota: cuota.tipoCuota,
+            planPagoId: planPagoIdHist,
+            planVersion: planVersionHist,
+            planNombre: planNombreHist,
+          }
+        : null,
+      referenciaCuotaUi,
     };
   });
 
-  const pagosNormalizados = pagos.map((p) => ({
-    ...p,
-    monto: toNum(p.monto),
-  }));
+  // Visión global de la venta: planificado = ya pagado (toda la historia) + saldo del plan vigente.
+  const montoTotalPlanificadoResumen = roundMoney2(montoTotalPagado + saldoPendienteTotal);
 
   return {
     venta: {
@@ -140,7 +240,7 @@ export async function getPagosContextByVentaId(ventaId: number) {
     pagos: pagosNormalizados,
     planesHistoricos,
     resumen: {
-      montoTotalPlanificado,
+      montoTotalPlanificado: montoTotalPlanificadoResumen,
       montoTotalPagado,
       saldoPendienteTotal,
       cantidadCuotas: cuotas.length,
@@ -170,15 +270,10 @@ interface CreatePlanPayload {
   observaciones?: string;
 }
 
-interface UserContext {
-  email?: string;
-  role?: string;
-}
-
 export async function createPlanPagoInicial(
   ventaId: number,
   payload: CreatePlanPayload,
-  user?: UserContext
+  user?: PagoUserContext
 ) {
   const venta = await prisma.venta.findUnique({
     where: { id: ventaId },
@@ -270,7 +365,7 @@ interface RegistrarPagoPayload {
 export async function registrarPagoEnVenta(
   ventaId: number,
   payload: RegistrarPagoPayload,
-  user?: UserContext
+  user?: PagoUserContext
 ) {
   const venta = await prisma.venta.findUnique({
     where: { id: ventaId },
@@ -475,7 +570,7 @@ interface AplicarRecargoPayload {
 export async function aplicarRecargoManualEnVenta(
   ventaId: number,
   payload: AplicarRecargoPayload,
-  user?: UserContext
+  user?: PagoUserContext
 ) {
   const venta = await prisma.venta.findUnique({
     where: { id: ventaId },
@@ -601,3 +696,5 @@ export async function aplicarRecargoManualEnVenta(
     });
   });
 }
+
+export { reemplazarPlanPagoVigente } from './pagoPlanReemplazo.service';

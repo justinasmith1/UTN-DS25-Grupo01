@@ -44,3 +44,18 @@ export async function aplicarRecargoManual(req: Request, res: Response, next: Ne
     next(error);
   }
 }
+
+export async function reemplazarPlanPago(req: Request, res: Response, next: NextFunction) {
+  try {
+    const ventaId = parseInt(req.params.ventaId);
+    const user = req.user;
+    const result = await pagoService.reemplazarPlanPagoVigente(ventaId, req.body, user);
+    res.status(201).json({
+      success: true,
+      message: 'Plan de pago reemplazado correctamente',
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+}
