@@ -145,6 +145,28 @@
   padding-bottom: 1rem;
   margin-bottom: 1.5rem;
 }
+.vp-header__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem 0;
+  align-items: flex-start;
+}
+.vp-header__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
+}
+.vp-header__consulta-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+  max-width: 42rem;
+}
+.vp-header__meta {
+  margin-top: 0.15rem;
+}
 .vp-title {
   font-size: 1.5rem;
   font-weight: 700;
@@ -156,6 +178,12 @@
   flex-wrap: wrap;
   gap: 1rem 1.5rem;
   align-items: center;
+}
+@media (max-width: 576px) {
+  .vp-context-item--block-sm {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
 }
 .vp-context-item {
   display: flex;
@@ -218,6 +246,23 @@
 }
 .vp-summary-value--success { color: #18794E; }
 .vp-summary-value--warn { color: #B45309; }
+.vp-summary-value--danger-soft {
+  color: #b91c1c;
+}
+.vp-summary-card--vencidas-alert {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fffafa 0%, #fff5f5 100%);
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.06);
+}
+.vp-summary-card--vencidas-alert .vp-summary-label {
+  color: #991b1b;
+}
+.vp-summary-row .vp-summary-card {
+  min-height: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 
 /* Plan vigente */
 .vp-plan-grid {

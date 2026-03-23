@@ -15,8 +15,23 @@ import StatusBadge from './cells/StatusBadge.jsx';
 import { getLoteIdFormatted } from '../TablaLotes/utils/getters';
 import './TablaVentas.css';
 
-// Persistencia de columnas por usuario
-const STORAGE_VERSION = 'v2';
+/** Cancelada sin plan/pagos/planes → botón Pagos visible pero disabled (mismo patrón que eliminar). */
+function ventaTieneInfoFinancieraParaPagos(venta) {
+  const vigente = Array.isArray(venta?.planPagos) && venta.planPagos.length > 0;
+  const c = venta?._count;
+  const planes = c?.planPagos ?? 0;
+  const pagos = c?.pagosRegistrados ?? 0;
+  return vigente || planes > 0 || pagos > 0;
+}
+
+function pagosDeshabilitadoPorCancelada(venta) {
+  if (!venta) return true;
+  if (String(venta.estado || '').toUpperCase() !== 'CANCELADA') return false;
+  return !ventaTieneInfoFinancieraParaPagos(venta);
+}
+
+// Persistencia de columnas por usuario (v4: Financiación tras Inmobiliaria; sin Comprador/Tipo pago)
+const STORAGE_VERSION = 'v4';
 const APP_NS = 'lfed';
 const makeColsKey = (userKey) =>
   `${APP_NS}:tabla-ventas-cols:${STORAGE_VERSION}:${userKey}`;
@@ -218,7 +233,8 @@ export default function TablaVentas({
     const puedeEditar = canEditByEstadoOperativo(venta);
     const puedeEliminar = canDeleteVenta(venta);
     const tooltipEliminar = getVentaDeleteTooltip(venta);
-    
+    const pagosOff = pagosDeshabilitadoPorCancelada(venta);
+
     if (estaEliminada) {
       return (
         <div className="tl-actions">
@@ -281,10 +297,17 @@ export default function TablaVentas({
       )}
       {can('ver') && onPagos && (
         <button
-          className="tl-icon tl-icon--pagos"
+          type="button"
+          className={`tl-icon tl-icon--pagos${pagosOff ? ' disabled' : ''}`}
           aria-label="Pagos"
-          data-tooltip="Pagos"
-          onClick={() => onPagos?.(venta)}
+          data-tooltip={
+            pagosOff
+              ? 'Venta cancelada sin información de pagos para consultar'
+              : 'Pagos'
+          }
+          disabled={pagosOff}
+          onClick={() => !pagosOff && onPagos?.(venta)}
+          style={pagosOff ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
         >
           <Banknote size={18} strokeWidth={2} />
         </button>

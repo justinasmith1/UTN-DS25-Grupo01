@@ -68,6 +68,9 @@ const fromApi = (row = {}) => {
     })(),
     createdAt: row.createdAt ?? row.fechaCreacion ?? null,
     updatedAt: row.updatedAt ?? row.updateAt ?? row.fechaActualizacion ?? null,
+    // Submódulo pagos / tabla: el back incluye plan vigente y conteos; sin esto siempre cae "Sin plan"
+    planPagos: Array.isArray(row.planPagos) ? row.planPagos : [],
+    _count: row._count && typeof row._count === "object" ? row._count : undefined,
   };
 };
 
@@ -128,6 +131,8 @@ async function apiGetById(id) {
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     reserva: raw?.reserva || null,
+    planPagos: Array.isArray(raw?.planPagos) ? raw.planPagos : base.planPagos ?? [],
+    _count: raw?._count ?? base._count,
   });
 }
 
@@ -241,6 +246,8 @@ async function apiUpdate(id, payload) {
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     reserva: raw?.reserva || null,
+    planPagos: Array.isArray(raw?.planPagos) ? raw.planPagos : base.planPagos ?? [],
+    _count: raw?._count ?? base._count,
   });
 }
 

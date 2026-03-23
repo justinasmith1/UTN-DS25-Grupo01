@@ -16,6 +16,17 @@ const VENTA_INCLUDE = {
     compradores: true,
     lote: { include: { propietario: true, fraccion: { select: { numero: true } } } },
     inmobiliaria: true,
+    /** Plan vigente (tabla ventas: Con plan / Sin plan; acceso Pagos en canceladas) */
+    planPagos: {
+        where: { esVigente: true },
+        select: { id: true },
+    },
+    _count: {
+        select: {
+            planPagos: true,
+            pagosRegistrados: true,
+        },
+    },
 } as const;
 
 /** Unifica legacy compradorId y nuevo compradores[] en una lista de IDs */

@@ -6,6 +6,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
+import { getLoteIdFormatted } from "../components/Table/TablaLotes/utils/getters";
 import PlanCrearForm from "../components/Pagos/PlanCrearForm";
 import PagoRegistrarCard from "../components/Pagos/PagoRegistrarCard";
 import RecargoAplicarCard from "../components/Pagos/RecargoAplicarCard";
@@ -35,13 +36,15 @@ const getCompradorLabel = (comprador) => {
   return [n, a].filter(Boolean).join(" ").trim() || "—";
 };
 
-// Lote: numero o id
-const getLoteLabel = (lote) => {
-  if (!lote) return "—";
-  if (lote.numero != null) return String(lote.numero);
-  if (lote.fraccion?.numero != null) return `Fracc. ${lote.fraccion.numero}`;
-  if (lote.id != null) return `Lote #${lote.id}`;
-  return "—";
+/** Lista legible de compradores (compradores[] + fallback comprador principal). */
+const formatCompradoresVenta = (venta) => {
+  if (!venta) return "—";
+  const multi = Array.isArray(venta.compradores) ? venta.compradores : [];
+  const list =
+    multi.length > 0 ? multi : venta.comprador ? [venta.comprador] : [];
+  const labels = list.map(getCompradorLabel).filter((s) => s && s !== "—");
+  if (!labels.length) return "—";
+  return labels.join(", ");
 };
 
 // Badge para estado de venta / estado de cobro
@@ -214,7 +217,33 @@ export default function VentaPagosPage() {
     return sorted[0] ?? null;
   }, [data?.cuotas]);
 
+  const modoConsultaCancelada = useMemo(
+    () => String(data?.venta?.estado ?? "").toUpperCase() === "CANCELADA",
+    [data?.venta?.estado]
+  );
+
+  /** Monto planificado = pagado + saldo (coherente con recargos y reemplazos). */
+  const resumenCoherente = useMemo(() => {
+    const r = data?.resumen ?? {};
+    const p = Number(r.montoTotalPagado);
+    const s = Number(r.saldoPendienteTotal);
+    const pagado = Number.isFinite(p) ? p : 0;
+    const saldo = Number.isFinite(s) ? s : 0;
+    return {
+      ...r,
+      montoPlanificado: Math.round((pagado + saldo) * 100) / 100,
+    };
+  }, [
+    data?.resumen?.montoTotalPagado,
+    data?.resumen?.saldoPendienteTotal,
+    data?.resumen?.cantidadCuotas,
+    data?.resumen?.cuotasPagas,
+    data?.resumen?.cuotasVencidas,
+    data?.resumen?.montoTotalPlanificado,
+  ]);
+
   const puedeMostrarReemplazoPlan = useMemo(() => {
+    if (modoConsultaCancelada) return false;
     if (planVista.esHistorico) return false;
     const pv = data?.planVigente;
     if (!pv?.id) return false;
@@ -224,12 +253,13 @@ export default function VentaPagosPage() {
     );
     const saldo = Number(data?.resumen?.saldoPendienteTotal);
     return tienePagosEnPlanVigente && !Number.isNaN(saldo) && saldo > 0;
-  }, [data, planVista.esHistorico]);
+  }, [data, planVista.esHistorico, modoConsultaCancelada]);
 
   const puedeAplicarRecargoCuota = (c) =>
     Boolean(c?.estaVencida) && Number(c?.saldoPendiente) > 0;
 
-  const mostrarAccionesCronograma = Boolean(data?.planVigente) && !planVista.esHistorico;
+  const mostrarAccionesCronograma =
+    Boolean(data?.planVigente) && !planVista.esHistorico && !modoConsultaCancelada;
   const planVersionNiceSelectValue = selectedPlanId ?? data?.planVigente?.id ?? "";
 
   const volverAVentas = () => navigate("/ventas");
@@ -260,8 +290,10 @@ export default function VentaPagosPage() {
     );
   }
 
-  const { venta, planVigente, pagos = [], resumen = {} } = data ?? {};
-  const totalCuotas = resumen.cantidadCuotas ?? 0;
+  const { venta, planVigente, pagos = [] } = data ?? {};
+  const totalCuotas = resumenCoherente.cantidadCuotas ?? 0;
+  const cuotasVencidas = resumenCoherente.cuotasVencidas ?? 0;
+  const loteDisplay = getLoteIdFormatted(venta?.lote);
 
   return (
     <div className="container py-4">
@@ -284,72 +316,99 @@ export default function VentaPagosPage() {
 
       {/* A. Encabezado / contexto de venta */}
       <div className="vp-header d-flex justify-content-between align-items-start flex-wrap gap-3">
-        <div>
+        <div className="vp-header__main flex-grow-1 min-w-0">
           <h1 className="vp-title">Pagos — Venta {venta?.numero ?? ventaId}</h1>
-          <div className="vp-context">
-            <span className="vp-context-item">
-              <span className="vp-context-label">Fecha:</span> {fmtFecha(venta?.fechaVenta)}
-            </span>
-            <span
-              className="vp-context-item"
-              title={
-                planVigente
-                  ? undefined
-                  : "Monto de la venta; la moneda de cobro queda definida al crear el plan de pago."
-              }
-            >
-              <span className="vp-context-label">Monto venta:</span>{" "}
-              {planVigente ? fmtMonto(venta?.monto, planVigente.moneda) : fmtMontoSinMoneda(venta?.monto)}
-            </span>
-            <span className="vp-context-item">
+          <div className="vp-header__secondary">
+            <div className="vp-header__badges" role="group" aria-label="Estados">
               <span className={`vp-badge ${getEstadoBadgeClass(venta?.estado)}`}>
                 {venta?.estado ?? "—"}
               </span>
-            </span>
-            <span className="vp-context-item">
               <span className={`vp-badge ${getEstadoBadgeClass(venta?.estadoCobro)}`}>
                 Cobro: {venta?.estadoCobro ?? "—"}
               </span>
-            </span>
-            <span className="vp-context-item">
-              <span className="vp-context-label">Lote:</span> {getLoteLabel(venta?.lote)}
-            </span>
-            <span className="vp-context-item">
-              <span className="vp-context-label">Comprador:</span> {getCompradorLabel(venta?.comprador)}
-            </span>
+            </div>
+            {modoConsultaCancelada ? (
+              <p className="vp-header__consulta-hint">
+                Venta cancelada — solo consulta (sin crear plan, registrar pagos ni aplicar recargos).
+              </p>
+            ) : null}
+            <div className="vp-header__meta vp-context">
+              <span className="vp-context-item">
+                <span className="vp-context-label">Fecha:</span> {fmtFecha(venta?.fechaVenta)}
+              </span>
+              <span
+                className="vp-context-item"
+                title={
+                  planVigente
+                    ? undefined
+                    : "Monto de la venta; la moneda de cobro queda definida al crear el plan de pago."
+                }
+              >
+                <span className="vp-context-label">Monto venta:</span>{" "}
+                {planVigente ? fmtMonto(venta?.monto, planVigente.moneda) : fmtMontoSinMoneda(venta?.monto)}
+              </span>
+              <span className="vp-context-item">
+                <span className="vp-context-label">Lote:</span> {loteDisplay}
+              </span>
+              <span className="vp-context-item vp-context-item--block-sm">
+                <span className="vp-context-label">
+                  Comprador{Array.isArray(venta?.compradores) && venta.compradores.length > 1 ? "es" : ""}:
+                </span>{" "}
+                {formatCompradoresVenta(venta)}
+              </span>
+            </div>
           </div>
         </div>
         {botonVolver}
       </div>
 
-      {/* B. Resumen financiero */}
-      <div className="row g-3 mb-4">
-        <div className="col-md-6 col-lg-3">
+      {/* B. Resumen financiero (global operativo; cuotas del plan vigente) */}
+      <div className="row g-3 mb-4 vp-summary-row">
+        <div className="col-6 col-md-4 col-xl-2">
           <div className="vp-summary-card vp-summary-card--highlight">
             <div className="vp-summary-label">Monto planificado</div>
-            <div className="vp-summary-value">{fmtMonto(resumen.montoTotalPlanificado, moneda)}</div>
+            <div className="vp-summary-value">
+              {fmtMonto(resumenCoherente.montoPlanificado, moneda)}
+            </div>
           </div>
         </div>
-        <div className="col-md-6 col-lg-3">
+        <div className="col-6 col-md-4 col-xl-2">
           <div className="vp-summary-card vp-summary-card--highlight">
             <div className="vp-summary-label">Monto pagado</div>
-            <div className="vp-summary-value vp-summary-value--success">{fmtMonto(resumen.montoTotalPagado, moneda)}</div>
+            <div className="vp-summary-value vp-summary-value--success">
+              {fmtMonto(resumenCoherente.montoTotalPagado, moneda)}
+            </div>
           </div>
         </div>
-        <div className="col-md-6 col-lg-3">
+        <div className="col-6 col-md-4 col-xl-2">
           <div className="vp-summary-card vp-summary-card--highlight">
             <div className="vp-summary-label">Saldo pendiente</div>
-            <div className="vp-summary-value vp-summary-value--warn">{fmtMonto(resumen.saldoPendienteTotal, moneda)}</div>
+            <div className="vp-summary-value vp-summary-value--warn">
+              {fmtMonto(resumenCoherente.saldoPendienteTotal, moneda)}
+            </div>
           </div>
         </div>
-        <div className="col-md-6 col-lg-3">
+        <div className="col-6 col-md-4 col-xl-2">
           <div className="vp-summary-card">
-            <div className="vp-summary-label">Cuotas</div>
-            <div className="vp-summary-value">
-              {resumen.cuotasPagas ?? 0} pagas / {totalCuotas} total
-              {(resumen.cuotasVencidas ?? 0) > 0 && (
-                <span className="vp-badge vp-badge--danger ms-2">{resumen.cuotasVencidas} vencidas</span>
-              )}
+            <div className="vp-summary-label">Cuotas pagas</div>
+            <div className="vp-summary-value">{resumenCoherente.cuotasPagas ?? 0}</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-4 col-xl-2">
+          <div className="vp-summary-card">
+            <div className="vp-summary-label">Cuotas totales</div>
+            <div className="vp-summary-value">{totalCuotas}</div>
+          </div>
+        </div>
+        <div className="col-6 col-md-4 col-xl-2">
+          <div
+            className={`vp-summary-card${cuotasVencidas > 0 ? " vp-summary-card--vencidas-alert" : ""}`}
+          >
+            <div className="vp-summary-label">Cuotas vencidas</div>
+            <div
+              className={`vp-summary-value${cuotasVencidas > 0 ? " vp-summary-value--danger-soft" : ""}`}
+            >
+              {cuotasVencidas}
             </div>
           </div>
         </div>
@@ -442,15 +501,17 @@ export default function VentaPagosPage() {
         <div className="vp-summary-card vp-plan-empty-card mb-4">
           <div className="vp-plan-empty-header">
             <h5 className="vp-section-title mb-0">Plan vigente</h5>
-            <Can permission={PERMISSIONS.SALE_EDIT}>
-              <button
-                type="button"
-                className="vp-btn-crear-plan"
-                onClick={() => setShowFormPlan(true)}
-              >
-                Crear plan
-              </button>
-            </Can>
+            {!modoConsultaCancelada ? (
+              <Can permission={PERMISSIONS.SALE_EDIT}>
+                <button
+                  type="button"
+                  className="vp-btn-crear-plan"
+                  onClick={() => setShowFormPlan(true)}
+                >
+                  Crear plan
+                </button>
+              </Can>
+            ) : null}
           </div>
           <div className="vp-empty vp-empty--plan">Esta venta no tiene plan de pago definido.</div>
         </div>
@@ -466,6 +527,11 @@ export default function VentaPagosPage() {
             {planVigente && planVista.esHistorico ? (
               <p className="vp-cronograma-hint text-muted small mb-0 mt-1">
                 Vista de consulta — versión reemplazada (sin acciones de cobro).
+              </p>
+            ) : null}
+            {planVigente && modoConsultaCancelada && !planVista.esHistorico ? (
+              <p className="vp-cronograma-hint text-muted small mb-0 mt-1">
+                Venta cancelada — solo consulta (sin registrar pagos ni aplicar recargos).
               </p>
             ) : null}
           </div>
@@ -619,7 +685,7 @@ export default function VentaPagosPage() {
       </div>
 
       {/* Modal flotante: Crear plan de pago */}
-      {!planVigente && (
+      {!planVigente && !modoConsultaCancelada && (
         <PlanCrearForm
           open={showFormPlan}
           ventaId={parseInt(ventaId, 10)}
@@ -665,7 +731,7 @@ export default function VentaPagosPage() {
             version: planVigente.version,
             tipoFinanciacion: planVigente.tipoFinanciacion,
             moneda: planVigente.moneda ?? "ARS",
-            saldoPendienteReal: Number(resumen.saldoPendienteTotal),
+            saldoPendienteReal: Number(resumenCoherente.saldoPendienteTotal),
           }}
           onSuccess={handlePlanReemplazado}
           onCancel={() => setShowReemplazoModal(false)}
