@@ -32,13 +32,105 @@
 }
 
 /* Empty state "sin plan" */
-.vp-plan-empty-header {
+.vp-plan-empty-header,
+.vp-plan-vigente-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.75rem 1rem;
   margin-bottom: 1rem;
+}
+.vp-plan-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+/* Select + Reemplazar: misma anchura; botón compacto (no hereda el tamaño grande del vp-btn-crear-plan) */
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 9.5rem));
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+}
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) .vp-plan-version-ns {
+  width: 100%;
+}
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) .vp-btn-crear-plan {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* NiceSelect versión plan: tipografía chica, menú anclado al trigger (sin portal → no “flota” al scroll) */
+.vp-plan-header-actions .vp-plan-version-ns {
+  position: relative;
+  z-index: 5;
+  width: 9.5rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.vp-plan-version-ns .ns-wrap {
+  width: 100%;
+}
+.vp-plan-version-ns .ns-trigger {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 30px 4px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafbfc;
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #4b5563;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.vp-plan-version-ns .ns-trigger:hover {
+  background: #f3f4f6;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.vp-plan-version-ns .ns-trigger:focus-visible {
+  outline: none;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.35);
+}
+.vp-plan-version-ns .ns-trigger span {
+  padding-right: 2px;
+  color: #374151;
+}
+.vp-plan-version-ns .ns-trigger svg {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+.vp-plan-version-ns .ns-trigger svg polyline {
+  stroke: #64748b;
+}
+.vp-plan-version-ns .ns-list {
+  font-size: 0.75rem;
+  border-radius: 8px;
+  padding: 4px;
+}
+.vp-plan-version-ns .ns-item {
+  padding: 6px 8px;
+  border-radius: 6px;
 }
 .vp-plan-empty-card .vp-empty--plan {
   margin-bottom: 0;
@@ -102,6 +194,13 @@
 .vp-summary-card--highlight {
   border-color: #d1ece3;
   background: #f8fcf9;
+}
+.vp-summary-card--historico {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+.vp-summary-card--historico:hover {
+  box-shadow: 0 1px 6px rgba(16, 24, 40, 0.06);
 }
 .vp-summary-label {
   font-size: 0.75rem;
@@ -507,6 +606,11 @@
 /* Evita doble separación con .cclf-footer (mismo modal que Registrar pago) */
 .cclf-card__body.vp-plan-form__body > .cclf-footer.vp-plan-form__footer {
   margin-top: 0;
+}
+
+.vp-cronograma-hint {
+  max-width: 36rem;
+  line-height: 1.4;
 }
 
 /* Cronograma: header con CTA Registrar pago */

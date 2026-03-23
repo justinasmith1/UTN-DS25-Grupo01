@@ -51,6 +51,29 @@ export async function createPlanPagoInicial(ventaId, payload) {
 }
 
 /**
+ * Reemplaza el plan vigente (con pagos ya registrados) por uno nuevo sobre el saldo pendiente real.
+ * @param {number} ventaId
+ * @param {object} payload - Mismo cuerpo que creación salvo que el servidor no usa montoTotalPlanificado (usa saldo real).
+ */
+export async function reemplazarPlanPago(ventaId, payload) {
+  const res = await http(`${BASE}/${ventaId}/pagos/plan/reemplazar`, {
+    method: "POST",
+    body: payload,
+  });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    const msg = data?.message || "Error al reemplazar el plan de pago";
+    const err = new Error(msg);
+    err.statusCode = res.status;
+    err.response = data;
+    throw err;
+  }
+
+  return data?.data ?? data;
+}
+
+/**
  * Registra un pago sobre una cuota de la venta.
  * @param {number} ventaId - ID de la venta
  * @param {object} payload - { cuotaId, fechaPago, monto, medioPago, referencia?, observacion? }

@@ -122,3 +122,51 @@ export function mapAplicarRecargoError(error) {
 
   return base;
 }
+
+const HINT_REEMPLAZO = " Cerrá el formulario o actualizá la página y volvé a intentar.";
+
+/** Mensajes 409 / dominio al reemplazar plan → texto claro */
+function mapReemplazarPlanConflictMessage(raw) {
+  const msg = String(raw || "").trim();
+  const table = {
+    "La venta está eliminada": "La venta no está disponible para reemplazar el plan.",
+    "La venta no tiene un plan vigente para reemplazar":
+      "No hay plan vigente para reemplazar. Verificá la venta o actualizá la página.",
+    "El reemplazo de plan solo aplica cuando ya existen pagos registrados sobre el plan vigente; hasta entonces puede editarse el plan directamente":
+      "El reemplazo aplica solo cuando ya hay pagos registrados en este plan. Si aún no hay pagos, podés ajustar el plan de otra forma.",
+    "No se permite cambiar la moneda al reemplazar el plan":
+      "No se puede cambiar la moneda al reemplazar el plan. La moneda debe ser la del plan actual.",
+    "El plan no puede reemplazarse porque no existe saldo pendiente":
+      "No hay saldo pendiente para redistribuir; no corresponde reemplazar el plan.",
+    "El nuevo cronograma debe coincidir con el saldo pendiente real":
+      "La suma del nuevo cronograma no coincide con el saldo pendiente real. Revisá los montos de las cuotas.",
+  };
+  if (table[msg]) return table[msg];
+  if (msg.toLowerCase().includes("saldo pendiente real") || msg.toLowerCase().includes("monto esperado")) {
+    return table["El nuevo cronograma debe coincidir con el saldo pendiente real"];
+  }
+  if (msg.toLowerCase().includes("moneda")) {
+    return table["No se permite cambiar la moneda al reemplazar el plan"];
+  }
+  return msg + (msg.endsWith(".") ? "" : ".") + HINT_REEMPLAZO;
+}
+
+/**
+ * Errores al reemplazar plan: Zod (400) + conflictos 409.
+ * @param {Error & { statusCode?: number; response?: object }} error
+ */
+export function mapReemplazarPlanPagoError(error) {
+  const base = mapPagoBackendError(error, { defaultMessage: "Error al reemplazar el plan de pago" });
+  if (Object.keys(base.fieldErrors).length > 0) {
+    return base;
+  }
+
+  const status = error?.statusCode;
+  const rawMsg = error?.message || error?.response?.message || "";
+
+  if (status === 409 && rawMsg) {
+    return { fieldErrors: {}, generalMessage: mapReemplazarPlanConflictMessage(rawMsg) };
+  }
+
+  return base;
+}

@@ -2,13 +2,14 @@
 // Formulario para crear el plan inicial de pagos (Bloque 1 I3).
 // Se abre como card/modal flotante bloqueante (cclf-overlay + cclf-card).
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useForm, useFieldArray, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Trash2, Info } from "lucide-react";
-import { createPlanPagoInicial } from "../../lib/api/pagos";
+import { createPlanPagoInicial, reemplazarPlanPago } from "../../lib/api/pagos";
 import { toDateInputValue, fromDateInputToISO } from "../../utils/ventaDateUtils";
-import { mapPagoBackendError } from "../../utils/pagoErrorMapper";
+import { mapPagoBackendError, mapReemplazarPlanPagoError } from "../../utils/pagoErrorMapper";
+import { fmtMonto } from "../../utils/pagoUtils";
 import { planPagoCreateSchema } from "../../lib/validations/planPagoCreate.schema.js";
 import {
   TIPOS_FINANCIACION_OPTIONS,
@@ -56,7 +57,33 @@ const getDefaultValues = () => {
   };
 };
 
-export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
+export default function PlanCrearForm({
+  ventaId,
+  onSuccess,
+  onCancel,
+  open,
+  mode = "crear",
+  reemplazoContext = null,
+}) {
+  const isReemplazo = mode === "reemplazo";
+  const formId = isReemplazo ? "plan-reemplazar-form" : "plan-crear-form";
+  const saldoReemplazo = reemplazoContext?.saldoPendienteReal;
+  const monedaReemplazo = reemplazoContext?.moneda;
+
+  const defaultFormValues = useMemo(() => {
+    if (isReemplazo && saldoReemplazo != null && monedaReemplazo) {
+      const n = Number(saldoReemplazo);
+      if (!Number.isNaN(n) && n > 0) {
+        return {
+          ...getDefaultValues(),
+          moneda: monedaReemplazo,
+          montoTotalPlanificado: n.toFixed(2),
+        };
+      }
+    }
+    return getDefaultValues();
+  }, [isReemplazo, saldoReemplazo, monedaReemplazo]);
+
   const {
     register,
     handleSubmit,
@@ -69,7 +96,7 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
     watch,
   } = useForm({
     resolver: zodResolver(planPagoCreateSchema),
-    defaultValues: getDefaultValues(),
+    defaultValues: defaultFormValues,
     mode: "onChange",
     reValidateMode: "onChange",
   });
@@ -227,37 +254,58 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
     setSaving(true);
 
     try {
-      const payload = {
-        nombre: String(data.nombre).trim(),
-        tipoFinanciacion: data.tipoFinanciacion,
-        moneda: data.moneda,
-        cantidadCuotas: Number(data.cantidadCuotas),
-        montoTotalPlanificado: Number(data.montoTotalPlanificado),
-        fechaInicio: fromDateInputToISO(data.fechaInicio),
-        cuotas: data.cuotas.map((c) => ({
-          numeroCuota: Number(c.numeroCuota),
-          tipoCuota: c.tipoCuota,
-          fechaVencimiento: fromDateInputToISO(c.fechaVencimiento),
-          montoOriginal: Number(c.montoOriginal),
-          ...(c.descripcion?.trim() ? { descripcion: c.descripcion.trim() } : {}),
-        })),
-      };
-      if (data.montoAnticipo !== undefined && data.montoAnticipo !== "") {
-        payload.montoAnticipo = Number(data.montoAnticipo);
-      }
-      if (data.observaciones?.trim()) {
-        payload.observaciones = data.observaciones.trim();
-      }
-      if (data.descripcion?.trim()) {
-        payload.descripcion = data.descripcion.trim();
-      }
+      const cuotasPayload = data.cuotas.map((c) => ({
+        numeroCuota: Number(c.numeroCuota),
+        tipoCuota: c.tipoCuota,
+        fechaVencimiento: fromDateInputToISO(c.fechaVencimiento),
+        montoOriginal: Number(c.montoOriginal),
+        ...(c.descripcion?.trim() ? { descripcion: c.descripcion.trim() } : {}),
+      }));
 
-      await createPlanPagoInicial(ventaId, payload);
+      if (isReemplazo) {
+        const payload = {
+          nombre: String(data.nombre).trim(),
+          tipoFinanciacion: data.tipoFinanciacion,
+          cantidadCuotas: Number(data.cantidadCuotas),
+          fechaInicio: fromDateInputToISO(data.fechaInicio),
+          cuotas: cuotasPayload,
+        };
+        if (data.montoAnticipo !== undefined && data.montoAnticipo !== "") {
+          payload.montoAnticipo = Number(data.montoAnticipo);
+        }
+        if (data.observaciones?.trim()) {
+          payload.observaciones = data.observaciones.trim();
+        }
+        if (data.descripcion?.trim()) {
+          payload.descripcion = data.descripcion.trim();
+        }
+        await reemplazarPlanPago(ventaId, payload);
+      } else {
+        const payload = {
+          nombre: String(data.nombre).trim(),
+          tipoFinanciacion: data.tipoFinanciacion,
+          moneda: data.moneda,
+          cantidadCuotas: Number(data.cantidadCuotas),
+          montoTotalPlanificado: Number(data.montoTotalPlanificado),
+          fechaInicio: fromDateInputToISO(data.fechaInicio),
+          cuotas: cuotasPayload,
+        };
+        if (data.montoAnticipo !== undefined && data.montoAnticipo !== "") {
+          payload.montoAnticipo = Number(data.montoAnticipo);
+        }
+        if (data.observaciones?.trim()) {
+          payload.observaciones = data.observaciones.trim();
+        }
+        if (data.descripcion?.trim()) {
+          payload.descripcion = data.descripcion.trim();
+        }
+        await createPlanPagoInicial(ventaId, payload);
+      }
       await Promise.resolve(onSuccess?.());
     } catch (err) {
-      const { fieldErrors, generalMessage } = mapPagoBackendError(err, {
-        defaultMessage: "Error al crear el plan de pago",
-      });
+      const { fieldErrors, generalMessage } = isReemplazo
+        ? mapReemplazarPlanPagoError(err)
+        : mapPagoBackendError(err, { defaultMessage: "Error al crear el plan de pago" });
       Object.entries(fieldErrors).forEach(([field, message]) => {
         setError(field, { type: "manual", message });
       });
@@ -277,9 +325,13 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
         {/* Header */}
         <div className="cclf-card__header">
           <div>
-            <h2 className="cclf-card__title">Crear plan de pago</h2>
+            <h2 className="cclf-card__title">
+              {isReemplazo ? "Reemplazar plan de pago" : "Crear plan de pago"}
+            </h2>
             <p className="vp-plan-form__subtitle-modal">
-              Definí la financiación inicial de la venta
+              {isReemplazo
+                ? "Armá el nuevo cronograma sobre el saldo pendiente real; el plan actual quedará en historial."
+                : "Definí la financiación inicial de la venta"}
             </p>
           </div>
           <div className="cclf-card__actions">
@@ -298,12 +350,63 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
         {/* Body con scroll interno y footer sticky */}
         <div className="cclf-card__body vp-plan-form__body">
           <div className="vp-plan-form__scroll">
-            <form onSubmit={handleSubmit(onSubmit, onInvalid)} id="plan-crear-form">
+            <form onSubmit={handleSubmit(onSubmit, onInvalid)} id={formId}>
               {errors.root && (
                 <div className="alert alert-danger mb-3" role="alert">
                   {errors.root.message}
                 </div>
               )}
+
+              {isReemplazo && reemplazoContext ? (
+                <div className="vp-plan-form__section vp-plan-form__reemplazo-context">
+                  <h6 className="vp-plan-form__subtitle">Plan que se reemplaza</h6>
+                  <p className="vp-plan-form__reemplazo-nota text-muted small mb-3">
+                    El plan actual pasará a estado histórico (reemplazado). No se pierden pagos ni datos anteriores.
+                  </p>
+                  <div className="venta-grid" style={{ "--sale-label-w": "200px" }}>
+                    <div className="venta-col">
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Nombre del plan vigente</div>
+                          <div className="field-value is-readonly">{reemplazoContext.nombrePlanActual}</div>
+                        </div>
+                      </div>
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Versión actual</div>
+                          <div className="field-value is-readonly">{reemplazoContext.version}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="venta-col">
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Tipo de financiación actual</div>
+                          <div className="field-value is-readonly">
+                            {reemplazoContext.tipoFinanciacion ?? "—"}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Moneda del plan</div>
+                          <div className="field-value is-readonly">{reemplazoContext.moneda}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="venta-col venta-col--span-all">
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Saldo pendiente real (base del nuevo plan)</div>
+                          <div className="field-value is-readonly">
+                            {fmtMonto(reemplazoContext.saldoPendienteReal, reemplazoContext.moneda)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
 
               {/* A. Datos generales */}
               <div className="vp-plan-form__section">
@@ -358,21 +461,28 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                         <div className="field-label" title="Moneda *">
                           Moneda *
                         </div>
-                        <div className="field-value p0">
-                          <Controller
-                            name="moneda"
-                            control={control}
-                            render={({ field: { onChange, value } }) => (
-                              <NiceSelect
-                                value={value ?? ""}
-                                options={MONEDAS_OPTIONS}
-                                placeholder="Moneda"
-                                usePortal
-                                onChange={onChange}
-                              />
-                            )}
-                          />
-                        </div>
+                        {isReemplazo ? (
+                          <div className="field-value is-readonly">
+                            <input type="hidden" {...register("moneda")} />
+                            {formValues.moneda ?? monedaReemplazo ?? "—"}
+                          </div>
+                        ) : (
+                          <div className="field-value p0">
+                            <Controller
+                              name="moneda"
+                              control={control}
+                              render={({ field: { onChange, value } }) => (
+                                <NiceSelect
+                                  value={value ?? ""}
+                                  options={MONEDAS_OPTIONS}
+                                  placeholder="Moneda"
+                                  usePortal
+                                  onChange={onChange}
+                                />
+                              )}
+                            />
+                          </div>
+                        )}
                       </div>
                       {errors.moneda && (
                         <div className="fieldError">{errors.moneda.message}</div>
@@ -408,12 +518,20 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                         <div className="field-label vp-label-monto">
                           <span
                             className="vp-label-monto__icon"
-                            title="Monto total planificado *"
-                            aria-label="Monto total planificado"
+                            title={
+                              isReemplazo
+                                ? "Saldo pendiente real a redistribuir en el nuevo cronograma"
+                                : "Monto total planificado *"
+                            }
+                            aria-label={isReemplazo ? "Saldo pendiente real a redistribuir" : "Monto total planificado"}
                           >
                             <Info size={14} />
                           </span>
-                          <span className="vp-label-monto__text">Monto total planificado *</span>
+                          <span className="vp-label-monto__text">
+                            {isReemplazo
+                              ? "Saldo pendiente real a redistribuir *"
+                              : "Monto total planificado *"}
+                          </span>
                         </div>
                         <div className="field-value p0">
                           <input
@@ -421,8 +539,10 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
                             min="0"
                             step="0.01"
                             inputMode="decimal"
-                            className={`field-input vp-input-monto ${errors.montoTotalPlanificado ? "is-invalid" : ""}`}
+                            className={`field-input vp-input-monto ${isReemplazo ? "is-readonly" : ""} ${errors.montoTotalPlanificado ? "is-invalid" : ""}`}
                             onWheel={(e) => e.currentTarget.blur()}
+                            readOnly={isReemplazo}
+                            aria-readonly={isReemplazo}
                             {...register("montoTotalPlanificado")}
                             placeholder="0"
                           />
@@ -738,10 +858,10 @@ export default function PlanCrearForm({ ventaId, onSuccess, onCancel, open }) {
             <button
               className="btn btn-primary"
               type="submit"
-              form="plan-crear-form"
+              form={formId}
               disabled={saving}
             >
-              {saving ? "Guardando…" : "Crear plan"}
+              {saving ? "Guardando…" : isReemplazo ? "Reemplazar plan" : "Crear plan"}
             </button>
           </div>
         </div>

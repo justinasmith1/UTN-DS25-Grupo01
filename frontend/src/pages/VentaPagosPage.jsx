@@ -13,12 +13,15 @@ import SuccessAnimation from "../components/Cards/Base/SuccessAnimation.jsx";
 import Can from "../components/Can";
 import { PERMISSIONS } from "../lib/auth/rbac";
 import { fmtMonto, fmtMontoSinMoneda } from "../utils/pagoUtils";
+import NiceSelect from "../components/Base/NiceSelect";
+import "../components/Cards/Base/cards.css";
 import "../styles/venta-pagos.css";
 
 const SUCCESS_ANIM_MS = 1500;
 const MSG_PLAN_CREADO = "¡Plan de pago creado exitosamente!";
 const MSG_PAGO_REGISTRADO = "¡Pago registrado exitosamente!";
 const MSG_RECARGO_APLICADO = "¡Recargo aplicado exitosamente!";
+const MSG_PLAN_REEMPLAZADO = "¡Plan de pago reemplazado exitosamente!";
 const MSG_REFRESH_FALLIDO =
   "La operación se completó pero no se pudo actualizar la vista. Actualizá la página para ver los datos al día.";
 
@@ -68,10 +71,14 @@ export default function VentaPagosPage() {
   const [showFormPlan, setShowFormPlan] = useState(false);
   const [showFormPago, setShowFormPago] = useState(false);
   const [showRecargoModal, setShowRecargoModal] = useState(false);
+  const [showReemplazoModal, setShowReemplazoModal] = useState(false);
   const [cuotaRecargoSeleccionada, setCuotaRecargoSeleccionada] = useState(null);
   const [successAnimMessage, setSuccessAnimMessage] = useState(null);
   const [contextRefreshWarning, setContextRefreshWarning] = useState(null);
   const successAnimTimerRef = useRef(null);
+  /** Id del plan cuyo detalle y cronograma se muestran; al cargar / tras reemplazo se sincroniza con el vigente. */
+  const [selectedPlanId, setSelectedPlanId] = useState(null);
+  const prevVigentePlanIdRef = useRef(null);
 
   const fetchContext = useCallback(async (options = {}) => {
     const { showLoading = true } = options;
@@ -107,6 +114,24 @@ export default function VentaPagosPage() {
   }, [fetchContext]);
 
   useEffect(() => {
+    prevVigentePlanIdRef.current = null;
+  }, [ventaId]);
+
+  useEffect(() => {
+    const vid = data?.planVigente?.id;
+    if (vid == null) return;
+    if (prevVigentePlanIdRef.current === null) {
+      setSelectedPlanId(vid);
+      prevVigentePlanIdRef.current = vid;
+      return;
+    }
+    if (prevVigentePlanIdRef.current !== vid) {
+      setSelectedPlanId(vid);
+      prevVigentePlanIdRef.current = vid;
+    }
+  }, [data?.planVigente?.id]);
+
+  useEffect(() => {
     return () => {
       if (successAnimTimerRef.current) clearTimeout(successAnimTimerRef.current);
     };
@@ -139,17 +164,47 @@ export default function VentaPagosPage() {
     showSuccessThenRefresh(MSG_RECARGO_APLICADO);
   }, [showSuccessThenRefresh]);
 
-  const puedeAplicarRecargoCuota = (c) =>
-    Boolean(c?.estaVencida) && Number(c?.saldoPendiente) > 0;
+  const handlePlanReemplazado = useCallback(() => {
+    setShowReemplazoModal(false);
+    showSuccessThenRefresh(MSG_PLAN_REEMPLAZADO);
+  }, [showSuccessThenRefresh]);
+
+  const planVista = useMemo(() => {
+    const pv = data?.planVigente;
+    if (!pv) {
+      return { plan: null, cuotas: [], esHistorico: false };
+    }
+    const hist = data?.planesHistoricos ?? [];
+    const effectiveId = selectedPlanId ?? pv.id;
+    if (Number(effectiveId) === Number(pv.id)) {
+      return { plan: pv, cuotas: data?.cuotas ?? [], esHistorico: false };
+    }
+    const h = hist.find((p) => Number(p.id) === Number(effectiveId));
+    if (h) {
+      return { plan: h, cuotas: h.cuotas ?? [], esHistorico: true };
+    }
+    return { plan: pv, cuotas: data?.cuotas ?? [], esHistorico: false };
+  }, [data, selectedPlanId]);
+
+  const versionOptions = useMemo(() => {
+    const pv = data?.planVigente;
+    if (!pv) return [];
+    const hist = [...(data?.planesHistoricos ?? [])].sort(
+      (a, b) => (b.version ?? 0) - (a.version ?? 0)
+    );
+    return [
+      { id: pv.id, label: `Vigente (v${pv.version})` },
+      ...hist.map((p) => ({ id: p.id, label: `v${p.version}` })),
+    ];
+  }, [data?.planVigente, data?.planesHistoricos]);
+
+  const versionNiceSelectOptions = useMemo(
+    () => versionOptions.map((o) => ({ value: o.id, label: o.label })),
+    [versionOptions]
+  );
 
   const moneda = data?.planVigente?.moneda ?? "ARS";
-  const cuotaById = useMemo(() => {
-    const map = {};
-    (data?.cuotas ?? []).forEach((c) => {
-      if (c?.id != null) map[String(c.id)] = c;
-    });
-    return map;
-  }, [data?.cuotas]);
+  const monedaVistaPlan = planVista.plan?.moneda ?? moneda;
 
   // Cuota habilitada: primera del plan vigente con saldoPendiente > 0, ordenada por numeroCuota ASC
   const cuotaHabilitada = useMemo(() => {
@@ -158,6 +213,24 @@ export default function VentaPagosPage() {
     const sorted = [...list].sort((a, b) => (a.numeroCuota ?? 0) - (b.numeroCuota ?? 0));
     return sorted[0] ?? null;
   }, [data?.cuotas]);
+
+  const puedeMostrarReemplazoPlan = useMemo(() => {
+    if (planVista.esHistorico) return false;
+    const pv = data?.planVigente;
+    if (!pv?.id) return false;
+    const listPagos = data?.pagos ?? [];
+    const tienePagosEnPlanVigente = listPagos.some(
+      (p) => Number(p.planPagoId) === Number(pv.id)
+    );
+    const saldo = Number(data?.resumen?.saldoPendienteTotal);
+    return tienePagosEnPlanVigente && !Number.isNaN(saldo) && saldo > 0;
+  }, [data, planVista.esHistorico]);
+
+  const puedeAplicarRecargoCuota = (c) =>
+    Boolean(c?.estaVencida) && Number(c?.saldoPendiente) > 0;
+
+  const mostrarAccionesCronograma = Boolean(data?.planVigente) && !planVista.esHistorico;
+  const planVersionNiceSelectValue = selectedPlanId ?? data?.planVigente?.id ?? "";
 
   const volverAVentas = () => navigate("/ventas");
   const botonVolver = (
@@ -187,7 +260,7 @@ export default function VentaPagosPage() {
     );
   }
 
-  const { venta, planVigente, cuotas = [], pagos = [], resumen = {} } = data ?? {};
+  const { venta, planVigente, pagos = [], resumen = {} } = data ?? {};
   const totalCuotas = resumen.cantidadCuotas ?? 0;
 
   return (
@@ -282,45 +355,87 @@ export default function VentaPagosPage() {
         </div>
       </div>
 
-      {/* C. Plan vigente o formulario de creación */}
+      {/* C. Plan de pago (visor por versión) o formulario de creación */}
       {planVigente ? (
-        <div className="vp-summary-card mb-4">
-          <h5 className="vp-section-title mb-3">Plan vigente</h5>
+        <div className={`vp-summary-card mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}>
+          <div className="vp-plan-vigente-header">
+            <h5 className="vp-section-title mb-0">Plan de pago</h5>
+            <div className="vp-plan-header-actions">
+              {versionOptions.length > 1 ? (
+                <div
+                  className="vp-plan-version-ns"
+                  role="group"
+                  aria-label="Versión del plan de pago"
+                >
+                  <NiceSelect
+                    value={planVersionNiceSelectValue}
+                    options={versionNiceSelectOptions}
+                    placeholder="Versión"
+                    onChange={(v) => {
+                      const n = Number(v);
+                      if (!Number.isNaN(n)) setSelectedPlanId(n);
+                    }}
+                  />
+                </div>
+              ) : null}
+              {puedeMostrarReemplazoPlan ? (
+                <Can permission={PERMISSIONS.SALE_EDIT}>
+                  <button
+                    type="button"
+                    className="vp-btn-crear-plan"
+                    onClick={() => setShowReemplazoModal(true)}
+                  >
+                    Reemplazar plan
+                  </button>
+                </Can>
+              ) : null}
+            </div>
+          </div>
           <div className="vp-plan-grid">
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Nombre</div>
-              <div className="vp-plan-field__value">{planVigente.nombre}</div>
+              <div className="vp-plan-field__value">{planVista.plan?.nombre ?? "—"}</div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Tipo financiación</div>
-              <div className="vp-plan-field__value">{planVigente.tipoFinanciacion ?? "—"}</div>
+              <div className="vp-plan-field__value">{planVista.plan?.tipoFinanciacion ?? "—"}</div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Moneda</div>
-              <div className="vp-plan-field__value">{planVigente.moneda ?? "—"}</div>
+              <div className="vp-plan-field__value">{planVista.plan?.moneda ?? "—"}</div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Cantidad de cuotas</div>
-              <div className="vp-plan-field__value">{planVigente.cantidadCuotas ?? "—"}</div>
+              <div className="vp-plan-field__value">{planVista.plan?.cantidadCuotas ?? "—"}</div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Anticipo</div>
-              <div className="vp-plan-field__value">{fmtMonto(planVigente.montoAnticipo, moneda)}</div>
+              <div className="vp-plan-field__value">
+                {fmtMonto(planVista.plan?.montoAnticipo, monedaVistaPlan)}
+              </div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Monto financiado</div>
-              <div className="vp-plan-field__value">{fmtMonto(planVigente.montoFinanciado, moneda)}</div>
+              <div className="vp-plan-field__value">
+                {fmtMonto(planVista.plan?.montoFinanciado, monedaVistaPlan)}
+              </div>
             </div>
             <div className="vp-plan-field">
               <div className="vp-plan-field__label">Fecha inicio</div>
-              <div className="vp-plan-field__value">{fmtFecha(planVigente.fechaInicio)}</div>
+              <div className="vp-plan-field__value">{fmtFecha(planVista.plan?.fechaInicio)}</div>
             </div>
-            {planVigente.observaciones && (
+            {planVista.plan?.descripcion ? (
+              <div className="vp-plan-field" style={{ gridColumn: "1 / -1" }}>
+                <div className="vp-plan-field__label">Descripción</div>
+                <div className="vp-plan-field__value">{planVista.plan.descripcion}</div>
+              </div>
+            ) : null}
+            {planVista.plan?.observaciones ? (
               <div className="vp-plan-field" style={{ gridColumn: "1 / -1" }}>
                 <div className="vp-plan-field__label">Observaciones</div>
-                <div className="vp-plan-field__value">{planVigente.observaciones}</div>
+                <div className="vp-plan-field__value">{planVista.plan.observaciones}</div>
               </div>
-            )}
+            ) : null}
           </div>
         </div>
       ) : (
@@ -341,11 +456,20 @@ export default function VentaPagosPage() {
         </div>
       )}
 
-      {/* D. Cronograma de cuotas */}
-      <div className="vp-summary-card mb-4">
+      {/* D. Cronograma de cuotas (según versión seleccionada) */}
+      <div
+        className={`vp-summary-card mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}
+      >
         <div className="vp-cronograma-header mb-3">
-          <h5 className="vp-section-title mb-0">Cronograma de cuotas</h5>
-          {planVigente &&
+          <div>
+            <h5 className="vp-section-title mb-0">Cronograma de cuotas</h5>
+            {planVigente && planVista.esHistorico ? (
+              <p className="vp-cronograma-hint text-muted small mb-0 mt-1">
+                Vista de consulta — versión reemplazada (sin acciones de cobro).
+              </p>
+            ) : null}
+          </div>
+          {mostrarAccionesCronograma &&
             (cuotaHabilitada ? (
               <div className="vp-cronograma-cta">
                 <div className="vp-cronograma-cta__context">
@@ -355,7 +479,7 @@ export default function VentaPagosPage() {
                     <span className="vp-cronograma-cta__sep">·</span>
                     {cuotaHabilitada.tipoCuota ?? "—"}
                     <span className="vp-cronograma-cta__sep">·</span>
-                    {moneda}
+                    {monedaVistaPlan}
                   </span>
                 </div>
                 <Can permission={PERMISSIONS.SALE_EDIT}>
@@ -372,7 +496,7 @@ export default function VentaPagosPage() {
               <span className="vp-no-cuotas-msg text-muted">No hay cuotas pendientes para registrar pago</span>
             ))}
         </div>
-        {cuotas.length > 0 ? (
+        {planVista.cuotas.length > 0 ? (
           <div className="vp-table-wrap">
             <table className="vp-table">
               <thead>
@@ -385,13 +509,14 @@ export default function VentaPagosPage() {
                   <th className="vp-th-num vp-th-pagado">Pagado</th>
                   <th className="vp-th-num vp-th-saldo">Saldo</th>
                   <th>Estado</th>
-                  <th className="vp-th-acciones">Acciones</th>
+                  {mostrarAccionesCronograma ? <th className="vp-th-acciones">Acciones</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {cuotas.map((c) => {
+                {planVista.cuotas.map((c) => {
                   const vencida = Boolean(c.estaVencida);
-                  const habilitada = cuotaHabilitada && c.id === cuotaHabilitada.id;
+                  const habilitada =
+                    mostrarAccionesCronograma && cuotaHabilitada && c.id === cuotaHabilitada.id;
                   const conRecargo = Number(c.montoRecargoManual) > 0;
                   const rowClass = [
                     vencida ? "vp-row--vencida" : "",
@@ -406,13 +531,15 @@ export default function VentaPagosPage() {
                       <td>{c.tipoCuota ?? "—"}</td>
                       <td>{fmtFecha(c.fechaVencimiento)}</td>
                       <td className="vp-cell-num vp-cell-recargo">
-                        {fmtMonto(c.montoRecargoManual ?? 0, moneda)}
+                        {fmtMonto(c.montoRecargoManual ?? 0, monedaVistaPlan)}
                       </td>
                       <td className="vp-cell-num vp-cell-exigible">
-                        {fmtMonto(c.montoTotalExigible ?? c.montoOriginal, moneda)}
+                        {fmtMonto(c.montoTotalExigible ?? c.montoOriginal, monedaVistaPlan)}
                       </td>
-                      <td className="vp-cell-num vp-cell-pagado">{fmtMonto(c.montoPagado, moneda)}</td>
-                      <td className="vp-cell-num vp-cell-saldo-crono">{fmtMonto(c.saldoPendiente, moneda)}</td>
+                      <td className="vp-cell-num vp-cell-pagado">{fmtMonto(c.montoPagado, monedaVistaPlan)}</td>
+                      <td className="vp-cell-num vp-cell-saldo-crono">
+                        {fmtMonto(c.saldoPendiente, monedaVistaPlan)}
+                      </td>
                       <td>
                         {vencida ? (
                           <span className="vp-badge-cuota vp-badge--vencida">VENCIDA</span>
@@ -422,24 +549,26 @@ export default function VentaPagosPage() {
                           </span>
                         )}
                       </td>
-                      <td className="vp-cell-acciones">
-                        {puedeAplicarRecargoCuota(c) ? (
-                          <Can permission={PERMISSIONS.SALE_EDIT}>
-                            <button
-                              type="button"
-                              className="vp-btn-recargo"
-                              onClick={() => {
-                                setCuotaRecargoSeleccionada(c);
-                                setShowRecargoModal(true);
-                              }}
-                            >
-                              Aplicar recargo
-                            </button>
-                          </Can>
-                        ) : (
-                          <span className="vp-acciones-vacio" aria-label="Sin acciones disponibles" />
-                        )}
-                      </td>
+                      {mostrarAccionesCronograma ? (
+                        <td className="vp-cell-acciones">
+                          {puedeAplicarRecargoCuota(c) ? (
+                            <Can permission={PERMISSIONS.SALE_EDIT}>
+                              <button
+                                type="button"
+                                className="vp-btn-recargo"
+                                onClick={() => {
+                                  setCuotaRecargoSeleccionada(c);
+                                  setShowRecargoModal(true);
+                                }}
+                              >
+                                Aplicar recargo
+                              </button>
+                            </Can>
+                          ) : (
+                            <span className="vp-acciones-vacio" aria-label="Sin acciones disponibles" />
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
                   );
                 })}
@@ -451,9 +580,10 @@ export default function VentaPagosPage() {
         )}
       </div>
 
-      {/* E. Historial de pagos */}
+      {/* E. Historial de pagos (global a la venta; no depende del plan seleccionado) */}
       <div className="vp-summary-card">
-        <h5 className="vp-section-title mb-3">Historial de pagos</h5>
+        <h5 className="vp-section-title mb-1">Historial de pagos</h5>
+        <p className="text-muted small mb-3">Historial total de pagos de la venta.</p>
         {pagos.length > 0 ? (
           <div className="vp-table-wrap">
             <table className="vp-table">
@@ -469,21 +599,17 @@ export default function VentaPagosPage() {
                 </tr>
               </thead>
               <tbody>
-                {pagos.map((p) => {
-                  const cuota = cuotaById[String(p.cuotaId)];
-                  const cuotaLabel = cuota ? `Cuota ${cuota.numeroCuota}` : "—";
-                  return (
-                    <tr key={p.id}>
-                      <td>{fmtFecha(p.fechaPago)}</td>
-                      <td className="vp-cell-num">{fmtMonto(p.monto, moneda)}</td>
-                      <td>{p.medioPago ?? "—"}</td>
-                      <td>{cuotaLabel}</td>
-                      <td>{p.referencia ?? "—"}</td>
-                      <td>{p.observacion ?? "—"}</td>
-                      <td>{p.registradoBy ?? "—"}</td>
-                    </tr>
-                  );
-                })}
+                {pagos.map((p) => (
+                  <tr key={p.id}>
+                    <td>{fmtFecha(p.fechaPago)}</td>
+                    <td className="vp-cell-num">{fmtMonto(p.monto, moneda)}</td>
+                    <td>{p.medioPago ?? "—"}</td>
+                    <td>{p.referenciaCuotaUi ?? "—"}</td>
+                    <td>{p.referencia ?? "—"}</td>
+                    <td>{p.observacion ?? "—"}</td>
+                    <td>{p.registradoBy ?? "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -526,6 +652,23 @@ export default function VentaPagosPage() {
             setShowRecargoModal(false);
             setCuotaRecargoSeleccionada(null);
           }}
+        />
+      )}
+
+      {planVigente && showReemplazoModal && puedeMostrarReemplazoPlan && (
+        <PlanCrearForm
+          open
+          ventaId={parseInt(ventaId, 10)}
+          mode="reemplazo"
+          reemplazoContext={{
+            nombrePlanActual: planVigente.nombre,
+            version: planVigente.version,
+            tipoFinanciacion: planVigente.tipoFinanciacion,
+            moneda: planVigente.moneda ?? "ARS",
+            saldoPendienteReal: Number(resumen.saldoPendienteTotal),
+          }}
+          onSuccess={handlePlanReemplazado}
+          onCancel={() => setShowReemplazoModal(false)}
         />
       )}
     </div>
