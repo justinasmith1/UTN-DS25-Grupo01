@@ -564,7 +564,6 @@ export async function registrarPagoEnVenta(
 interface AplicarRecargoPayload {
   cuotaId: number;
   montoRecargo: number;
-  motivoRecargo: string;
 }
 
 export async function aplicarRecargoManualEnVenta(
@@ -639,7 +638,6 @@ export async function aplicarRecargoManualEnVenta(
   const nuevoEstadoCuota = determinarEstadoCuota(montoPagado, nuevoSaldoPendiente);
 
   const recargoAplicadoBy = user?.email ?? null;
-  const motivoTrim = payload.motivoRecargo.trim();
 
   await prisma.$transaction(async (tx) => {
     await tx.cuotaPlanPago.update({
@@ -649,7 +647,6 @@ export async function aplicarRecargoManualEnVenta(
         montoTotalExigible,
         saldoPendiente: nuevoSaldoPendiente,
         estadoCuota: nuevoEstadoCuota,
-        motivoRecargo: motivoTrim,
         recargoAplicadoBy,
         fechaAplicacionRecargo: ahora,
         updateAt: ahora,

@@ -100,7 +100,7 @@ export async function registrarPagoEnVenta(ventaId, payload) {
 /**
  * Aplica recargo manual sobre una cuota vencida (monto a sumar al recargo acumulado).
  * @param {number} ventaId
- * @param {{ cuotaId: number, montoRecargo: number, motivoRecargo: string }} payload
+ * @param {{ cuotaId: number, montoRecargo: number }} payload
  */
 export async function aplicarRecargoEnVenta(ventaId, payload) {
   const res = await http(`${BASE}/${ventaId}/pagos/recargo`, {

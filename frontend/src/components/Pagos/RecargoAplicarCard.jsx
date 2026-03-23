@@ -34,7 +34,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
     defaultValues: {
       tipoRecargo: "",
       valor: "",
-      motivoRecargo: "",
     },
     mode: "onSubmit",
     reValidateMode: "onBlur",
@@ -63,7 +62,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
     reset({
       tipoRecargo: "",
       valor: "",
-      motivoRecargo: "",
     });
     return () => {
       document.body.style.overflow = prev;
@@ -96,7 +94,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
       await aplicarRecargoEnVenta(ventaId, {
         cuotaId: cuota.id,
         montoRecargo,
-        motivoRecargo: data.motivoRecargo.trim(),
       });
       await Promise.resolve(onSuccess?.());
     } catch (err) {
@@ -118,7 +115,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
   const recargoActual = Number(cuota.montoRecargoManual) || 0;
   const exigible = cuota.montoTotalExigible ?? cuota.montoOriginal;
   const pctIngresado = parseValorRecargo(valorWatch);
-  const motivoRegistradoPrevio = String(cuota.motivoRecargo ?? "").trim();
 
   return (
     <div className="cclf-overlay" onClick={!saving ? handleCancel : undefined}>
@@ -186,12 +182,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
                         {fmtMonto(saldoPendiente, moneda)}
                       </span>
                     </div>
-                    {motivoRegistradoPrevio ? (
-                      <div className="vp-pago-resumen__motivo-registrado">
-                        <span className="vp-pago-contexto-label">Motivo del recargo registrado</span>
-                        <p className="vp-pago-resumen__motivo-registrado-text">{motivoRegistradoPrevio}</p>
-                      </div>
-                    ) : null}
                   </div>
                 </div>
               </div>
@@ -286,28 +276,6 @@ export default function RecargoAplicarCard({ open, ventaId, cuota, moneda, onSuc
                       </div>
                     </div>
                   ) : null}
-
-                  <div
-                    className={`vp-recargo-field vp-recargo-field--full${
-                      errors.motivoRecargo ? " vp-recargo-field--error" : ""
-                    }`}
-                  >
-                    <label className="vp-recargo-field__label" htmlFor="recargo-motivo">
-                      Motivo <span className="vp-recargo-field__req" aria-hidden="true">*</span>
-                    </label>
-                    <div className="vp-recargo-field__control vp-recargo-field__control--textarea">
-                      <textarea
-                        id="recargo-motivo"
-                        rows={4}
-                        className={`field-input${errors.motivoRecargo ? " is-invalid" : ""}`}
-                        placeholder="Motivo del recargo por mora"
-                        {...register("motivoRecargo")}
-                      />
-                    </div>
-                    {errors.motivoRecargo ? (
-                      <div className="vp-recargo-field__error">{errors.motivoRecargo.message}</div>
-                    ) : null}
-                  </div>
                 </div>
               </div>
             </form>

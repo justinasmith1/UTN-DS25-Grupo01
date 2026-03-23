@@ -158,5 +158,4 @@ export const registrarPagoSchema = z.object({
 export const aplicarRecargoSchema = z.object({
   cuotaId: idInt,
   montoRecargo: dineroPositivo,
-  motivoRecargo: z.string().min(1, 'El motivo del recargo es obligatorio').trim(),
 });

@@ -38,10 +38,6 @@ export function createAplicarRecargoSchema(montoOriginal) {
         )
         .transform((v) => String(v).trim()),
       valor: z.union([z.string(), z.number()]),
-      motivoRecargo: z
-        .string()
-        .trim()
-        .min(1, "El motivo del recargo es obligatorio"),
     })
     .superRefine((data, ctx) => {
       const n = parseMontoOPorcentaje(data.valor);

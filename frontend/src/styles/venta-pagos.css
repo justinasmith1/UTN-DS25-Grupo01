@@ -673,21 +673,36 @@
   overflow: hidden;
   min-height: 0;
 }
+/* Menos aire bajo el footer respecto al borde del card (.cclf-card__body usa 26px abajo por defecto) */
+.cclf-card > .cclf-card__body.vp-plan-form__body {
+  padding-bottom: 10px;
+}
 .vp-plan-form__scroll {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
 }
+/* Crear/reemplazar plan, Registrar pago, Recargo: aire ante el footer sticky y espacio para la barra de scroll */
+.cclf-card > .cclf-card__body.vp-plan-form__body > .vp-plan-form__scroll {
+  padding-right: 12px;
+  padding-bottom: 1.25rem;
+  box-sizing: border-box;
+}
 .vp-plan-form__footer {
   flex-shrink: 0;
-  padding: 10px 20px;
   margin-top: 0;
   border-top: 1px solid rgba(0, 0, 0, 0.08);
   background: #fff;
 }
-/* Evita doble separación con .cclf-footer (mismo modal que Registrar pago) */
+/* Sticky footer: Registrar pago, Aplicar recargo, Crear/reemplazar plan (misma franja que .cclf-footer) */
 .cclf-card__body.vp-plan-form__body > .cclf-footer.vp-plan-form__footer {
   margin-top: 0;
+  align-items: center;
+  padding-top: 14px;
+  padding-bottom: 10px;
+  padding-left: 20px;
+  padding-right: 20px;
+  gap: 10px;
 }
 
 .vp-cronograma-hint {
@@ -845,30 +860,11 @@
 .vp-pago-resumen__grid--recargo .vp-pago-resumen__saldo {
   grid-column: 1 / -1;
 }
-.vp-pago-resumen__motivo-registrado {
-  grid-column: 1 / -1;
-  margin-top: 0.15rem;
-  padding-top: 0.55rem;
-  border-top: 1px dashed #e2e8f0;
-}
-.vp-pago-resumen__motivo-registrado-text {
-  margin: 0.2rem 0 0 0;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: #334155;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
 .cclf-card--recargo {
   width: min(720px, 94vw);
 }
 .cclf-card--recargo .vp-pago-contexto-cuota {
   padding: 0.7rem 0.9rem;
-}
-/* Aire entre el contenido y la barra de scroll del modal */
-.cclf-card--recargo .vp-plan-form__scroll {
-  padding-right: 12px;
-  box-sizing: border-box;
 }
 
 /* Cronograma: recargo manual */
@@ -993,22 +989,6 @@
   min-height: 44px;
   box-shadow: none;
 }
-.vp-recargo-field__control--textarea {
-  min-height: unset;
-  display: block;
-  padding: 0;
-}
-.vp-recargo-field--full .field-input {
-  display: block;
-  width: 100%;
-  min-height: 104px;
-  max-height: 240px;
-  resize: vertical;
-  line-height: 1.45;
-  padding: 10px 12px;
-  white-space: pre-wrap;
-  border-radius: 7px;
-}
 .vp-recargo-field--error .vp-recargo-field__control {
   border-color: rgba(220, 53, 69, 0.55);
 }
@@ -1016,12 +996,6 @@
   font-size: 0.8125rem;
   color: #c23b3b;
   line-height: 1.35;
-}
-.cclf-card--recargo .vp-recargo-footer.cclf-footer {
-  align-items: center;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  gap: 10px;
 }
 .cclf-card--recargo .vp-recargo-footer__cancel {
   font-weight: 500;
