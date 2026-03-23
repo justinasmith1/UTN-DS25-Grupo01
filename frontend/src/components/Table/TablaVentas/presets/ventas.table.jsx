@@ -20,9 +20,9 @@ export const ventasTablePreset = {
       case 'loteId':              return '100px';
       case 'fechaVenta':          return '120px';
       case 'estado':              return '140px';
-      case 'monto':               return '120px';
+      case 'monto':               return '100px';
       case 'financiacion':        return '110px';
-      case 'inmobiliaria':        return '180px';
+      case 'inmobiliaria':        return '220px';
       case 'estadoCobro':         return '140px'; // Etapa 3
       case 'plazoEscritura':      return '140px';
       case 'fechaEscrituraReal':  return '140px'; // Etapa 3

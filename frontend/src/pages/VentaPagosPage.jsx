@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Wallet, CalendarRange, History } from "lucide-react";
 import { getPagosContextByVentaId } from "../lib/api/pagos";
 import { fmtFecha } from "../components/Table/TablaVentas/utils/formatters";
 import { getLoteIdFormatted } from "../components/Table/TablaLotes/utils/getters";
@@ -416,9 +416,14 @@ export default function VentaPagosPage() {
 
       {/* C. Plan de pago (visor por versión) o formulario de creación */}
       {planVigente ? (
-        <div className={`vp-summary-card mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}>
+        <div
+          className={`vp-summary-card vp-section-block mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}
+        >
           <div className="vp-plan-vigente-header">
-            <h5 className="vp-section-title mb-0">Plan de pago</h5>
+            <h5 className="vp-section-title vp-section-title--with-icon mb-0">
+              <Wallet className="vp-section-title__icon" size={18} strokeWidth={2} aria-hidden />
+              Plan de pago
+            </h5>
             <div className="vp-plan-header-actions">
               {versionOptions.length > 1 ? (
                 <div
@@ -519,18 +524,21 @@ export default function VentaPagosPage() {
 
       {/* D. Cronograma de cuotas (según versión seleccionada) */}
       <div
-        className={`vp-summary-card mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}
+        className={`vp-summary-card vp-section-block mb-4${planVista.esHistorico ? " vp-summary-card--historico" : ""}`}
       >
         <div className="vp-cronograma-header mb-3">
-          <div>
-            <h5 className="vp-section-title mb-0">Cronograma de cuotas</h5>
+          <div className="vp-section-head">
+            <h5 className="vp-section-title vp-section-title--with-icon mb-0">
+              <CalendarRange className="vp-section-title__icon" size={18} strokeWidth={2} aria-hidden />
+              Cronograma de cuotas
+            </h5>
             {planVigente && planVista.esHistorico ? (
-              <p className="vp-cronograma-hint text-muted small mb-0 mt-1">
+              <p className="vp-cronograma-hint text-muted small mb-0">
                 Vista de consulta — versión reemplazada (sin acciones de cobro).
               </p>
             ) : null}
             {planVigente && modoConsultaCancelada && !planVista.esHistorico ? (
-              <p className="vp-cronograma-hint text-muted small mb-0 mt-1">
+              <p className="vp-cronograma-hint text-muted small mb-0">
                 Venta cancelada — solo consulta (sin registrar pagos ni aplicar recargos).
               </p>
             ) : null}
@@ -647,9 +655,12 @@ export default function VentaPagosPage() {
       </div>
 
       {/* E. Historial de pagos (global a la venta; no depende del plan seleccionado) */}
-      <div className="vp-summary-card">
-        <h5 className="vp-section-title mb-1">Historial de pagos</h5>
-        <p className="text-muted small mb-3">Historial total de pagos de la venta.</p>
+      <div className="vp-summary-card vp-section-block">
+        <h5 className="vp-section-title vp-section-title--with-icon mb-0">
+          <History className="vp-section-title__icon" size={18} strokeWidth={2} aria-hidden />
+          Historial de pagos
+        </h5>
+        <p className="vp-section-subtitle">Historial total de pagos de la venta.</p>
         {pagos.length > 0 ? (
           <div className="vp-table-wrap">
             <table className="vp-table">
