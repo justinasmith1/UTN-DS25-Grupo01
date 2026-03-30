@@ -10,6 +10,10 @@ import {
     assertVentaEliminable
 } from '../domain/ventaState/ventaState.rules';
 import { isFederalaInmobiliaria } from '../utils/inmobiliaria.utils';
+import {
+    montoVentaEsperadoDesdeReserva,
+    MONTO_VENTA_RESERVA_TOLERANCIA,
+} from '../domain/reserva/reservaMontoVenta.utils';
 
 const VENTA_INCLUDE = {
     comprador: true,
@@ -167,6 +171,15 @@ export async function createVenta(data: PostVentaRequest): Promise<Venta> {
                 `[Venta-Reserva] Cliente de reserva no coincide con compradores.`,
                 { reservaId: reserva.id, clienteId: reserva.clienteId, compradorIds }
             );
+        }
+
+        const montoEsperado = montoVentaEsperadoDesdeReserva(reserva);
+        if (Math.abs(Number(data.monto) - montoEsperado) > MONTO_VENTA_RESERVA_TOLERANCIA) {
+            const error = new Error(
+                `El monto de la venta debe coincidir con el monto de la reserva (esperado: ${montoEsperado.toFixed(2)})`
+            );
+            (error as any).statusCode = 400;
+            throw error;
         }
     }
 

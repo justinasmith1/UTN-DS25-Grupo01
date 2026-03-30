@@ -17,6 +17,7 @@ import {
   toNum,
   type PagoUserContext,
 } from './pago.shared';
+import { MONTO_VENTA_RESERVA_TOLERANCIA } from '../domain/reserva/reservaMontoVenta.utils';
 
 type PagoConCuotaHistorica = Prisma.PagoRegistradoGetPayload<{
   include: {
@@ -277,7 +278,7 @@ export async function createPlanPagoInicial(
 ) {
   const venta = await prisma.venta.findUnique({
     where: { id: ventaId },
-    select: { id: true, estadoOperativo: true },
+    select: { id: true, estadoOperativo: true, monto: true },
   });
 
   if (!venta) {
@@ -289,6 +290,15 @@ export async function createPlanPagoInicial(
   if (venta.estadoOperativo === 'ELIMINADO') {
     const error = new Error('La venta está eliminada') as any;
     error.statusCode = 409;
+    throw error;
+  }
+
+  const montoVenta = toNum(venta.monto);
+  if (Math.abs(payload.montoTotalPlanificado - montoVenta) > MONTO_VENTA_RESERVA_TOLERANCIA) {
+    const error = new Error(
+      `El monto total del plan debe coincidir con el monto de la venta (${montoVenta.toFixed(2)})`
+    ) as Error & { statusCode?: number };
+    error.statusCode = 400;
     throw error;
   }
 

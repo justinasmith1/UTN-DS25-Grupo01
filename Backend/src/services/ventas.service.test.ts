@@ -130,7 +130,7 @@ describe('createVenta', () => {
     test('reserva ACTIVA → pasa a ACEPTADA y se asigna ventaId', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 50, loteId: 10, estado: 'ACTIVA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100 },
+            { id: 50, loteId: 10, estado: 'ACTIVA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
 
         await createVenta(baseVentaRequest());
@@ -147,7 +147,7 @@ describe('createVenta', () => {
     test('reserva ACEPTADA → permanece ACEPTADA, ventaId seteado', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 51, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100 },
+            { id: 51, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100, ofertaInicial: 70000, ofertaActual: 80000 },
         ]);
 
         await createVenta(baseVentaRequest());
@@ -161,7 +161,7 @@ describe('createVenta', () => {
     test('reserva con inmobiliaria no-Federala: venta con misma inmobiliaria OK', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 52, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: 7, clienteId: 100 },
+            { id: 52, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: 7, clienteId: 100, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
 
         await expect(createVenta(baseVentaRequest({ inmobiliariaId: 7 }))).resolves.toBeDefined();
@@ -170,7 +170,7 @@ describe('createVenta', () => {
     test('reserva con inmobiliaria no-Federala: venta con distinta → error 400', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 53, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: 7, clienteId: 100 },
+            { id: 53, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: 7, clienteId: 100, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
 
         await expect(
@@ -181,7 +181,7 @@ describe('createVenta', () => {
     test('reserva Federala (inmobiliariaId null): venta con cualquier inmobiliaria OK', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 54, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100 },
+            { id: 54, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
 
         await expect(createVenta(baseVentaRequest({ inmobiliariaId: 42 }))).resolves.toBeDefined();
@@ -198,8 +198,8 @@ describe('createVenta', () => {
     test('múltiples reservas vigentes → error 409', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 60, loteId: 10, estado: 'ACTIVA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100 },
-            { id: 61, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 101 },
+            { id: 60, loteId: 10, estado: 'ACTIVA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 100, ofertaInicial: 80000, ofertaActual: 80000 },
+            { id: 61, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 101, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
 
         await expect(createVenta(baseVentaRequest())).rejects.toThrow(/Conflicto.*reservas vigentes/);
@@ -208,7 +208,7 @@ describe('createVenta', () => {
     test('cliente reserva no coincide con compradores: no bloquea, se crea la venta', async () => {
         setupBaseMocks({ estado: 'RESERVADO' });
         (prisma.reserva.findMany as jest.Mock).mockResolvedValue([
-            { id: 55, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 999 },
+            { id: 55, loteId: 10, estado: 'ACEPTADA', estadoOperativo: 'OPERATIVO', ventaId: null, inmobiliariaId: null, clienteId: 999, ofertaInicial: 80000, ofertaActual: 80000 },
         ]);
         const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
 

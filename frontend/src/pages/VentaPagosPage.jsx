@@ -700,6 +700,7 @@ export default function VentaPagosPage() {
         <PlanCrearForm
           open={showFormPlan}
           ventaId={parseInt(ventaId, 10)}
+          montoVentaBloqueado={data?.venta?.monto}
           onSuccess={handlePlanCreado}
           onCancel={() => setShowFormPlan(false)}
         />

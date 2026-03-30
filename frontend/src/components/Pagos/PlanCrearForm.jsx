@@ -64,13 +64,14 @@ export default function PlanCrearForm({
   open,
   mode = "crear",
   reemplazoContext = null,
+  montoVentaBloqueado = undefined,
 }) {
   const isReemplazo = mode === "reemplazo";
   const formId = isReemplazo ? "plan-reemplazar-form" : "plan-crear-form";
   const saldoReemplazo = reemplazoContext?.saldoPendienteReal;
   const monedaReemplazo = reemplazoContext?.moneda;
 
-  const defaultFormValues = useMemo(() => {
+  const initialValues = useMemo(() => {
     if (isReemplazo && saldoReemplazo != null && monedaReemplazo) {
       const n = Number(saldoReemplazo);
       if (!Number.isNaN(n) && n > 0) {
@@ -81,8 +82,20 @@ export default function PlanCrearForm({
         };
       }
     }
+    if (!isReemplazo && montoVentaBloqueado != null) {
+      const n = Number(montoVentaBloqueado);
+      if (!Number.isNaN(n) && n > 0) {
+        return {
+          ...getDefaultValues(),
+          montoTotalPlanificado: n.toFixed(2),
+        };
+      }
+    }
     return getDefaultValues();
-  }, [isReemplazo, saldoReemplazo, monedaReemplazo]);
+  }, [isReemplazo, saldoReemplazo, monedaReemplazo, montoVentaBloqueado]);
+
+  const montoPlanReadonly =
+    isReemplazo || (!isReemplazo && Number(montoVentaBloqueado) > 0);
 
   const {
     register,
@@ -96,7 +109,7 @@ export default function PlanCrearForm({
     watch,
   } = useForm({
     resolver: zodResolver(planPagoCreateSchema),
-    defaultValues: defaultFormValues,
+    defaultValues: initialValues,
     mode: "onChange",
     reValidateMode: "onChange",
   });
@@ -121,6 +134,11 @@ export default function PlanCrearForm({
       document.body.style.overflow = prev;
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    reset(initialValues);
+  }, [open, reset, initialValues]);
 
   const formValues = watch();
   const tipoFinanciacion = formValues.tipoFinanciacion;
@@ -158,14 +176,18 @@ export default function PlanCrearForm({
     setPendingRegenerarConfirm(false);
     clearErrors();
     const cantidadCuotas = parseInt(formValues.cantidadCuotas, 10);
-    const montoTotalPlanificado = parseFloat(formValues.montoTotalPlanificado);
+    const mvBloq =
+      !isReemplazo && montoVentaBloqueado != null ? Number(montoVentaBloqueado) : NaN;
+    const montoTotalPlanificado = !Number.isNaN(mvBloq) && mvBloq > 0
+      ? mvBloq
+      : parseFloat(formValues.montoTotalPlanificado);
     const montoAnticipo = parseFloat(formValues.montoAnticipo) || 0;
     const primerVencimiento = (formValues.primerVencimiento || "").trim();
     const cadencia = formValues.cadencia || "mensual";
     const fechaInicio = (formValues.fechaInicio || "").trim();
 
     const errores = [];
-    if (!formValues.montoTotalPlanificado || Number.isNaN(montoTotalPlanificado) || montoTotalPlanificado <= 0) {
+    if (Number.isNaN(montoTotalPlanificado) || montoTotalPlanificado <= 0) {
       setError("montoTotalPlanificado", { type: "manual", message: "El monto debe ser mayor a 0" });
       errores.push("montoTotalPlanificado");
     }
@@ -251,6 +273,17 @@ export default function PlanCrearForm({
 
   const onSubmit = async (data) => {
     clearErrors();
+    if (!isReemplazo && montoVentaBloqueado != null) {
+      const mv = Number(montoVentaBloqueado);
+      const mp = Number(data.montoTotalPlanificado);
+      if (!Number.isNaN(mv) && mv > 0 && Math.abs(mp - mv) > 0.01) {
+        setError("montoTotalPlanificado", {
+          type: "manual",
+          message: "El monto total debe coincidir con el monto de la venta",
+        });
+        return;
+      }
+    }
     setSaving(true);
 
     try {
@@ -281,12 +314,16 @@ export default function PlanCrearForm({
         }
         await reemplazarPlanPago(ventaId, payload);
       } else {
+        const mv =
+          montoVentaBloqueado != null ? Number(montoVentaBloqueado) : NaN;
+        const montoTotalPlanificadoNum =
+          !Number.isNaN(mv) && mv > 0 ? mv : Number(data.montoTotalPlanificado);
         const payload = {
           nombre: String(data.nombre).trim(),
           tipoFinanciacion: data.tipoFinanciacion,
           moneda: data.moneda,
           cantidadCuotas: Number(data.cantidadCuotas),
-          montoTotalPlanificado: Number(data.montoTotalPlanificado),
+          montoTotalPlanificado: montoTotalPlanificadoNum,
           fechaInicio: fromDateInputToISO(data.fechaInicio),
           cuotas: cuotasPayload,
         };
@@ -521,9 +558,17 @@ export default function PlanCrearForm({
                             title={
                               isReemplazo
                                 ? "Saldo pendiente real a redistribuir en el nuevo cronograma"
-                                : "Monto total planificado *"
+                                : montoPlanReadonly
+                                  ? "Coincide con el monto de la venta"
+                                  : "Monto total planificado *"
                             }
-                            aria-label={isReemplazo ? "Saldo pendiente real a redistribuir" : "Monto total planificado"}
+                            aria-label={
+                              isReemplazo
+                                ? "Saldo pendiente real a redistribuir"
+                                : montoPlanReadonly
+                                  ? "Monto total planificado (igual a la venta)"
+                                  : "Monto total planificado"
+                            }
                           >
                             <Info size={14} />
                           </span>
@@ -533,16 +578,18 @@ export default function PlanCrearForm({
                               : "Monto total planificado *"}
                           </span>
                         </div>
-                        <div className="field-value p0">
+                        <div
+                          className={`field-value p0${montoPlanReadonly ? " is-readonly" : ""}`}
+                        >
                           <input
                             type="number"
                             min="0"
                             step="0.01"
                             inputMode="decimal"
-                            className={`field-input vp-input-monto ${isReemplazo ? "is-readonly" : ""} ${errors.montoTotalPlanificado ? "is-invalid" : ""}`}
+                            className={`field-input vp-input-monto ${montoPlanReadonly ? "is-readonly" : ""} ${errors.montoTotalPlanificado ? "is-invalid" : ""}`}
                             onWheel={(e) => e.currentTarget.blur()}
-                            readOnly={isReemplazo}
-                            aria-readonly={isReemplazo}
+                            readOnly={montoPlanReadonly}
+                            aria-readonly={montoPlanReadonly}
                             {...register("montoTotalPlanificado")}
                             placeholder="0"
                           />

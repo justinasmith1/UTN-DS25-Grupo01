@@ -12,6 +12,8 @@ import CompradoresMultiSelect from "./CompradoresMultiSelect.jsx";
 import { toDateInputValue, fromDateInputToISO } from "../../../utils/ventaDateUtils";
 import { mapVentaBackendError } from "../../../utils/ventaErrorMapper";
 import { isFederalaInmobiliaria } from "../../../utils/inmobiliariaHelpers.js";
+import { montoVentaDesdeReserva } from "../../../utils/reservaMontoVenta.js";
+import { fmtMontoSinMoneda } from "../../../utils/pagoUtils.js";
 
 const INITIAL_ERRORS = {
   numero: null,
@@ -153,7 +155,8 @@ export default function VentaCrearCard({
       const operativo = String(r.estadoOperativo || "OPERATIVO").toUpperCase() === "OPERATIVO";
       return String(rLoteId) === String(loteId)
         && (estado === "ACTIVA" || estado === "ACEPTADA")
-        && operativo;
+        && operativo
+        && (r.ventaId == null);
     });
     return vigentes[0] ?? null;
   }, [loteId, lotes, reservas]);
@@ -176,6 +179,16 @@ export default function VentaCrearCard({
       setInmobiliariaId("");
     }
   }, [reservaDelLote, inmobiliariaFreezeada]);
+
+  const montoCongeladoPorReserva = Boolean(reservaDelLote);
+
+  useEffect(() => {
+    if (!reservaDelLote) return;
+    const v = montoVentaDesdeReserva(reservaDelLote);
+    if (v != null && !Number.isNaN(v) && v > 0) {
+      setMonto(String(Number(v.toFixed(2))));
+    }
+  }, [reservaDelLote]);
 
   function clearFieldError(field) {
     setErrors(prev => ({ ...prev, [field]: null }));
@@ -408,18 +421,24 @@ export default function VentaCrearCard({
               <div className={`fieldRow ${errors.monto ? "hasError" : ""}`}>
                 <div className="field-row">
                   <div className="field-label">MONTO</div>
-                  <div className="field-value p0 venta-monto-wrapper">
-                    <input
-                      className={`field-input ${errors.monto ? "is-invalid" : ""}`}
-                      type="number"
-                      min="0"
-                      step="100"
-                      value={monto}
-                      onChange={(e) => { setMonto(e.target.value); if (errors.monto) clearFieldError("monto"); }}
-                      style={{ paddingRight: 50 }}
-                    />
-                    <span className="venta-monto-currency">USD</span>
-                  </div>
+                  {montoCongeladoPorReserva ? (
+                    <div className="field-value is-readonly" title="Definido por la reserva">
+                      {monto ? `${fmtMontoSinMoneda(monto)} USD` : "—"}
+                    </div>
+                  ) : (
+                    <div className="field-value p0 venta-monto-wrapper">
+                      <input
+                        className={`field-input ${errors.monto ? "is-invalid" : ""}`}
+                        type="number"
+                        min="0"
+                        step="100"
+                        value={monto}
+                        onChange={(e) => { setMonto(e.target.value); if (errors.monto) clearFieldError("monto"); }}
+                        style={{ paddingRight: 50 }}
+                      />
+                      <span className="venta-monto-currency">USD</span>
+                    </div>
+                  )}
                 </div>
                 {errors.monto && <div className="fieldError">{errors.monto}</div>}
               </div>
