@@ -243,6 +243,10 @@ export interface GetVentasResponse {
     total: number;
 }
 
+export interface VentaCompradorInput {
+    personaId: number;
+}
+
 export interface PostVentaRequest {
     id: number;
     loteId: number;
@@ -256,7 +260,10 @@ export interface PostVentaRequest {
     fechaCancelacion?: DateTime;
     motivoCancelacion?: string;
     tipoPago: string;
-    compradorId: number;  
+    /** @deprecated Usar compradores[]. Se mantiene por compatibilidad legacy. */
+    compradorId?: number;
+    /** Etapa 4: lista de compradores. Al menos uno requerido (junto con compradorId legacy). */
+    compradores?: VentaCompradorInput[];
     inmobiliariaId?: number;
     reservaId?: number;
     createdAt?: DateTime;
@@ -282,7 +289,10 @@ export interface PutVentaRequest {
     id: number;
     loteId?: number;
     monto?: number;
-    compradorId?: number; // Es mejor enviar solo el ID
+    /** @deprecated Usar compradores[]. Se mantiene por compatibilidad legacy. */
+    compradorId?: number;
+    /** Etapa 4: si viene, reemplaza la lista completa de compradores. */
+    compradores?: VentaCompradorInput[];
     fechaVenta?: DateTime
     estado?: EstadoVenta;
     estadoCobro?: 'PENDIENTE' | 'EN_CURSO' | 'PAGO_COMPLETO';

@@ -3,6 +3,16 @@ import type { Request, Response, NextFunction } from 'express';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
 
 export function handleError(err: unknown, _req: Request, res: Response, _next: NextFunction) {
+  // Manejar errores de Multer (ej. LIMIT_FILE_SIZE) - Etapa 5.4.3
+  const errAny = err as { code?: string; message?: string };
+  if (errAny?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(400).json({
+      success: false,
+      code: 'ERROR',
+      message: 'Archivo demasiado grande. Tamaño máximo permitido: 20 MB.',
+    });
+  }
+
   // Manejar errores de parsing JSON de Express
   if (err instanceof SyntaxError && 'body' in err) {
     return res.status(400).json({ 

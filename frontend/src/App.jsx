@@ -12,6 +12,7 @@ import { PERMISSIONS } from "./lib/auth/rbac";
 import Prioridades from "./pages/Prioridades";
 import Reservas from "./pages/Reservas";
 import Ventas from "./pages/Ventas";
+import VentaPagosPage from "./pages/VentaPagosPage";
 import Inmobiliarias from "./pages/Inmobiliarias";
 import Personas from "./pages/Personas";
 import Reportes from "./pages/Reportes";
@@ -45,6 +46,14 @@ export default function App() {
             element={
               <RequireRole permission={PERMISSIONS.AGENCY_ACCESS}>
                 <Inmobiliarias />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="ventas/:ventaId/pagos"
+            element={
+              <RequireRole permission={PERMISSIONS.SALE_ACCESS}>
+                <VentaPagosPage />
               </RequireRole>
             }
           />

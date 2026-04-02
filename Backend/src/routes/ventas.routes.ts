@@ -1,8 +1,16 @@
 import { Router } from 'express';
 import * as ventaController from '../controllers/venta.controller';
+import * as pagoController from '../controllers/pago.controller';
 import { validate, validateParams, validateQuery } from '../middlewares/validation.middleware';
 import { authenticate, authorize } from '../middlewares/auth.middleware';
 import { createVentaSchema, updateVentaSchema, getVentaSchema, deleteVentaSchema, queryVentaSchema, patchVentaParamsSchema } from '../validations/venta.validation';
+import {
+  ventaIdParamSchema,
+  createPlanPagoSchema,
+  reemplazarPlanPagoSchema,
+  registrarPagoSchema,
+  aplicarRecargoSchema,
+} from '../validations/pago.validation';
 
 const router = Router();
 
@@ -71,5 +79,51 @@ router.patch(
     validateParams(patchVentaParamsSchema),
     ventaController.reactivarVenta
 );
+
+// --- Submódulo Pagos ---
+
+// GET /api/ventas/:ventaId/pagos
+router.get(
+    '/:ventaId/pagos',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    pagoController.obtenerContextoPagos);
+
+// POST /api/ventas/:ventaId/pagos/recargo
+router.post(
+    '/:ventaId/pagos/recargo',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(aplicarRecargoSchema),
+    pagoController.aplicarRecargoManual);
+
+// POST /api/ventas/:ventaId/pagos
+router.post(
+    '/:ventaId/pagos',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(registrarPagoSchema),
+    pagoController.registrarPago);
+
+// POST /api/ventas/:ventaId/pagos/plan/reemplazar (antes que /plan para no colisionar rutas)
+router.post(
+    '/:ventaId/pagos/plan/reemplazar',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(reemplazarPlanPagoSchema),
+    pagoController.reemplazarPlanPago);
+
+// POST /api/ventas/:ventaId/pagos/plan
+router.post(
+    '/:ventaId/pagos/plan',
+    authenticate,
+    authorize('ADMINISTRADOR', 'GESTOR'),
+    validateParams(ventaIdParamSchema),
+    validate(createPlanPagoSchema),
+    pagoController.crearPlanPagoInicial);
 
 export const ventaRoutes = router;

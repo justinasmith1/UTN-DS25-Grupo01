@@ -1,0 +1,620 @@
+/* ========================================================================
+   DOCUMENTOS PANEL — Etapa 5.1.1
+   Panel de documentos del lote: lista + preview + acciones
+   ======================================================================== */
+
+/* Card modal documentos: ancho, altura y sombra más marcada */
+.doc-card {
+  width: min(1200px, 95vw);
+  max-height: 90vh;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.28), 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Body del modal: flex para footer sticky (Etapa 5.5.1) */
+.doc-card .c-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Contenido scrolleable */
+.doc-modal-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Footer sticky */
+.doc-modal-footer {
+  flex-shrink: 0;
+  padding: var(--space-4, 16px) 0 0;
+  margin-top: var(--space-3, 12px);
+  border-top: 1px solid #eee;
+  background: #fff;
+}
+
+.doc-modal-footer .doc-actions {
+  padding-top: 0;
+}
+
+/* Header documentos: título a la izquierda, tabs a la derecha del título */
+.doc-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.doc-header__left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.doc-header__left .c-title {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+/* Toggle píldora (segmented control) Activos / Eliminados */
+.doc-view-mode-tabs {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+  background: #f3f4f6;
+}
+
+.doc-pill-segment {
+  min-width: 88px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: #6b7280;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.doc-pill-segment:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.doc-pill-segment:last-child {
+  border-radius: 0 999px 999px 0;
+}
+
+.doc-pill-segment:hover:not(:disabled) {
+  color: #374151;
+}
+
+.doc-pill-segment--active.doc-pill-segment:first-child {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.doc-pill-segment--active.doc-pill-segment:last-child {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.doc-pill-segment:not(:first-child) {
+  border-left: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+/* Layout principal: sidebar + preview */
+.doc-panel {
+  display: flex;
+  gap: var(--space-6, 24px);
+  min-height: 480px;
+  max-height: calc(90vh - 200px);
+  overflow: hidden;
+}
+
+/* ========================================================================
+   SIDEBAR (lista de documentos)
+   ======================================================================== */
+.doc-sidebar {
+  width: 280px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md, 8px);
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.doc-sidebar__header {
+  padding: var(--space-3, 12px) var(--space-4, 16px);
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  flex-shrink: 0;
+}
+
+.doc-sidebar__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2, 8px);
+}
+
+.doc-sidebar__list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.doc-sidebar__list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.doc-sidebar__list::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 3px;
+}
+
+.doc-sidebar__item {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+  margin-bottom: 4px;
+}
+
+.doc-sidebar__item:hover {
+  background: #e5e7eb;
+}
+
+.doc-sidebar__item--selected {
+  background: #dbeafe;
+  border-color: var(--color-action-primary, #2849AF);
+}
+
+.doc-sidebar__item--selected:hover {
+  background: #bfdbfe;
+}
+
+.doc-sidebar__item-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.doc-sidebar__badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: #4b5563;
+  background: #e5e7eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.doc-sidebar__badge--eliminado {
+  color: #991b1b;
+  background: #fecaca;
+}
+
+.doc-sidebar__item-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.doc-sidebar__empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc-sidebar__empty-title {
+  font-weight: 600;
+  color: #374151;
+}
+
+/* ========================================================================
+   PREVIEW (visualización del documento)
+   ======================================================================== */
+.doc-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md, 8px);
+  background: #f9fafb;
+  overflow: hidden;
+}
+
+.doc-preview__frame {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  min-height: 400px;
+}
+
+.doc-preview__frame embed {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.doc-preview__frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.doc-preview__placeholder {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 8px;
+}
+
+.doc-preview__placeholder-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.doc-preview__placeholder-sub {
+  font-size: 14px;
+  color: #9ca3af;
+}
+
+.doc-preview__error {
+  padding: 40px;
+  text-align: center;
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.doc-preview__loading {
+  padding: 40px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+/* ========================================================================
+   ACTIONS (barra de botones)
+   ======================================================================== */
+.doc-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3, 12px);
+  padding: var(--space-4, 16px) 0 0;
+  flex-wrap: wrap;
+}
+
+.doc-actions__spacer {
+  flex: 1;
+}
+
+.doc-actions__pair {
+  display: flex;
+  gap: var(--space-3, 12px);
+}
+
+/* Todos los botones doc-actions: tamaño y estilo unificados */
+.doc-actions .btn {
+  min-height: 38px;
+  min-width: 120px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  transition: transform 120ms ease, filter 120ms ease, box-shadow 120ms ease;
+}
+
+.doc-actions .btn:hover:not(:disabled),
+.doc-actions .btn:focus-visible:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+}
+
+.doc-actions .btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.doc-actions .btn.btn-primary {
+  background: var(--color-action-primary, #2849af);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #fff;
+}
+
+.doc-actions .btn.btn-primary:hover:not(:disabled),
+.doc-actions .btn.btn-primary:focus-visible:not(:disabled) {
+  filter: brightness(0.98);
+}
+
+.doc-actions .btn.btn-success {
+  background: #0b8b67;
+  border-color: #0b8b67;
+  color: #fff;
+}
+
+.doc-actions .btn.btn-success:hover:not(:disabled),
+.doc-actions .btn.btn-success:focus-visible:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.doc-actions .btn.btn-danger {
+  background: #d32f2f;
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #fff;
+  font-weight: 400;
+  letter-spacing: 0.2px;
+}
+
+.doc-actions .btn.btn-danger:hover:not(:disabled),
+.doc-actions .btn.btn-danger:focus-visible:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+/* ========================================================================
+   CONFIRMACIÓN ELIMINAR (modal centrado, no se puede salir hasta Confirmar/Cancelar)
+   ======================================================================== */
+.doc-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2800;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.doc-confirm-modal {
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: var(--radius-md, 8px);
+  padding: 20px 24px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2);
+  min-width: 280px;
+  max-width: 420px;
+}
+
+.doc-confirm-modal__msg {
+  margin: 0 0 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.doc-confirm-modal__actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.doc-confirm-modal__actions .btn {
+  min-width: 100px;
+  font-size: 13px;
+  padding: 8px 14px;
+}
+
+/* ========================================================================
+   INLINE MESSAGES
+   ======================================================================== */
+.doc-error-inline {
+  font-size: 13px;
+  color: #dc2626;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  background: #fef2f2;
+  border-radius: var(--radius-sm, 6px);
+  margin-top: var(--space-2, 8px);
+}
+
+/* ========================================================================
+   APROBACIONES PLANO (Etapa 5.5)
+   ======================================================================== */
+.doc-aprobaciones {
+  display: flex;
+  gap: 16px;
+  margin-top: var(--space-3, 12px);
+}
+
+.doc-aprobacion-bloque {
+  flex: 1;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: var(--radius-md, 8px);
+  padding: 14px 16px;
+  background: #f9fafb;
+}
+
+.doc-aprobacion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.doc-aprobacion-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #374151;
+}
+
+.doc-aprobacion-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 999px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.doc-aprobacion-badge--pendiente {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.doc-aprobacion-badge--aprobado {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.doc-aprobacion-badge--rechazado {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.doc-aprobacion-meta {
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.doc-aprobacion-obs {
+  font-size: 12px;
+  color: #4b5563;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+/* Etapa 5.5.1: resumen colapsado */
+.approval-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.approval-summary .doc-aprobacion-edit-btn {
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 4px 10px;
+  min-width: auto;
+}
+
+.doc-aprobacion-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* Etapa 5.5.1: formulario expandido (override para modo edición) */
+.approval-edit .doc-aprobacion-form {
+  margin-top: 8px;
+  padding-top: 0;
+  border-top: none;
+}
+
+.doc-aprobacion-form-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 4px;
+}
+
+.doc-aprobacion-form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.doc-aprobacion-form-actions .doc-aprobacion-btn {
+  align-self: flex-start;
+}
+
+.doc-aprobacion-select-wrap {
+  width: 100%;
+}
+
+.doc-aprobacion-select-wrap .ns-trigger {
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.doc-aprobacion-textarea {
+  padding: 6px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius-sm, 6px);
+  font-size: 13px;
+  resize: vertical;
+  font-family: inherit;
+  color: #111827;
+}
+
+.doc-aprobacion-btn {
+  align-self: flex-end;
+  min-width: 100px;
+  padding: 6px 16px;
+  font-size: 13px;
+}
+
+/* ========================================================================
+   RESPONSIVE
+   ======================================================================== */
+@media (max-width: 768px) {
+  .doc-panel {
+    flex-direction: column;
+    max-height: none;
+  }
+
+  .doc-sidebar {
+    width: 100%;
+    min-width: unset;
+    max-height: 200px;
+  }
+
+  .doc-preview__frame {
+    min-height: 300px;
+  }
+
+  .doc-aprobaciones {
+    flex-direction: column;
+  }
+
+  .doc-actions .btn {
+    min-width: 100px;
+    font-size: 13px;
+  }
+}

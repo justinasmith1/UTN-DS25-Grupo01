@@ -1,0 +1,1071 @@
+/* Módulo Pagos (VentaPagosPage, PlanCrearForm) - estilos coherentes con tl-* */
+
+.vp-refresh-warning {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* Botones secundarios (Volver, Crear plan) - mismo lenguaje que tl-btn--soft */
+.vp-btn--soft,
+.vp-btn-volver,
+.vp-btn-crear-plan {
+  border: 1px solid #d1ece3;
+  background: #eef7f4;
+  color: #116149;
+  border-radius: 12px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.vp-btn--soft:hover,
+.vp-btn-volver:hover,
+.vp-btn-crear-plan:hover {
+  background: #d9f0e8;
+  filter: brightness(1.02);
+}
+
+/* Empty state "sin plan" */
+.vp-plan-empty-header,
+.vp-plan-vigente-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+.vp-plan-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+/* Select + Reemplazar: misma anchura; botón compacto (no hereda el tamaño grande del vp-btn-crear-plan) */
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 9.5rem));
+  width: fit-content;
+  max-width: 100%;
+  align-items: center;
+}
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) .vp-plan-version-ns {
+  width: 100%;
+}
+.vp-plan-header-actions:has(.vp-plan-version-ns):has(.vp-btn-crear-plan) .vp-btn-crear-plan {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 32px;
+  margin: 0;
+  padding: 4px 6px;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+/* NiceSelect versión plan: tipografía chica, menú anclado al trigger (sin portal → no “flota” al scroll) */
+.vp-plan-header-actions .vp-plan-version-ns {
+  position: relative;
+  z-index: 5;
+  width: 9.5rem;
+  max-width: 100%;
+  min-width: 0;
+}
+.vp-plan-version-ns .ns-wrap {
+  width: 100%;
+}
+.vp-plan-version-ns .ns-trigger {
+  width: 100%;
+  min-height: 32px;
+  padding: 4px 30px 4px 9px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fafbfc;
+  box-shadow: none;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #4b5563;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+.vp-plan-version-ns .ns-trigger:hover {
+  background: #f3f4f6;
+  border-color: rgba(0, 0, 0, 0.12);
+}
+.vp-plan-version-ns .ns-trigger:focus-visible {
+  outline: none;
+  border-color: #94a3b8;
+  box-shadow: 0 0 0 2px rgba(148, 163, 184, 0.35);
+}
+.vp-plan-version-ns .ns-trigger span {
+  padding-right: 2px;
+  color: #374151;
+}
+.vp-plan-version-ns .ns-trigger svg {
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+.vp-plan-version-ns .ns-trigger svg polyline {
+  stroke: #64748b;
+}
+.vp-plan-version-ns .ns-list {
+  font-size: 0.75rem;
+  border-radius: 8px;
+  padding: 4px;
+}
+.vp-plan-version-ns .ns-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+}
+.vp-plan-empty-card .vp-empty--plan {
+  margin-bottom: 0;
+}
+.vp-empty--plan {
+  margin-top: 0;
+}
+
+/* Encabezado */
+.vp-header {
+  border-bottom: 1px solid #e6ebf2;
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+.vp-header__secondary {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem 0;
+  align-items: flex-start;
+}
+.vp-header__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.65rem;
+  align-items: center;
+}
+.vp-header__consulta-hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+  max-width: 42rem;
+}
+.vp-header__meta {
+  margin-top: 0.15rem;
+}
+.vp-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+}
+.vp-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem 1.5rem;
+  align-items: center;
+}
+@media (max-width: 576px) {
+  .vp-context-item--block-sm {
+    flex: 1 1 100%;
+    align-items: flex-start;
+  }
+}
+.vp-context-item {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-context-label {
+  color: #6b7280;
+}
+.vp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.vp-badge--muted { background: #F2F4F7; color: #475467; }
+.vp-badge--success { background: #E7F7EE; color: #18794E; }
+.vp-badge--warn { background: #FFF6E5; color: #B45309; }
+.vp-badge--danger { background: #FEECEC; color: #C23B3B; }
+
+/* Cards resumen */
+.vp-summary-card {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: #fff;
+  transition: box-shadow 0.15s ease;
+}
+.vp-summary-card:hover {
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.08);
+}
+.vp-summary-card--highlight {
+  border-color: #d1ece3;
+  background: #f8fcf9;
+}
+.vp-summary-card--historico {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+.vp-summary-card--historico:hover {
+  box-shadow: 0 1px 6px rgba(16, 24, 40, 0.06);
+}
+.vp-summary-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  margin-bottom: 0.35rem;
+}
+.vp-summary-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-summary-value--success { color: #18794E; }
+.vp-summary-value--warn { color: #B45309; }
+.vp-summary-value--danger-soft {
+  color: #b91c1c;
+}
+.vp-summary-card--vencidas-alert {
+  border-color: #fecaca;
+  background: linear-gradient(180deg, #fffafa 0%, #fff5f5 100%);
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.06);
+}
+.vp-summary-card--vencidas-alert .vp-summary-label {
+  color: #991b1b;
+}
+.vp-summary-row .vp-summary-card {
+  min-height: 5.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+/* Plan vigente */
+.vp-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1rem 1.5rem;
+}
+.vp-plan-field {
+  font-size: 0.875rem;
+}
+.vp-plan-field__label {
+  color: #6b7280;
+  margin-bottom: 0.2rem;
+}
+.vp-plan-field__value {
+  font-weight: 600;
+  color: #0f172a;
+}
+.vp-section-title {
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+  font-weight: 600;
+}
+
+/* Bloques Plan / Cronograma / Historial: título con ícono y presencia uniforme */
+.vp-section-block {
+  border-color: #e2e8f0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.045);
+}
+.vp-section-block.vp-summary-card--historico {
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.vp-section-title.vp-section-title--with-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0;
+  line-height: 1.35;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.vp-section-title__icon {
+  flex-shrink: 0;
+  color: #116149;
+  opacity: 0.88;
+}
+.vp-section-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.vp-section-subtitle {
+  margin: 0.35rem 0 0.75rem 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+  max-width: 36rem;
+}
+.vp-table th.vp-th-num {
+  text-align: right;
+}
+.vp-empty {
+  text-align: center;
+  padding: 2rem 1.5rem;
+  color: #6b7280;
+  font-size: 0.9375rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #e5e7eb;
+}
+
+/* Tablas */
+.vp-table-wrap {
+  border: 1px solid #e6ebf2;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+.vp-table {
+  width: 100%;
+  font-size: 0.875rem;
+  border-collapse: collapse;
+}
+.vp-table th {
+  background: #f7fafc;
+  font-weight: 600;
+  color: #2b3748;
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid #e6ebf2;
+}
+.vp-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eef2f6;
+  vertical-align: middle;
+}
+.vp-table tbody tr:hover {
+  background: #fcfdfe;
+}
+.vp-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.vp-table .vp-cell-num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+/* Cronograma de cuotas: recargo compacto; montos operativos con más aire */
+.vp-table th.vp-th-recargo,
+.vp-table td.vp-cell-recargo {
+  width: 5rem;
+  min-width: 4.75rem;
+  max-width: 6rem;
+  padding-left: 10px;
+  padding-right: 12px;
+  font-size: 0.8125rem;
+}
+.vp-table th.vp-th-recargo {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #64748b;
+}
+.vp-table th.vp-th-exigible,
+.vp-table th.vp-th-pagado,
+.vp-table th.vp-th-saldo {
+  min-width: 8.75rem;
+  padding-left: 1.125rem;
+  padding-right: 1.125rem;
+}
+.vp-table td.vp-cell-exigible,
+.vp-table td.vp-cell-pagado,
+.vp-table td.vp-cell-saldo-crono {
+  padding-left: 1.125rem;
+  padding-right: 1.125rem;
+  min-width: 8.75rem;
+}
+.vp-table td.vp-cell-exigible {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.vp-table td.vp-cell-pagado,
+.vp-table td.vp-cell-saldo-crono {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+/* Jerarquía: 1) habilitada (franja verde), 2) vencida sin habilitar (ámbar), 3) recargo (indicador en Nº) */
+.vp-table tbody tr.vp-row--vencida:not(.vp-row--habilitada) {
+  background: #fffbeb;
+  box-shadow: inset 3px 0 0 0 #e8a317;
+}
+.vp-table tbody tr.vp-row--vencida:not(.vp-row--habilitada):hover {
+  background: #fff4e0;
+}
+.vp-table tbody tr.vp-row--habilitada:not(.vp-row--vencida) {
+  box-shadow: inset 3px 0 0 0 #116149;
+  background: #f3faf7;
+}
+.vp-table tbody tr.vp-row--habilitada:not(.vp-row--vencida):hover {
+  background: #ecf8f3;
+}
+.vp-table tbody tr.vp-row--habilitada.vp-row--vencida {
+  box-shadow: inset 3px 0 0 0 #116149;
+  background: linear-gradient(90deg, #eefaf4 0%, #fff8ed 100%);
+}
+.vp-table tbody tr.vp-row--habilitada.vp-row--vencida:hover {
+  background: linear-gradient(90deg, #e6f5ec 0%, #fff3e0 100%);
+}
+/* Cuota con recargo manual: punto junto al Nº (complementa el monto en columna Recargo) */
+.vp-table tbody tr.vp-row--con-recargo > td:first-child {
+  position: relative;
+  padding-left: 22px;
+}
+.vp-table tbody tr.vp-row--con-recargo > td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #c2410c;
+  opacity: 0.8;
+}
+.vp-table .vp-badge-cuota {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.vp-table .vp-badge--PENDIENTE { background: #F2F4F7; color: #475467; }
+.vp-table .vp-badge--PAGO_PARCIAL { background: #FFF6E5; color: #B45309; }
+.vp-table .vp-badge--PAGA { background: #E7F7EE; color: #18794E; }
+.vp-table .vp-badge--vencida { background: #FEECEC; color: #C23B3B; }
+
+/* Formulario crear plan (PlanCrearForm) - Modal flotante cclf-* */
+.vp-plan-form__subtitle-modal {
+  margin: 4px 0 0 0;
+  font-size: 0.875rem;
+  color: #475467;
+  font-weight: 400;
+}
+
+.vp-plan-form__section {
+  margin-bottom: 1.5rem;
+}
+.vp-plan-form__section:first-of-type {
+  margin-top: 0;
+}
+.vp-plan-form__section:last-of-type {
+  margin-bottom: 1rem;
+}
+.vp-plan-form__section--modal-tight {
+  margin-bottom: 1rem;
+}
+.vp-plan-form__section--modal-tight:last-of-type {
+  margin-bottom: 0.35rem;
+}
+.vp-plan-form__subtitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #2b3748;
+  margin-bottom: 0.75rem;
+}
+.vp-plan-form__cronograma {
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid #eef2f6;
+}
+.vp-plan-form__cronograma-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+}
+.vp-plan-form__cronograma-header .vp-plan-form__subtitle {
+  margin-bottom: 0;
+}
+.vp-plan-form__cuota-counter {
+  font-size: 0.8125rem;
+  color: #475467;
+  font-weight: 500;
+}
+.vp-plan-form__cuota-error {
+  font-size: 0.875rem;
+  color: #C23B3B;
+  padding: 10px 12px;
+  background: #FEF2F2;
+  border: 1px solid rgba(194, 59, 59, 0.3);
+  border-radius: 8px;
+  font-weight: 500;
+}
+.vp-plan-form__cell-error {
+  font-size: 11px;
+  color: #C23B3B;
+  margin-top: 2px;
+}
+.vp-plan-form .field-value.p0 {
+  padding: 0;
+}
+/* Inputs del cronograma: mismo look que Datos generales */
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input {
+  background: #fff !important;
+  border: 1px solid rgba(0, 0, 0, 0.18) !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  padding: 6px 10px !important;
+  font-size: 0.875rem !important;
+  outline: none !important;
+}
+.vp-plan-form__cronograma .vp-table--edit .vp-cell-input.field-input.is-invalid {
+  border-color: rgba(220, 53, 69, 0.6) !important;
+}
+/* Columna y celda de acciones para el ícono eliminar */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-actions,
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions {
+  width: 52px;
+  min-width: 52px;
+  text-align: center;
+  vertical-align: middle;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-td-actions .tl-icon {
+  flex-shrink: 0;
+}
+/* Columna Monto: alineación consistente con el resto (izquierda) */
+.vp-plan-form__cronograma .vp-table--edit th.vp-th-num {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto {
+  width: 120px;
+  min-width: 120px;
+  text-align: left;
+}
+.vp-plan-form__cronograma .vp-table--edit td.vp-cell-monto .vp-input-monto {
+  width: 100%;
+  min-width: 90px;
+}
+
+/* Botón Agregar cuota: más pequeño y separado de la tabla */
+.vp-btn-agregar-cuota {
+  padding: 5px 12px;
+  font-size: 13px;
+  margin-top: 12px;
+}
+
+/* Sección configuración del cronograma (Bloque 2A) */
+.vp-plan-form__config {
+  border-top: 1px solid #eef2f6;
+  padding-top: 1rem;
+}
+/* Label "Primer vencimiento" - ancho suficiente para ambas palabras */
+.vp-plan-form__config .vp-label-primer-vencimiento {
+  min-width: 14em;
+  white-space: nowrap;
+}
+.vp-btn-generar {
+  padding: 6px 14px;
+  font-size: 13px;
+}
+/* Bloque 2B: confirmación al regenerar cronograma */
+.vp-plan-form__confirm-regenerar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+}
+.vp-plan-form__confirm-msg {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475467;
+}
+.vp-plan-form__confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.vp-plan-form__config-hint {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+.vp-plan-form__cronograma-manual-hint {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+.vp-field-anticipo--required .field-label {
+  font-weight: 600;
+  color: #116149;
+}
+
+/* ===== PlanCrearForm: ajustes específicos ===== */
+
+/* Ocultar picker/spinner en campos monetarios (evitar cambios accidentales) */
+#plan-crear-form input[type="number"].vp-input-monto,
+.vp-plan-form__body input[type="number"].vp-input-monto {
+  -moz-appearance: textfield !important;
+  appearance: textfield !important;
+}
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+#plan-crear-form input[type="number"].vp-input-monto::-webkit-inner-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-outer-spin-button,
+.vp-plan-form__body input[type="number"].vp-input-monto::-webkit-inner-spin-button {
+  -webkit-appearance: none !important;
+  margin: 0 !important;
+  height: 0 !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Label Monto total: icono de info con tooltip (siempre visible, al inicio) */
+.vp-label-monto {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.vp-label-monto__icon {
+  flex-shrink: 0;
+  cursor: help;
+  color: #6b7280;
+  display: inline-flex;
+}
+.vp-label-monto__icon:hover {
+  color: #116149;
+}
+.vp-label-monto__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Contenedor scroll + footer sticky dentro del card */
+.vp-plan-form__body {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+/* Menos aire bajo el footer respecto al borde del card (.cclf-card__body usa 26px abajo por defecto) */
+.cclf-card > .cclf-card__body.vp-plan-form__body {
+  padding-bottom: 10px;
+}
+.vp-plan-form__scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+/* Crear/reemplazar plan, Registrar pago, Recargo: aire ante el footer sticky y espacio para la barra de scroll */
+.cclf-card > .cclf-card__body.vp-plan-form__body > .vp-plan-form__scroll {
+  padding-right: 12px;
+  padding-bottom: 1.25rem;
+  box-sizing: border-box;
+}
+.vp-plan-form__footer {
+  flex-shrink: 0;
+  margin-top: 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  background: #fff;
+}
+/* Sticky footer: Registrar pago, Aplicar recargo, Crear/reemplazar plan (misma franja que .cclf-footer) */
+.cclf-card__body.vp-plan-form__body > .cclf-footer.vp-plan-form__footer {
+  margin-top: 0;
+  align-items: center;
+  padding-top: 14px;
+  padding-bottom: 10px;
+  padding-left: 20px;
+  padding-right: 20px;
+  gap: 10px;
+}
+
+.vp-cronograma-hint {
+  max-width: 36rem;
+  line-height: 1.4;
+}
+
+/* Cronograma: header con CTA Registrar pago */
+.vp-cronograma-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+@media (min-width: 768px) {
+  .vp-cronograma-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+}
+.vp-cronograma-cta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0.85rem;
+  background: #f8fcf9;
+  border: 1px solid #d1ece3;
+  border-radius: 10px;
+}
+.vp-cronograma-cta__context {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.vp-cronograma-cta__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #116149;
+}
+.vp-cronograma-cta__meta {
+  font-size: 0.875rem;
+  color: #0f172a;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.vp-cronograma-cta__sep {
+  margin: 0 0.25rem;
+  color: #94a3b8;
+  font-weight: 400;
+}
+.vp-btn-registrar-pago {
+  flex-shrink: 0;
+}
+.vp-no-cuotas-msg {
+  font-size: 0.875rem;
+}
+
+/* Contexto de cuota en card Registrar pago */
+.vp-pago-contexto-cuota {
+  padding: 0.85rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #eef2f6;
+  border-radius: 10px;
+}
+.vp-pago-resumen__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.65rem;
+  border-bottom: 1px solid #e6ebf2;
+}
+.vp-pago-resumen__nro {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.vp-pago-resumen__tipo {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #475467;
+  padding: 2px 8px;
+  background: #f1f5f9;
+  border-radius: 6px;
+}
+.vp-pago-resumen__moneda {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #64748b;
+}
+.vp-pago-resumen__head .vp-badge-cuota {
+  margin-left: auto;
+}
+.vp-pago-resumen__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.65rem 1rem;
+}
+@media (min-width: 480px) {
+  .vp-pago-resumen__grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+.vp-pago-resumen__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.vp-pago-resumen__saldo {
+  grid-column: 1 / -1;
+}
+@media (min-width: 480px) {
+  .vp-pago-resumen__saldo {
+    grid-column: span 2;
+  }
+}
+.vp-pago-contexto-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+}
+.vp-pago-contexto-value {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-pago-contexto-value--warn {
+  color: #B45309;
+  font-size: 1.05rem;
+}
+.vp-pago-resumen__saldo .vp-pago-contexto-value--warn {
+  font-size: 1.1rem;
+}
+/* Resumen extendido en modal Aplicar recargo: 3 columnas equilibradas */
+.vp-pago-resumen__grid--recargo {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.55rem 1rem;
+}
+@media (min-width: 540px) {
+  .vp-pago-resumen__grid--recargo {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+.vp-pago-resumen__grid--recargo .vp-pago-resumen__saldo {
+  grid-column: 1 / -1;
+}
+.cclf-card--recargo {
+  width: min(720px, 94vw);
+}
+.cclf-card--recargo .vp-pago-contexto-cuota {
+  padding: 0.7rem 0.9rem;
+}
+
+/* Cronograma: recargo manual */
+.vp-table .vp-th-acciones,
+.vp-table .vp-cell-acciones {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.vp-table .vp-th-acciones {
+  width: 1%;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: #6b7280;
+}
+.vp-btn-recargo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 11px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+  white-space: nowrap;
+}
+.vp-btn-recargo:hover {
+  background: #eef7f3;
+  border-color: #94cbb5;
+  color: #116149;
+}
+.vp-btn-recargo:focus-visible {
+  outline: 2px solid #116149;
+  outline-offset: 2px;
+}
+.vp-cell-acciones .vp-acciones-vacio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 26px;
+}
+.vp-acciones-vacio::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #e5e7eb;
+}
+
+/* Modal recargo: formulario (evita venta-grid de 2 col con un solo hijo) */
+.vp-recargo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 0;
+}
+.vp-recargo-form__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem 1.25rem;
+  align-items: start;
+}
+@media (max-width: 520px) {
+  .vp-recargo-form__row {
+    grid-template-columns: 1fr;
+  }
+}
+.vp-recargo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+.vp-recargo-field__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475467;
+  line-height: 1.35;
+}
+.vp-recargo-field__req {
+  color: #b45309;
+  font-weight: 700;
+}
+.vp-recargo-field__control {
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06);
+  min-height: 44px;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+.vp-recargo-field__control .ns-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: stretch;
+}
+.vp-recargo-field__control .ns-trigger {
+  min-height: 42px;
+  border-radius: 7px;
+}
+.vp-recargo-field__control .field-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  width: 100%;
+  min-height: 44px;
+  box-shadow: none;
+}
+.vp-recargo-field--error .vp-recargo-field__control {
+  border-color: rgba(220, 53, 69, 0.55);
+}
+.vp-recargo-field__error {
+  font-size: 0.8125rem;
+  color: #c23b3b;
+  line-height: 1.35;
+}
+.cclf-card--recargo .vp-recargo-footer__cancel {
+  font-weight: 500;
+}
+
+/* Modal recargo: bloque de cálculo / resultado */
+.vp-recargo-result {
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  border: 1px solid #d8e8e0;
+  background: linear-gradient(180deg, #f8fcf9 0%, #f3faf6 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+.vp-recargo-result__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 1rem;
+  margin-bottom: 0.35rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(17, 97, 73, 0.12);
+}
+.vp-recargo-result__kicker {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #116149;
+}
+.vp-recargo-result__amount {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f172a;
+  font-variant-numeric: tabular-nums;
+}
+.vp-recargo-result__formula {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8125rem;
+  color: #64748b;
+  line-height: 1.4;
+}
+.vp-recargo-result__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.vp-recargo-result__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8125rem;
+}
+.vp-recargo-result__row-label {
+  color: #64748b;
+  font-weight: 500;
+}
+.vp-recargo-result__row-value {
+  font-weight: 600;
+  color: #334155;
+  font-variant-numeric: tabular-nums;
+}
+.vp-recargo-result__row--emphasis .vp-recargo-result__row-label {
+  color: #475467;
+  font-weight: 600;
+}
+.vp-recargo-result__row--emphasis .vp-recargo-result__row-value {
+  color: #116149;
+  font-size: 0.9375rem;
+}

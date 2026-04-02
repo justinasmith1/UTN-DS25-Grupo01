@@ -1,5 +1,14 @@
 // frontend/src/utils/inmobiliariaHelpers.js
-// Helpers comunes para lógica de inmobiliarias (cupo de prioridades, etc.)
+// Helpers comunes para lógica de inmobiliarias (cupo, detección Federala, etc.)
+
+/**
+ * Convención del proyecto: inmobiliariaId null = La Federala (CCLF).
+ * @param {number|null|undefined} inmobiliariaId
+ * @returns {boolean}
+ */
+export function isFederalaInmobiliaria(inmobiliariaId) {
+  return inmobiliariaId == null;
+}
 
 /**
  * Verifica si una inmobiliaria está saturada (no puede crear más prioridades activas)

@@ -1,21 +1,17 @@
 // src/components/Table/TablaVentas/presets/ventas.table.jsx
 import React from 'react';
-import { fmtMoney, fmtEstado, fmtTipoPago} from '../utils/formatters';
+import { fmtMoney, fmtEstado } from '../utils/formatters';
 import StatusBadge from '../cells/StatusBadge';
 import { ESTADO_COBRO_LABELS, isVentaFinalizada } from '../../../../utils/ventaState';
-
-// DEBUG: verificar que este preset sea el que usa la tabla de verdad
-console.info('[Ventas][preset activo] ventas.table.jsx cargado');
 
 export const ventasTablePreset = {
   key: 'ventas',
 
   COLUMN_TEMPLATES_BY_ROLE: {
-    // Etapa 3: Columnas por defecto (sin comprador, +acciones implícitas)
-    admin:        ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'inmobiliaria'],
-    gestor:       ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'inmobiliaria'],
-    tecnico:      ['id', 'loteId', 'fechaVenta', 'estado', 'monto'],
-    inmobiliaria: ['id', 'loteId', 'fechaVenta', 'estado', 'monto'],
+    admin:        ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'inmobiliaria', 'financiacion'],
+    gestor:       ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'inmobiliaria', 'financiacion'],
+    tecnico:      ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'financiacion'],
+    inmobiliaria: ['id', 'loteId', 'fechaVenta', 'estado', 'monto', 'financiacion'],
   },
 
   widthFor(id) {
@@ -24,11 +20,10 @@ export const ventasTablePreset = {
       case 'loteId':              return '100px';
       case 'fechaVenta':          return '120px';
       case 'estado':              return '140px';
-      case 'monto':               return '120px';
-      case 'comprador':           return '220px';
-      case 'inmobiliaria':        return '180px';
+      case 'monto':               return '100px';
+      case 'financiacion':        return '110px';
+      case 'inmobiliaria':        return '220px';
       case 'estadoCobro':         return '140px'; // Etapa 3
-      case 'tipoPago':            return '150px';
       case 'plazoEscritura':      return '140px';
       case 'fechaEscrituraReal':  return '140px'; // Etapa 3
       case 'fechaCancelacion':    return '140px'; // Etapa 3
@@ -91,28 +86,6 @@ export const ventasTablePreset = {
         align: 'right',
       },
       {
-        id: 'comprador',
-        titulo: 'Comprador',
-        accessor: (v) => {
-          const n = v?.comprador?.nombre && String(v.comprador.nombre).trim();
-          const a = v?.comprador?.apellido && String(v.comprador.apellido).trim();
-          const full = [n, a].filter(Boolean).join(' ').trim();
-          if (full) return full;
-
-          if (typeof v?.compradorNombreCompleto === 'string' && v.compradorNombreCompleto.trim()) {
-            return v.compradorNombreCompleto.trim();
-          }
-          if (typeof v?.compradorNombre === 'string' && v.compradorNombre.trim()) {
-            return v.compradorNombre.trim();
-          }
-          if (typeof v?.comprador === 'string' && v.comprador.trim()) {
-            return v.comprador.trim();
-          }
-          return '—';
-        },
-        align: 'center',
-      },
-      {
         // Inmobiliaria: hasta que el back envíe { inmobiliaria: { nombre } }, no mostramos el id.
         id: 'inmobiliaria',
         titulo: 'Inmobiliaria',
@@ -131,9 +104,10 @@ export const ventasTablePreset = {
         align: 'center',
       },
       {
-        id: 'tipoPago',
-        titulo: 'Tipo Pago',
-        accessor: (v) => fmtTipoPago(v.tipoPago ?? v.paymentType),
+        id: 'financiacion',
+        titulo: 'Financiación',
+        accessor: (v) =>
+          Array.isArray(v.planPagos) && v.planPagos.length > 0 ? 'Con plan' : 'Sin plan',
         align: 'center',
       },
       {

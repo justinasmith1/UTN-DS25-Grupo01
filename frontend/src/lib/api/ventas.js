@@ -1,10 +1,3 @@
-// src/lib/api/ventas.js
-// Adapter para Ventas: traduce UI <-> Backend y maneja listado/CRUD.
-// Cambios clave:
-// - Endpoint: intenta "/Ventas" (mayúscula) y si 404 prueba "/ventas".
-// - fromApi / toApi: mapean nombres.
-// - list(): usa normalizador para entregar { data, meta } consistente.
-
 import { http, normalizeApiListResponse } from "../http/http";
 
 const PRIMARY = "/ventas";
@@ -14,7 +7,6 @@ const ok = (data) => ({ data });
 
 const toNumberOrNull = (v) => (v === "" || v == null ? null : Number(v));
 
-// Backend -> UI
 const fromApi = (row = {}) => {
   const lotId =
     row.lotId ?? row.loteId ?? row.lote_id ?? row.lote ?? row.lot ?? null;
@@ -46,7 +38,6 @@ const fromApi = (row = {}) => {
     lotId,
     lotMapId: lotMapId ?? null,
     lote: ensureLote(),
-    // Preservar campos en español del backend (monto, fechaVenta, estado, tipoPago, plazoEscritura)
     monto: row.monto != null ? (typeof row.monto === "number" ? row.monto : Number(row.monto)) : (row.amount != null ? Number(row.amount) : null),
     fechaVenta: row.fechaVenta ?? row.date ?? row.fecha ?? null,
     estado: row.estado ?? row.status ?? null,
@@ -54,36 +45,35 @@ const fromApi = (row = {}) => {
     tipoPago: row.tipoPago ?? row.paymentType ?? null,
     plazoEscritura: row.plazoEscritura ?? row.plazo_escritura ?? null,
     fechaBaja: row.fechaBaja ?? row.fecha_baja ?? null,
-    // Campos nuevos (Etapa 1)
     fechaEscrituraReal: row.fechaEscrituraReal ?? null,
     fechaCancelacion: row.fechaCancelacion ?? null,
     motivoCancelacion: row.motivoCancelacion ?? null,
-    // Mantener compatibilidad con nombres en inglés para código existente
     date: row.fechaVenta ?? row.date ?? row.fecha ?? null,
     status: row.estado ?? row.status ?? null,
     amount: row.monto != null ? (typeof row.monto === "number" ? row.monto : Number(row.monto)) : (row.amount != null ? Number(row.amount) : null),
     paymentType: row.tipoPago ?? row.paymentType ?? null,
     buyerId: row.buyerId ?? row.compradorId ?? null,
     compradorId: row.compradorId ?? row.buyerId ?? null,
+    // vc.persona ?? vc soporta tanto relación explícita (VentaComprador) como implícita (Persona[])
+    compradores: (row.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     inmobiliariaId: row.inmobiliariaId ?? row.inmobiliaria_id ?? null,
     reservaId: row.reservaId ?? row.reserva_id ?? null,
     observaciones: row.observaciones ?? row.notas ?? "",
-    // Estado operativo: usar campo estadoOperativo directamente si existe, sino default OPERATIVO
     estadoOperativo: row.estadoOperativo ?? (() => {
-      // Fallback: derivar de estado solo si es OPERATIVO/ELIMINADO (compatibilidad con datos antiguos)
       const estadoStr = String(row.estado ?? "").toUpperCase().trim();
       if (estadoStr === "OPERATIVO" || estadoStr === "ELIMINADO") {
         return estadoStr;
       }
       return "OPERATIVO";
     })(),
-    // Preservar fechas del backend
     createdAt: row.createdAt ?? row.fechaCreacion ?? null,
     updatedAt: row.updatedAt ?? row.updateAt ?? row.fechaActualizacion ?? null,
+    // Submódulo pagos / tabla: el back incluye plan vigente y conteos; sin esto siempre cae "Sin plan"
+    planPagos: Array.isArray(row.planPagos) ? row.planPagos : [],
+    _count: row._count && typeof row._count === "object" ? row._count : undefined,
   };
 };
 
-// UI -> Backend
 const toApi = (form = {}) => ({
   loteId: form.lotId != null ? String(form.lotId).trim() : undefined,
   fechaVenta: form.date || form.fechaVenta || null,
@@ -96,7 +86,6 @@ const toApi = (form = {}) => ({
   observaciones: (form.observaciones ?? "").trim() || null,
 });
 
-// QS
 function qs(params = {}) {
   const s = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
@@ -106,7 +95,6 @@ function qs(params = {}) {
   return str ? `?${str}` : "";
 }
 
-// Fallback de ruta
 async function fetchWithFallback(path, options) {
   let res = await http(path, options);
   if (res.status === 404) {
@@ -116,7 +104,6 @@ async function fetchWithFallback(path, options) {
   return res;
 }
 
-/* ------------------------------ MODO API ------------------------------ */
 async function apiGetAll(params = {}) {
   const res = await fetchWithFallback(`${PRIMARY}${qs(params)}`, { method: "GET" });
   const data = await res.json().catch(() => ({}));
@@ -137,13 +124,15 @@ async function apiGetById(id) {
   
   return ok({
     ...base,
-    // Preservar relaciones completas del backend
     comprador: raw?.comprador || base?.comprador || null,
+    compradores: base.compradores?.length ? base.compradores : (raw?.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     reserva: raw?.reserva || null,
+    planPagos: Array.isArray(raw?.planPagos) ? raw.planPagos : base.planPagos ?? [],
+    _count: raw?._count ?? base._count,
   });
 }
 
@@ -217,25 +206,24 @@ async function apiCreate(payload) {
 }
 
 async function apiUpdate(id, payload) {
-  // El payload ya viene con los campos correctos del componente (monto, estado, fechaVenta, etc.)
-  // No usar toApi porque espera otro formato (form.date, form.amount, etc.)
-  // Enviar directamente los campos que espera el backend según la validación
   const body = {};
-  
-  // Mapear campos que pueden venir
+
   if (payload.loteId != null) body.loteId = payload.loteId;
   if (payload.fechaVenta != null) body.fechaVenta = payload.fechaVenta;
   if (payload.monto != null) body.monto = payload.monto;
   if (payload.estado != null) body.estado = payload.estado;
-  if (payload.estadoCobro != null) body.estadoCobro = payload.estadoCobro; // Etapa 2
+  if (payload.estadoCobro != null) body.estadoCobro = payload.estadoCobro;
   if (payload.plazoEscritura != null) body.plazoEscritura = payload.plazoEscritura;
   if (payload.tipoPago != null) body.tipoPago = payload.tipoPago;
   if (payload.numero != null) body.numero = payload.numero;
   if (payload.compradorId != null) body.compradorId = payload.compradorId;
+  if (payload.compradores != null && Array.isArray(payload.compradores)) {
+    body.compradores = payload.compradores.map(c =>
+      typeof c === 'object' && c.personaId != null ? { personaId: c.personaId } : { personaId: c.id ?? c }
+    );
+  }
   if (payload.inmobiliariaId != null) body.inmobiliariaId = payload.inmobiliariaId;
   if (payload.reservaId != null) body.reservaId = payload.reservaId;
-  
-  // Campos nuevos (Etapa 1)
   if (payload.fechaEscrituraReal != null) body.fechaEscrituraReal = payload.fechaEscrituraReal;
   if (payload.fechaCancelacion != null) body.fechaCancelacion = payload.fechaCancelacion;
   if (payload.motivoCancelacion != null) body.motivoCancelacion = payload.motivoCancelacion;
@@ -252,11 +240,14 @@ async function apiUpdate(id, payload) {
   return ok({
     ...base,
     comprador: raw?.comprador || base?.comprador || null,
+    compradores: base.compradores?.length ? base.compradores : (raw?.compradores ?? []).map(vc => vc.persona ?? vc).filter(Boolean),
     lote: raw?.lote
       ? { ...raw.lote, mapId: raw.lote.mapId ?? base.lotMapId ?? null }
       : base.lote || null,
     inmobiliaria: raw?.inmobiliaria || base?.inmobiliaria || null,
     reserva: raw?.reserva || null,
+    planPagos: Array.isArray(raw?.planPagos) ? raw.planPagos : base.planPagos ?? [],
+    _count: raw?._count ?? base._count,
   });
 }
 
@@ -270,7 +261,6 @@ async function apiDelete(id) {
 }
 
 async function apiDesactivar(id) {
-  // Usamos PATCH /:id/eliminar para soft delete (estadoOperativo = ELIMINADO)
   const res = await fetchWithFallback(`${PRIMARY}/${id}/eliminar`, { method: "PATCH" });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data?.message || "Error al eliminar venta");
@@ -284,7 +274,58 @@ async function apiReactivar(id) {
   return ok(fromApi(data?.data ?? data));
 }
 
-/* --------------------------- EXPORT PÚBLICO --------------------------- */
+function getApiBase() {
+  const RAW_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_BASE || "";
+  const FORCE_ABS = import.meta.env.VITE_API_FORCE_ABSOLUTE === "true";
+  const isLocalAbs = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(RAW_BASE);
+  return (import.meta.env.DEV && isLocalAbs && !FORCE_ABS) ? "/api" : (RAW_BASE || "/api");
+}
+
+async function apiRegistrarBoleto(ventaId, file) {
+  const formData = new FormData();
+  formData.append("file", file);
+  const { getAccessToken } = await import("../auth/token");
+  const access = getAccessToken();
+  const res = await fetch(`${getApiBase()}${PRIMARY}/${ventaId}/registrar-boleto`, {
+    method: "POST",
+    headers: { ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || "Error al registrar boleto");
+  }
+  const raw = data?.data ?? data;
+  return ok({
+    archivo: raw?.archivo ?? null,
+    venta: raw?.venta ? fromApi(raw.venta) : null,
+  });
+}
+
+async function apiRegistrarEscritura(ventaId, file, fechaEscritura) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("fechaEscritura", typeof fechaEscritura === "string" ? fechaEscritura : fechaEscritura?.toISOString?.() ?? String(fechaEscritura));
+  const { getAccessToken } = await import("../auth/token");
+  const access = getAccessToken();
+  const res = await fetch(`${getApiBase()}${PRIMARY}/${ventaId}/registrar-escritura`, {
+    method: "POST",
+    headers: { ...(access ? { Authorization: `Bearer ${access}` } : {}) },
+    credentials: "include",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data?.message || "Error al registrar escritura");
+  }
+  const raw = data?.data ?? data;
+  return ok({
+    archivo: raw?.archivo ?? null,
+    venta: raw?.venta ? fromApi(raw.venta) : null,
+  });
+}
+
 export const getAllVentas = apiGetAll;
 export const getVentaById = apiGetById;
 export const createVenta = apiCreate;
@@ -293,3 +334,5 @@ export const deleteVenta = apiDelete;
 export const desactivarVenta = apiDesactivar;
 export const reactivarVenta = apiReactivar;
 export const getVentasByInmobiliaria = apiGetByInmobiliaria;
+export const registrarBoleto = apiRegistrarBoleto;
+export const registrarEscritura = apiRegistrarEscritura;

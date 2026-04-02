@@ -144,21 +144,29 @@ export default function VentaVerCard({
 
   const safe = (v) => (isBlank(v) ? NA : v);
 
-  // Comprador: nombre + apellido, con alternativas por si cambian claves
-  const compradorNombre = (() => {
-    const n =
-      sale?.comprador?.nombre ||
-      sale?.buyer?.nombre ||
-      sale?.buyer?.firstName;
-    const a =
-      sale?.comprador?.apellido ||
-      sale?.buyer?.apellido ||
-      sale?.buyer?.lastName;
-    const joined = [n, a].filter(Boolean).join(" ");
-    if (!isBlank(joined)) return joined;
-    if (!isBlank(n)) return n;
-    return NA;
+  // Etapa 4: Compradores múltiples — UI tipo "grupo familiar": nombre + DNI/CUIL debajo
+  const compradoresLista = (() => {
+    if (sale?.compradores?.length) return sale.compradores;
+    if (sale?.comprador) return [sale.comprador];
+    return [];
   })();
+
+  const compradoresUI = compradoresLista.length === 0 ? NA : (
+    <div className="buyerChipList">
+      {compradoresLista.map((c, idx) => {
+        const nombre = [c.nombre, c.apellido].filter(Boolean).join(' ') || c.razonSocial || `Persona ${c.id ?? idx + 1}`;
+        const identificador = c.identificadorValor
+          ? `${c.identificadorTipo ?? 'DNI'}: ${c.identificadorValor}`
+          : null;
+        return (
+          <div key={c.id ?? idx} className="buyerChip">
+            <div className="buyerChip__name">{nombre}</div>
+            {identificador && <div className="buyerChip__meta">{identificador}</div>}
+          </div>
+        );
+      })}
+    </div>
+  );
 
   // Propietario: primero `venta.propietario`, si no `venta.lote.propietario`
   const propietarioNombre = (() => {
@@ -189,14 +197,14 @@ export default function VentaVerCard({
   // Verificar si es FINALIZADA (derivada)
   const esFinalizada = isVentaFinalizada(sale);
 
-  // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha
+  // Orden solicitado: comprador/propietario a la izquierda; número/fechas/plazo a la derecha.
+  // COMPRADORES va siempre al final fuera de las columnas (full-width) para mantener simetría.
   const leftPairs = [
     ["LOTE N°", safe(sale?.lote?.mapId ?? sale?.lotMapId ?? sale?.loteId)],
     ["MONTO", fmtMoney(sale?.monto)],
     ["ESTADO DE VENTA", titleCaseEstado(sale?.estado)],
     ["ESTADO DE COBRO", estadoCobroLabel],
     ["INMOBILIARIA", safe(sale?.inmobiliaria?.nombre)],
-    ["COMPRADOR", compradorNombre],
     ["PROPIETARIO", propietarioNombre],
   ];
 
@@ -232,6 +240,10 @@ export default function VentaVerCard({
     const computed = Math.min(240, Math.max(160, Math.round(longest * 8.6) + 20));
     setLabelW(computed);
   }, [open, sale]);
+
+  // Helper: aplicar estilo de contraste solo a strings (los JSX no necesitan color override)
+  const fieldValueStyle = (val) =>
+    typeof val === 'string' ? valueStyle(val) : undefined;
 
   if (!open) return null;
 
@@ -293,7 +305,7 @@ export default function VentaVerCard({
               {leftPairs.map(([label, value]) => (
                 <div className="field-row" key={label}>
                   <div className="field-label">{label}</div>
-                  <div className="field-value" style={valueStyle(value)}>
+                  <div className="field-value" style={fieldValueStyle(value)}>
                     {value}
                   </div>
                 </div>
@@ -304,11 +316,21 @@ export default function VentaVerCard({
               {rightPairs.map(([label, value]) => (
                 <div className="field-row" key={label}>
                   <div className="field-label">{label}</div>
-                  <div className="field-value" style={valueStyle(value)}>
+                  <div className="field-value" style={fieldValueStyle(value)}>
                     {value}
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* COMPRADORES — siempre al final, se extiende por ambas columnas */}
+            <div className="venta-col venta-col--span-all">
+              <div className="field-row field-row--multiline">
+                <div className="field-label">COMPRADORES</div>
+                <div className="field-value field-value--expandable">
+                  {compradoresUI}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -319,7 +341,7 @@ export default function VentaVerCard({
                 {camposCondicionales.map(([label, value]) => (
                   <div className="field-row" key={label}>
                     <div className="field-label">{label}</div>
-                    <div className="field-value" style={valueStyle(value)}>
+                    <div className="field-value" style={fieldValueStyle(value)}>
                       {value}
                     </div>
                   </div>
