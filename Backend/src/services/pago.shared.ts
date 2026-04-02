@@ -6,6 +6,7 @@ export const VENTA_INCLUDE_PAGOS = {
   comprador: { select: { id: true, nombre: true, apellido: true, razonSocial: true } },
   compradores: { select: { id: true, nombre: true, apellido: true, razonSocial: true } },
   inmobiliaria: { select: { id: true, nombre: true } },
+  reservaConsumo: { select: { id: true, sena: true, fechaReserva: true } },
 } as const;
 
 export const PLAN_INCLUDE = {

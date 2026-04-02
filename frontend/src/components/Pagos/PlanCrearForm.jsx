@@ -65,6 +65,10 @@ export default function PlanCrearForm({
   mode = "crear",
   reemplazoContext = null,
   montoVentaBloqueado = undefined,
+  /** Base del cronograma (venta − seña) cuando hay reserva con seña; si no viene, se usa montoVentaBloqueado. */
+  saldoAPlanificarBloqueado = undefined,
+  montoSenaReserva = undefined,
+  monedaResumen = "ARS",
 }) {
   const isReemplazo = mode === "reemplazo";
   const formId = isReemplazo ? "plan-reemplazar-form" : "plan-crear-form";
@@ -82,6 +86,15 @@ export default function PlanCrearForm({
         };
       }
     }
+    if (!isReemplazo && saldoAPlanificarBloqueado != null) {
+      const n = Number(saldoAPlanificarBloqueado);
+      if (!Number.isNaN(n) && n > 0) {
+        return {
+          ...getDefaultValues(),
+          montoTotalPlanificado: n.toFixed(2),
+        };
+      }
+    }
     if (!isReemplazo && montoVentaBloqueado != null) {
       const n = Number(montoVentaBloqueado);
       if (!Number.isNaN(n) && n > 0) {
@@ -92,10 +105,33 @@ export default function PlanCrearForm({
       }
     }
     return getDefaultValues();
-  }, [isReemplazo, saldoReemplazo, monedaReemplazo, montoVentaBloqueado]);
+  }, [isReemplazo, saldoReemplazo, monedaReemplazo, montoVentaBloqueado, saldoAPlanificarBloqueado]);
 
   const montoPlanReadonly =
-    isReemplazo || (!isReemplazo && Number(montoVentaBloqueado) > 0);
+    isReemplazo ||
+    (!isReemplazo &&
+      (Number(saldoAPlanificarBloqueado) > 0 || Number(montoVentaBloqueado) > 0));
+
+  /** Base numérica para generar cronograma y payload (I8 2B: saldo a planificar si aplica). */
+  const baseMontoPlanificacion = useMemo(() => {
+    if (isReemplazo) return null;
+    if (saldoAPlanificarBloqueado != null) {
+      const n = Number(saldoAPlanificarBloqueado);
+      if (!Number.isNaN(n) && n > 0) return n;
+    }
+    if (montoVentaBloqueado != null) {
+      const n = Number(montoVentaBloqueado);
+      if (!Number.isNaN(n) && n > 0) return n;
+    }
+    return null;
+  }, [isReemplazo, saldoAPlanificarBloqueado, montoVentaBloqueado]);
+
+  const senaNum = Number(montoSenaReserva);
+  const mostrarBloqueReserva =
+    !isReemplazo &&
+    montoVentaBloqueado != null &&
+    !Number.isNaN(Number(montoVentaBloqueado)) &&
+    Number(montoVentaBloqueado) > 0;
 
   const {
     register,
@@ -176,11 +212,10 @@ export default function PlanCrearForm({
     setPendingRegenerarConfirm(false);
     clearErrors();
     const cantidadCuotas = parseInt(formValues.cantidadCuotas, 10);
-    const mvBloq =
-      !isReemplazo && montoVentaBloqueado != null ? Number(montoVentaBloqueado) : NaN;
-    const montoTotalPlanificado = !Number.isNaN(mvBloq) && mvBloq > 0
-      ? mvBloq
-      : parseFloat(formValues.montoTotalPlanificado);
+    const montoTotalPlanificado =
+      baseMontoPlanificacion != null
+        ? baseMontoPlanificacion
+        : parseFloat(formValues.montoTotalPlanificado);
     const montoAnticipo = parseFloat(formValues.montoAnticipo) || 0;
     const primerVencimiento = (formValues.primerVencimiento || "").trim();
     const cadencia = formValues.cadencia || "mensual";
@@ -273,13 +308,16 @@ export default function PlanCrearForm({
 
   const onSubmit = async (data) => {
     clearErrors();
-    if (!isReemplazo && montoVentaBloqueado != null) {
-      const mv = Number(montoVentaBloqueado);
+    if (!isReemplazo && baseMontoPlanificacion != null) {
+      const target = baseMontoPlanificacion;
       const mp = Number(data.montoTotalPlanificado);
-      if (!Number.isNaN(mv) && mv > 0 && Math.abs(mp - mv) > 0.01) {
+      if (!Number.isNaN(target) && target > 0 && Math.abs(mp - target) > 0.01) {
         setError("montoTotalPlanificado", {
           type: "manual",
-          message: "El monto total debe coincidir con el monto de la venta",
+          message:
+            senaNum > 0
+              ? "El monto total del plan debe coincidir con el saldo a planificar (venta − seña)"
+              : "El monto total debe coincidir con el monto de la venta",
         });
         return;
       }
@@ -314,10 +352,10 @@ export default function PlanCrearForm({
         }
         await reemplazarPlanPago(ventaId, payload);
       } else {
-        const mv =
-          montoVentaBloqueado != null ? Number(montoVentaBloqueado) : NaN;
         const montoTotalPlanificadoNum =
-          !Number.isNaN(mv) && mv > 0 ? mv : Number(data.montoTotalPlanificado);
+          baseMontoPlanificacion != null
+            ? baseMontoPlanificacion
+            : Number(data.montoTotalPlanificado);
         const payload = {
           nombre: String(data.nombre).trim(),
           tipoFinanciacion: data.tipoFinanciacion,
@@ -437,6 +475,50 @@ export default function PlanCrearForm({
                           <div className="field-label">Saldo pendiente real (base del nuevo plan)</div>
                           <div className="field-value is-readonly">
                             {fmtMonto(reemplazoContext.saldoPendienteReal, reemplazoContext.moneda)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+
+              {!isReemplazo && mostrarBloqueReserva ? (
+                <div className="vp-plan-form__section vp-plan-form__reemplazo-context">
+                  <h6 className="vp-plan-form__subtitle">Montos de la venta</h6>
+                  <p className="vp-plan-form__reemplazo-nota text-muted small mb-3">
+                    El cronograma debe cerrar contra el saldo a planificar (lo pendiente de cobrar por el plan; la seña no forma parte del cronograma).
+                  </p>
+                  <div className="venta-grid" style={{ "--sale-label-w": "200px" }}>
+                    <div className="venta-col venta-col--span-all">
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Monto total de la venta</div>
+                          <div className="field-value is-readonly">
+                            {fmtMonto(montoVentaBloqueado, formValues.moneda || monedaResumen)}
+                          </div>
+                        </div>
+                      </div>
+                      {senaNum > 0 ? (
+                        <div className="fieldRow">
+                          <div className="field-row">
+                            <div className="field-label">Seña ya pagada (reserva)</div>
+                            <div className="field-value is-readonly">
+                              {fmtMonto(montoSenaReserva, formValues.moneda || monedaResumen)}
+                            </div>
+                          </div>
+                        </div>
+                      ) : null}
+                      <div className="fieldRow">
+                        <div className="field-row">
+                          <div className="field-label">Saldo a planificar (base del cronograma)</div>
+                          <div className="field-value is-readonly">
+                            <strong>
+                              {fmtMonto(
+                                saldoAPlanificarBloqueado ?? montoVentaBloqueado,
+                                formValues.moneda || monedaResumen
+                              )}
+                            </strong>
                           </div>
                         </div>
                       </div>

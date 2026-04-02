@@ -700,7 +700,10 @@ export default function VentaPagosPage() {
         <PlanCrearForm
           open={showFormPlan}
           ventaId={parseInt(ventaId, 10)}
-          montoVentaBloqueado={data?.venta?.monto}
+          montoVentaBloqueado={data?.planificacion?.montoVenta ?? data?.venta?.monto}
+          saldoAPlanificarBloqueado={data?.planificacion?.saldoAPlanificar}
+          montoSenaReserva={data?.planificacion?.montoSenaReserva}
+          monedaResumen={moneda}
           onSuccess={handlePlanCreado}
           onCancel={() => setShowFormPlan(false)}
         />

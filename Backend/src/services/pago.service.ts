@@ -138,18 +138,24 @@ export async function getPagosContextByVentaId(ventaId: number) {
     cuotas: ph.cuotas.map((c) => normalizarCuotaPlanPagoContext(c, ahora)),
   }));
 
-  let montoTotalPagado = 0;
   let saldoPendienteTotal = 0;
   let cuotasPagas = 0;
   let cuotasPendientes = 0;
   let cuotasVencidas = 0;
 
-  // Total pagado de la venta: todos los pagos registrados (planes anteriores siguen referenciando sus cuotas).
-  montoTotalPagado = pagos.reduce((acc, p) => acc + toNum(p.monto), 0);
+  // Pagos imputados a cuotas (historial persistido). La seña de la reserva se suma aparte como pago previo.
+  const sumPagosRegistrados = pagos.reduce((acc, p) => acc + toNum(p.monto), 0);
 
+  const reservaOrigen = venta.reservaConsumo;
+  const montoSena =
+    reservaOrigen?.sena != null && toNum(reservaOrigen.sena) > 0
+      ? roundMoney2(toNum(reservaOrigen.sena))
+      : 0;
+
+  let sumSaldoCuotasPlanVigente = 0;
   for (const cuota of cuotas) {
     const saldo = toNum(cuota.saldoPendiente);
-    saldoPendienteTotal += saldo;
+    sumSaldoCuotasPlanVigente += saldo;
 
     if (cuota.estadoCuota === 'PAGA') {
       cuotasPagas++;
@@ -159,6 +165,32 @@ export async function getPagosContextByVentaId(ventaId: number) {
         cuotasVencidas++;
       }
     }
+  }
+
+  const montoTotalPagado = roundMoney2(sumPagosRegistrados + montoSena);
+  const montoVentaNum = toNum(venta.monto);
+
+  if (planVigente) {
+    const planTotal = toNum(planVigente.montoTotalPlanificado);
+    const cierraNetoConSeña =
+      Math.abs(planTotal + montoSena - montoVentaNum) <= MONTO_VENTA_RESERVA_TOLERANCIA;
+    const planLegacyBrutoConSeña =
+      montoSena > 0 &&
+      Math.abs(planTotal - montoVentaNum) <= MONTO_VENTA_RESERVA_TOLERANCIA;
+    if (cierraNetoConSeña) {
+      // Plan armado sobre venta − seña (I8 2B) o sin seña: el cronograma ya no incluye la seña.
+      saldoPendienteTotal = roundMoney2(sumSaldoCuotasPlanVigente);
+    } else if (planLegacyBrutoConSeña) {
+      // Plan histórico: total del plan = monto bruto de venta con seña aparte (I8 2A).
+      saldoPendienteTotal = roundMoney2(Math.max(0, sumSaldoCuotasPlanVigente - montoSena));
+    } else {
+      // Reemplazo u otros: base distinta al monto de venta; no restar la seña otra vez.
+      saldoPendienteTotal = roundMoney2(sumSaldoCuotasPlanVigente);
+    }
+  } else {
+    saldoPendienteTotal = roundMoney2(
+      Math.max(0, montoVentaNum - sumPagosRegistrados - montoSena)
+    );
   }
 
   const cuotasNormalizadas = cuotas.map((c) => normalizarCuotaPlanPagoContext(c, ahora));
@@ -204,7 +236,32 @@ export async function getPagosContextByVentaId(ventaId: number) {
     };
   });
 
-  // Visión global de la venta: planificado = ya pagado (toda la historia) + saldo del plan vigente.
+  /** Entrada solo en DTO: seña pagada en la reserva (fechaReserva = única fecha disponible en el modelo). */
+  const pagosConSenia =
+    montoSena > 0 && reservaOrigen
+      ? [
+          {
+            id: `sena-reserva-${reservaOrigen.id}`,
+            ventaId: venta.id,
+            fechaPago: reservaOrigen.fechaReserva,
+            monto: montoSena,
+            medioPago: 'OTRO' as const,
+            referencia: null as string | null,
+            observacion: null as string | null,
+            registradoBy: null as string | null,
+            createdAt: reservaOrigen.fechaReserva,
+            cuotaHistorica: null,
+            referenciaCuotaUi: 'Seña — pago previo por reserva',
+            esPagoPrevioReserva: true,
+          },
+        ]
+      : [];
+
+  const pagosHistorialOrdenados = [...pagosNormalizados, ...pagosConSenia].sort(
+    (a, b) => new Date(b.fechaPago).getTime() - new Date(a.fechaPago).getTime()
+  );
+
+  // Visión global de la venta: planificado = pagado (incl. seña) + saldo pendiente coherente.
   const montoTotalPlanificadoResumen = roundMoney2(montoTotalPagado + saldoPendienteTotal);
 
   return {
@@ -238,7 +295,7 @@ export async function getPagosContextByVentaId(ventaId: number) {
       createdBy: planVigente.createdBy,
     } : null,
     cuotas: cuotasNormalizadas,
-    pagos: pagosNormalizados,
+    pagos: pagosHistorialOrdenados,
     planesHistoricos,
     resumen: {
       montoTotalPlanificado: montoTotalPlanificadoResumen,
@@ -248,6 +305,11 @@ export async function getPagosContextByVentaId(ventaId: number) {
       cuotasPagas,
       cuotasPendientes,
       cuotasVencidas,
+    },
+    planificacion: {
+      montoVenta: montoVentaNum,
+      montoSenaReserva: montoSena,
+      saldoAPlanificar: roundMoney2(Math.max(0, montoVentaNum - montoSena)),
     },
   };
 }
@@ -278,7 +340,12 @@ export async function createPlanPagoInicial(
 ) {
   const venta = await prisma.venta.findUnique({
     where: { id: ventaId },
-    select: { id: true, estadoOperativo: true, monto: true },
+    select: {
+      id: true,
+      estadoOperativo: true,
+      monto: true,
+      reservaConsumo: { select: { sena: true } },
+    },
   });
 
   if (!venta) {
@@ -294,9 +361,24 @@ export async function createPlanPagoInicial(
   }
 
   const montoVenta = toNum(venta.monto);
-  if (Math.abs(payload.montoTotalPlanificado - montoVenta) > MONTO_VENTA_RESERVA_TOLERANCIA) {
+  const rc = venta.reservaConsumo;
+  const montoSena =
+    rc?.sena != null && toNum(rc.sena) > 0 ? roundMoney2(toNum(rc.sena)) : 0;
+
+  if (montoSena > montoVenta + MONTO_VENTA_RESERVA_TOLERANCIA) {
     const error = new Error(
-      `El monto total del plan debe coincidir con el monto de la venta (${montoVenta.toFixed(2)})`
+      'La seña de la reserva no puede superar el monto de la venta'
+    ) as Error & { statusCode?: number };
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const saldoAPlanificar = roundMoney2(montoVenta - montoSena);
+  if (Math.abs(payload.montoTotalPlanificado - saldoAPlanificar) > MONTO_VENTA_RESERVA_TOLERANCIA) {
+    const error = new Error(
+      montoSena > 0
+        ? `El monto total del plan debe coincidir con el saldo a planificar (${saldoAPlanificar.toFixed(2)} = venta − seña)`
+        : `El monto total del plan debe coincidir con el monto de la venta (${montoVenta.toFixed(2)})`
     ) as Error & { statusCode?: number };
     error.statusCode = 400;
     throw error;
